@@ -42,7 +42,7 @@ import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableCircle3, mintabl
 import { definiteCircle3 } from '../engine/definiteCircle';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
-import { convexWhenSimple, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
+import { commandStatesCircle3, convexWhenSimple, statedConcyclic3, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
@@ -1513,12 +1513,18 @@ function deriveCore3(
    *
    * Blamed on the LATEST of the two declarations — the line that completed the contradiction — exactly as
    * ADR-3D-322 blames the ring-first order's shape line.
+   *
+   * #2810 ([ADR-3D-467](../../docs/06b-decisions-3d.md#adr-3d-467)) — A SECOND SUFFICIENT REASON: letters a stated
+   * circle passes through (`statedConcyclic3`: a circle through them, a cyclic fix, a right pyramid's base) are in
+   * convex position too, whatever noun the ring wears. Every declared ring of four or more letters is read
+   * (`declaredRings3`: pentagons and bound bases included), and when the circle is the proof, the lines that stated it
+   * join the blame: a circle or right-pyramid line that completed the contradiction is the one refused.
    */
   {
     const ringsByLetters = new Map<string, { ids: Id[]; convex: boolean }[]>();
     const letterKey = (ids: readonly Id[]) => [...ids].sort().join('');
     const addRing = (ids: readonly Id[], convex: boolean) => {
-      if (ids.length !== 4 || new Set(ids).size !== 4) return;
+      if (ids.length < 4 || new Set(ids).size !== ids.length) return;
       const k = letterKey(ids);
       const list = ringsByLetters.get(k) ?? [];
       if (!list.some((r) => ringKeyIds3(r.ids) === ringKeyIds3(ids))) list.push({ ids: [...ids], convex });
@@ -1526,15 +1532,22 @@ function deriveCore3(
       ringsByLetters.set(k, list);
     };
     for (const q of declaredQuads3(c)) addRing(q.ids, convexWhenSimple(q.base));
-    for (const sld of c.solids) if (sld.kind === 'polygon4') addRing(sld.ids, false); // a bare «מרובע» promises nothing
+    for (const ring of declaredRingsOf3(c)) addRing(ring, false); // a bare «מרובע» / «מחומש» promises nothing by its noun
+    /** The letters a stated circle passes through (ADR-3D-467) — their convexity is the circle's, not a noun's. */
+    const cyclicLetters = new Set([...ringsByLetters.values()].filter((l) => l.length >= 2 && statedConcyclic3(c, l[0].ids)).map((l) => letterKey(l[0].ids)));
     /** Does fact `f` declare exactly this ring, in this cyclic order? (ADR-3D-322's own reader.) */
     const declaresRingOrdered = (f: Fact3, ring: readonly Id[]) =>
-      f.cmds.some((k) => (k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && k.ids.length === ring.length && ringKeyIds3(k.ids) === ringKeyIds3(ring));
+      f.cmds.some((k) => (k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') &&
+        // #2810 (ADR-3D-467): a quad pyramid declares its BASE ring (base ids first) — a bound one over existing letters
+        ((k.ids.length === ring.length && ringKeyIds3(k.ids) === ringKeyIds3(ring)) ||
+          (k.type === 'solid' && ring.length === 4 && QUAD_PYRAMIDS[k.kind] !== undefined && ringKeyIds3(k.ids.slice(0, 4)) === ringKeyIds3(ring))));
     for (const list of ringsByLetters.values()) {
       if (list.length < 2) continue;
+      const byCircle = cyclicLetters.has(letterKey(list[0].ids));
       for (const crossed of list) {
-        if (!list.some((other) => other !== crossed && other.convex)) continue;
-        const involved = facts.filter((f) => f.enabled && list.some((r) => declaresRingOrdered(f, r.ids)));
+        if (!byCircle && !list.some((other) => other !== crossed && other.convex)) continue;
+        const involved = facts.filter((f) => f.enabled && list.some((r) => declaresRingOrdered(f, r.ids) ||
+          (byCircle && !list.some((o) => o.convex) && f.cmds.some((k) => commandStatesCircle3(k, r.ids)))));
         const blamed = involved[involved.length - 1];
         if (!blamed || status[blamed.id] !== 'ok') continue;
         status[blamed.id] = { code: 'ring-crossed', stated: blamed.utterance };

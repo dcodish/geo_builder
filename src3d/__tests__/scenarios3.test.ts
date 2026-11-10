@@ -854,3 +854,54 @@ describe('SCENARIO — #2341: a statement the figure already holds is already kn
     expect(state().facts).toHaveLength(1);
   });
 });
+
+// crossed-ring-concyclic-2810 (#2810, ADR-3D-467) — found in round #2808: «מרובע ABCD» · «מעגל חוסם את ABCD» · «מרובע ABDC»
+// was accepted with ABDC drawn crossed (5/6 seeds) or as a dart under a circle that missed a vertex (the sixth). Four
+// points on one stated circle have ONE simple order, so the line that completes a second order is refused
+// `ring-crossed` — whichever line that is: the ring, the circle, or the right pyramid. Refusals, so a bespoke lock.
+describe('SCENARIO — crossed-ring-concyclic-2810: a second order over a cyclic ring is refused', () => {
+  beforeEach(reset);
+  const pos = (id: string) => derived().positions.get(id)!;
+  /** Ptolemy's defect of A, B, C, D in their convex order: 0 iff the four are on one circle. */
+  const ptolemy = () => {
+    const L = (u: string, v: string) => dist3(pos(u), pos(v));
+    const p = [L('A', 'C') * L('B', 'D'), L('A', 'B') * L('C', 'D'), L('B', 'C') * L('A', 'D')].sort((x, y) => x - y);
+    return Math.abs(p[2] - p[1] - p[0]) / p[2];
+  };
+
+  it.each([
+    [['מרובע ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC']], // R1, the reported case
+    [['מרובע ABCD', 'מעגל חוסם את ABCD', 'מרובע ACBD']], // R2
+    [['מרובע ABCD', 'המרובע ABCD חסום במעגל', 'מרובע ABDC']], // R3
+    [['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABCD']], // R4: the circle line completes it
+    [['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABDC']], // R5
+    [['מרובע ABCD', 'פירמידה ישרה ABCDS שבסיסה מרובע', 'מרובע ABDC']], // R6
+    [['מרובע ABCD', 'פירמידה ישרה ABCDS', 'מרובע ABDC']], // R7
+    [['מרובע ABCD', 'מרובע ABDC', 'פירמידה ישרה ABCDS']], // R8: the pyramid line completes it
+    [['דלתון ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC']], // R9: no dart under a circle
+    [['מחומש ABCDE', 'מעגל חוסם את ABCDE', 'מחומש ABDCE']], // R10
+    [['מרובע ABCD', 'מעגל חוסם את ABCD', 'משולש ABD', 'מרובע ABDC']], // R11
+    [['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD', 'מרובע ABDC']], // a rider on the circle
+  ])('%j', (lines) => {
+    lines.forEach(submit);
+    const last = lines[lines.length - 1];
+    expect(state().lastError).toEqual({ code: 'ring-crossed', stated: last });
+    expect(state().facts.map((f) => f.utterance)).toEqual(lines.slice(0, -1));
+  });
+
+  it.each([
+    [['מרובע ABCD', 'מרובע ABDC'], false], // C1: no circle, both drawn simple (one concave)
+    [['דלתון ABCD', 'מרובע ABDC'], false], // C2: a dart
+    [['מרובע ABCD', 'מעגל חוסם את ABCD'], true], // C4: one ring and its circle
+    [['דלתון ABCD', 'מעגל חוסם את ABCD'], true],
+  ])('%j builds, every ring simple at seeds 0–5', (lines, circle) => {
+    lines.forEach(submit);
+    for (let seed = 0; seed < 6; seed++) {
+      useGeo3.setState({ seed });
+      expectAllOk();
+      const rings = state().facts.flatMap((f) => (/^(מרובע|דלתון) /.test(f.utterance) ? [f.utterance.split(' ')[1].split('')] : []));
+      for (const r of rings) expect(ringSelfCrossing3(r.map(pos)), `seed ${seed} ${r.join('')}`).toBe(false);
+      if (circle) expect(ptolemy(), `seed ${seed}`).toBeLessThan(1e-6);
+    }
+  });
+});

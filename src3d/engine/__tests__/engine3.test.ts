@@ -6,9 +6,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { applyCommand3, freeDims, unstatedPyramidBase3 } from '../apply';
-import { verifyClaim } from '../claims';
+import { claimResidual3, residualHolds3, verifyClaim } from '../claims';
 import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, type QuadPreference3 } from '../evaluate';
-import { quadDrawnDegenerate } from '../baseShapes';
+import { commandStatesCircle3, concaveSeatVertices3, quadDrawnDegenerate, statedConcyclic3 } from '../baseShapes';
 import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
 import { cross3, dist3, dot3, lerp3, norm3, sub3, v3 } from '../vec3';
@@ -554,6 +554,94 @@ describe('#2749 — an impossible drawing preference is not demanded', () => {
     const [oldSeed, oldCost] = counted(() => fullSweep(build(quad('parallelogram')), prefsOf(par)));
     expect(pSeed).toBe(oldSeed);
     expect(pCost).toBeLessThanOrEqual(oldCost + 4);
+  });
+});
+
+describe('#2810 — letters a stated circle passes through have one simple order (ADR-3D-467)', () => {
+  const quad = (ids = ['A', 'B', 'C', 'D']): Command3 => ({ type: 'solid', kind: 'polygon4', ids });
+  const two = (...more: Command3[]) => build(quad(), ...more, { type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'D', 'C'] });
+
+  it('statedConcyclic3 reads a circle through the ring, a concyclic claim or pin, and a right pyramid base', () => {
+    const circum = build(quad(), { type: 'circle3', id: 'circle-ABCD', def: { kind: 'circum', ring: ['A', 'B', 'C', 'D'] } });
+    expect(statedConcyclic3(circum, ['A', 'B', 'D', 'C'])).toBe(true); // any order of the same letters
+    const fix = build(quad(), { type: 'concyclic', ids: ['A', 'B', 'C', 'D'] });
+    expect(fix.scalarPins.some((p) => p.kind === 'concyclic') || fix.claims.some((k) => k.type === 'concyclic')).toBe(true);
+    expect(statedConcyclic3(fix, ['A', 'B', 'C', 'D'])).toBe(true);
+    const right = build(quad(), { type: 'solid', kind: 'pyramid4r', ids: ['A', 'B', 'C', 'D', 'S'] });
+    expect(statedConcyclic3(right, ['A', 'B', 'C', 'D'])).toBe(true);
+    // nothing states a circle: a bare quad, a plain (not right) pyramid, a kite, a circle through three of the four
+    expect(statedConcyclic3(build(quad()), ['A', 'B', 'C', 'D'])).toBe(false);
+    expect(statedConcyclic3(build(quad(), { type: 'solid', kind: 'pyramidQuad', ids: ['A', 'B', 'C', 'D', 'S'] }), ['A', 'B', 'C', 'D'])).toBe(false);
+    expect(statedConcyclic3(build({ type: 'quad-shape', base: 'kite', ids: ['A', 'B', 'C', 'D'] }), ['A', 'B', 'C', 'D'])).toBe(false);
+    expect(statedConcyclic3(build(quad(), { type: 'circle3', id: 'circle-ABC', def: { kind: 'circum', ring: ['A', 'B', 'C'] } }), ['A', 'B', 'C', 'D'])).toBe(false);
+  });
+
+  it('a rider stated on the circle joins its letters', () => {
+    const c = build(
+      { type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] },
+      { type: 'circle3', id: 'circle-ABC', def: { kind: 'circum', ring: ['A', 'B', 'C'] } },
+      { type: 'point-on-circle3', point: 'D', circle: 'circle-ABC' },
+    );
+    expect(statedConcyclic3(c, ['A', 'B', 'C', 'D'])).toBe(true);
+    expect(statedConcyclic3(c, ['A', 'B', 'C', 'E'])).toBe(false);
+  });
+
+  it('concaveSeatVertices3 yields to a stated circle (flat ring and kite alike); no circle keeps the seat', () => {
+    expect(concaveSeatVertices3(two(), ['A', 'B', 'D', 'C'])).not.toBeNull(); // C1: no circle, the seat stays
+    expect(concaveSeatVertices3(two({ type: 'circle3', id: 'circle-ABCD', def: { kind: 'circum', ring: ['A', 'B', 'C', 'D'] } }), ['A', 'B', 'D', 'C'])).toBeNull();
+    expect(concaveSeatVertices3(two({ type: 'concyclic', ids: ['A', 'B', 'C', 'D'] }), ['A', 'B', 'D', 'C'])).toBeNull();
+    const kite = (...more: Command3[]) => build({ type: 'quad-shape', base: 'kite', ids: ['A', 'B', 'C', 'D'] }, ...more, quad(['A', 'B', 'D', 'C']));
+    expect(concaveSeatVertices3(kite(), ['A', 'B', 'D', 'C'])).not.toBeNull();
+    expect(concaveSeatVertices3(kite({ type: 'circle3', id: 'circle-ABCD', def: { kind: 'circum', ring: ['A', 'B', 'C', 'D'] } }), ['A', 'B', 'D', 'C'])).toBeNull();
+  });
+
+  it('commandStatesCircle3 names the lines a crossing is blamed on', () => {
+    const L = ['A', 'B', 'D', 'C'];
+    expect(commandStatesCircle3({ type: 'circle3', id: 'c', def: { kind: 'circum', ring: ['A', 'B', 'C', 'D'] } }, L)).toBe(true);
+    expect(commandStatesCircle3({ type: 'circle3', id: 'c', def: { kind: 'incircle', ring: ['A', 'B', 'C', 'D'] } }, L)).toBe(false);
+    expect(commandStatesCircle3({ type: 'concyclic', ids: ['A', 'B', 'C', 'D'] }, L)).toBe(true);
+    expect(commandStatesCircle3({ type: 'solid', kind: 'pyramid4r', ids: ['A', 'B', 'C', 'D', 'S'] }, L)).toBe(true);
+    expect(commandStatesCircle3({ type: 'solid', kind: 'pyramidQuad', ids: ['A', 'B', 'C', 'D', 'S'] }, L)).toBe(false);
+  });
+
+  it('the concyclic VERIFIER is in-order concyclicity: a dart with ∠A + ∠C = 180°, a crossed order and a skew quad are refuted', () => {
+    const at = (pts: Record<string, [number, number, number]>) => new Map(Object.entries(pts).map(([k, [x, y, z]]) => [k, v3(x, y, z)]));
+    const holds = (ids: string[], pos: Map<string, ReturnType<typeof v3>>) =>
+      residualHolds3(claimResidual3({ type: 'concyclic', ids }, emptyConstruction3(), pos));
+    const t = [0.3, 1.4, 2.9, 4.6];
+    const cyc = at(Object.fromEntries(['A', 'B', 'C', 'D'].map((k, i) => [k, [2 * Math.cos(t[i]), 2 * Math.sin(t[i]), 0]])) as never);
+    expect(holds(['A', 'B', 'C', 'D'], cyc)).toBe(true);
+    expect(holds(['A', 'B', 'D', 'C'], cyc)).toBe(false); // the crossed order of four concyclic points
+    // a dart: C inside triangle ABD with ∠BAD + ∠BCD = 180° (B, D at ±1 on the x-axis, A above, C above too)
+    const A: [number, number, number] = [0, 2, 0];
+    const angA = Math.acos(3 / 5); // ∠BAD at A(0,2) with B(−1,0), D(1,0)
+    // ∠BCD = π − ∠A: C on the axis, above BD, at height 1 / tan((π − ∠A) / 2) = 0.5 — inside triangle ABD
+    const dart = at({ A, B: [-1, 0, 0], C: [0, 1 / Math.tan((Math.PI - angA) / 2), 0], D: [1, 0, 0] });
+    const cosAt = (v: string, p: string, q: string) => {
+      const u1 = sub3(dart.get(p)!, dart.get(v)!);
+      const u2 = sub3(dart.get(q)!, dart.get(v)!);
+      return dot3(u1, u2) / (norm3(u1) * norm3(u2));
+    };
+    expect(Math.abs(cosAt('A', 'B', 'D') + cosAt('C', 'B', 'D'))).toBeLessThan(1e-12); // the old residual's zero
+    expect(holds(['A', 'B', 'C', 'D'], dart)).toBe(false);
+    // A turned 40° about the line BD keeps |AB|, |AD| and so ∠BAD: opposite angles still supplementary, off one plane
+    const [B, D, A0] = [cyc.get('B')!, cyc.get('D')!, cyc.get('A')!];
+    const k = sub3(D, B);
+    const kn = v3(k.x / norm3(k), k.y / norm3(k), k.z / norm3(k));
+    const p = sub3(A0, B);
+    const [co, si] = [Math.cos(0.7), Math.sin(0.7)];
+    const kp = cross3(kn, p);
+    const kd = dot3(kn, p);
+    const rot = v3(p.x * co + kp.x * si + kn.x * kd * (1 - co), p.y * co + kp.y * si + kn.y * kd * (1 - co), p.z * co + kp.z * si + kn.z * kd * (1 - co));
+    const skew = new Map(cyc);
+    skew.set('A', v3(B.x + rot.x, B.y + rot.y, B.z + rot.z));
+    expect(Math.abs(skew.get('A')!.z)).toBeGreaterThan(0.1);
+    expect(holds(['A', 'B', 'C', 'D'], skew)).toBe(false);
+    // a circumscribed pentagon's backstop tuples [r0, r1, r2, v] hold in order
+    const s = [0.2, 1.3, 2.5, 3.9, 5.1];
+    const pent = at(Object.fromEntries(['A', 'B', 'C', 'D', 'E'].map((k, i) => [k, [Math.cos(s[i]), Math.sin(s[i]), 1]])) as never);
+    expect(holds(['A', 'B', 'C', 'D'], pent)).toBe(true);
+    expect(holds(['A', 'B', 'C', 'E'], pent)).toBe(true);
   });
 });
 

@@ -15462,3 +15462,43 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 **Locks.** `issue-2764-independent-parts.test.ts`: written with `seed` a number and `seedParts` beside it; the file, the link and the session load back the same drawing; an old `seed: 7` file with no `seedParts` loads ok with its first part at 7; a malformed entry is dropped. `fixtures3/nine-separate-shapes-2764.geo3.json` carries `seedParts`, so the corpus net loads the field.
 
 **Behaviour change for a student:** none beyond ADR-3D-454's.
+
+## ADR-3D-467 — Letters a stated circle passes through have one simple order: a second order over them is refused, and no dart verifies the circle (#2810)
+
+**Status:** accepted · 2026-11-10 · bug (P2, 3d, wrong-answer) · fix round #2822, stream C · branch `fix/2810-crossed-second-ring` from `main` @ `86768862`, under #2490 + #2702 (it lands with them) · amends [ADR-3D-327](#adr-3d-327) (a second sufficient reason, rings of n ≥ 4, the blame) and [ADR-3D-418](#adr-3d-418) (the seat yields to a stated circle); the concyclic verifier of [ADR-3D-090](#adr-3d-090) / [ADR-3D-307](#adr-3d-307) item 7
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-7 · **Design:** [04b](04b-design-3d.md) § the crossing order (ADR-3D-327 pass) and § the concave seat · **Ladder:** none: the store's structural pass and the configuration seat (stage 6); no solve change
+
+**Rulings.** ADR-W-199 §2 (a figure that cannot exist is refused, naming the line); ADR-3D-307 item 7 ("refuted, never drawn"); 2-D measured at `4f9fdfac` (refuses R1, R3, R10); Q1 (the circle line's message) the session's call under ADR-W-174: the shared crossed-shape message, no new text.
+
+**Measured at pickup** (`86768862`, `decideSubmit3` line by line, `derive3` seeds 0–5, `ringSelfCrossing3` per declared ring, Ptolemy's defect of A, B, C, D):
+
+| # | lines | before | after |
+|---|---|---|---|
+| R1 | «מרובע ABCD» · «מעגל חוסם את ABCD» · «מרובע ABDC» | green; ABDC crossed at 5/6, a dart under the circle at seed 2 (defect 0.83) | last line `ring-crossed` |
+| R2 / R3 / R11 | «… מרובע ACBD» / «המרובע ABCD חסום במעגל» / with «משולש ABD» between | the same | `ring-crossed` |
+| R4 | «מרובע ABCD» · «מרובע ABDC» · «מעגל חוסם את ABCD» | green, crossed 5/6 | the circle line `ring-crossed` |
+| R5 | «… · מעגל חוסם את ABDC» | green, both rings simple and not concyclic (defect 0.75–0.84) at 4/6 | the circle line `ring-crossed` |
+| R6 | «מרובע ABCD» · «פירמידה ישרה ABCDS שבסיסה מרובע» · «מרובע ABDC» | green, crossed 5/6 | `ring-crossed` |
+| R7 | «מרובע ABCD» · «פירמידה ישרה ABCDS» · «מרובע ABDC» | `ring-crossed` (as a rectangle) | `ring-crossed` (unchanged) |
+| R8 | «מרובע ABCD» · «מרובע ABDC» · «פירמידה ישרה ABCDS» | recorded; the pyramid row green and the two ring rows red (966 ms) | the pyramid line `ring-crossed` (48 ms) |
+| R9 | «דלתון ABCD» · «מעגל חוסם את ABCD» · «מרובע ABDC» | green at 6/6, a dart under a circle that misses a vertex (defect 0.75–0.95) | `ring-crossed` |
+| R10 | «מחומש ABCDE» · «מעגל חוסם את ABCDE» · «מחומש ABDCE» | green, crossed 6/6 (7.1 s) | `ring-crossed` (174 ms) |
+| rider | «משולש ABC» · «מעגל חוסם את ABC» · «D על המעגל» · «מרובע ABCD» · «מרובע ABDC» | green | `ring-crossed` |
+| C1 / C2 | «מרובע ABCD» · «מרובע ABDC»; «דלתון ABCD» · «מרובע ABDC» | concave / dart, both simple | unchanged |
+| C4 | «מרובע ABCD» (or «דלתון ABCD») · «מעגל חוסם את ABCD» | cyclic 6/6 | unchanged |
+
+**Class.** *3-D decided whether four letters may sit in non-convex position only from the quad's NOUN, never asking whether a statement puts them on one circle, and its concyclic verifier accepted a dart.* Concyclic points are in convex position, so they have exactly one simple cyclic order. Three chokepoints: the concave seat (`concaveSeatVertices3`) offered a dart to a cyclic ring; ADR-3D-327's structural pass gave a bare «מרובע» `convex: false` whatever circle passed through it, read 4-rings only, and blamed only ring lines; the `concyclic` claim residual `cos∠BAD + cos∠BCD` is zero on a dart too (A and C on one side of BD) and on four points off one plane.
+
+**Decision.**
+1. **One reader of stated concyclicity**, `statedConcyclic3(c, letters)` (baseShapes.ts, beside `convexWhenSimple`): true when a circle passes through every letter — a `circum` circle's ring together with every point stated on that circle (an `on-circle3` rider, a placed `circleMembers3` member), for any circle — or a `concyclic` claim or pin covers four letters, or a RIGHT quad pyramid's base is the four. Structural, read off the construction, never positions.
+2. **The seat yields**: `concaveSeatVertices3` returns null when `statedConcyclic3` holds — for a flat ring and a kite alike. C1–C2 keep their seat (nothing states a circle).
+3. **ADR-3D-327's pass** reads every declared ring of four or more (`declaredRings3`: pentagons, bound bases); a letter set is convex when a ring over it is `convexWhenSimple` **or** the set is `statedConcyclic3`. When the circle is the proof (no ring's noun is), the facts holding a command that states it (`commandStatesCircle3`: the circle, the cyclic fix, the rider, the right pyramid) join the blame, and a quad pyramid declares its base ring; the latest such line is refused (ADR-3D-322's rule). It still needs two orders over one letter set, so one ring and its circle (C4) never fires.
+4. **The verifier** (claims.ts `concyclic`) is in-order concyclicity: the diagonals AC and BD must cross (else refuted), and the residual is the larger of |cos∠BAD + cos∠BCD| and the normalised volume of ABCD. Each term is first order in the error. *Deviation from the plan,* which asked for Ptolemy's in-order defect: that defect is second order (it touches zero, ADR-3D-006's lesson), so a tolerance on it accepts a point √tol off the circle; and Ptolemy's equality in space already implies coplanarity, so the plan's extra coplanarity term would have been redundant there. The solver pin keeps its sign-crossing form.
+
+**The plan's "measure at pickup" items.** The rider case is covered by the reader (row "rider"). No green circle row draws a non-cyclic figure at seeds 0–5 after steps 1–3 (measured over every row above; locked by the scenario's control rows), so the pin needs no second component. Found, not fixed (a different chokepoint): «משולש ABC» · «מעגל חוסם את ABC» · «D על המעגל» · «מרובע ABCD» draws ABCD itself **crossed** at 5/6 seeds — the rider's seat on the circle ignores the declared ring (FR-RD-7's "drawn simple"); commented on #2810.
+
+**Perf** (docs/17 §7). R1's last line 137 → 82 ms; R8's 966 → 48 ms; R10's 7.1 s → 174 ms: the structural pass refuses before the claim-sample search. `statedConcyclic3` is O(statements) and runs only for a reordered ring in the seat and once per letter group in the pass.
+
+**Locks.** Unit (`src3d/engine/__tests__/engine3.test.ts`, *#2810*): the reader for each statement and its negatives; the rider; the seat yielding (flat and kite); `commandStatesCircle3`; the verifier refuting a measured dart (cos-sum 0), the crossed order and a skew quad, and holding on a cyclic quad and a pentagon's backstop tuples. Regression: scenario `crossed-ring-concyclic-2810` in `src3d/__tests__/scenarios3.test.ts` (R1–R11 and the rider refused on the exact line; C1, C2, C4 green with every ring simple and Ptolemy < 1e-6 at seeds 0–5). Parity rows `crossed-ring-2810-01…06` (analytic cells → #2812, 2-D's circle-last cell → #2811; the pentagon's analytic cell is unscheduled: analytic reads no circle through a pentagon).
+
+**Behaviour change for a student:** a second letter order over a quadrilateral or pentagon with a circle through it (or a right pyramid on it) is refused with the crossed-shape message instead of drawn crossed, or as a dart with a circle that misses a vertex.

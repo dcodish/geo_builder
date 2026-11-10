@@ -376,7 +376,13 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   kite and the bare quadrilateral — makes the crossing STRUCTURAL. `derive3` groups the declared rings by letter SET
   after the retry fixpoint and BEFORE the claim pass: a group with two cyclic orders, one of them convex-when-simple,
   refuses the LATEST declaring fact `ring-crossed`. Running first is why no verdict has to be overridden; ADR-3D-322's
-  sample-based pass stays where it is, for the rings whose figure the pivot can still place.
+  sample-based pass stays where it is, for the rings whose figure the pivot can still place. Since #2810
+  ([ADR-3D-467](06b-decisions-3d.md#adr-3d-467)) the pass reads every declared ring of four or more (`declaredRings3`:
+  pentagons, bound bases) and a second sufficient reason, `statedConcyclic3` (baseShapes.ts: a circle through the
+  letters, with its riders and members; a `concyclic` claim or pin; a right quad pyramid's base): concyclic points are in
+  convex position. When the circle is the proof, the facts that stated it (`commandStatesCircle3`) join the blame, so
+  a circle or right-pyramid line that completed the contradiction is the one refused; a quad pyramid declares its base
+  ring for the blame too.
 - **The IMPLIED re-declaration** (#1988, [ADR-3D-326](06b-decisions-3d.md#adr-3d-326)). The same split's other arm
   has ONE outcome: `quadImplies(known, cmd.base)` records the statement in `redundantShapes` and returns the figure
   untouched, so `buildNotices3` says it added nothing. `shape-less-specific` is gone from `EngineError3`. The store's
@@ -1162,7 +1168,10 @@ that could be a dart (a kite, a general quadrilateral) fails the check open, and
 ([ADR-3D-418](06b-decisions-3d.md#adr-3d-418)) 3-D draws that drawing: **the concave seat** — a flat `polygon4` whose
 letters another declared ring orders differently (`ringReordered3`, the yield condition) is seated with one vertex inside
 the triangle of the other three (`polygon4ConcaveDims`; which vertex is drawn from the seed, as a branch is), where every
-cyclic order is simple at once; a single ring keeps the convex seat bit-identically. **The ring preference** — a seed whose
+cyclic order is simple at once; a single ring keeps the convex seat bit-identically. The seat yields to a stated circle
+(`statedConcyclic3`, #2810, [ADR-3D-467](06b-decisions-3d.md#adr-3d-467)): concyclic letters have no concave drawing,
+and the `concyclic` claim verifies in-order concyclicity — coplanar, diagonals crossing, opposite angles supplementary
+— so a dart can no longer verify the circle (the solver pin keeps its sign-crossing descent form). **The ring preference** — a seed whose
 declared rings (`declaredRings3`, the one enumeration this loop and the seed search share) are all simple joins
 `meetsShapePreferences3`'s tier in `firstSatisfyingSeed3`, so a forced crossing still resolves at today's fallback seed.
 **The reach** — an unpinned coordinate letter whose default draw crosses a declared ring over its point is re-drawn at
