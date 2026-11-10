@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-10T15:39:41.642Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מישור π 2x+y=1",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π",
+          "plane": {
+            "cx": {
+              "k": 2,
+              "p": 0
+            },
+            "cy": {
+              "k": 1,
+              "p": 0
+            },
+            "cz": {
+              "k": 0,
+              "p": 0
+            },
+            "d": {
+              "k": -1,
+              "p": 0
+            },
+            "src": "2x+y=1"
+          }
+        }
+      ]
+    }
+  ]
+}
