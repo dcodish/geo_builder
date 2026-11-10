@@ -1038,8 +1038,8 @@ Four one-side lines stay a solved `circle-at`.
 ### The same relations about the ellipse and the parabola ([ADR-AG-355](06c-decisions-analytic.md#adr-ag-355), #2618)
 
 **Parse: one curve-host atom.** `CONIC_NOUN_HE` / `CONIC_NOUN_EN` («אליפסה», «פרבולה») sit beside the circle phrase in the
-chord readers (`CHORD_CIRCLE_HE`, `CHORD_ONE_EN`, `CHORD_LIST_EN`), the diameter readers (the ellipse only: a parabola has
-no centre, #2625), the tangent noun (`TANGENT_HOST_HE/EN` → `readTangentNoun`), the from-point reader (`TANGENT_FROM_*`)
+chord readers (`CHORD_CIRCLE_HE`, `CHORD_ONE_EN`, `CHORD_LIST_EN`), the diameter readers (the parabola group refuses there, `parabola-no-diameter`: it has
+no centre, [ADR-AG-454](06c-decisions-analytic.md#adr-ag-454)), the tangent noun (`TANGENT_HOST_HE/EN` → `readTangentNoun`), the from-point reader (`TANGENT_FROM_*`)
 and the line-first order of `parseCircleAt`. The inscribed family adds `parseConicInscribed` after every circle reader,
 and «קודקודי ה<noun> XYZW נמצאים על <host>» (`VERTICES_ON_HE/EN`) is `cyclicFacts` on a circle and
 `conicInscribedFacts` on a conic. A conic takes no name or centre tail: the fact carries its kind as
