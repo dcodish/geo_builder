@@ -1170,6 +1170,29 @@ function commitDrawnFreeVertices(r: StepResult): StepResult {
 }
 
 /**
+ * #2795 ([ADR-821](../../docs/06-decisions.md#adr-821), H2) — is a `collinear-order`'s SIGN entailed by what the prior
+ * figure already STATES? Structural, never sampled: (a) the prior holds the same order, in either direction (an exact
+ * repeat, «D על המשך AB» twice); or (b) for three points [a, x, b], x is BETWEEN a and b by riders — an interior
+ * `on-segment` rider of a→b, or of a segment whose two ends are themselves a, b or between them («D על BA» after
+ * «D על AB»; «E על AB» after «D על הקטע AB» · «E על הקטע AD»). Anything else is a new region and keeps its carrier.
+ */
+function orderEntailedByPrior(prev: Construction, prevCons: readonly Constraint[], con: Extract<Constraint, { type: 'collinear-order' }>): boolean {
+  const same = (p: readonly Id[]) => p.length === con.points.length && (p.every((id, i) => id === con.points[i]) || p.every((id, i) => id === con.points[con.points.length - 1 - i]));
+  if (prevCons.some((k) => k.type === 'collinear-order' && same(k.points))) return true;
+  if (con.points.length !== 3) return false;
+  const byId = new Map(prev.objects.map((o) => [o.id, o] as const));
+  const between = (x: Id, a: Id, b: Id, depth: number): boolean => {
+    const o = byId.get(x);
+    if (!o || o.kind !== 'on-segment' || o.extension || depth > 4) return false;
+    if (!o.free && !(o.t > 0 && o.t < 1)) return false;
+    const within = (y: Id) => y === a || y === b || between(y, a, b, depth + 1);
+    return (o.a === a && o.b === b) || (o.a === b && o.b === a) || (o.a !== o.b && within(o.a) && within(o.b));
+  };
+  const [a, x, b] = con.points;
+  return between(x, a, b, 0);
+}
+
+/**
  * THE RE-STATED GIVEN YIELDS (#1943/#1819, [ADR-623](../../docs/06-decisions.md#adr-623)) — the mirror of
  * {@link ensureOwnership}, at the same seam.
  *
@@ -1248,6 +1271,10 @@ function releaseImpliedOwnership(prev: Construction, r: StepResult): StepResult 
     // order row (a bound) has no equality half to prove and keeps today's answer.
     if (isOrderConstraint(con)) {
       if (con.type !== 'collinear-order' || con.points.length < 3) return r;
+      // its SIGN must be entailed by the prior's own statements, never read off sampled layouts: an order is a
+      // region, and a sign that holds at every sample of THIS prior can stop holding once a later line frees what
+      // it rode on (#2545's incircle set-lines, found in round #2822)
+      if (!orderEntailedByPrior(prev, prevCons, con)) return r;
       const [p0, ...rest] = con.points;
       const pn = rest[rest.length - 1];
       const halves = rest.slice(0, -1).map((q): Constraint => ({ type: 'collinear', a: q, b: p0, c: pn }));
