@@ -987,6 +987,9 @@ describe('pyramid-dart-base-2702 — «פירמידה SABCD שבסיסה דלת�
     submit('מרובע ABDC');
     expect(state().lastError).toEqual({ code: 'ring-crossed', stated: 'מרובע ABDC' });
     expect(state().facts.map((f) => f.utterance)).toEqual([first]);
+  });
+});
+
 // #1541 (ADR-3D-475) — the operator's exact sequence (prod, 2026-09-29): the panel printed B and B', and the
 // ask box answered «משוואת BB'» with «לא זוהה». The line is now asked the way it is stated, answered as given.
 describe('line-ask-by-points-1541 — «משוואת BB\'» answers the line through two known points', () => {

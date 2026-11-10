@@ -798,6 +798,9 @@ describe('#2702 — a second ring over a solid base draws the base as a dart', (
     const one = build({ type: 'solid', kind: 'pyramidKite', ids: PYR });
     expect(concaveSeatVertices3(one, ['A', 'B', 'C', 'D'])).toBeNull();
     expect(solidDimsAll3(one, 3)[0]).toEqual(solidDims('pyramidKite', 'solid-pyramidKite-ABCDS', 3));
+  });
+});
+
 describe('#2814 — the pivot pick is over DISTINCT configurations, in an order the configurations decide (ADR-3D-461)', () => {
   type P = [string, [number, number, number]][];
   const cfg = (pts: P, pinSymbols?: Record<string, number>): PoolConfig3 => ({ pos: new Map(pts.map(([id, [x, y, z]]) => [id, v3(x, y, z)])), pinSymbols });
