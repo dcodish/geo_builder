@@ -16208,3 +16208,21 @@ Each of those points moves along a curve.
 **Locks.** `src-analytic/__tests__/issue-2231-llm-retry.test.ts` (the operator's case, the regression lock, model mocked): «פרבולה שמוקדה (2,0)» answered `y^2 = 4x` gets a second call naming «שמוקדה (2,0)»; a second answer `y^2 = 8x` records; a repeated `y^2 = 4x` is `unfaithful` / `llm-dropped` naming «2», with exactly two calls; the diameter and foci rows likewise; the right answer first is one call. `shell/__tests__/retryLostNames.test.ts`: the second trigger, its one-retry bound, and the names-only call shape unchanged. `server/__tests__/issue-2231-keep.test.ts`: `buildRequest` with and without the field, and `readContradicted`'s accepted and ignored shapes. Analytic has no scenario corpus for the model lane; the lock is the runFallback row, as for ADR-W-189.
 
 **Behaviour change for a student:** in analytic, before refusing such an answer the tool asks the AI once more, naming the contradicted statement. A right second answer builds; a wrong one gets today's refusal naming the value.
+
+## ADR-AG-454 — A diameter of the parabola is refused with its reason: the diameter readers read it and own the refusal (#2625)
+
+**Date:** 2026-11-10 · **Status:** accepted · feature (P2, analytic) · fix round #2822 stream G1, branch `feat/2625-parabola-diameter` · plan: the #2625 "Fix plan — 2026-11-03" (auto-ok 2026-11-03) · operator 2026-10-30 on #2618 (*"there is a קוטר and we need to support it"*, the book's ellipse definition) · text chosen under [ADR-W-174](06w-decisions-workspace.md#adr-w-174) sr-01 (2026-11-02, `chose-2625-text`). LADDER stage: none (the parser's owned refusals).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R204 (the parabola's diameter is refused with its reason) · **Design:** [04c](04c-design-analytic.md) § "The same relations about the ellipse and the parabola" (the parabola group of the diameter readers).
+
+**Measured before** (`86768862`, `decideSubmit`, model mocked): after «נתונה פרבולה שמשוואתה y^2=8x», «AB קוטר בפרבולה», «הקוטר AB של הפרבולה» and "AB is a diameter of the parabola" were each `not-handled`, so they escalated to the model, which has no honest answer (a parabola has no centre). «AB מיתר בפרבולה» and the ellipse's diameter recorded.
+
+**Decision.** The three diameter readers (`DIAM_HE`, `DIAM_NOUN_FIRST_HE`, `DIAM_EN`, `parser/parseAnalytic.ts`) take `פרבולה` / `parabola` beside `אליפסה` / `ellipse` as a host group. When it matched, the rule returns the owned refusal `parabola-no-diameter`: the sentence is understood, and it names something the curve does not have. The refusal is decided where the ellipse's diameter is decided, never by a pre-filter, and like every owned code it does not escalate. Text (`errParabolaNoDiameter`): «לפרבולה אין מרכז, ולכן אין לה קוטר.» / "A parabola has no centre, so it has no diameter."
+
+**Scope (rule 1).** The class is "a centre-only feature asked of the parabola". Measured at pickup: «מרכז הפרבולה», "the centre of the parabola" and «O מרכז הפרבולה» are `not-handled` and escalate. They are not in the plan's *What the student will see*, so they are reported to the operator, not built here (rule 7).
+
+**Ports.** 2-D and 3-D have no parabola: a parity row under the conic family X2 (`parabola-diameter-2625`, `expect: 'refused'`).
+
+**Locks.** `src-analytic/__tests__/parser.test.ts` (#2625 block): five spellings → `parabola-no-diameter`, the controls (the ellipse's and the circle's diameter, «AB מיתר בפרבולה») still read, and both locale texts. The parity row runs the real submit decision.
+
+**Behaviour change for a student:** in analytic, «AB קוטר בפרבולה» (and its English and noun-first forms) is refused with «לפרבולה אין מרכז, ולכן אין לה קוטר.»; nothing is drawn and the AI is not asked. Before, it went to the AI.

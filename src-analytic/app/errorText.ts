@@ -210,6 +210,8 @@ export function errorText(error: InputError, t: Translate): string {
     'radian-angle': 'errRadianAngle',
     // #2032 (ADR-AG-408) — an arc's length is refused, naming the sentence that is read, until #2710
     'arc-length-unread': 'errArcLengthUnread',
+    // #2625 (ADR-AG-454) — a parabola has no centre, so no diameter: its own reason, not the generic refusal
+    'parabola-no-diameter': 'errParabolaNoDiameter',
     // #1919 — the operator chose THIS sentence for a name the tool cannot read, in every builder.
     'unread-name': 'errRenameBadName',
     'unread-word': 'errUnreadWord',

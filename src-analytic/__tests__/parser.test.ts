@@ -16,6 +16,8 @@ import { evaluate } from '../engine/evaluate';
 import { derive } from '../engine/derive';
 import { buildScene } from '../render/scene';
 import { reportedDof } from '../engine/carriers';
+import { errorText } from '../app/errorText';
+import { analyticI18n } from '../i18n';
 
 describe('catalog — every entry parses, in BOTH languages', () => {
   for (const entry of COMMAND_CATALOG_ANALYTIC) {
@@ -610,5 +612,26 @@ describe('#1074 — the segment NOUN is optional', () => {
   it('still refuses «EE», and still canonicalises FE to EF', () => {
     expect(derive(['E(0,0)', 'F(3,4)', 'EE'], 0).faults.map((f) => f.code)).toEqual(['repeated-vertex']);
     expect(derive(['EF', 'FE'], 0).outcomes[1]).toBe('known');
+  });
+});
+
+describe('#2625 (ADR-AG-454) — a diameter of the parabola is refused with its reason, never escalated', () => {
+  it.each([
+    ['AB קוטר בפרבולה'],
+    ['AB קוטר של הפרבולה'],
+    ['הקוטר AB של הפרבולה'],
+    ['קוטר AB בפרבולה'],
+    ['AB is a diameter of the parabola'],
+  ])('«%s» → parabola-no-diameter', (line) => {
+    expect(parseLine(line)).toEqual({ ok: false, code: 'parabola-no-diameter', detail: line });
+  });
+  it.each([['AB קוטר באליפסה'], ['AB קוטר במעגל'], ['AB is a diameter of the ellipse'], ['AB מיתר בפרבולה']])('control «%s» still reads', (line) => {
+    expect(parseLine(line).ok).toBe(true);
+  });
+  it('the sentence names the reason, in both locales', () => {
+    type T = (k: string, o?: Record<string, unknown>) => string;
+    const err = { key: 'parabola-no-diameter', detail: 'AB קוטר בפרבולה' } as const;
+    expect(errorText(err, analyticI18n.getFixedT('he') as unknown as T)).toBe('לפרבולה אין מרכז, ולכן אין לה קוטר.');
+    expect(errorText(err, analyticI18n.getFixedT('en') as unknown as T)).toBe('A parabola has no centre, so it has no diameter.');
   });
 });

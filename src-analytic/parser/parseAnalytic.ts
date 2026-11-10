@@ -134,6 +134,11 @@ export type ParseFailure =
    */
   | { code: 'arc-length-unread'; detail: string }
   /**
+   * #2625 (ADR-AG-454; operator ruling 2026-11-02, the text chosen under ADR-W-174) — «AB קוטר בפרבולה»: a diameter is a
+   * chord through the centre, and a parabola has none. Understood, so refused with its reason and never escalated.
+   */
+  | { code: 'parabola-no-diameter'; detail: string }
+  /**
    * #1919 (ADR-626, the operator's ruling of 2026-10-08: *"we only support english or hebrew … rejected.
    * in all tools"*) — a letter this tool cannot read. Analytic had no member of the class: it handed
    * «משולש ДЖФ» to the model, where 2-D and 3-D drew A, B, C. It joins for ONE verdict (ADR-W-118 B1).
@@ -4992,21 +4997,25 @@ const THRU_BARE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+(${NAME}${NAME}${NAME})
  */
 /*
  * «AB קוטר באליפסה / של האליפסה» (#2618, ADR-AG-355; operator ruling 2026-10-30, Q3): the book's «מיתר העובר דרך מרכז
- * האליפסה» — the seventh capture. The ELLIPSE only: a parabola has no centre, and its sentence is #2625's question.
+ * האליפסה» — the seventh capture.
+ *
+ * «AB קוטר בפרבולה» (#2625, ADR-AG-454; operator ruling 2026-11-02, the text chosen under ADR-W-174): the eighth capture,
+ * read by the SAME readers so the refusal is decided where the ellipse's diameter is. A parabola has no centre, so the
+ * sentence is understood and refused with its own reason (`parabola-no-diameter`), never escalated to the model.
  */
 const DIAM_HE = new RegExp(
   `^${HE_GIVEN}(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?קוטר` +
-    `(?:\\s+(ב|של\\s+)(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)))?$`,
+    `(?:\\s+(ב|של\\s+)(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)|(פרבולה)))?$`,
 );
 /** «קוטר BD במעגל» — the noun first, the same statement. */
 const DIAM_NOUN_FIRST_HE = new RegExp(
-  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(ב|של\\s+)(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה))$`,
+  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(ב|של\\s+)(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)|(פרבולה))$`,
 );
 /** «נתון מעגל שקוטרו BD» — the circle DEFINED by its diameter, always a new circle. */
 const DIAM_DEFINE_HE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+ש(?:ה)?קוטר(?:ו|\\s+שלו)(?:\\s+(?:הוא|היא))?\\s+(${NAME})(${NAME})$`);
 const DIAM_EN = new RegExp(
   `^(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+diameter` +
-    `(?:\\s+of\\s+(the\\s+|a\\s+(new\\s+)?)?(?:circle(?:\\s+(${CIRCLE_NAME}))?|(ellipse)))?$`,
+    `(?:\\s+of\\s+(the\\s+|a\\s+(new\\s+)?)?(?:circle(?:\\s+(${CIRCLE_NAME}))?|(ellipse)|(parabola)))?$`,
 );
 const DIAM_DEFINE_EN = new RegExp(`^(?:the\\s+|a\\s+)?circle\\s+(?:with|on)\\s+(?:the\\s+|a\\s+)?diameter\\s+(${NAME})(${NAME})$`, 'i');
 
@@ -5048,7 +5057,9 @@ function parseCircleThru(line: string): RuleOutcome {
   }
   const he = DIAM_HE.exec(line) ?? DIAM_NOUN_FIRST_HE.exec(line);
   if (he) {
-    const [, a, b, prep, article, circle, fresh, ellipse] = he;
+    const [, a, b, prep, article, circle, fresh, ellipse, parabola] = he;
+    // A parabola has no centre, so it has no diameter (#2625): understood, and refused with that reason.
+    if (parabola) return refuse('parabola-no-diameter', line);
     // A diameter of THE ellipse is about the figure's one ellipse — it never defines a curve (#2618).
     if (ellipse) return made([{ t: 'diameter-of', a, b, define: false, host: 'ellipse', src: line }, ...pieceFacts('segment', a, b, line)]);
     // «של מעגל» — OF A circle, indefinite — defines one; «במעגל חדש» says so outright.
@@ -5057,7 +5068,8 @@ function parseCircleThru(line: string): RuleOutcome {
   }
   const en = DIAM_EN.exec(line);
   if (en) {
-    const [, a, b, det, fresh, circle, ellipse] = en;
+    const [, a, b, det, fresh, circle, ellipse, parabola] = en;
+    if (parabola) return refuse('parabola-no-diameter', line);
     if (ellipse) return made([{ t: 'diameter-of', a, b, define: false, host: 'ellipse', src: line }, ...pieceFacts('segment', a, b, line)]);
     const isDefine = Boolean(fresh) || (det !== undefined && /^a\s/i.test(det));
     return made([{ t: 'diameter-of', a, b, define: isDefine, ...(circle ? { circle } : {}), src: line }, ...pieceFacts('segment', a, b, line)]);
