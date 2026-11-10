@@ -12,7 +12,6 @@ import { commandStatesCircle3, concaveSeatVertices3, quadDrawnDegenerate, stated
 import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
 import { cross3, dist3, dot3, lerp3, norm3, ringSelfCrossing3, sub3, v3 } from '../vec3';
-import { cross3, dist3, dot3, lerp3, norm3, sub3, v3 } from '../vec3';
 import { configurationOrder3, congruentShapes3, intrinsicShape3, sameConfiguration3, type PoolConfig3 } from '../configs3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
