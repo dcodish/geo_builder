@@ -62,7 +62,7 @@ export interface FigureCurve {
 export interface Vacancy {
   id: Id;
   reason: Extract<ClassifyResult, { ok: false }>['reason'];
-  /** For `kind-mismatch`: what the equation actually describes (02c R7, #1514 pre-play). */
+  /** For `kind-mismatch` and `not-canonical` (#2664): what the equation actually describes (02c R7, #1514 pre-play). */
   actual?: NumCurve['kind'];
 }
 
@@ -4981,7 +4981,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       case 'curve': {
         const res = resolveCurve(o.curve, env);
         if (res.ok) curves.push({ id: o.id, label: o.label, curve: res.curve, stated: o.stated });
-        else vacant.push({ id: o.id, reason: res.reason, ...(res.reason === 'kind-mismatch' ? { actual: res.actual } : {}) });
+        else vacant.push({ id: o.id, reason: res.reason, ...(res.reason === 'kind-mismatch' || res.reason === 'not-canonical' ? { actual: res.actual } : {}) });
         break;
       }
       case 'derived': {

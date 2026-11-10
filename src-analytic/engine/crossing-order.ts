@@ -30,6 +30,7 @@ import type { Pt } from './derived';
 import { SOLVE_RESOLUTION, type Constraint } from './solve';
 import type { Id, NumCurve } from './types';
 import { conicSize, lineQuadratic, type Walk } from './lineQuadratic';
+import { frameOf, toLocal, toWorld } from './conicFrame';
 
 // The substitution and a conic's size live in a leaf module the solver reads too (#2618, ADR-AG-355). A walk built
 // here starts at the point of its line nearest the origin.
@@ -134,15 +135,25 @@ export function conicsMeet(c1: NumCurve, c2: NumCurve): { roots: Pt[]; touching:
     return w ? conicMeet(w, c1) : { roots: [], touching: false }; // concentric: no crossing, or the same circle
   }
   if (c1.kind === 'parabola' && c2.kind === 'parabola') {
-    return c1.p === c2.p ? { roots: [], touching: false } : { roots: [{ x: 0, y: 0 }], touching: true };
+    const [f1, f2] = [frameOf(c1), frameOf(c2)];
+    // One frame (every pair before #2664): they share the vertex and its tangent, so they touch there or coincide.
+    if (f1.h === f2.h && f1.k === f2.k && f1.swap === f2.swap) {
+      return c1.p === c2.p ? { roots: [], touching: false } : { roots: [toWorld(c1, 0, 0)], touching: true };
+    }
   }
   const loopFirst = loopOf(c1) !== null;
-  const loop = loopOf(loopFirst ? c1 : c2);
-  const f = implicitOf(loopFirst ? c2 : c1);
+  /*
+   * Two parabolas in different frames (#2664, ADR-AG-455 — «y^2=2x» and «x^2=2y», קיץ 2021 Q1) meet in up to four
+   * points and neither is closed: the first is walked along its own parameter over a span that holds every crossing,
+   * and the other's implicit function is sampled along it exactly as for a closed conic, without the wrap.
+   */
+  const open = !loopFirst && loopOf(c2) === null ? openWalkOf(c1, Math.max(extentOf(c1), extentOf(c2), 1)) : null;
+  const loop = open ?? loopOf(loopFirst ? c1 : c2);
+  const f = implicitOf(loopFirst || open ? c2 : c1);
   if (!loop || !f) return { roots: [], touching: false };
 
   const scale = Math.max(extentOf(c1), extentOf(c2), 1e-9);
-  const N = 1440;
+  const N = open ? 8000 : 1440;
   const step = (2 * Math.PI) / N;
   const val = (th: number) => f(loop(th));
   const found: Pt[] = [];
@@ -151,6 +162,7 @@ export function conicsMeet(c1: NumCurve, c2: NumCurve): { roots: Pt[]; touching:
   for (let i = 0; i < N; i += 1) vs.push(val(i * step));
   const vmax = Math.max(...vs.map((v) => Math.abs(v)), 1e-300);
   for (let i = 0; i < N; i += 1) {
+    if (open && i === N - 1) break; // an open walk does not wrap from its last sample to its first
     const j = (i + 1) % N;
     const lo = i * step;
     const v0 = vs[i];
@@ -177,6 +189,7 @@ export function conicsMeet(c1: NumCurve, c2: NumCurve): { roots: Pt[]; touching:
       continue;
     }
     // A touch: |f| at a local minimum that reaches zero without changing sign.
+    if (open && i === 0) continue;
     const prev = vs[(i - 1 + N) % N];
     if (Math.abs(v0) <= Math.abs(prev) && Math.abs(v0) <= Math.abs(v1) && Math.sign(prev) === Math.sign(v0) && Math.abs(v0) < 1e-9 * vmax) {
       found.push(loop(lo));
@@ -193,23 +206,48 @@ export function conicsMeet(c1: NumCurve, c2: NumCurve): { roots: Pt[]; touching:
 /** A CLOSED conic walked once round by an angle — the circle and the ellipse; `null` for an open one. */
 function loopOf(cu: NumCurve): ((th: number) => Pt) | null {
   if (cu.kind === 'circle') return (th) => ({ x: cu.cx + cu.r * Math.cos(th), y: cu.cy + cu.r * Math.sin(th) });
-  if (cu.kind === 'ellipse') return (th) => ({ x: cu.a * Math.cos(th), y: cu.b * Math.sin(th) });
+  if (cu.kind === 'ellipse') return (th) => toWorld(cu, cu.a * Math.cos(th), cu.b * Math.sin(th));
   return null;
+}
+
+/**
+ * A PARABOLA walked by the same angle a loop takes (#2664): `th ∈ [0, 2π)` maps linearly to its own parameter
+ * `v ∈ [−L, L]`, the point `(v²/2p, v)` in its frame. `L` is a generous multiple of the pair's reach, so every crossing
+ * of two parabolas whose sizes and offsets are `reach` lies inside it.
+ */
+function openWalkOf(cu: NumCurve, reach: number): ((th: number) => Pt) | null {
+  if (cu.kind !== 'parabola') return null;
+  const L = 40 * reach;
+  return (th) => {
+    const v = L * (th / Math.PI - 1);
+    return toWorld(cu, (v * v) / (2 * cu.p), v);
+  };
 }
 
 /** A conic's implicit function: zero on it, and of opposite signs on its two sides. */
 function implicitOf(cu: NumCurve): ((q: Pt) => number) | null {
   if (cu.kind === 'circle') return (q) => (q.x - cu.cx) ** 2 + (q.y - cu.cy) ** 2 - cu.r * cu.r;
-  if (cu.kind === 'ellipse') return (q) => (q.x * q.x) / (cu.a * cu.a) + (q.y * q.y) / (cu.b * cu.b) - 1;
-  if (cu.kind === 'parabola') return (q) => q.y * q.y - 2 * cu.p * q.x;
+  if (cu.kind === 'ellipse') {
+    return (w) => {
+      const q = toLocal(cu, w.x, w.y);
+      return (q.x * q.x) / (cu.a * cu.a) + (q.y * q.y) / (cu.b * cu.b) - 1;
+    };
+  }
+  if (cu.kind === 'parabola') {
+    return (w) => {
+      const q = toLocal(cu, w.x, w.y);
+      return q.y * q.y - 2 * cu.p * q.x;
+    };
+  }
   return null;
 }
 
 /** How far a conic reaches — the scale its crossings are told apart at. */
 function extentOf(cu: NumCurve): number {
   if (cu.kind === 'circle') return Math.abs(cu.r) + Math.abs(cu.cx) + Math.abs(cu.cy);
-  if (cu.kind === 'ellipse') return Math.max(Math.abs(cu.a), Math.abs(cu.b));
-  if (cu.kind === 'parabola') return Math.abs(cu.p);
+  // A moved conic reaches as far as its offset too (#2664); at the origin the offset is 0 and the reach is unchanged.
+  if (cu.kind === 'ellipse') return Math.max(Math.abs(cu.a), Math.abs(cu.b)) + Math.abs(frameOf(cu).h) + Math.abs(frameOf(cu).k);
+  if (cu.kind === 'parabola') return Math.abs(cu.p) + Math.abs(frameOf(cu).h) + Math.abs(frameOf(cu).k);
   return 0;
 }
 

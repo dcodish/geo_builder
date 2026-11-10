@@ -100,7 +100,7 @@ export type MeasureTerm =
 export type RoleEnd = { p: Id } | { role: EllipseRole };
 
 /** The point a role end stands at, given the points and the ellipse's semi-axes. */
-export function roleEndAt(end: RoleEnd, at: (id: Id) => Pt | null, ellipse: { a: number; b: number } | null): Pt | null {
+export function roleEndAt(end: RoleEnd, at: (id: Id) => Pt | null, ellipse: { a: number; b: number; h?: number; k?: number } | null): Pt | null {
   if ('p' in end) return at(end.p);
   return ellipse ? ellipseRolePoint(ellipse, end.role) : null;
 }
@@ -625,7 +625,7 @@ export function evalLengthExpr(
       value = Math.abs(lu.c / nu - (flip * lv.c) / nv);
     } else if (term.kind === 'ellipse-dist') {
       const k = curveAt?.(term.curve) ?? null;
-      const e = k && k.kind === 'ellipse' && typeof k.a === 'number' && typeof k.b === 'number' ? { a: k.a, b: k.b } : null;
+      const e = k && k.kind === 'ellipse' && typeof k.a === 'number' && typeof k.b === 'number' ? { a: k.a, b: k.b, h: k.h, k: k.k } : null;
       const p = roleEndAt(term.u, at, e);
       const q = roleEndAt(term.v, at, e);
       if (!p || !q) return null;

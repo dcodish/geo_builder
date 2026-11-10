@@ -166,6 +166,8 @@ export type InputError =
    * A third crossing asked of a line through two points already on the circle (#1893, ADR-AG-271; #1834's ruled
    * sentence): the line's two letters as written, and the two points it already crosses the circle at.
    */
+  /** #2664 (ADR-AG-455) — «קנונית» said of a conic whose equation `line` is off the origin; `curve` is its family. */
+  | { key: 'not-canonical'; detail: string; line?: string; curve?: 'parabola' | 'ellipse' }
   | { key: 'third-crossing'; detail: string; line?: string; a?: string; b?: string; curve?: 'circle' | 'parabola' | 'ellipse' }
   /** A crossing asked of a line tangent to the circle at a point the figure has (#1924, ADR-AG-272; 2-D's sentence): the point. */
   | { key: 'tangent-no-second-crossing'; detail: string; id?: string; curve?: 'circle' | 'parabola' | 'ellipse' }
