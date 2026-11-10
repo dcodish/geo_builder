@@ -36,7 +36,10 @@ duality possible. **Reach for M1 duality before adding a construct.**
 
 **The normalisation seam and case (ADR-3D-039, ADR-3D-223).** `normalize3` is the one boundary every rule
 reads: format controls stripped, primes and minus unified, look-alike glyphs folded, script transitions
-split. **The look-alike glyph fold is the SHARED table** ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329)):
+split. Last, the subject frame comes off ([ADR-3D-479](06b-decisions-3d.md#adr-3d-479), #2062): `normalize3` =
+`subjectFrame3(normalizeText3(s))`, where `readSubjectFrame3` reads «HE_SUBJ X מקיי(ם|מת|מים|מות) :? rest» / "(the)?
+(point)? X satisf(ies|y) :? rest" (behind «נתון כי» too) and gives `rest` only when it names X. `subjectFrameOf3` reads it
+before it comes off, for `unreadParts3`' exemption (the frame's subject is a co-reference to its statement's label). **The look-alike glyph fold is the SHARED table** ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329)):
 `shell/glyphFold.ts` `foldGlyphs` (⟂ → ⊥, ∡/∢ → ∠, the guarded `<` → ∠, ⁰/º/˚ → °, «שורש N» → √, the infix «‖» / «||» → ∥), called by
 `normalize3` right after `foldPrimes3` and by the ask lane's `parseQuery` — 3-D folded none of them, which is
 why «AC ⟂ AB» was not-understood while «AC ⊥ AB» built (#1912); 2-D's and analytic's boundaries call the same
@@ -229,6 +232,14 @@ it does not apply:
    and the rotation question (`evaluate.ts`); one that fixes nothing leaves the placement sampled.
 9. **Marks and surfacing.** A new source of a 90° angle gets its knee. The relation surfaces in the data
    view and the query lane (`dataView.ts`, `queries.ts`): the operator's *"and show that"*.
+   **The point × plane row** ([ADR-3D-480](06b-decisions-3d.md#adr-3d-480), #2062): the mutual universe's point side is
+   every student-introduced point that is no solid's vertex, paired with every planar side it does not define; the
+   relation (`on-plane` / `off-plane`, `distanceBetween` over the figure's extent, `MUTUAL_VERIFY_TOL`-class 1e-4) is
+   pushed only when every knowledge sample agrees. `pointPlaneRowKey3` keys it (a run plane by its letters as a set);
+   `pointPlaneRow3(panel, point, plane)` is the one decision both question surfaces read: `membershipQuestion3`
+   (`parse3.ts`) feeds `readStatement3`'s `answer-in-panel` refusal (category `guided`, never the model) and
+   `parseQuery`'s `membership` kind (`note: 'inPanel'`). App3 opens the panel on a known answer and highlights the row
+   by its `data-row-key`.
 10. **The parameter pin.** When either operand can carry the figure parameter, `paramPinningRels`
     (`operands.ts`, through `claimPinsParam` and `operandCarriesParam`) must admit the relation, with
     what it reads declared: direction or position. `pinningGivens` and `paramRoots` read that one list

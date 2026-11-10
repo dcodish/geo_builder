@@ -92,6 +92,8 @@ describe('#1746 — the class: every query kind\'s JOINED row names its subject 
     volume: [{ lines: CUBE_FRAMED, q: "נפח ABCDA'B'C'D'", want: "נפח ABCDA'B'C'D' = 8" }],
     rev: [{ lines: ['חרוט שרדיוס בסיסו 5 וגובהו 12'], q: 'נפח החרוט', want: 'נפח החרוט = 100π' }],
     plane: [{ lines: ['A(0,0,0)', 'B(1,0,0)', 'C(0,1,0)'], q: 'מישור ABC', want: 'מישור ABC = z = 0' }],
+    // #2062 (ADR-3D-480): a membership question has no value — its note points at the panel row
+    membership: [{ lines: [...CUBE, 'M אמצע AB', "מישור ACC'"], q: "האם M נמצאת במישור ACC'?", want: "האם M נמצאת במישור ACC'? — inPanel" }],
   };
 
   for (const [kind, cases] of Object.entries(CASES)) {

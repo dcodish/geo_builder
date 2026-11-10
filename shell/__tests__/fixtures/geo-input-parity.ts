@@ -1526,6 +1526,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'unread-name-square-1919', family: 'polygons', steps: ['ריבוע ДЖФИ'], expect: 'refused' },
   { id: 'unread-name-arabic-1919', family: 'polygons', steps: ['משולש ابج'], expect: 'refused', note: 'any script the label grammar cannot read, not only Cyrillic' },
   { id: 'unread-name-point-1919', family: 'points-incidence', steps: ['משולש ABC', 'נקודה Ж על AB'], expect: 'refused', note: 'anywhere in the line, not only a shape’s vertex list' },
+  // #2062 (ADR-819, ADR-AG-460, ADR-3D-479; operator ruling 2026-10-14, card d14b-2062-frame A): the exam's subject frame
+  // «הנקודה M מקיימת …» is read in front of any statement about M, in every builder
+  { id: 'subject-frame-2062', family: 'frame', steps: ['משולש ABC', 'M על AB', 'הנקודה M מקיימת AM = 3'], expect: 'builds', note: 'the bagrut wording (03572 Q2): the frame names the statement’s point' },
+  { id: 'subject-frame-colon-2062', family: 'frame', steps: ['משולש ABC', 'M על AB', 'הנקודה M מקיימת: AM = MB'], expect: 'builds', note: 'the colon after the verb' },
+  { id: 'subject-frame-masc-2062', family: 'frame', steps: ['משולש ABC', 'M על AB', 'M מקיים AM = MB'], expect: 'builds', note: 'the masculine «מקיים» (final mem), found in round' },
+  { id: 'subject-frame-en-2062', family: 'frame', steps: ['משולש ABC', 'M על AB', 'the point M satisfies AM = MB'], expect: 'builds', note: 'the English frame' },
+  { id: 'subject-frame-angle-2062', family: 'frame', steps: ['משולש ABC', 'M אמצע BC', 'הנקודה M מקיימת ∠AMB = 90'], expect: 'builds', note: 'in front of an angle statement' },
+  { id: 'subject-frame-unrelated-2062', family: 'frame', steps: ['משולש ABC', 'הנקודה D מקיימת AB = 3'], expect: 'not-handled', knownGap: [{ product: 'analytic' }], note: 'a frame whose statement does not mention its point is not this sentence: D would vanish, so the line keeps its pre-#2062 verdict. analytic refuses it with the one-input-per-line message (split-statements) where 2-D and 3-D hand it to the model — measured, older than #2062' },
   { id: 'unread-word-1919', family: 'frame', steps: ['треугольник ABC'], expect: 'refused', note: 'a WORD in another language takes the other ruled sentence' },
   { id: 'unread-greek-vertex-1919', family: 'polygons', steps: ['משולש ΓΔΘ'], expect: 'not-handled', note: 'Greek is math (the ruling), so a Greek vertex name goes to the model as in 2-D — 3-D recorded A, B, C before #1919' },
   { id: 'unread-lookalike-1919', family: 'polygons', steps: ['משולש КМО'], expect: 'builds', note: 'the Cyrillic look-alikes fold to K, M, O (the ruling: «fold them silently») — 2-D always did; 3-D recorded A, B, C and analytic read nothing' },
@@ -1829,7 +1837,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'radius-ratio-unnamed-2388', family: 'circles', steps: ['נתון מעגל שמרכזו M(0,0) ורדיוסו r', 'נתון מעגל שמרכזו N(9,0) ורדיוסו R', 'היחס בין אורכי הרדיוסים של המעגלים הוא 1:2'], contextFor: { '2d': ['מעגל M', 'מעגל N'] }, expect: 'builds', exception: 'X8', knownGap: [{ product: '2d' }], note: '2-D asks which circle (ambiguous-circle-ref)' },
 
   // ── #2391 (ADR-AG-315): the exam's own two-circle and centre sentences, each read as its canonical twin ──
-  { id: 'satisfies-2391', family: 'lengths', steps: ['נקודה A', 'נקודה B', 'M מקיימת MA = MB'], contextFor: { '3d': ['A(0,0,0)', 'B(4,0,0)'] }, expect: 'builds', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic did not read «מקיימת» before ADR-AG-315; 2-D escalates it to the model' },
+  { id: 'satisfies-2391', family: 'lengths', steps: ['נקודה A', 'נקודה B', 'M מקיימת MA = MB'], contextFor: { '3d': ['A(0,0,0)', 'B(4,0,0)'] }, expect: 'builds', note: 'analytic did not read «מקיימת» before ADR-AG-315; 2-D and 3-D read it since #2062 (ADR-819, ADR-3D-479)' },
   { id: 'underscore-index-2391', family: 'points-incidence', steps: ['נקודה N_2'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'analytic did not read `N_2` before ADR-AG-315 (it is `N₂` there; 2-D reads it as `N2`)' },
   // ── #1138 (ADR-AG-340): «P נקודה (כלשהי) על …» is the incidence — 2-D reads both, analytic did not ──
   { id: 'point-noun-on-side-1138', family: 'points-incidence', steps: ['משולש ABC', 'P נקודה על הצלע AB'], expect: 'builds', knownGap: [{ product: '3d' }] },

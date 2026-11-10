@@ -15462,3 +15462,36 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 **Locks.** `issue-2764-independent-parts.test.ts`: written with `seed` a number and `seedParts` beside it; the file, the link and the session load back the same drawing; an old `seed: 7` file with no `seedParts` loads ok with its first part at 7; a malformed entry is dropped. `fixtures3/nine-separate-shapes-2764.geo3.json` carries `seedParts`, so the corpus net loads the field.
 
 **Behaviour change for a student:** none beyond ADR-3D-454's.
+
+## ADR-3D-479 — The exam's subject frame «הנקודה M מקיימת …» comes off at `normalize3` (#2062)
+
+**Status:** accepted · 2026-11-10 · feature (P2, 3d) · fix round #2822, stream G6 · [#2062](https://github.com/dcodish/geo_builder/issues/2062)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-31 · **Design:** [04b](04b-design-3d.md) § *The normalisation seam and case* · **Ladder:** none (parser)
+**Cites** the [operator ruling of 2026-10-13](https://github.com/dcodish/geo_builder/issues/2062#issuecomment-6151745014) (*"The exam's own sentences … are read as their bare forms are"*) and the [operator ruling 2026-10-14](https://github.com/dcodish/geo_builder/issues/2062#issuecomment-6167336795), card `d14b-2062-frame` A (*in front of any statement, in all three tools*). Siblings: [ADR-819](06-decisions.md#adr-819), [ADR-AG-460](06c-decisions-analytic.md#adr-ag-460).
+
+**Measured at pickup** (`d6004946`, `decideSubmit3`): «הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w» (the bagrut 03572 Q2 sentence), «נקודה M מקיימת …», «הנקודה E מקיימת BE = 1/2BB'» and every plane twin («… M מקיימת AM = 3», «…: AM = MB», "the point M satisfies AM = MB", «… ∠AMB = 90», «הנקודה M מקיימת M אמצע BC») were `not-understood`; the bare statements record.
+
+**Decision.** `readSubjectFrame3` (`parse3.ts`): «HE_SUBJ X מקיי(ם|מת|מים|מות) :? rest» / "(the)? (point)? X satisf(ies|y) :? rest", behind a given-prefix too, giving `rest` only when it names X. It runs LAST in `normalize3` (`normalize3 = subjectFrame3(normalizeText3(s))`), the boundary every rule and honesty gate reads. The plan named `stripStatementPrefix` as the seat; that helper is called by ten rules, not all, and the ruling is "in front of any statement", so the normalize boundary is the one seat that reaches every rule (2-D's `readFrame` seat). The read-extent gate (`unreadParts3`, ADR-3D-316) substitutes one letter at a time, and a frame about a substituted letter the statement also names still comes off, so the subject read as an unread operand (`dropped-given «M»`); `subjectFrameOf3` reads the frame before it comes off and an occurrence equal to the subject is exempt, as a co-reference.
+
+**Not done here: escalated.** The plan's other half (the `−x/n` divisor: «BN=u/2-v/2» refused `dropped-given «2»`) named the parser's `TERM` grammar as the cause. Measured: `parse3` reads every one of those rows correctly (through `parseSymExpr`); the refusal comes from the honesty gate's bare-number pass (`droppedGivenNumbers3`), whose lowering candidates hold `1/n` but not `−1/n`, so the second `−x/n` term's denominator is unaccounted. The named cause does not fire, so that half is escalated on #2062 (fix-round Step 4), not built.
+
+**Locks.** Unit: `src3d/parser/__tests__/parse3.test.ts` (#2062 blocks: frame × spelling × statement → the bare commands; the unrelated frame), `src3d/__tests__/issue-1888-unread-part3.test.ts` (the exemption). Parity rows `subject-frame-*-2062`, `satisfies-2391`. Fixture `fixtures3/bagrut-03572-q2-wording-2062.geo3.json` (the exam's own wording).
+
+**Behaviour change for a student:** «הנקודה M מקיימת BM = …» and every framed statement about M build as the bare statement does, where they went to the AI.
+
+## ADR-3D-480 — A point × plane row in the data panel, and the exam's membership question points at it (#2062)
+
+**Status:** accepted · 2026-11-10 · feature (P2, 3d) · fix round #2822, stream G6 · [#2062](https://github.com/dcodish/geo_builder/issues/2062)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-32 · **Design:** [04b](04b-design-3d.md) § the panel's point × plane row · **Ladder:** none (panel, read-only)
+**Cites** the [operator ruling 2026-10-14](https://github.com/dcodish/geo_builder/issues/2062#issuecomment-6167336795), card `d14b-2062-question` A: *"Point to the panel row: «התשובה מופיעה בלוח הנתונים — שורת המיקום ההדדי של M ומישור AEC», and highlight it"*, his note *"if now - we should"*.
+
+**Measured at pickup** (`d6004946`): on the exam figure («תיבה ABCDA'B'C'D'» · «נסמן: AA' = w, AB = v, AD = u» · «הנקודה E היא אמצע המקצוע BB'» · «BM = …» · «מישור AEC»), «האם הנקודה M נמצאת במישור AEC?» was `not-understood` in the main input and `notUnderstood` in the ask box; the panel's mutual universe held only linear and planar objects, so no row said where M is.
+
+**Decision.**
+1. **The point side** (`dataView`): every point whose id is a label and which is no solid's vertex, against every planar side whose run it is not in (E × AEC is skipped), `on-plane` / `off-plane` by `distanceBetween` over the figure's extent below 1e-4, pushed only when every knowledge sample agrees. Locale: «{{a}} נמצאת במישור {{b}}» / «{{a}} אינה נמצאת במישור {{b}}».
+2. **One reader, one decision.** `membershipQuestion3` (`parse3.ts`) reads «האם (ה)נקודה X נמצא(ת)/מונח(ת)/שייכ(ת)/מוכל(ת) (ב|על) (ה)מישור P?» and "is (the point) X in/on (the) plane P?". `pointPlaneRow3(panel, point, plane)` finds the row (a run plane keyed by its letters as a set, `pointPlaneRowKey3`).
+3. **Main input:** `readStatement3` reads the question right after the proof-target check and refuses `answer-in-panel { point, plane, known }` (category `guided`): nothing is added, and it never goes to the model. **Ask box:** `parseQuery`'s `membership` kind answers `note: 'inPanel'`. Both print `query.note.inPanel` («התשובה מופיעה בלוח הנתונים — שורת המיקום ההדדי של {{point}} ומישור {{plane}}»), or `query.note.undetermined` where the panel has no row. App3 opens the panel on a known answer and highlights the row (`data-row-key`, scrolled into view).
+
+**Locks.** Unit: `src3d/__tests__/data-view.test.ts` (#2062: on-plane on the exam figure, E and the box's vertices without rows, off-plane on the cube, no plane no row, the key), `src3d/__tests__/queries.test.ts` (#2062: the ask box in three spellings, undetermined, the main input's refusal and its category), `src3d/parser/__tests__/parse3.test.ts` (the reader). Fixture `bagrut-03572-q2-wording-2062.geo3.json` ends with «מישור AEC», so the corpus net builds the figure the row is read on.
+
+**Behaviour change for a student:** the 3-D data panel says whether each point you introduced lies in each plane of the figure, and «האם הנקודה M נמצאת במישור AEC?» answers by pointing at that row (highlighted) instead of going to the AI.

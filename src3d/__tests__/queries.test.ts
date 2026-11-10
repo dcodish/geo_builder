@@ -7,7 +7,8 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { derive3, useGeo3 } from '../store/store3';
+import { decideSubmit3, derive3, useGeo3 } from '../store/store3';
+import { refusalCategory3 } from '../app/decideDeterministic3';
 import { resolve3 } from '../engine/evaluate';
 import { answerQuery } from '../engine/queries';
 import { dataView } from '../engine/dataView';
@@ -402,5 +403,28 @@ describe('#642 — naming the subject is the same question', () => {
     expect(ans(prism, 'אורך צלע AB').answer).toBe(ans(prism, 'אורך AB').answer);
     expect(ans(prism, 'the length of segment AB').answer).toBe(ans(prism, 'אורך AB').answer);
     expect(ans(prism, 'אורך AB').answer).not.toBeNull();
+  });
+});
+
+// #2062 (ADR-3D-480): the exam's membership question — one decision, two surfaces (this box and the main input)
+describe('#2062 — «האם הנקודה M נמצאת במישור AEC?» points at the panel row', () => {
+  const EXAM = ["תיבה ABCDA'B'C'D'", "נסמן: AA' = w, AB = v, AD = u", "הנקודה E היא אמצע המקצוע BB'", 'הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w', 'מישור AEC'];
+  it('the ask lane answers with the pointer, in every spelling', () => {
+    for (const q of ['האם הנקודה M נמצאת במישור AEC?', 'האם M נמצאת במישור AEC', 'is M in plane AEC?']) {
+      const r = ans(EXAM, q);
+      expect(r, q).toMatchObject({ answer: null, note: 'inPanel', inPanel: { point: 'M', plane: 'AEC' } });
+    }
+  });
+  it('where the panel has no row, the honest «לא נקבע על ידי הנתונים»', () => {
+    expect(ans(["קובייה ABCDA'B'C'D'", 'M אמצע AB'], "האם M נמצאת במישור ACC'?")).toMatchObject({ answer: null, note: 'undetermined' });
+  });
+  it('the main input: nothing is added, and the refusal carries the same decision', () => {
+    const st = build(EXAM);
+    const facts = useGeo3.getState().facts;
+    const v = decideSubmit3({ facts, seed: st.seed }, 'האם הנקודה M נמצאת במישור AEC?');
+    expect(v).toEqual({ kind: 'refused', error: { code: 'answer-in-panel', point: 'M', plane: 'AEC', known: true } });
+    expect(refusalCategory3({ code: 'answer-in-panel', point: 'M', plane: 'AEC', known: true })).toBe('guided');
+    const none = decideSubmit3({ facts: facts.slice(0, -1), seed: st.seed }, 'האם הנקודה M נמצאת במישור AEC?');
+    expect(none).toEqual({ kind: 'refused', error: { code: 'answer-in-panel', point: 'M', plane: 'AEC', known: false } });
   });
 });

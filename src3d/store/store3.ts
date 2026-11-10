@@ -59,7 +59,8 @@ import { partsOf3, sameSeed3, seedKey3, seedNumber3, type Seed3 } from '../engin
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
-import { isBareAltitude3, namesQuadBase3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
+import { isBareAltitude3, membershipQuestion3, namesQuadBase3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
+import { dataView, pointPlaneRow3 } from '../engine/dataView';
 
 export interface Fact3 {
   id: string;
@@ -246,6 +247,10 @@ export type StoreError3 =
   /** #1666 (ADR-3D-295, ADR-W-107): a PROOF TARGET («הוכיחו כי …», "prove that …") — what the student must
    *  show, never a given. `sentence` is the proof sentence as typed. Typed, so it never escalates. */
   | { code: 'proof-target'; sentence: string }
+  /** #2062 (ADR-3D-480): «האם הנקודה M נמצאת במישור AEC?» — an exam QUESTION, never a given. Answered by pointing at
+   *  the data panel's point × plane row when it is there (`known`), else with the ask lane's «לא נקבע על ידי הנתונים».
+   *  Typed, so it never escalates and nothing is added to the figure. */
+  | { code: 'answer-in-panel'; point: string; plane: string; known: boolean }
   /** #1837 (ADR-W-142, ADR-710): a plane-geometry angle written in radians («∠ABC = π/2») — radians are the
    *  complex builder's notation only. «∠ABC = π» RECORDED an angle mark labelled π; the rest went to the model.
    *  Typed, so it never escalates; answered with 2-D's degrees sentence. */
@@ -2662,6 +2667,13 @@ function readStatement3(
   // what the student was asked to prove. The rule is shared with 2-D and analytic (`shell/proofTarget`).
   const proof = findProofTarget(utterance);
   if (proof) return { ok: false, error: { code: 'proof-target', sentence: proof.sentence } };
+  // #2062 (ADR-3D-480): the exam's membership QUESTION, read at the same reader — never a given, never the model. It
+  // points at the panel's point × plane row (the ask lane reads the same row, `answerQuery`).
+  const member = membershipQuestion3(utterance);
+  if (member) {
+    const row = pointPlaneRow3(dataView(derive3(st.facts, st.seed).construction, st.seed), member.point, member.plane);
+    return { ok: false, error: { code: 'answer-in-panel', point: member.point, plane: member.plane, known: row !== null } };
+  }
   // #1837 (ADR-W-142): a plane-geometry angle written in radians, refused at the same reader with 2-D's rule
   // (`shell/radianAngle`) — never recorded as a π-labelled mark, never sent to the model.
   if (findRadianAngle(utterance)) return { ok: false, error: { code: 'radian-angle' } };

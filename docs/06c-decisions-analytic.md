@@ -16208,3 +16208,17 @@ Each of those points moves along a curve.
 **Locks.** `src-analytic/__tests__/issue-2231-llm-retry.test.ts` (the operator's case, the regression lock, model mocked): «פרבולה שמוקדה (2,0)» answered `y^2 = 4x` gets a second call naming «שמוקדה (2,0)»; a second answer `y^2 = 8x` records; a repeated `y^2 = 4x` is `unfaithful` / `llm-dropped` naming «2», with exactly two calls; the diameter and foci rows likewise; the right answer first is one call. `shell/__tests__/retryLostNames.test.ts`: the second trigger, its one-retry bound, and the names-only call shape unchanged. `server/__tests__/issue-2231-keep.test.ts`: `buildRequest` with and without the field, and `readContradicted`'s accepted and ignored shapes. Analytic has no scenario corpus for the model lane; the lock is the runFallback row, as for ADR-W-189.
 
 **Behaviour change for a student:** in analytic, before refusing such an answer the tool asks the AI once more, naming the contradicted statement. A right second answer builds; a wrong one gets today's refusal naming the value.
+
+## ADR-AG-460 — The subject frame takes the exam's colon and the masculine «מקיים» (#2062)
+
+**Status:** accepted, 2026-11-10 · **Issue:** [#2062](https://github.com/dcodish/geo_builder/issues/2062) (feature, `P2`, `analytic`) · round [#2822](https://github.com/dcodish/geo_builder/issues/2822)
+**Requirements:** [02c](02c-requirements-analytic.md) — the exam's circle-and-centre sentences («M מקיימת …») · **Design:** [04c](04c-design-analytic.md) § `satisfiesClause` · **LADDER stage:** none (parser)
+**Cites** the [operator ruling 2026-10-14](https://github.com/dcodish/geo_builder/issues/2062#issuecomment-6167336795), card `d14b-2062-frame` A. The 2-D twin: [ADR-819](06-decisions.md#adr-819).
+
+**Measured at pickup** (`d6004946`, `decideSubmit`): analytic already read the frame (`satisfiesClause`, ADR-AG-315): «הנקודה M מקיימת AM = 3», «M מקיימת AM = MB», "the point M satisfies AM = MB" and «הנקודה M מקיימת ∠AMB = 90» record. The exception was «הנקודה M מקיימת: AM = MB» (`not-handled`), the colon after the verb. The masculine «מקיים» (final mem) was missed too: the pattern spelled `מקיימ(ת|ים|ות)?`, which never matches «מקיים». The plan's account («analytic `not-handled`») was older than ADR-AG-315's reach; corrected here, not built twice.
+
+**Decision.** `satisfiesClause` reads `מקיי(ם|מת|מים|מות)` and `satisf(ies|y)`, followed by a colon or a space: the spelling 2-D's `readSubjectFrame` and 3-D's `readSubjectFrame3` share. The mention gate (the statement's facts name the point) is unchanged. «הנקודה D מקיימת AB = 3» keeps its `split-statements` refusal; 2-D and 3-D hand it to the model, recorded as an unscheduled known-gap cell on `subject-frame-unrelated-2062`.
+
+**Locks.** Unit: `src-analytic/__tests__/issue-1618-sentence-frame.test.ts` (#2062 block). Parity rows `subject-frame-*-2062`.
+
+**Behaviour change for a student:** «הנקודה M מקיימת: AM = MB» and «M מקיים AM = MB» build, where they went to the AI.
