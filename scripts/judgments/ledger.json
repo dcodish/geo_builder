@@ -4013,6 +4013,27 @@
       "limits": "Not a specifically ruled first drawing (a stated sign, ADR-3D-400 floor, 2-D extension ladder); not a change gaining/losing a configuration or changing a status; not Q-2814a; not the 2.7× cost sign-off.",
       "at": "2026-11-10T00:45:07.834Z",
       "status": "pending"
+    },
+    {
+      "id": "Q-2731c",
+      "question": "In the book's p2-15 ellipse figure there are three valid ellipses; «הציגו תצורה אחרת» reaches the third first on press 13. (a) keep today's walk, every solution reachable in whatever order; (b) the button gives priority to a genuinely different solution over another placement of one already shown.",
+      "class": "alternative-configuration-press-order",
+      "verdict": "escalate",
+      "reason": "No precedent: his rulings settle that every drawing is reachable and that three or more values are left open, not the order or the number of presses; (b) would change the press sequence of every multi-solution figure.",
+      "nearest": [
+        {
+          "quote": "if there is more than 1 way to build it - we draw a possible config and allow user to change configs",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-199"
+        },
+        {
+          "quote": "if there are 2 possible answers, we give them and anything else we leave open",
+          "date": "2026-11-10",
+          "link": "https://github.com/dcodish/geo_builder/issues/2731#issuecomment-6763609663"
+        }
+      ],
+      "at": "2026-11-10T13:50:21.025Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
