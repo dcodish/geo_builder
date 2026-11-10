@@ -3,18 +3,18 @@
  * and a line stated again gets one verdict in every spelling ([ADR-AG-346](../../docs/06c-decisions-analytic.md#adr-ag-346)).
  *
  * Operator rulings, 2026-10-27: «B» (the bisector's midpoint has no dot, no letter, no «הכלי קרא לנקודה …» until a line
- * letters it); T32 *"it should refuse to draw second line and say that already exists and offer to rename the line"*;
+ * letters it); T32's refusal (*"it should refuse to draw second line…"*) WITHDRAWN by the 2026-11-09 ruling "b" (#2790,
+ * ADR-AG-463): the restated line under a new name is its own row, names the line, and carries the already-held notice;
  * the equation spelling *"it should rename the line but not create another line"* (#2425 Q3 stands). Driven through the
  * real door, `decideSubmit` line by line → `derive`; the model is never called.
  */
 import { describe, expect, it } from 'vitest';
 import { ask } from '../app/ask';
 import { errorText } from '../app/errorText';
-import { decideSubmit, sentenceOutcome } from '../app/submit';
+import { decideSubmit, isHeld, sentenceOutcome } from '../app/submit';
 import { derive } from '../engine/derive';
 import { fmtAnalytic } from '../format';
 import { analyticI18n } from '../i18n';
-import { lineOfferCandidate } from '../parser/lineOffer';
 import summerB from './fixtures/exam-2024sB-locus-1138.analytic.json';
 
 /** Submit `seq` line by line through the real decision; every line must record. */
@@ -33,7 +33,6 @@ function lastVerdict(seq: readonly string[]) {
   return { lines, v: decideSubmit(seq[seq.length - 1], lines, 0, derive(lines, 0)) };
 }
 const he = analyticI18n.getFixedT('he');
-const en = analyticI18n.getFixedT('en');
 /** The rendered message with the bidi isolates the renderer adds stripped, so the sentence reads as written. */
 const plain = (s: string) => s.replace(/[⁦-⁩]/g, '');
 const pointIds = (lines: readonly string[]) => derive(lines, 0).figure.points.map((p) => p.id);
@@ -86,7 +85,7 @@ describe('#2583 — a perpendicular bisector draws only its line (ADR-AG-345)', 
     expect(P.y).toBeCloseTo(E.y / 2, 9);
     // the bisector restated afterwards is the same line; a second name for the point records on P (#1595, ADR-AG-372;
     // operator ruling 2026-11-02, "accept with message" — was the `already-named` refusal)
-    expect(decideSubmit('אנך אמצעי ל-EK', lines, 0, d).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('אנך אמצעי ל-EK', lines, 0, d))).toBe(true); // #2790: its own row, with the notice
     expect(decideSubmit('Q אמצע EK', lines, 0, d).kind).toBe('record');
   });
 
@@ -121,19 +120,20 @@ describe('#2583 — a perpendicular bisector draws only its line (ADR-AG-345)', 
 });
 
 describe('#2584 — a line stated again: one verdict in every spelling (ADR-AG-346)', () => {
-  it('T32, the operator’s exact sequence: the 5th line is refused, names the row, and offers the naming sentence', () => {
+  it('T32 under ruling "b" (#2790, ADR-AG-463): the 5th line records as its own row, names the drawn line l2, and says it was there', () => {
     const { lines, v } = lastVerdict([...EK, 'אנך אמצעי ל-EK', 'l2 אנך אמצעי ל-EK']);
-    expect(v).toEqual({
-      kind: 'refused',
-      error: { key: 'line-exists', detail: 'l2 אנך אמצעי ל-EK', lineName: 'l2', declared: 'אנך אמצעי ל-EK', offer: 'נסמן את האנך האמצעי ל-EK ב-l2' },
-    });
-    if (v.kind !== 'refused') return;
-    expect(plain(errorText(v.error, he))).toBe('הישר הזה כבר קיים באיור: «אנך אמצעי ל-EK». כדי לקרוא לו l2, לחצו Enter — המשפט כבר בתיבה.');
-    expect(sentenceOutcome(v)).toEqual({ prefill: 'נסמן את האנך האמצעי ל-EK ב-l2' });
-    expect(lines).toHaveLength(4);
+    expect(v).toMatchObject({ kind: 'record', line: 'l2 אנך אמצעי ל-EK', notice: { code: 'already-held', holder: 'l2' } });
+    expect(sentenceOutcome(v)).toBe('consumed');
+    const after = [...lines, 'l2 אנך אמצעי ל-EK'];
+    expect(lineAts(after).map((o) => o.kind === 'line-at' && o.name)).toEqual(['l2']);
+    // the name is usable: G is defined on l2, and the locus reads as before
+    const more = built([...after, 'דרך E עובר ישר l1 מקביל לציר ה-x', 'G נקודת החיתוך של הישר l1 עם הישר l2']);
+    expect(ask(derive(more, 0), 'המקום הגיאומטרי של G', fmtAnalytic, undefined, 'chip').value).toBe('parabola · y² = 4x');
+    // the earlier, unnamed row deleted: the named row draws the line alone
+    expect(lineAts(more.filter((l) => l !== 'אנך אמצעי ל-EK')).map((o) => o.kind === 'line-at' && o.name)).toEqual(['l2', 'l1']);
   });
 
-  it('the taught remedy is a grammar claim: the offered sentence records, the line is l2, and G is defined on it', () => {
+  it('the naming sentence still records, the line is l2, and G is defined on it', () => {
     const lines = built([...EK, 'אנך אמצעי ל-EK', 'נסמן את האנך האמצעי ל-EK ב-l2', 'דרך E עובר ישר l1 מקביל לציר ה-x', 'G נקודת החיתוך של הישר l1 עם הישר l2']);
     const named = lineAts(lines).filter((o) => o.kind === 'line-at' && o.name === 'l2');
     expect(named).toHaveLength(1);
@@ -141,21 +141,18 @@ describe('#2584 — a line stated again: one verdict in every spelling (ADR-AG-3
     expect(ask(derive(lines, 0), 'המקום הגיאומטרי של G', fmtAnalytic, undefined, 'chip').value).toBe('parabola · y² = 4x');
   });
 
-  it('the parallel through a point: refused, and its offer records', () => {
+  it('the parallel through a point: named, one line', () => {
     const { lines, v } = lastVerdict([...EK, 'דרך E עובר ישר מקביל לציר ה-x', 'דרך E עובר ישר l1 מקביל לציר ה-x']);
-    expect(v).toMatchObject({ kind: 'refused', error: { key: 'line-exists', lineName: 'l1', declared: 'דרך E עובר ישר מקביל לציר ה-x', offer: 'נסמן את הישר העובר דרך E המקביל לציר ה-x ב-l1' } });
-    if (v.kind !== 'refused' || v.error.key !== 'line-exists') return;
-    const after = built([...lines, v.error.offer!]);
-    expect(lineAts(after).map((o) => o.kind === 'line-at' && o.name)).toEqual(['l1']);
+    expect(v).toMatchObject({ kind: 'record', notice: { code: 'already-held', holder: 'l1' } });
+    expect(lineAts([...lines, 'דרך E עובר ישר l1 מקביל לציר ה-x']).map((o) => o.kind === 'line-at' && o.name)).toEqual(['l1']);
   });
 
-  it('the line-first and English spellings get the same refusal', () => {
-    const lineFirst = lastVerdict([...EK, 'האנך האמצעי לקטע EK', 'הישר l2 הוא האנך האמצעי לקטע EK']).v;
-    expect(lineFirst).toMatchObject({ kind: 'refused', error: { key: 'line-exists', declared: 'האנך האמצעי לקטע EK', offer: 'נסמן את האנך האמצעי ל-EK ב-l2' } });
-    const english = lastVerdict([...EK_EN, 'the perpendicular bisector of EK', 'l2 is the perpendicular bisector of EK']).v;
-    expect(english).toMatchObject({ kind: 'refused', error: { key: 'line-exists', offer: 'denote the perpendicular bisector of EK by l2' } });
-    if (english.kind !== 'refused') return;
-    expect(plain(errorText(english.error, en))).toBe('This line is already in the figure: «the perpendicular bisector of EK». To call it l2, press Enter — the sentence is already in the box.');
+  it('the line-first and English spellings name the line the same way', () => {
+    const lineFirst = lastVerdict([...EK, 'האנך האמצעי לקטע EK', 'הישר l2 הוא האנך האמצעי לקטע EK']);
+    expect(lineFirst.v).toMatchObject({ kind: 'record', notice: { code: 'already-held', holder: 'l2' } });
+    expect(lineAts([...lineFirst.lines, 'הישר l2 הוא האנך האמצעי לקטע EK']).map((o) => o.kind === 'line-at' && o.name)).toEqual(['l2']);
+    const english = lastVerdict([...EK_EN, 'the perpendicular bisector of EK', 'l2 is the perpendicular bisector of EK']);
+    expect(english.v).toMatchObject({ kind: 'record', notice: { code: 'already-held', holder: 'l2' } });
   });
 
   it('a second name for a named line is refused naming the holder, as a line, and no second line is drawn', () => {
@@ -178,7 +175,7 @@ describe('#2584 — a line stated again: one verdict in every spelling (ADR-AG-3
   });
 
   it('the named-then-unnamed order stays known; a point’s second name records on it (#1595)', () => {
-    expect(lastVerdict([...EK, 'l2 אנך אמצעי ל-EK', 'אנך אמצעי ל-EK']).v.kind).toBe('already-known');
+    expect(isHeld(lastVerdict([...EK, 'l2 אנך אמצעי ל-EK', 'אנך אמצעי ל-EK']).v)).toBe(true); // #2790
     // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): «Q אמצע AB» after
     // «P אמצע AB» records, with «P ו-Q נפלו על אותה נקודה.» (was «כבר יש שם לנקודה הזו: P.»). A curve's centre named
     // twice keeps that sentence (issue-1153).
@@ -186,15 +183,6 @@ describe('#2584 — a line stated again: one verdict in every spelling (ADR-AG-3
     const { v } = lastVerdict(['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'P מרכז המעגל I', 'O מרכז המעגל I']);
     expect(v).toMatchObject({ kind: 'refused', error: { key: 'already-named', holder: 'P' } });
     if (v.kind === 'refused') expect(plain(errorText(v.error, he))).toContain('P');
-  });
-
-  it('the offer is written from the line, whatever row drew it (unit: lineOfferCandidate)', () => {
-    const c = derive(built([...EK, 'האנך האמצעי לקטע EK', 'דרך E עובר ישר מקביל לציר ה-x']), 0).construction;
-    const [bis, par] = c.objects.filter((o) => o.kind === 'line-at').map((o) => o.id);
-    expect(lineOfferCandidate(c, bis, 'l2', 'he')).toBe('נסמן את האנך האמצעי ל-EK ב-l2');
-    expect(lineOfferCandidate(c, bis, 'l2', 'en')).toBe('denote the perpendicular bisector of EK by l2');
-    expect(lineOfferCandidate(c, par, 'l1', 'he')).toBe('נסמן את הישר העובר דרך E המקביל לציר ה-x ב-l1');
-    expect(lineOfferCandidate(c, 'no-such-line', 'l1', 'he')).toBeNull();
   });
 
   it('a free-direction line is never matched as a restatement', () => {

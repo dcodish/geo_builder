@@ -427,7 +427,7 @@ Through a point, the noun «אנך» is the LINE: `case 'אנך'` teaches «הי
 `pointSpelling` (`app/pointOrder.ts`) teaches a point in a spelling the book does not use: «(3,5)A», «A = (3,5)» and a bare «(3,5)» ([ADR-AG-422](06c-decisions-analytic.md#adr-ag-422), #1774).
 `confirmTaught(lines, seed)` (`app/submit.ts`) is what the 471 ratchet calls.
 
-*Identifiers:* `record` · `imperativeCandidates` · `already-known` · `already-follows`
+*Identifiers:* `record` · `imperativeCandidates` · `isHeld`
 
 A restatement is `known` when every fact of the line is absorbed in `applyFact`; a selector is compared by
 `selectorIdentity`, which reads a `distinct` selector as the SET it is, so a ring restated in another order is
@@ -2030,9 +2030,13 @@ conic, `solid` / `none` for a circle (a hidden circle also drops its centre cros
 
 ### The submit path's three answers ([ADR-AG-020](06c-decisions-analytic.md#adr-ag-020))
 
-`App.submit` dry-runs the list with the new line: `faulted` refuses, `created` / `narrowed` record, `known` gives a
-notice. The effect is decided once, at the apply boundary, and carried by `fold` and `derive`; `narrowed` exists
-because `absorbed` hid two events. **Before either no-op answer** (`already-known`, `already-follows`) the decision
+`App.submit` dry-runs the list with the new line: `faulted` refuses; `created` / `narrowed` record; `known` records too, as
+its own row with the already-held notice ([ADR-AG-462](06c-decisions-analytic.md#adr-ag-462), ADR-W-200). The effect is decided once, at the apply boundary, and carried by `fold` and `derive`; `narrowed` exists
+because `absorbed` hid two events. **Held lines** ([ADR-AG-462](06c-decisions-analytic.md#adr-ag-462)): a `known` outcome, or a line passing
+the #1063 entailment gate (`entailedGiven`: the given holds, the freedom did not drop, no tool assumption was pinned,
+true in every configuration, nothing gained but its operand ink, `inklessGained`), records with `notice.code`
+`already-held`, which `noticeText` words as `suite.notice.alreadyHeld`; `isHeld(verdict)` reads it. The fallback and
+the triage replay drop a model's held step, as they dropped the old no-row verdicts. **Before the held answer** the decision
 asks `addsStatedValue(current, trial)` (`app/submit.ts`): a trial whose stated-measure layer labels something the
 current figure's does not — keyed by what is labelled (segment, vertex and rays, ring, arc), never
 counted — records, so its value is drawn (2-D's ADR-542 visibility half; [ADR-AG-401](06c-decisions-analytic.md#adr-ag-401)).
@@ -2106,7 +2110,7 @@ answers them with a value, a trace and a `mark` `{ from, foot }`, drawn by `buil
 
 `app/submit.ts` (what a line DOES), `app/ask.ts` (what an answer IS), `app/answers.ts` (what the row list BECOMES): the
 component and the locks call the same pure function, `decideSubmit(raw, lines, seed, current)` →
-`'ignored'` / `'refused'` / `'already-known'` / `'already-follows'` / `'record'`. The mark rides on the `Answer` and is
+`'ignored'` / `'refused'` / `'record'` / `'teach'` / `'rename'` / `'swap'` (a held line is a `record`, ADR-AG-462). The mark rides on the `Answer` and is
 drawn only when the distance is knowledge; `asPair` gates a length offer.
 
 *Identifiers:* `src-analytic/app/` · `lines` · `derive(lines, seed)` · `ask`
@@ -2257,14 +2261,14 @@ or several.
 
 **A line stated again** ([ADR-AG-346](06c-decisions-analytic.md#adr-ag-346), #2584): both twin arms of `applyStatement` (the
 equation twin, `identicalCurve`; the construction twin, `lineAtTwin`) ask one verdict, `restatedLine`: known · rename
-(over the tool's l-number, or a carrier) · `already-named` (`holderKind: 'line'`) · `line-exists` (a new name for a drawn,
-unnamed line). `line-exists` reaches the submit path with the twin's id; `derive` adds the row that drew it
-(`declared`), and `parser/lineOffer.ts` writes «נסמן את <description> ב-<name>» from the `line-at`, kept only when
-`decideSubmit` would record it; `sentenceOutcome` pre-fills it. `name-line-object` (`parseNameLineObject`) is that
-sentence: its operand is any clause the grammar reads as one `line-at`; M1 builds or restates it and names it as
+(over the tool's l-number, or a carrier) · `already-named` (`holderKind: 'line'`) · `held-name` (a new name for a drawn,
+unnamed line: the line takes the name — `nameConstructedLine` for a `line-at`, the promotion arm for an equation line —
+and the outcome carries the `already-held` notice; [ADR-AG-463](06c-decisions-analytic.md#adr-ag-463), withdrawing T32's
+`line-exists` refusal and `parser/lineOffer.ts`). `name-line-object` (`parseNameLineObject`) names a line by its
+description: its operand is any clause the grammar reads as one `line-at`; M1 builds or restates it and names it as
 `name-line` does.
 
-*Identifiers:* `roleLineRef` · `perp-bisector` · `restatedLine` · `lineAtTwin` · `line-exists` · `name-line-object` · `lineOfferCandidate`
+*Identifiers:* `roleLineRef` · `perp-bisector` · `restatedLine` · `lineAtTwin` · `held-name` · `nameConstructedLine` · `name-line-object`
 
 #### It rides the ask lane, and widens one field
 

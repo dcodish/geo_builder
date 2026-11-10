@@ -31,11 +31,12 @@ describe('#1362 — the replay threads the session forward through decideSubmit'
   it('an LLM step is judged on OUR grammar, and its committed lines keep the prefix real', () => {
     const out = replayAnalyticSession([
       submit('קלקלקל', 'llm', 'lines', JSON.stringify(['נקודה A (1,2)'])),
-      submit('נקודה A (1,2)'), // the model's line is already in the figure → understood, adds nothing
+      submit('נקודה A (1,2)'), // the model's line is already in the figure → its own row, held (#2790, ADR-AG-462)
     ]);
     expect(out[0].now).toBe('not-handled');
     expect(out[0].degraded).toBe(false);
-    expect(out[1].now).toBe('built-nothing');
+    expect(out[1].now).toBe('built');
+    expect(out[1].detail).toBe('held');
   });
 
   it('clear, undo and delete are FOLLOWED — the prefix stays faithful', () => {

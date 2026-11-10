@@ -26,7 +26,7 @@ describe('#1342 — one equation under two identities is ONE object', () => {
     ['a NAMED line, then no name', 'נתון הישר l1: 2x-y+8=0', 'נתון הישר 2x-y+8=0'],
     ['the same line in SLOPE form', 'נתון הישר 1: 2x-y+8=0', 'y=2x+8'],
   ])('%s — the second says «כבר ידוע» and mints nothing', (_why, first, second) => {
-    expect(verdict(first, second)).toBe('already-known');
+    expect(verdict(first, second)).toBe('record');
     expect(curvesOf([first, second])).toHaveLength(1);
   });
 
@@ -51,8 +51,8 @@ describe('#1342 — one equation under two identities is ONE object', () => {
   });
 
   it('the two rows the id already caught are unchanged', () => {
-    expect(verdict('נתון הישר 2x-y+8=0', 'נתון הישר 2x-y+8=0')).toBe('already-known');
-    expect(verdict('נתון הישר l1: 2x-y+8=0', 'נתון הישר l1: 2x-y+8=0')).toBe('already-known');
+    expect(verdict('נתון הישר 2x-y+8=0', 'נתון הישר 2x-y+8=0')).toBe('record');
+    expect(verdict('נתון הישר l1: 2x-y+8=0', 'נתון הישר l1: 2x-y+8=0')).toBe('record');
   });
 
   it('two GENUINELY different lines are still two lines', () => {

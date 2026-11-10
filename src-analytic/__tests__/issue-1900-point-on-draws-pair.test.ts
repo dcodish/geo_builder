@@ -98,7 +98,7 @@ describe('#1900 — the class: every spelling of the point-on sentence draws its
 describe('#1900 — the pair is ONE object: the piece typed afterwards is already known', () => {
   it.each(['AB', 'קטע AB', 'הקטע AB', 'הישר AB'])('«D על AB» then «%s» adds nothing and says so', (later) => {
     const { kinds, kept } = play([...AB, 'D על AB', later]);
-    expect(kinds).toEqual(['record', 'record', 'record', 'already-known']);
+    expect(kinds).toEqual(['record', 'record', 'record', 'record']);
     expect(drawn(kept)).toEqual(['seg-AB']);
   });
 });
@@ -116,8 +116,8 @@ describe('#1900 — the controls, measured at pickup and unchanged', () => {
   });
 
   it('a subject that is an end of its own pair states nothing new and draws nothing new', () => {
-    expect(play([...AB, 'A על AB']).kinds.at(-1)).toBe('already-follows');
-    expect(play([...AB, 'B על AB']).kinds.at(-1)).toBe('already-follows');
+    expect(play([...AB, 'A על AB']).kinds.at(-1)).toBe('record');
+    expect(play([...AB, 'B על AB']).kinds.at(-1)).toBe('record');
     const { kinds, kept } = play([...AB, 'A על הקטע AB']);
     expect(kinds.at(-1)).toBe('record');
     expect(drawn(kept)).toEqual([]);

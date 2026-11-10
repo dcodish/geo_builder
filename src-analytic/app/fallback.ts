@@ -21,8 +21,9 @@
  * route (its honesty battery refuses a fallback that drops a stated given); here the rule is simpler
  * because the unit is a whole utterance.
  *
- * `already-known` and `already-follows` are NOT refusals — a model that restates something true has
- * produced a valid line that adds nothing, and the remaining lines still stand.
+ * A HELD line (#2790, ADR-AG-462: a `record` carrying the already-held notice) is NOT a refusal — a model that restates
+ * something true has produced a valid line that adds nothing, and the remaining lines still stand. It is dropped, not
+ * recorded: ADR-W-200's own row is for a line the STUDENT typed, and a model's restatement is not one.
  *
  * ## No live call in tests
  *
@@ -30,7 +31,7 @@
  * forbids firing a live call without the operator. Nothing in this module reaches the network.
  */
 
-import { decideSubmit, type RecordNotice, type SubmitVerdict } from './submit';
+import { decideSubmit, isHeld, type RecordNotice, type SubmitVerdict } from './submit';
 import { derive } from '../engine/derive';
 import type { Seed } from '../engine/evaluate';
 import type { LlmStepsOutcome } from '../parser/llmAnalytic';
@@ -171,9 +172,9 @@ function judgeAnswer(utterance: string, lines: readonly string[], seed: Seed, an
       const code = verdict.kind === 'refused' ? (verdict.error as { key?: string }).key : undefined;
       return { kind: 'rejected', refusedStep: step, ...(code ? { code } : {}), answer: gated.lines };
     }
-    // `already-known` / `already-follows` contribute nothing but are not failures: the model restated
-    // something true. Drop the line and keep going rather than recording a duplicate.
-    if (verdict.kind === 'record') {
+    // A held line contributes nothing but is not a failure: the model restated something true. Drop the line and keep
+    // going rather than recording a duplicate (#2790, ADR-AG-462: the student's own row is for what HE typed).
+    if (verdict.kind === 'record' && !isHeld(verdict)) {
       accepted.push(verdict.line);
       if (verdict.configuration !== undefined) at = verdict.configuration;
       notice ??= verdict.notice;

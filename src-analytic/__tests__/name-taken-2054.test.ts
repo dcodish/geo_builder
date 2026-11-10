@@ -80,9 +80,9 @@ describe('#2061 (analytic arm) — the same letter with another coefficient cont
 
 describe('unchanged', () => {
   it.each([
-    [['משולש ABC', 'AB=a', 'AB=a'], 'already-known'],
-    [['משולש ABC', 'זווית ABC=α', 'זווית ABC=α'], 'already-known'],
-    [['משולש ABC', '∠ABC=2α', '∠ABC=2α'], 'already-known'],
+    [['משולש ABC', 'AB=a', 'AB=a'], 'record'],
+    [['משולש ABC', 'זווית ABC=α', 'זווית ABC=α'], 'record'],
+    [['משולש ABC', '∠ABC=2α', '∠ABC=2α'], 'record'],
     [['משולש ABC', 'AB=a', 'BC=a'], 'record'], // one letter on two segments: AB = BC
     [['משולש ABC', 'CB=c', 'AB=a', 'AB=c'], 'record'], // c names CB: the relation, never a second name
     [['משולש ABC', 'AB=a', 'AB=5'], 'record'], // a number pins the letter
