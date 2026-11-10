@@ -2397,3 +2397,13 @@ export const incircleRefusal3 = (sides: number): EngineError3 =>
 export type ApplyResult3 = { ok: true; next: Construction3 } | { ok: false; error: EngineError3 };
 
 export type Positions3 = Map<Id, Vec3>;
+
+/**
+ * #2795 ([ADR-3D-483](../../docs/06b-decisions-3d.md#adr-3d-483)) — WHERE A DRIVING SCALAR PIN CAME FROM: the claim it
+ * drives (set by the one claim recorder, `recordClaim3`) and the list position of the fact that stated it (set by the
+ * store's fold, `applyFact`, by count-delta). Read by the pivot's held-pin release (`resolveHeld3`): a pin is left out of
+ * the solve only when the figure is forced to hold it already, newest fact first, and its claim is then checked where
+ * the pin would have driven. Keyed by the pin OBJECT, so a construction's copies (`{ ...c, scalarPins }`, the parts of a
+ * split figure) share it; a pin with no entry (a query's temporary pin, the joint rung's) is never left out.
+ */
+export const scalarPinOrigin3 = new WeakMap<ScalarPin, { claim?: Claim3; fact?: number }>();

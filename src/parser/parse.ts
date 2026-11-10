@@ -35,7 +35,7 @@ import { findRadianAngle } from '../../shell/radianAngle';
 import { arcRunRoles } from '../../shell/arcRun';
 import { foreignGiven, rightAngledAtVertex } from './scope';
 import { incidenceList, objectListShape } from './incidenceList';
-import { readFrame } from './frame';
+import { readFrame, readSubjectFrame } from './frame';
 import { withImpliedPoints } from './impliedPoints';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting, RADICAL, radicalTerm, evalRadicalTerm, COUNT_DIGITS, UNIT_WORD } from '../../shell/llm/honestyCore';
@@ -14598,6 +14598,18 @@ const SIDE_CLAUSE = String.raw`\s*(?:שצלעו|שאורך\s+צלעו|שכל\s+�
 const SIDE_SHAPES = String.raw`ריבוע|מעוין|square|rhombus|(?:משולש\s+)?שווה[\s-]?צלעות|equilateral(?:\s+triangle)?`;
 
 export function normalizeUtterance(raw: string): string {
+  return readFrame(normalizeText(raw));
+}
+
+/**
+ * #2062 ([ADR-819](../../docs/06-decisions.md#adr-819)) — the line's SUBJECT FRAME («הנקודה M מקיימת …»), read off the
+ * normalised text before {@link readFrame} takes it away: the read-extent gate's exemption for the frame's subject.
+ */
+export function subjectFrameOf(raw: string): { subject: string; rest: string } | null {
+  return readSubjectFrame(normalizeText(raw));
+}
+
+function normalizeText(raw: string): string {
   // maqaf U+05BE → ASCII hyphen (so the ל-?/ב-?/מ-? suffix groups match); then strip invisible format
   // chars: ALM, ZWSP/ZWNJ/ZWJ/LRM/RLM, LRE…RLO, isolates LRI…PDI, BOM.
   // עיגול (disk) ≡ מעגל (circle): the everyday Hebrew synonym students use interchangeably. Normalising it
@@ -14673,8 +14685,9 @@ export function normalizeUtterance(raw: string): string {
   const words = normalizeWordEquality(normalizeWordDegrees(lengths));
   const folded = normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
   // #1676 (ADR-630): the exam's sentence frame — «בסרטוט שלפניך מתואר …», «O – …», «המרובע ABCD הוא טרפז (…)» — read
-  // off LAST, on the fully folded text, so every rule and every honesty gate sees the canonical sentence.
-  return readFrame(folded);
+  // off LAST, on the fully folded text, so every rule and every honesty gate sees the canonical sentence
+  // (`normalizeUtterance`, above).
+  return folded;
 }
 
 /**

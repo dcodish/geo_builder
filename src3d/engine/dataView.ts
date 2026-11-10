@@ -27,9 +27,7 @@ import { COMBINING_ARROW } from '../lexicon/marks3';
 import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { spellingOf } from './types';
 import type { Construction3, FreeVec3, FreeVecMetric3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';
-
-/** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
-type VecDef = Construction3['vecDefs'][number];
+import { applyCommand3 } from './apply';
 
 export interface VecEntry {
   /** Display label, e.g. `EN` or a declared name like `w`. */
@@ -52,11 +50,37 @@ export interface MutualRow {
   b: string;
   /** #577: `contained` is the linear×planar cell's own answer — a segment lying IN a plane is not
    *  'parallel' to it, and saying so would be a false statement. */
-  rel: MutualRel3 | 'perpendicular' | 'contained';
+  rel: MutualRel3 | 'perpendicular' | 'contained' | 'on-plane' | 'off-plane';
   /** #577: a LINEAR×PLANAR pair, with `a` the linear side. The wording is asymmetric here — «FG
    *  מקביל למישור ABCD», never the symmetric «מקבילים», which misreads for a plane — so the row
    *  carries its own kind rather than the App re-deriving it from the labels. */
   mixed?: true;
+}
+
+/**
+ * #2062 ([ADR-3D-480](../../docs/06b-decisions-3d.md#adr-3d-480)) — the stable key of a POINT × PLANE row, which the
+ * membership question («האם הנקודה M נמצאת במישור AEC?») points at and the App highlights. A plane named by a point
+ * run is keyed by its letters as a set, so «מישור ACE» finds the row of «מישור AEC».
+ */
+export function pointPlaneRowKey3(point: string, plane: string): string {
+  const run = plane.match(/[A-Z]\d*'?/g);
+  const planeKey = run && run.join('') === plane ? [...run].sort().join('') : plane;
+  return `point~plane:${point}:${planeKey}`;
+}
+
+/** The row's key, when it is a point × plane row. */
+export function mutualRowKey3(m: MutualRow): string {
+  return m.rel === 'on-plane' || m.rel === 'off-plane' ? pointPlaneRowKey3(m.a, m.b) : `${m.rel}-${m.a}-${m.b}`;
+}
+
+/**
+ * #2062 (ADR-3D-480) — what the panel knows about a point and a plane: the point × plane row, when the panel has one.
+ * The ONE decision both question surfaces read (the main input's `answer-in-panel` refusal and the ask lane), so the
+ * pointer never points at a row the panel does not show.
+ */
+export function pointPlaneRow3(panel: DataPanel, point: string, plane: string): MutualRow | null {
+  const key = pointPlaneRowKey3(point, plane);
+  return panel.mutual.find((m) => (m.rel === 'on-plane' || m.rel === 'off-plane') && mutualRowKey3(m) === key) ?? null;
 }
 
 export interface DataPanel {
@@ -557,29 +581,38 @@ export function decompStr(coefs: [number, number, number], names: string[]): str
   return parts.length ? parts.join(' ') : '0';
 }
 
-/** Render Σ(aᵢ + bᵢ·k)·nameᵢ — the exam's symbolic answer shape. */
-function decompSymStr(a: [number, number, number], b: [number, number, number], names: string[], sym: string): string {
+/**
+ * Render Σ(aᵢ + Σₖ bᵢₖ·symₖ)·nameᵢ — the exam's symbolic answer shape. One letter in a coefficient keeps the
+ * #297 spellings (`t·w`, `(t + 1/2)·u`, `(1/2 − t)·u`); several letters (#1829) read `(s + t)·u`, `(1 − s − t)·u`.
+ */
+function decompSymStr(a: [number, number, number], b: [number, number, number][], names: string[], syms: string[]): string {
   const parts: string[] = [];
-  for (let i = 0; i < 3; i++) {
+  const symTerm = (m: number, sym: string) => (Math.abs(m - 1) < 2e-3 ? sym : `${cleanCoef(m)}·${sym}`);
+  for (let i = 0; i < names.length && i < 3; i++) {
     const ai = Math.abs(a[i]) < 1e-3 ? 0 : a[i];
-    const bi = Math.abs(b[i]) < 1e-3 ? 0 : b[i];
-    if (ai === 0 && bi === 0) continue;
+    const live = syms.map((sym, k) => ({ sym, bk: Math.abs(b[k][i]) < 1e-3 ? 0 : b[k][i] })).filter((x) => x.bk !== 0);
+    if (ai === 0 && live.length === 0) continue;
     let coef: string;
     let neg = false;
-    if (bi === 0) {
+    if (live.length === 0) {
       neg = ai < 0;
       const m = Math.abs(ai);
       coef = Math.abs(m - 1) < 2e-3 ? '' : `${cleanCoef(m)}·`;
-    } else if (ai === 0) {
-      neg = bi < 0;
-      const m = Math.abs(bi);
-      coef = `${Math.abs(m - 1) < 2e-3 ? '' : cleanCoef(m) + '·'}${sym}·`;
-    } else if (bi > 0) {
-      const kPart = Math.abs(bi - 1) < 2e-3 ? sym : `${cleanCoef(bi)}·${sym}`;
-      coef = `(${kPart} ${ai < 0 ? '−' : '+'} ${cleanCoef(Math.abs(ai))})·`;
+    } else if (live.length === 1) {
+      const { sym, bk: bi } = live[0];
+      if (ai === 0) {
+        neg = bi < 0;
+        coef = `${symTerm(Math.abs(bi), sym)}·`;
+      } else if (bi > 0) {
+        coef = `(${symTerm(bi, sym)} ${ai < 0 ? '−' : '+'} ${cleanCoef(Math.abs(ai))})·`;
+      } else {
+        coef = `(${cleanCoef(ai)} − ${symTerm(-bi, sym)})·`;
+      }
     } else {
-      const kPart = Math.abs(bi + 1) < 2e-3 ? sym : `${cleanCoef(-bi)}·${sym}`;
-      coef = `(${cleanCoef(ai)} − ${kPart})·`;
+      // several letters: a constant reads first («1 − s − t», the barycentric shape), then the letters in order
+      const terms = live.map(({ sym, bk }) => ({ neg: bk < 0, text: symTerm(Math.abs(bk), sym) }));
+      const all = ai !== 0 ? [{ neg: ai < 0, text: cleanCoef(Math.abs(ai)) }, ...terms] : terms;
+      coef = `(${all.map((t, j) => (j === 0 ? (t.neg ? `−${t.text}` : t.text) : `${t.neg ? '−' : '+'} ${t.text}`)).join(' ')})·`;
     }
     const term = `${coef}${names[i]}`;
     parts.push(parts.length === 0 ? (neg ? `−${term}` : term) : neg ? `− ${term}` : `+ ${term}`);
@@ -655,44 +688,107 @@ export function basisDecompose(basis: { from: Id; to: Id }[], posArr: Positions3
 }
 
 /**
- * The PARAMETRIC decomposition of (from→to) in the first-3 declared-vector basis — the affine-in-parameter
- * form `1/2·u + 1/2·v − t·w` — when the construction has exactly one parameter symbol (FREE like `k` in
- * `SN=k·SC`, OR CONSTRAINT-DRIVEN like `t` in `AE=t·AS` with `EO⊥AS` pinning it). Evaluated at symbol=0
- * and symbol=1 (REPLACING any existing pin on that symbol so the probes aren't fought by the driving
- * constraint) and linearised. Null when there is no single such symbol, or the vector is not actually
- * symbol-dependent. Shared by the data panel and the query lane (#297) so they can never diverge.
- *
- * A symbol counts as a PARAMETER only if it actually VARIES across configurations
- * ([ADR-3D-070](../../docs/06b-decisions-3d.md), issue #302). A symbol the constraints have nailed to a
- * constant is a number — whether it was pinned by value or, like `t` under `SO⊥ABCD` on a box, determined
- * at exactly ½ by its driving constraint. Testing the PIN KIND instead of the symbol's behaviour let one
- * determined symbol elsewhere in the figure suppress every parametric row.
+ * #1829 (ADR-3D-471) — a figure with letters PINNED at values, through the student's own «k = …» route (apply's
+ * `symbol-value`, which asks `symbolOwnersOf` which lane owns the letter and gives every owner the value), so a ratio
+ * t, a coordinate letter k and an angle label α are pinned by one door. Null when a pin is refused.
  */
-export function parametricDecomp(c: Construction3, from: Id, to: Id, seeds: number[]): string | null {
+export function pinLetters3(c: Construction3, values: ReadonlyMap<string, number>): Construction3 | null {
+  let next = c;
+  for (const [symbol, value] of values) {
+    const r = applyCommand3(next, { type: 'symbol-value', symbol, value });
+    if (!r.ok) return null;
+    next = r.next;
+  }
+  return next;
+}
+
+/** #1829: where an open letter is pinned for a probe — a fraction of the span its own sampled values cover, so every
+ *  probe sits inside the range the figure itself drew (an angle's bound, a ratio's side of the segment). */
+export function letterSpan3(p: OpenParam3): { at: (x: number) => number } | null {
+  const vs = p.values.filter((v): v is number => v !== undefined && Number.isFinite(v));
+  if (vs.length < 2) return null;
+  const lo = Math.min(...vs);
+  const hi = Math.max(...vs);
+  if (!(hi - lo > 1e-6 * Math.max(1, Math.abs(hi)))) return null;
+  return { at: (x) => lo + x * (hi - lo) };
+}
+
+/**
+ * THE PARAMETRIC DECOMPOSITION (#297, generalised by #1829, [ADR-3D-471](../../docs/06b-decisions-3d.md#adr-3d-471)) —
+ * the vector (from→to) in the first-3 declared-vector basis as an AFFINE form in the figure's open letters:
+ * `t·w`, `u + t·v`, `s·u + t·v` (operator, 2026-10-06: *"it is ok for an answer to include a parameter or even more if
+ * thats the only way to show it"*). The letters are the params rows' OPEN ones (`paramRows3`), the one list the panel
+ * prints. Each is pinned at three values with the others held, every basis coefficient is fitted as an affine function
+ * of all of them, and the fit is ACCEPTED only when it is exact on a held-out joint sample (every letter moved at
+ * once): a non-affine dependence (cos α) or a freedom no letter names fails the check and prints nothing — never a
+ * wrong linear form. Reading a linear form off samples is not solving (src3d/CLAUDE.md: no CAS).
+ *
+ * A pinned letter REPLACES a relation that drove it (as `symbol-value` does), so the form is the identity the
+ * DEFINITIONS give — AE = t·AS stays `t·w` whatever drives t. Shared by the data panel and the ask lane (#297, the
+ * #481 rule), and reached only when the plain seed-stable decomposition failed (precedence: "only if that's the only
+ * way"). The pinned sample sets do not depend on the vector, so one fitter serves every row of a panel.
+ */
+export function parametricFitter3(c: Construction3, seeds: number[], open: readonly OpenParam3[]): (from: Id, to: Id) => string | null {
   const basisEntries = [...c.vectors.entries()].slice(0, 3);
-  if (basisEntries.length < 1) return null; // 1–2 declared vectors are a real basis for a planar/collinear figure (#311)
+  // a MEASURE letter (α, a length k) enters a basis coefficient through a cosine or a ratio, never affinely, so only the
+  // letters the placement reads as numbers are fitted (`letterNumbersAt3`'s own split); a vector that depends on α
+  // keeps the «תלוי ב-α» floor
+  const letters = open.flatMap((p) => {
+    const span = p.measure ? null : letterSpan3(p);
+    return span ? [{ sym: p.sym, span }] : [];
+  });
+  if (basisEntries.length < 1 || letters.length === 0) return () => null; // 1–2 declared vectors are a real basis (#311)
   const basis = basisEntries.map(([, d]) => d);
   const names = basisEntries.map(([n]) => n);
-  const posArr = knowledgeSamples3(c, seeds).map((r) => r.positions); // #1474: every branch, never a modulus
-  // a def whose OWN vector decomposes to stable coefficients is determined — its symbol does not vary.
-  // `basisDecompose` already answers exactly this (it is why a pinned `AS` prints numerically), so the
-  // predicate is a reuse of the shared sample set, never a second sampler (M3).
-  const varies = ({ vd }: { vd: VecDef; i: number }) =>
-    !c.symbolPins.some((p) => p.sym === vd.symbol && p.rel === 'value') &&
-    basisDecompose(basis, posArr, vd.from, vd.unknown) === null;
-  const syms = c.vecDefs.map((vd, i) => ({ vd, i })).filter(({ vd, i }) => vd.symbol && varies({ vd, i }));
-  if (syms.length !== 1) return null; // 0 → nothing parametric; ≥2 → genuinely two-parameter (#301), never faked
-  const sym = syms[0];
-  const at = (kv: number): [number, number, number] | null => {
-    const posArr = knowledgeSamples3({ ...c, symbolPins: [...c.symbolPins.filter((p) => p.sym !== sym.vd.symbol), { rel: 'value', value: kv, sym: sym.vd.symbol! }] }, seeds).map((r) => r.positions);
-    return basisDecompose(basis, posArr, from, to);
+  const MID = 0.5, LO = 0.2, HI = 0.8, HELD = 0.35;
+  const memo = new Map<string, Positions3[] | null>();
+  /** The sampled positions with letter k at `xk` and the others at MID; k = -1: all at MID; k = -2: all at HELD. */
+  const samplesAt = (k: number, xk: number): Positions3[] | null => {
+    const key = `${k}:${xk}`;
+    if (memo.has(key)) return memo.get(key)!;
+    const vals = new Map(letters.map((l, j) => [l.sym, l.span.at(k === -2 ? HELD : j === k ? xk : MID)] as const));
+    const pinned = pinLetters3(c, vals);
+    // the held probe at every seed is the "no freedom but the letters" check; the line probes need only agree
+    // with it, so two seeds each keep the fitter near the old single-letter cost (docs/17 §7)
+    const at = k === -1 ? seeds : seeds.slice(0, 2);
+    const out = pinned ? knowledgeSamples3(pinned, at).map((r) => r.positions) : null; // #1474: every branch
+    memo.set(key, out);
+    return out;
   };
-  const c0 = at(0);
-  const c1 = at(1);
-  if (!c0 || !c1) return null;
-  const slope = c1.map((x, i) => x - c0[i]) as [number, number, number];
-  if (slope.every((x) => Math.abs(x) < 1e-9)) return null; // not actually symbol-dependent
-  return decompSymStr(c0, slope, names, sym.vd.symbol!);
+  // an affine dependence is exact up to the solves' ~5e-6 wobble (`stableNums`' 1e-4): a curve the probes span
+  // narrowly still bends far more than that at the middle and the held-out sample
+  const TOL = 1e-4;
+  return (from, to) => {
+    const dec = (pos: Positions3[] | null) => (pos ? basisDecompose(basis, pos, from, to) : null);
+    const mid = dec(samplesAt(-1, MID));
+    if (!mid) return null; // the letters held, the vector still roams: a freedom no letter names
+    const slopes: [number, number, number][] = [];
+    for (let k = 0; k < letters.length; k++) {
+      const lo = dec(samplesAt(k, LO));
+      const hi = dec(samplesAt(k, HI));
+      if (!lo || !hi) return null;
+      const { at } = letters[k].span;
+      const dx = at(HI) - at(LO);
+      const slope = hi.map((h, i) => (h - lo[i]) / dx) as [number, number, number];
+      // three values with the others held: the middle one must sit on the line through the outer two
+      if (mid.some((m, i) => Math.abs(m - (lo[i] + slope[i] * (at(MID) - at(LO)))) > TOL * Math.max(1, Math.abs(m)))) return null;
+      slopes.push(slope);
+    }
+    if (slopes.every((s) => s.every((x) => Math.abs(x) < 1e-3))) return null; // not actually letter-dependent
+    const intercept = mid.map((m, i) => m - slopes.reduce((acc, s, k) => acc + s[i] * letters[k].span.at(MID), 0)) as [number, number, number];
+    // the held-out JOINT sample: every letter moved at once must land on the fitted form
+    const held = dec(samplesAt(-2, HELD));
+    if (!held) return null;
+    const predicted = intercept.map((a, i) => a + slopes.reduce((acc, s, k) => acc + s[i] * letters[k].span.at(HELD), 0));
+    if (held.some((h, i) => Math.abs(h - predicted[i]) > TOL * Math.max(1, Math.abs(h)))) return null;
+    const used = letters.map((l, k) => ({ sym: l.sym, slope: slopes[k] })).filter((l) => l.slope.some((x) => Math.abs(x) >= 1e-3));
+    return decompSymStr(intercept, used.map((l) => l.slope), names, used.map((l) => l.sym));
+  };
+}
+
+/** #297's one-vector entry point; the panel and the ask lane build one {@link parametricFitter3} and reuse it. */
+export function parametricDecomp(c: Construction3, from: Id, to: Id, seeds: number[]): string | null {
+  return parametricFitter3(c, seeds, paramRows3(c, knowledgeSamples3(c, seeds)).open)(from, to);
 }
 
 const near = (a: number, b: number) => Math.abs(a - b) < EPS;
@@ -833,12 +929,205 @@ export const panelSeeds3 = (at: Seed3): number[] => {
   return [seed, seed + 1013, seed + 2027];
 };
 
+/** #1829 (ADR-3D-471): the number a vec-def ratio letter takes in one drawing, read off the positions — the ask's
+ *  reading of «t» and the params row's, one reader (the #481 rule). Null when the letter defines no point here. */
+export function vecDefLetterAt3(c: Construction3, sym: string, pos: Positions3): number | null {
+  const vd = c.vecDefs.find((d) => d.symbol === sym);
+  if (!vd) return null;
+  const from = pos.get(vd.from);
+  const unknown = pos.get(vd.unknown);
+  if (!from || !unknown) return null;
+  const termVec = (atom: (typeof vd.terms)[number]['atom']): Vec3 | null => {
+    if (atom.kind === 'pair') {
+      const a = pos.get(atom.from);
+      const b = pos.get(atom.to);
+      return a && b ? sub3(b, a) : null;
+    }
+    const d = c.vectors.get(atom.name);
+    const a = d && pos.get(d.from);
+    const b = d && pos.get(d.to);
+    return a && b ? sub3(b, a) : null;
+  };
+  let lhs = sub3(unknown, from); // (unknown − from) − Σ k·atom
+  let dir = { x: 0, y: 0, z: 0 }; // Σ p·atom  (the direction the symbol scales)
+  for (const t of vd.terms) {
+    const v = termVec(t.atom);
+    if (!v) return null;
+    lhs = sub3(lhs, { x: v.x * t.coeff.k, y: v.y * t.coeff.k, z: v.z * t.coeff.k });
+    dir = { x: dir.x + v.x * t.coeff.p, y: dir.y + v.y * t.coeff.p, z: dir.z + v.z * t.coeff.p };
+  }
+  const d2 = dot3(dir, dir);
+  return d2 < 1e-12 ? null : dot3(lhs, dir) / d2;
+}
+
+/** #1829 (ADR-3D-471): an OPEN letter of the params rows — its sampled values (one per configuration the rows read;
+ *  `undefined` where the lane left it unresolved), whether a stated relation drives it («OE ⊥ AS» drives t), and whether
+ *  it names a MEASURE — an angle or a length («∠SAB = α», «|AB| = k») — rather than a number the placement reads. */
+export type OpenParam3 = { sym: string; values: (number | undefined)[]; driven: boolean; measure: boolean };
+
+/**
+ * THE PARAMS ROWS (#325, ADR-3D-079 Am. 2), as one function: the panel prints them, and #1829 (ADR-3D-471) reads the
+ * OPEN ones as the figure's free parameters — the one list the ask lane's «תלוי ב-t» rescue and the parametric vector
+ * forms pin, so the panel's «t = ?» and the ask's «u + t·v» can never be about two different sets of letters.
+ */
+export function paramRows3(c: Construction3, resolved: readonly Resolved3[]): { params: DataPanel['params']; known: Map<string, number>; open: OpenParam3[] } {
+  const readings = new Map<string, (number | undefined)[]>();
+  // #325 (ADR-3D-079 Am. 2): the pins' open symbols — determined values print, free ones read
+  // open, so `B(2t, t, k)` visibly registers even while the coordinates still read `?`.
+  const params: DataPanel['params'] = [];
+  // #2077 (ADR-3D-368): the value of every letter the params rows call DETERMINED, read off the same
+  // decision that prints «k = 2», so a stated row switches to values exactly when that row closes.
+  const known = new Map<string, number>();
+  // #1746 (ADR-3D-339): ONE builder for a params row — the panel prints `text`, the ask row prints `value`.
+  const paramRow = (sym: string, value: string | null, num?: number): DataPanel['params'][number] => {
+    if (value && num !== undefined && Number.isFinite(num)) known.set(sym, num);
+    return value ? { sym, text: `${sym} = ${value}`, value, open: false } : { sym, text: `${sym} = ?`, value: '?', open: true };
+  };
+  /** #1769: a pin symbol's root set when every seed's pool carries ≥ 2 roots and the sets agree; else null. */
+  const pinRootSets = (sym: string): number[] | null => {
+    const perSeed = resolved.map((r) => r.pivot?.symRoots?.[sym] ?? []);
+    if (perSeed.some((b) => b.length < 2) || !rootSetsAgree(perSeed, 1e-4)) return null;
+    return [...perSeed[0]].sort((x, y) => x - y);
+  };
+  for (const sym of figureSymbolsOf(c)) {
+    /**
+     * #2594 ([ADR-3D-389](docs/06b-decisions-3d.md#adr-3d-389), operator ruling 2026-10-28: *"yes - show k=?"*) — a
+     * letter that names a length takes the length's scale gate (`hasScale`, ADR-3D-054), before any owner arm, so no
+     * lane — the length arm below, or a number owner the #2580 tie set from that length — prices it around the gate.
+     */
+    if (letterIsGaugeLength3(c, sym)) {
+      params.push(paramRow(sym, null));
+      continue;
+    }
+    /**
+     * #2703 ([ADR-3D-443](docs/06b-decisions-3d.md#adr-3d-443)) — a letter the student GAVE a value prints that value, as
+     * typed (#1497's ruling: a given is printed as the student typed it), before any lane prices it: «k = 2.5», never
+     * the tiers' «5/2», and never «k = ?» beside a number the student typed (a `vec-defined` point runs no pivot, so
+     * the pin lane had no reading to price). After the gauge gate, which is about a letter naming a length.
+     */
+    const givenVal = c.symbolGivens.get(sym);
+    if (givenVal) {
+      params.push(paramRow(sym, givenText(givenVal.value, givenVal.src, (v) => cleanNum(v, 1e-4)), givenVal.value));
+      continue;
+    }
+    // #480: the ALGEBRAIC lane's parameter is not a pivot pin symbol — its value lives in
+    // `resolved.param`, and its branch set is the answer whenever the givens leave more than one.
+    if (sym === c.param) {
+      const perSeed = resolved.map((r) => r.param?.branches ?? []);
+      // the branch set is a property of the GIVENS, so it must agree across seeds; if it somehow
+      // does not, the symbol is not knowledge and reads open rather than picking a seed's version
+      const agree = rootSetsAgree(perSeed, 1e-6);
+      const text = agree ? branchAnswer(sym, perSeed[0]) : null;
+      params.push(paramRow(sym, text, perSeed[0].length === 1 ? perSeed[0][0] : undefined));
+      if (!text) readings.set(sym, resolved.map((r) => r.param?.value)); // an unpinned parameter: its sampled values
+      continue;
+    }
+    /**
+     * #939 ([ADR-3D-230](docs/06b-decisions-3d.md#adr-3d-230)) — the three owner kinds the panel did
+     * not price. Each is read from the SAME sampled resolutions the rest of this loop uses, so the
+     * seed-stability gate below applies unchanged: an undetermined letter still reads `?` and `open`,
+     * in every lane. No second sampler, and no second registry — {@link symbolOwnersOf} is asked what
+     * the letter denotes, exactly as every command that resolves a letter does.
+     */
+    const owners = symbolOwnersOf(c, sym);
+    const priced = owners.length > 0 && !owners.some((o) => o.kind === 'pin-sym' || o.kind === 'vec-def')
+      ? resolved.map((r) => {
+          const at = (id: Id) => r.positions.get(id);
+          for (const o of owners) {
+            if (o.kind === 'rider') {
+              // The rider's own parameter, read off the drawn figure: how far along its host it sits.
+              // `fromB` says the student measured from the far end, so the letter is 1 − that.
+              const def = c.points.get(o.id);
+              if (def?.kind !== 'on-segment') continue;
+              const a = at(def.a);
+              const b = at(def.b);
+              const e = at(o.id);
+              if (!a || !b || !e) continue;
+              const ab = sub3(b, a);
+              const len2 = dot3(ab, ab);
+              if (!(len2 > 1e-12)) continue;
+              const t = dot3(sub3(e, a), ab) / len2;
+              return o.fromB ? 1 - t : t;
+            }
+            if (o.kind === 'free-sym') {
+              // #1188 step 2 (ADR-3D-390): a free vector's letter — the free-vector system's value at this drawing
+              const v = r.freeSyms.get(sym);
+              if (v !== undefined) return v;
+            }
+            if (o.kind === 'component') {
+              // #814's own resolver, so the panel and the sign gate cannot disagree about the value.
+              const v = componentValue(c, o.target, o.axis, at, r.freeVectors); // #1188: a free vector's component
+              if (v !== undefined) return v;
+            }
+            if (o.kind === 'length') {
+              // #2092 (ADR-3D-381): the letter's value read off the drawn segment, its coefficient divided out
+              const m = o.marks[0];
+              const A = at(m.a);
+              const B = at(m.b);
+              if (!A || !B) continue;
+              return norm3(sub3(B, A)) / (m.coef ?? 1);
+            }
+            if (o.kind === 'angle') {
+              const m = o.marks[0];
+              const V = at(m.vertex);
+              const P = at(m.p);
+              const Q = at(m.q);
+              if (!V || !P || !Q) continue;
+              const u = sub3(P, V);
+              const w = sub3(Q, V);
+              const den = Math.sqrt(dot3(u, u) * dot3(w, w));
+              if (!(den > 1e-12)) continue;
+              return (Math.acos(Math.max(-1, Math.min(1, dot3(u, w) / den))) * 180) / Math.PI;
+            }
+          }
+          return undefined;
+        })
+      : null;
+    // #1829 (ADR-3D-471): a vec-def ratio letter is read off the drawing by the ask's own reader (`vecDefLetterAt3`),
+    // so a letter its relation DETERMINES («SO ⊥ ABCD» nails t at ½) reads closed, as the ask «t» already answered,
+    // instead of «t = ?» beside a figure that draws it at ½ in every configuration.
+    const vecDefOwned = owners.some((o) => o.kind === 'vec-def');
+    const vals = priced ?? resolved.map((r) => r.pivot?.pinSymbols?.[sym] ?? (vecDefOwned ? (vecDefLetterAt3(c, sym, r.positions) ?? undefined) : undefined));
+    const nums = vals.filter((v): v is number => v !== undefined && Number.isFinite(v));
+    // #797 (ADR-3D-168 Am. 1): seed-stability alone is not determinedness — a symbol restricted to
+    // DISCRETE roots (k ∈ {1,2} after two of Q2's three vectors) cannot be moved off a root by the
+    // Am. 2 anchor, and a deterministic root pick reads seed-stable. The admissible pool's distinct
+    // values must ALSO be a singleton at every sampled seed (operator ruling: only a fully
+    // determined symbol shows a value; otherwise «? »).
+    const singleRoot = resolved.every((r) => (r.pivot?.symRoots?.[sym]?.length ?? 1) <= 1);
+    /**
+     * #1769 (ADR-3D-395, operator ruling 2026-10-04 «show both»; format ADR-3D-336, operator ruling W1): a symbol the
+     * givens leave on SEVERAL discrete roots reads its root SET — «k = -1 או k = 2» — when every sampled seed's
+     * admissible pool carries the same set, exactly as the algebraic lane's branch set reads (the branch above). Any
+     * disagreement between seeds — a seed whose drive missed a root — is not knowledge, and reads the open «k = ?».
+     */
+    const rootSet = singleRoot ? null : pinRootSets(sym);
+    if (rootSet) {
+      params.push(paramRow(sym, branchAnswer(sym, rootSet)));
+      continue;
+    }
+    const stable =
+      singleRoot &&
+      nums.length === resolved.length && nums.every((v) => Math.abs(v - nums[0]) <= 1e-4 * Math.max(1, Math.abs(nums[0])));
+    params.push(paramRow(sym, stable ? cleanNum(nums[0], 1e-4) : null, nums[0]));
+    if (!stable) readings.set(sym, vals);
+  }
+  const open = params.filter((p) => p.open).map((p) => ({
+    sym: p.sym,
+    values: readings.get(p.sym) ?? [],
+    driven: c.symbolPins.some((q) => q.sym === p.sym && q.rel !== 'value'),
+    measure: symbolOwnersOf(c, p.sym).every((o) => o.kind === 'angle' || o.kind === 'length'),
+  }));
+  return { params, known, open };
+}
+
 export function dataView(c: Construction3, seed: Seed3): DataPanel {
   const seeds = panelSeeds3(seed);
   // #1474 (ADR-3D-283): the seeds cover the gauge, `knowledgeSamples3` every parameter branch at each —
   // so every agreement gate below reads ALL of `resolved`, never a fixed [0]/[1]/[2].
   const resolved = knowledgeSamples3(c, seeds, { readback: true }); // #2368: + the leftover placement freedom's image
   const positions = resolved.map((r) => r.positions);
+  const { params, known, open: openParams } = paramRows3(c, resolved); // #1829: before the vector rows, which read the open ones
   /**
    * #827 — the VECTOR lane needs the same branch guard the point lane got, for the same reason.
    *
@@ -918,7 +1207,7 @@ export function dataView(c: Construction3, seed: Seed3): DataPanel {
   // determined figure (the `|EN|=√6/4·|w|` path) still shows its numeric decomposition.
   const basisDefs = basis.map(([, d]) => d);
   const decompose = (a: Id, b: Id) => basisDecompose(basisDefs, positions, a, b);
-  const decomposeSym = (a: Id, b: Id) => parametricDecomp(c, a, b, seeds);
+  const decomposeSym = parametricFitter3(c, seeds, openParams); // #1829: one fitter, every row (the pinned samples are shared)
 
   const lengths = statedLengths(c);
   const pairKey = (a: Id, b: Id) => [a, b].sort().join('|');
@@ -1266,6 +1555,28 @@ export function dataView(c: Construction3, seed: Seed3): DataPanel {
         // a generic crossing is noise — the #384 precedent, applied to the mixed column too
       }
     }
+
+    // #2062 (ADR-3D-480; the operator's ruling of 2026-10-14, card `d14b-2062-question` A, *"if now - we should"*): a
+    // POINT side. The exam asks «האם הנקודה M נמצאת במישור AEC?», and the panel had no row for a point at all. Flood
+    // control, as #558's edge rule: only a point the student INTRODUCED (not a vertex of a solid — a box's eight
+    // vertices against every plane would be noise), against a planar side, never against a plane it defines (E × AEC).
+    // The relation is reported only when it is the same in every sampled configuration (the panel's knowledge rule).
+    const solidVertex = new Set(c.solids.flatMap((sd) => sd.ids));
+    const pointSides = [...c.points.keys()].filter((id) => /^[A-Z]\d*'?$/.test(id) && !solidVertex.has(id));
+    for (const id of pointSides) {
+      for (const pln of planar) {
+        if (pln.ids.includes(id)) continue;
+        const devs = resolved.map((res, k) => {
+          const p = res.positions.get(id);
+          const g = resolveOperand(pln.op, c, { lines: res.lines, planes: res.planes })((x: Id) => res.positions.get(x) ?? null);
+          const d = p && g ? distanceBetween({ point: p }, g) : null;
+          return d === null ? null : d / Math.max(1, figureExtent(positions[k]));
+        });
+        if (devs.some((d) => d === null)) continue;
+        if (devs.every((d) => d! < TOL)) mutual.push({ a: id, b: pln.label, rel: 'on-plane' });
+        else if (devs.every((d) => d! >= TOL)) mutual.push({ a: id, b: pln.label, rel: 'off-plane' });
+      }
+    }
   }
 
   // #384: stated DISTANCES — «המרחק בין AB לבין CD הוא 3» left the panel silent (operator play,
@@ -1503,140 +1814,6 @@ export function dataView(c: Construction3, seed: Seed3): DataPanel {
     if (eq) planeRows(name, eq);
   }
 
-  // #325 (ADR-3D-079 Am. 2): the pins' open symbols — determined values print, free ones read
-  // open, so `B(2t, t, k)` visibly registers even while the coordinates still read `?`.
-  const params: DataPanel['params'] = [];
-  // #2077 (ADR-3D-368): the value of every letter the params rows call DETERMINED, read off the same
-  // decision that prints «k = 2», so a stated row switches to values exactly when that row closes.
-  const known = new Map<string, number>();
-  // #1746 (ADR-3D-339): ONE builder for a params row — the panel prints `text`, the ask row prints `value`.
-  const paramRow = (sym: string, value: string | null, num?: number): DataPanel['params'][number] => {
-    if (value && num !== undefined && Number.isFinite(num)) known.set(sym, num);
-    return value ? { sym, text: `${sym} = ${value}`, value, open: false } : { sym, text: `${sym} = ?`, value: '?', open: true };
-  };
-  /** #1769: a pin symbol's root set when every seed's pool carries ≥ 2 roots and the sets agree; else null. */
-  const pinRootSets = (sym: string): number[] | null => {
-    const perSeed = resolved.map((r) => r.pivot?.symRoots?.[sym] ?? []);
-    if (perSeed.some((b) => b.length < 2) || !rootSetsAgree(perSeed, 1e-4)) return null;
-    return [...perSeed[0]].sort((x, y) => x - y);
-  };
-  for (const sym of figureSymbolsOf(c)) {
-    /**
-     * #2594 ([ADR-3D-389](docs/06b-decisions-3d.md#adr-3d-389), operator ruling 2026-10-28: *"yes - show k=?"*) — a
-     * letter that names a length takes the length's scale gate (`hasScale`, ADR-3D-054), before any owner arm, so no
-     * lane — the length arm below, or a number owner the #2580 tie set from that length — prices it around the gate.
-     */
-    if (letterIsGaugeLength3(c, sym)) {
-      params.push(paramRow(sym, null));
-      continue;
-    }
-    /**
-     * #2703 ([ADR-3D-443](docs/06b-decisions-3d.md#adr-3d-443)) — a letter the student GAVE a value prints that value, as
-     * typed (#1497's ruling: a given is printed as the student typed it), before any lane prices it: «k = 2.5», never
-     * the tiers' «5/2», and never «k = ?» beside a number the student typed (a `vec-defined` point runs no pivot, so
-     * the pin lane had no reading to price). After the gauge gate, which is about a letter naming a length.
-     */
-    const givenVal = c.symbolGivens.get(sym);
-    if (givenVal) {
-      params.push(paramRow(sym, givenText(givenVal.value, givenVal.src, (v) => cleanNum(v, 1e-4)), givenVal.value));
-      continue;
-    }
-    // #480: the ALGEBRAIC lane's parameter is not a pivot pin symbol — its value lives in
-    // `resolved.param`, and its branch set is the answer whenever the givens leave more than one.
-    if (sym === c.param) {
-      const perSeed = resolved.map((r) => r.param?.branches ?? []);
-      // the branch set is a property of the GIVENS, so it must agree across seeds; if it somehow
-      // does not, the symbol is not knowledge and reads open rather than picking a seed's version
-      const agree = rootSetsAgree(perSeed, 1e-6);
-      const text = agree ? branchAnswer(sym, perSeed[0]) : null;
-      params.push(paramRow(sym, text, perSeed[0].length === 1 ? perSeed[0][0] : undefined));
-      continue;
-    }
-    /**
-     * #939 ([ADR-3D-230](docs/06b-decisions-3d.md#adr-3d-230)) — the three owner kinds the panel did
-     * not price. Each is read from the SAME sampled resolutions the rest of this loop uses, so the
-     * seed-stability gate below applies unchanged: an undetermined letter still reads `?` and `open`,
-     * in every lane. No second sampler, and no second registry — {@link symbolOwnersOf} is asked what
-     * the letter denotes, exactly as every command that resolves a letter does.
-     */
-    const owners = symbolOwnersOf(c, sym);
-    const priced = owners.length > 0 && !owners.some((o) => o.kind === 'pin-sym' || o.kind === 'vec-def')
-      ? resolved.map((r) => {
-          const at = (id: Id) => r.positions.get(id);
-          for (const o of owners) {
-            if (o.kind === 'rider') {
-              // The rider's own parameter, read off the drawn figure: how far along its host it sits.
-              // `fromB` says the student measured from the far end, so the letter is 1 − that.
-              const def = c.points.get(o.id);
-              if (def?.kind !== 'on-segment') continue;
-              const a = at(def.a);
-              const b = at(def.b);
-              const e = at(o.id);
-              if (!a || !b || !e) continue;
-              const ab = sub3(b, a);
-              const len2 = dot3(ab, ab);
-              if (!(len2 > 1e-12)) continue;
-              const t = dot3(sub3(e, a), ab) / len2;
-              return o.fromB ? 1 - t : t;
-            }
-            if (o.kind === 'free-sym') {
-              // #1188 step 2 (ADR-3D-390): a free vector's letter — the free-vector system's value at this drawing
-              const v = r.freeSyms.get(sym);
-              if (v !== undefined) return v;
-            }
-            if (o.kind === 'component') {
-              // #814's own resolver, so the panel and the sign gate cannot disagree about the value.
-              const v = componentValue(c, o.target, o.axis, at, r.freeVectors); // #1188: a free vector's component
-              if (v !== undefined) return v;
-            }
-            if (o.kind === 'length') {
-              // #2092 (ADR-3D-381): the letter's value read off the drawn segment, its coefficient divided out
-              const m = o.marks[0];
-              const A = at(m.a);
-              const B = at(m.b);
-              if (!A || !B) continue;
-              return norm3(sub3(B, A)) / (m.coef ?? 1);
-            }
-            if (o.kind === 'angle') {
-              const m = o.marks[0];
-              const V = at(m.vertex);
-              const P = at(m.p);
-              const Q = at(m.q);
-              if (!V || !P || !Q) continue;
-              const u = sub3(P, V);
-              const w = sub3(Q, V);
-              const den = Math.sqrt(dot3(u, u) * dot3(w, w));
-              if (!(den > 1e-12)) continue;
-              return (Math.acos(Math.max(-1, Math.min(1, dot3(u, w) / den))) * 180) / Math.PI;
-            }
-          }
-          return undefined;
-        })
-      : null;
-    const vals = priced ?? resolved.map((r) => r.pivot?.pinSymbols?.[sym]);
-    const nums = vals.filter((v): v is number => v !== undefined && Number.isFinite(v));
-    // #797 (ADR-3D-168 Am. 1): seed-stability alone is not determinedness — a symbol restricted to
-    // DISCRETE roots (k ∈ {1,2} after two of Q2's three vectors) cannot be moved off a root by the
-    // Am. 2 anchor, and a deterministic root pick reads seed-stable. The admissible pool's distinct
-    // values must ALSO be a singleton at every sampled seed (operator ruling: only a fully
-    // determined symbol shows a value; otherwise «? »).
-    const singleRoot = resolved.every((r) => (r.pivot?.symRoots?.[sym]?.length ?? 1) <= 1);
-    /**
-     * #1769 (ADR-3D-395, operator ruling 2026-10-04 «show both»; format ADR-3D-336, operator ruling W1): a symbol the
-     * givens leave on SEVERAL discrete roots reads its root SET — «k = -1 או k = 2» — when every sampled seed's
-     * admissible pool carries the same set, exactly as the algebraic lane's branch set reads (the branch above). Any
-     * disagreement between seeds — a seed whose drive missed a root — is not knowledge, and reads the open «k = ?».
-     */
-    const rootSet = singleRoot ? null : pinRootSets(sym);
-    if (rootSet) {
-      params.push(paramRow(sym, branchAnswer(sym, rootSet)));
-      continue;
-    }
-    const stable =
-      singleRoot &&
-      nums.length === resolved.length && nums.every((v) => Math.abs(v - nums[0]) <= 1e-4 * Math.max(1, Math.abs(nums[0])));
-    params.push(paramRow(sym, stable ? cleanNum(nums[0], 1e-4) : null, nums[0]));
-  }
 
   // #1196: the STATED vector rows need no sampling — they are givens, not measurements — so they are
   // composed from the construction rather than from the three resolved configurations above.

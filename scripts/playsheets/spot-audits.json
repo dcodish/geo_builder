@@ -12,6 +12,24 @@
         "z1 = 3+4i"
       ],
       "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i»."
+    },
+    {
+      "sheet": "prod-2026-11-10-3",
+      "id": "P6",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-10",
+      "product": "analytic",
+      "base": "https://themathbible.com",
+      "path": "/analytic-builder/",
+      "lines": [
+        "נתונה פרבולה שמשוואתה y^2=4px",
+        "p > 0",
+        "K על הפרבולה",
+        "y_K = 12",
+        "F מוקד הפרבולה",
+        "KF = 20"
+      ],
+      "lookFor": "«p» answers «2 או 18»."
     }
   ],
   "results": [

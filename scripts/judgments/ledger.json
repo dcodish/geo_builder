@@ -4095,6 +4095,81 @@
       "status": "pending"
     },
     {
+      "id": "Q-2790b",
+      "issue": 2790,
+      "question": "«נתון ישר y=2x+1» then «נתון ישר l2: y=2x+1» (a student name over the tool's l-number): (a) own row with the held notice; (b) rename silently.",
+      "class": "restated-fact-held-row",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A line restating a line already in the figure is its own row with the held notice in every case; a new name does not take it out of that rule (Q-2790a 'b'); the student's name still replaces the tool's l-number (2026-10-20).",
+      "precedents": [
+        {
+          "quote": "ruling - if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists. this should be on all tools.",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-200"
+        },
+        {
+          "quote": "b",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2790#issuecomment-6750486021"
+        }
+      ],
+      "confidence": "high",
+      "at": "2026-11-10T18:58:37.525Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2790c",
+      "issue": 2790,
+      "question": "3-D held relation rows show the held notice AND an older relation note (#396/#842/#850): (a) one held notice; (b) both.",
+      "class": "restated-fact-held-row",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "In 3-D a held statement says one thing — that it already exists: the held notice replaces the older relation notes, as ADR-3D-449 replaced them under the 2026-11-06 ruling.",
+      "precedents": [
+        {
+          "quote": "In all cases it should say כבר קיים",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/2341#issuecomment-6683983248"
+        }
+      ],
+      "confidence": "high",
+      "at": "2026-11-10T18:58:37.525Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2793c",
+      "issue": 2793,
+      "question": "«תיבה» · «X_B=3» (one off-origin component, no sign): should «הציגו תצורה אחרת» slide the figure along its unanchored axes? (a) keep ADR-3D-373, it stays put; (b) slide at every configuration.",
+      "class": "stated-component-unanchored-axis-slide",
+      "verdict": "escalate",
+      "reason": "(b) would reverse ADR-3D-373 §4 with no ruling ordering it; his words conflict (ADR-052 no fixed position vs FR-SP-4 keep it flat on the floor); ADR-3D-373's figure decision is a session's scoping, not his words.",
+      "nearest": [
+        {
+          "quote": "4 - b",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2746#issuecomment-6745659180"
+        },
+        {
+          "quote": "Keep it flat on the floor",
+          "date": "2026-10-31",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/02b-requirements-3d.md"
+        }
+      ],
+      "at": "2026-11-10T15:52:09.298Z",
+      "status": "escalated"
+    },
+    {
+      "id": "text-2625-parabola-no-centre",
+      "kind": "text",
+      "issue": "#2625",
+      "what": "The refusal for «O מרכז הפרבולה» and its spellings (a parabola has no centre; ruled Q-2625b (a))",
+      "choice": "«לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, הכלי עדיין לא קורא אותו.» — the reason, then an honest next step: the vertex is what the student may mean, and the tool does not read it yet",
+      "chosen": true,
+      "at": "2026-11-10T17:24:27.784Z",
+      "status": "pending"
+    },
+    {
       "id": "text-2790-held-notice",
       "kind": "text",
       "issue": "#2790",

@@ -63,7 +63,6 @@
     "delete": "Delete",
     "edit": "Edit in place",
     "toggleTitle": "Include in the figure",
-    "claimVerified": "The claim was verified against the figure",
     "planeFace": "Face only",
     "planeFull": "Full plane",
     "dihedralShow": "Show construction",
@@ -249,7 +248,9 @@
       "perpendicular": "{{a}} is perpendicular to {{b}}",
       "contained": "{{a}} lies in plane {{b}}",
       "parallelPlane": "{{a}} is parallel to plane {{b}}",
-      "perpendicularPlane": "{{a}} is perpendicular to plane {{b}}"
+      "perpendicularPlane": "{{a}} is perpendicular to plane {{b}}",
+      "on-plane": "{{a}} lies in plane {{b}}",
+      "off-plane": "{{a}} does not lie in plane {{b}}"
     }
   },
   "scope": {
@@ -275,6 +276,7 @@
       "unavailable": "those points aren't in the figure",
       "noObject": "that object isn't in the figure",
       "undetermined": "not determined by the givens",
+      "inPanel": "The answer is in the data panel — the row for the mutual position of {{point}} and plane {{plane}}",
       "noFrame": "no coordinate system, so no equation — what IS known about the plane is shown. For an equation, state one point's coordinates (e.g. A(0,0,0)) or a plane/line equation",
       "noFrameLine": "no coordinate system, so no line equation. For an equation, state one point's coordinates (e.g. A(0,0,0)) or a plane/line equation",
       "scale": "depends on the figure's scale (pin a size)",

@@ -7,7 +7,8 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { derive3, useGeo3 } from '../store/store3';
+import { decideSubmit3, derive3, useGeo3 } from '../store/store3';
+import { refusalCategory3 } from '../app/decideDeterministic3';
 import { resolve3 } from '../engine/evaluate';
 import { answerQuery } from '../engine/queries';
 import { dataView } from '../engine/dataView';
@@ -410,6 +411,72 @@ describe('#642 — naming the subject is the same question', () => {
 });
 
 /**
+ * #1829 (ADR-3D-471) — an answer may be stated in the figure's free letters when that is the only way to state it
+ * (operator, 2026-10-06: *"it is ok for an answer to include a parameter or even more if thats the only way to show
+ * it"*). Before, «AE» on his rectangle read «לא נקבע על ידי הנתונים»: the parametric form knew one vec-def letter and
+ * his t defines two points, and the «תלוי ב-…» rescue knew angle labels only.
+ */
+describe('#1829 — answers that keep the free letters', () => {
+  beforeEach(reset);
+  const RECT = ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'AB=1', '|AD|=√7', 'DF→ = t*DC→', 'BE→ = t*BC→'];
+
+  it.each([
+    ['AE', 'u + t·v'],
+    ['AE→', 'u + t·v'],
+    ['וקטור AE', 'u + t·v'],
+    ['vector AE', 'u + t·v'],
+    ['AF→', 't·u + v'],
+    ['EF→', '(t − 1)·u + (1 − t)·v'],
+  ])("the operator's rectangle: «%s» answers %s", (q, want) => {
+    expect(ans(RECT, q).answer).toBe(want);
+  });
+
+  it('a vector with a letter-free answer keeps it (precedence: the stable form first)', () => {
+    expect(ans(RECT, 'AC→').answer).toBe('u + v');
+    expect(ans(RECT, 'AB→').answer).toBe('u');
+  });
+
+  it('a length that depends on t answers «depends on t», not «not determined»', () => {
+    expect(ans(RECT, '|AE|')).toMatchObject({ answer: null, note: 'depends', param: 't' });
+  });
+
+  it('one letter, one number: F and E are drawn at the same t in every configuration', () => {
+    const { c } = build(RECT);
+    for (const s of [0, 1, 7, 1013, 2027]) {
+      const p = resolve3(c, s).positions;
+      const ratio = (a: string, b: string, x: string) => {
+        const ab = { x: p.get(b)!.x - p.get(a)!.x, y: p.get(b)!.y - p.get(a)!.y, z: p.get(b)!.z - p.get(a)!.z };
+        const ax = { x: p.get(x)!.x - p.get(a)!.x, y: p.get(x)!.y - p.get(a)!.y, z: p.get(x)!.z - p.get(a)!.z };
+        return (ab.x * ax.x + ab.y * ax.y + ab.z * ax.z) / (ab.x * ab.x + ab.y * ab.y + ab.z * ab.z);
+      };
+      expect(ratio('D', 'C', 'F'), `seed ${s}`).toBeCloseTo(ratio('B', 'C', 'E'), 9);
+    }
+  });
+
+  it('two letters answer in both (s·u + t·v class): each coefficient carries its own letter', () => {
+    const two = ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'BE→ = s*BC→', 'DF→ = t*DC→'];
+    expect(ans(two, 'AE').answer).toBe('u + s·v');
+    expect(ans(two, 'EF').answer).toBe('(t − 1)·u + (1 − s)·v');
+    // both letters in ONE coefficient: E and F on the same side, measured from its two ends
+    expect(ans(['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'BE→ = s*BC→', 'CF→ = t*CB→'], 'EF').answer).toBe('(1 − s − t)·v');
+  });
+
+  it('a non-affine dependence (s·t) never prints a linear form — it «depends on» its letters', () => {
+    const bilinear = ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'BE→ = s*BC→', 'EF→ = t*ED→'];
+    const r = ans(bilinear, 'AF');
+    expect(r.answer).toBeNull();
+    expect(r).toMatchObject({ note: 'depends', param: 's, t' });
+  });
+
+  it("the data panel's vector rows print the ask's form (one decision, two surfaces)", () => {
+    const { c, seed } = build([...RECT, 'AE']);
+    const row = dataView(c, seed).vectors.find((v) => v.label === 'AE');
+    expect(row?.decomp).toBe(answerQuery(c, 'AE', seed).answer);
+    expect(row?.decomp).toBe('u + t·v');
+  });
+});
+
+/**
  * #1541 (ADR-3D-475) — a LINE's equation is askable: «משוואת BB'» answered «לא זוהה» on a figure whose panel
  * printed B and B'. The question is read BY the statement grammar (`lineAskOf`, the ADR-3D-279 mechanism), a
  * point pair answers `x = P + t·PQ` as given (operator ruling 2026-09-29), and a named line answers from the
@@ -499,5 +566,28 @@ describe('#1541 — the line-equation ask', () => {
       expect(examples.length).toBeGreaterThanOrEqual(7);
       for (const ex of examples) expect(answerQuery(c, ex, seed).note, ex).not.toBe('notUnderstood');
     }
+  });
+});
+
+// #2062 (ADR-3D-480): the exam's membership question — one decision, two surfaces (this box and the main input)
+describe('#2062 — «האם הנקודה M נמצאת במישור AEC?» points at the panel row', () => {
+  const EXAM = ["תיבה ABCDA'B'C'D'", "נסמן: AA' = w, AB = v, AD = u", "הנקודה E היא אמצע המקצוע BB'", 'הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w', 'מישור AEC'];
+  it('the ask lane answers with the pointer, in every spelling', () => {
+    for (const q of ['האם הנקודה M נמצאת במישור AEC?', 'האם M נמצאת במישור AEC', 'is M in plane AEC?']) {
+      const r = ans(EXAM, q);
+      expect(r, q).toMatchObject({ answer: null, note: 'inPanel', inPanel: { point: 'M', plane: 'AEC' } });
+    }
+  });
+  it('where the panel has no row, the honest «לא נקבע על ידי הנתונים»', () => {
+    expect(ans(["קובייה ABCDA'B'C'D'", 'M אמצע AB'], "האם M נמצאת במישור ACC'?")).toMatchObject({ answer: null, note: 'undetermined' });
+  });
+  it('the main input: nothing is added, and the refusal carries the same decision', () => {
+    const st = build(EXAM);
+    const facts = useGeo3.getState().facts;
+    const v = decideSubmit3({ facts, seed: st.seed }, 'האם הנקודה M נמצאת במישור AEC?');
+    expect(v).toEqual({ kind: 'refused', error: { code: 'answer-in-panel', point: 'M', plane: 'AEC', known: true } });
+    expect(refusalCategory3({ code: 'answer-in-panel', point: 'M', plane: 'AEC', known: true })).toBe('guided');
+    const none = decideSubmit3({ facts: facts.slice(0, -1), seed: st.seed }, 'האם הנקודה M נמצאת במישור AEC?');
+    expect(none).toEqual({ kind: 'refused', error: { code: 'answer-in-panel', point: 'M', plane: 'AEC', known: false } });
   });
 });

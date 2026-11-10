@@ -90,6 +90,11 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // equal-lengths claim has nothing to compare there; that arm waits for the operator (#2492).
     case 'proof-target':
       return t(PROOF_TARGET_KEY, { sentence: err.sentence });
+    // #2062 (ADR-3D-480; the operator's ruling of 2026-10-14, card `d14b-2062-question` A): the exam's membership question
+    // is answered by pointing at the panel row that holds it; where the panel has none, the ask lane's undetermined note.
+    case 'answer-in-panel':
+      // one sentence, both surfaces: the ask lane's note keys
+      return err.known ? t('query.note.inPanel', { point: err.point, plane: err.plane }) : t('query.note.undetermined');
     // #1837 (ADR-W-142): an angle in radians — 2-D's ruled degrees sentence, verbatim (ADR-W-118 B1).
     case 'radian-angle':
       return t('err.radianAngle');

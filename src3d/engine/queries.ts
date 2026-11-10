@@ -15,17 +15,17 @@
 import { knowledgeSamples3, letterIsGaugeLength3, resolve3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3 } from './evaluate';
 import { seedNumber3, type Seed3 } from './components3';
 import { SHAPE_SUBJ } from '../lexicon/nouns3';
-import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, branchAnswer, decompStr, lineEquationForms3, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeOffsetAnchored3, planeSymbols } from './dataView';
+import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, branchAnswer, decompStr, letterSpan3, lineEquationForms3, linePlaneAngleAt, vecDefLetterAt3, paramRows3, parametricFitter3, parametricPlaneForm, pinLetters3, planeEqStr, planeOffsetAnchored3, planeSymbols, type OpenParam3, pointPlaneRow3 } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { angleBetweenOperands, distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
 import { revolutionMeasure } from './claims';
-import { angleAskOperands, componentAskOf, foldPrimes3, lineAskOf, revolutionAskOf } from '../parser/parse3';
+import { angleAskOperands, componentAskOf, foldPrimes3, lineAskOf, membershipQuestion3, revolutionAskOf } from '../parser/parse3';
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
 import { namedVector3 } from './vecExpr';
 import { foldGlyphs } from '../../shell/glyphFold';
-import type { Construction3, Id, Operand3, Positions3, Requirement3 } from './types';
+import type { Construction3, Id, Operand3, Positions3 } from './types';
 
 /** An operand: a declared vector name, or an ordered point pair. */
 type Atom = { named: string } | { pair: [Id, Id] };
@@ -65,7 +65,9 @@ type Query =
   | { kind: 'plane'; name: string | null; ids: Id[] | null }
   // #1541 (ADR-3D-475): «משוואת BB'» / «משוואת הישר ℓ» — a line's equation, read by the statement grammar
   // (`lineAskOf`). A POINT PAIR is answered from its two points; a NAMED line from the canvas echo's decision.
-  | { kind: 'line'; name: string; pair: [Id, Id] | null };
+  | { kind: 'line'; name: string; pair: [Id, Id] | null }
+  // #2062 (ADR-3D-480): «האם הנקודה M נמצאת במישור AEC?» — answered by pointing at the panel's point × plane row.
+  | { kind: 'membership'; point: Id; plane: string };
 
 /** #1746 (ADR-3D-339) — every query kind, so the ask-row sweep can be TOTAL over them (a new kind cannot
  *  ship without a row case). */
@@ -92,6 +94,8 @@ export interface QueryResult {
   note?: string;
   /** For note `depends`: the free named parameter(s) the quantity is a function of («α»). */
   param?: string;
+  /** #2062 (ADR-3D-480): for note `inPanel` — the point and the plane whose panel row holds the answer. */
+  inPanel?: { point: string; plane: string };
   /**
    * #1543 (ADR-3D-301) — how the question's ECHO is rendered: `'vector'` iff the parse bound at least one
    * operand as a VECTOR ({@link queryEcho3}); `'plain'` otherwise, and always for a question that was not
@@ -138,6 +142,7 @@ function vectorAtoms(q: Query): Atom[] {
     case 'component':
     case 'plane':
     case 'line':
+    case 'membership':
       return [];
     default: {
       const unhandled: never = q;
@@ -232,6 +237,13 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   // `parseValueQuery` gets this for free by running the whole of `normalizeUtterance`).
   const s = foldGlyphs(foldPrimes3(raw)).replace(/\s+/g, ' ').trim();
   if (!s) return null;
+
+  // #2062 (ADR-3D-480): the exam's membership question — the statement reader's own (`membershipQuestion3`), so the
+  // main input and this box read the same sentences.
+  {
+    const mq = membershipQuestion3(s);
+    if (mq) return { kind: 'membership', point: mq.point, plane: mq.plane };
+  }
 
   // #319 — LINE↔PLANE angle: «הזווית בין SB למישור ABC» / «angle between SB and plane ABC»
   // (valueless — a QUESTION; the statement form with a value/label is the linePlaneAngle fact rule).
@@ -418,37 +430,6 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   return null;
 }
 
-/** Solve a vec-def's free symbol from the resolved positions: `unknown = from + Σ(k+p·sym)·atom` ⇒
- *  `sym = [(unknown−from) − Σk·atom] · (Σp·atom) / |Σp·atom|²`. Null when the symbol carries no direction. */
-function solveSymbol(c: Construction3, sym: string, pos: Positions3): number | null {
-  const vd = c.vecDefs.find((d) => d.symbol === sym);
-  if (!vd) return null;
-  const from = pos.get(vd.from);
-  const unknown = pos.get(vd.unknown);
-  if (!from || !unknown) return null;
-  const termVec = (atom: (typeof vd.terms)[number]['atom']): Vec3 | null => {
-    if (atom.kind === 'pair') {
-      const a = pos.get(atom.from);
-      const b = pos.get(atom.to);
-      return a && b ? sub3(b, a) : null;
-    }
-    const d = c.vectors.get(atom.name);
-    const a = d && pos.get(d.from);
-    const b = d && pos.get(d.to);
-    return a && b ? sub3(b, a) : null;
-  };
-  let lhs = sub3(unknown, from); // (unknown − from) − Σ k·atom
-  let dir = { x: 0, y: 0, z: 0 }; // Σ p·atom  (the direction the symbol scales)
-  for (const t of vd.terms) {
-    const v = termVec(t.atom);
-    if (!v) return null;
-    lhs = sub3(lhs, { x: v.x * t.coeff.k, y: v.y * t.coeff.k, z: v.z * t.coeff.k });
-    dir = { x: dir.x + v.x * t.coeff.p, y: dir.y + v.y * t.coeff.p, z: dir.z + v.z * t.coeff.p };
-  }
-  const d2 = dot3(dir, dir);
-  return d2 < 1e-12 ? null : dot3(lhs, dir) / d2;
-}
-
 /**
  * A queried solid's volume — through the SHARED subject resolver (#766, ADR-3D-169).
  *
@@ -485,6 +466,7 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
     case 'component':
     case 'plane':
     case 'line':
+    case 'membership':
       return null;
     case 'distance': {
       const ctx = abs ?? { lines: new Map(), planes: new Map() };
@@ -543,7 +525,7 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
     case 'volume':
       return solidVolume(c, q.ids, pos);
     case 'symbol':
-      return solveSymbol(c, q.sym, pos);
+      return vecDefLetterAt3(c, q.sym, pos);
     case 'vector':
       return null; // handled in answerQuery (a vector isn't a single scalar), never reached here
     case 'combo': {
@@ -564,7 +546,7 @@ function isUnitOn(coefs: [number, number, number], i: number): boolean {
  *  coefficients agree across seeds, even with a free scale), its PARAMETRIC form when the coefficients
  *  are affine in the construction's single parameter (#297: «AE» ⇒ `t·w`, shared with the data panel so
  *  a query answer and its panel row can't diverge), and its coordinates (only with a frame). */
-function vectorForms(c: Construction3, a: Atom, posArr: Positions3[], seeds: number[]): string[] {
+function vectorForms(c: Construction3, a: Atom, posArr: Positions3[], fit: ((from: Id, to: Id) => string | null) | null): string[] {
   const parts: string[] = [];
   const basisEntries = [...c.vectors.entries()].slice(0, 3);
   // 1–2 declared vectors are a real basis for a planar/collinear figure (#311); the decomposition
@@ -591,7 +573,7 @@ function vectorForms(c: Construction3, a: Atom, posArr: Positions3[], seeds: num
     // #297 — the numeric decomposition isn't stable (a driven-parameter vector: AE = t·w): show the
     // PARAMETRIC form instead, the same one the data panel surfaces (shared `parametricDecomp`).
     if (!pushedDecomp && !selfBasis && ft) {
-      const sym = parametricDecomp(c, ft[0], ft[1], seeds);
+      const sym = fit?.(ft[0], ft[1]);
       if (sym) parts.push(sym);
     }
   }
@@ -616,26 +598,27 @@ function vectorForms(c: Construction3, a: Atom, posArr: Positions3[], seeds: num
 }
 
 /**
- * When a quantity varies, is it a FUNCTION of a free NAMED parameter (α from «∠SAB = α», bounded but
- * unpinned)? Returns a construction with every such parameter PINNED to an in-bound value, plus the
- * parameter names — so the caller can re-check: if the quantity settles once α is fixed, it «depends on α»
- * ([ADR-3D-057](docs/06b-decisions-3d.md)). The tool never SOLVES the relation (t = ⅔cosα needs symbolic
- * algebra, the no-CAS boundary) — it only names the dependency, which is the pedagogical point.
+ * When a quantity varies, is it a FUNCTION of the figure's free NAMED parameters (α from «∠SAB = α», bounded but
+ * unpinned; a ratio t from «BE = t·BC»; a coordinate letter k)? Returns a construction with every such parameter
+ * PINNED inside the range the figure itself samples, plus the parameter names — so the caller can re-check: if the
+ * quantity settles once they are fixed, it «depends on t» ([ADR-3D-057](docs/06b-decisions-3d.md)). The tool never
+ * SOLVES the relation (t = ⅔cosα needs symbolic algebra, the no-CAS boundary) — it only names the dependency.
+ *
+ * #1829 ([ADR-3D-471](docs/06b-decisions-3d.md#adr-3d-471)): the parameters are the params rows' OPEN letters
+ * (`paramRows3`, the list the panel prints as «t = ? — פרמטר חופשי»), pinned through the student's own «t = …» door
+ * (`pinLetters3`). This read angle labels only, so a ratio letter never reached the rescue and «|AE|» said «לא נקבע»
+ * about a length fully known as a function of t. A letter a stated relation DRIVES («OE ⊥ AS» drives t) is not a free
+ * parameter — it is a function of the others — and the quantity asked is never its own parameter («t» asked is
+ * not «תלוי ב-t»).
  */
-function pinFreeMeasures(c: Construction3): { c: Construction3; params: string } | null {
-  const labels = [...new Set(c.angleMarks.map((m) => m.label).filter((l): l is string => !!l))];
-  if (labels.length === 0) return null;
-  const scalarPins = [...c.scalarPins];
-  for (const m of c.angleMarks) {
-    if (!m.label) continue;
-    const req = c.requirements.find(
-      (r): r is Extract<Requirement3, { kind: 'angle-bound' }> =>
-        r.kind === 'angle-bound' && r.vertex === m.vertex && ((r.p === m.p && r.q === m.q) || (r.p === m.q && r.q === m.p)),
-    );
-    const deg = req ? ((req.min ?? (req.max ?? 90) - 30) + (req.max ?? (req.min ?? 0) + 30)) / 2 : 60; // the bound's midpoint, else a generic acute value
-    scalarPins.push({ kind: 'vangle', vertex: m.vertex, p: m.p, q: m.q, deg });
-  }
-  return { c: { ...c, scalarPins }, params: labels.join(', ') };
+function pinFreeMeasures(c: Construction3, open: readonly OpenParam3[], asked?: string): { c: Construction3; params: string } | null {
+  const free = open.flatMap((p) => {
+    const span = !p.driven && p.sym !== asked ? letterSpan3(p) : null;
+    return span ? [{ sym: p.sym, value: span.at(0.5) }] : [];
+  });
+  if (free.length === 0) return null;
+  const pinned = pinLetters3(c, new Map(free.map((p) => [p.sym, p.value] as const)));
+  return pinned ? { c: pinned, params: free.map((p) => p.sym).join(', ') } : null;
 }
 
 /** Answer one query against the figure — the whole honesty gate (stability + scale) lives here. */
@@ -733,6 +716,12 @@ export function answerQuery(c: Construction3, text: string, seed: Seed3): QueryR
 
 /** Answer one PARSED question (the echo is attached by {@link answerQuery}). */
 function answerParsed(c: Construction3, text: string, q: Query, seed: Seed3): Answer3 {
+  // #2062 (ADR-3D-480): one decision, two surfaces — the panel's point × plane row, as the main input reads it
+  if (q.kind === 'membership') {
+    return pointPlaneRow3(dataView(c, seed), q.point, q.plane)
+      ? { text, answer: null, note: 'inPanel', inPanel: { point: q.point, plane: q.plane } }
+      : { text, answer: null, note: 'undetermined' };
+  }
   const seeds = querySeeds3(seed);
   const stableNums = (vals: (number | null)[]): number | null => {
     if (vals.some((v) => v === null || !Number.isFinite(v))) return null;
@@ -794,9 +783,13 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: Seed3): An
   }
 
   if (q.kind === 'vector') {
-    const posArr = knowledgeSamples3(c, seeds, RB).map((r) => r.positions);
+    const resolvedV = knowledgeSamples3(c, seeds, RB);
+    const posArr = resolvedV.map((r) => r.positions);
     if (atomVec(c, q.a, posArr[0]) === null) return { text, answer: null, note: 'unavailable' };
-    const forms = vectorForms(c, q.a, posArr, seeds);
+    // #1829 (ADR-3D-471): the open letters, read off the params rows' own decision — the parametric form and the
+    // «תלוי ב-…» rescue below pin the SAME list the panel prints
+    const open = paramRows3(c, resolvedV).open;
+    const forms = vectorForms(c, q.a, posArr, parametricFitter3(c, seeds, open));
     if (forms.length) return { text, answer: forms.join('  =  ') };
     /**
      * The PANEL's own vector row is the fallback (#1450, the #481 rule): a free injected vector
@@ -817,8 +810,8 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: Seed3): An
       }
     }
     // undetermined — but does it settle once a free named parameter α is fixed? Then «depends on α».
-    const pin = pinFreeMeasures(c);
-    if (pin && vectorForms(pin.c, q.a, knowledgeSamples3(pin.c, seeds, RB).map((r) => r.positions), seeds).length) {
+    const pin = pinFreeMeasures(c, open);
+    if (pin && vectorForms(pin.c, q.a, knowledgeSamples3(pin.c, seeds, RB).map((r) => r.positions), null).length) {
       return { text, answer: null, note: 'depends', param: pin.params };
     }
     return { text, answer: null, note: 'undetermined' };
@@ -924,7 +917,8 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: Seed3): An
     return v === null ? { text, answer: null, note: 'undetermined' } : { text, answer: piMultiple(v) };
   }
 
-  const vals = knowledgeSamples3(c, seeds, RB).map((r) => evalQuery(c, q, r.positions, { lines: r.lines, planes: r.planes }, r.freeVectors));
+  const resolvedS = knowledgeSamples3(c, seeds, RB);
+  const vals = resolvedS.map((r) => evalQuery(c, q, r.positions, { lines: r.lines, planes: r.planes }, r.freeVectors));
   if (vals.some((v) => v === null || !Number.isFinite(v)))
     // #1450: a SYMBOL that cannot be measured is 'undetermined' — 'unavailable' is worded about
     // points («הנקודות האלו אינן בציור»), which is how asking «k» blamed letters that were fine.
@@ -934,7 +928,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: Seed3): An
   const val0 = stableNums(vals);
   if (val0 === null) {
     // undetermined — but does it settle once a free named parameter α is fixed? Then «depends on α».
-    const pin = pinFreeMeasures(c);
+    const pin = pinFreeMeasures(c, paramRows3(c, resolvedS).open, q.kind === 'symbol' ? q.sym : undefined);
     if (pin && stableNums(knowledgeSamples3(pin.c, seeds, RB).map((r) => evalQuery(pin.c, q, r.positions, { lines: r.lines, planes: r.planes }, r.freeVectors))) !== null) {
       return { text, answer: null, note: 'depends', param: pin.params };
     }

@@ -1,7 +1,7 @@
 /** Public surface of the grammar parser (Phase 4). The `utterance → command[]` boundary. */
 
 export { parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, impliedPointBinding, droppedNewLabels, droppedGivenNumbers, statedNumberOccurrences, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs,
-  droppedComparison, droppedRadiusSymbol, introducedNewLabels, droppedRegionSubject, droppedMidsegment, droppedConstructNoun, normalizeUtterance,
+  droppedComparison, droppedRadiusSymbol, introducedNewLabels, droppedRegionSubject, droppedMidsegment, droppedConstructNoun, normalizeUtterance, subjectFrameOf,
   statedLabelTokens, distributedClauses, typedLabels, circleWithOtherCentre, doubleCentreNaming, lowercaseLabelFold, latinProseLabels, liftTeachable, definedLabels, lowercaseMeasureLetters, latinAngleLetters, upperCasedLabelCandidate, hebrewLabelCandidate, VERB_GATES, augmentParseCtx, cevianPairReadings } from './parse';
 export type { ParseResult, ParseContext, CevianPairSegment } from './parse';
 export { buildParseCtx, inscribedCircles } from './context';
