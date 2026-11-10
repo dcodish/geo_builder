@@ -129,7 +129,7 @@ describe('#2201 3b — (1) the four leak issues’ exact sequences', () => {
     // already true. Never the floor, never ∠AAB. Read from the locale table (one source).
     { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 40'], after: plain(T.he('errors.overConstrained_said', { said: 'קשת AB = 40', what: '∠AOB = 40°' })) + ' ' + HINT_HE },
     { issue: '#2345', lines: ['חצי מעגל AOB', 'קשת AB = 40'], after: plain(T.he('errors.overConstrained_said', { said: 'קשת AB = 40', what: '∠AOB = 40°' })) + ' ' + HINT_HE },
-    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 90'], after: plain(T.he('suite.notice.alreadyDrawn', {})) },
+    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 90'], after: plain(T.he('suite.notice.alreadyHeld', {})) },
     // The arc-end-is-centre sentence itself, its letters re-based to the middle-letter centre (#2486): O is the centre.
     { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AO = 40'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AO = 40', end: 'O' })) },
     { issue: '#2345', lines: ['רבע מעגל BAO', 'קשת AB = 40'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AB = 40', end: 'A' })) },

@@ -50,8 +50,8 @@ describe('#960 — the verdicts, measured', () => {
     expect((v as { detail?: string }).detail ?? '').toMatch(/cannot hold|impossible: the angle at/);
   });
 
-  it('re-typing an existing shape is a friendly no-op, never an escalation (ADR-156)', () => {
-    expect(verdictAfter(['square ABCD'], 'square ABCD').kind).toBe('noop');
+  it('re-typing an existing shape is a held row, never an escalation (ADR-156; its own row since #2790, ADR-W-200)', () => {
+    expect(verdictAfter(['square ABCD'], 'square ABCD')).toMatchObject({ kind: 'commit', held: true });
   });
 
   it('a deferrable constraint typed EARLY still commits — order-independence (ADR-104)', () => {
