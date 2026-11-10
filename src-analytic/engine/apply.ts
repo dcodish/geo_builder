@@ -3394,6 +3394,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
             ok: true,
             effect: 'narrowed',
             next: { ...c, objects: c.objects.map((o) => (o.id === twin.id ? { ...twin, label, stated: twin.stated || f.stated } : o)) },
+            // #2790 (ADR-AG-463 Am. 1, judged Q-2790b (a)): a DRAWN line restated under the student's name over the tool's
+            // l-number is its own row with the already-held notice, and the name replaces the l-number (2026-10-20)
+            ...(twin.stated ? { notice: heldName(f.src, incoming) } : {}),
           };
         }
         if (verdict === 'already-named') {
