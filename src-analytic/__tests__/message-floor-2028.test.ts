@@ -32,6 +32,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'radian-angle': [{ detail: 'π/2' }],
   'arc-length-unread': [{ detail: 'AB' }], // #2032 (ADR-AG-408)
   'parabola-no-diameter': [{ detail: 'AB' }], // #2625 (ADR-AG-454)
+  'not-canonical': [{ detail: 'פרבולה קנונית (y - 1)^2 = 4(x - 2)', line: '(y - 1)^2 = 4(x - 2)', curve: 'parabola' }, { detail: 'אליפסה קנונית (x - 3)^2/25 + y^2/9 = 1', line: '(x - 3)^2/25 + y^2/9 = 1', curve: 'ellipse' }], // #2664 (ADR-AG-455)
   'parabola-no-centre': [{ detail: 'O מרכז הפרבולה' }], // #2625 (ADR-AG-454 Am. 1)
   'unread-name': [{}],
   'unread-word': [{}],

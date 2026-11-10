@@ -262,6 +262,8 @@ export function errorText(error: InputError, t: Translate): string {
     // An id with no prefix (and so no kind) falls to the kind-free wording rather than guessing.
     'unknown-reference': kind ? UNKNOWN_REF_KEY[kind] : 'errUnknownRef',
     'kind-mismatch': 'errKindMismatch',
+    // #2664 (ADR-AG-455) — «קנונית» with an equation off the origin: the session's sentence (ADR-W-174)
+    'not-canonical': 'errNotCanonical',
     'does-not-exist': 'errDoesNotExist',
     'ring-contradicts-noun': 'errRingContradictsNoun',
     // #1849 (ADR-AG-247) — the givens flatten a declared polygon: the polygon and both statements named
@@ -330,7 +332,7 @@ export function errorText(error: InputError, t: Translate): string {
     'load-unreadable': 'errLoadUnreadable',
   }[error.key];
   const crossed: SecondCrossingCurve =
-    (error.key === 'third-crossing' || error.key === 'tangent-no-second-crossing') && error.curve ? error.curve : 'circle';
+    (error.key === 'third-crossing' || error.key === 'tangent-no-second-crossing' || error.key === 'not-canonical') && error.curve ? error.curve : 'circle';
   const near = error.key === 'unknown-reference' && error.nearMiss ? ` ${nearMissText(kind ?? 'curve', error.nearMiss, t)}` : '';
   return t(key, {
     detail: error.detail,
@@ -361,7 +363,7 @@ export function errorText(error: InputError, t: Translate): string {
         : '',
     second: error.key === 'crossing-already-named' && error.operands ? error.operands[1] : '',
     other: 'other' in error ? error.other : '',
-    line: error.key === 'third-crossing' ? (error.line ?? '') : '',
+    line: error.key === 'third-crossing' || error.key === 'not-canonical' ? (error.line ?? '') : '',
     a: error.key === 'third-crossing' ? (error.a ?? '') : '',
     b: error.key === 'third-crossing' ? (error.b ?? '') : '',
     id: error.key === 'tangent-no-second-crossing' ? (error.id ?? '') : '',

@@ -761,6 +761,11 @@ interface CurveHit {
   kind: CurveKind;
   eqSrc: string;
   /**
+   * The noun said «קנונית» / "canonical" (#2664, ADR-AG-455). Once a parabola or an ellipse may sit anywhere the word
+   * carries meaning, so it is carried to `classify` as a claim, never swallowed.
+   */
+  canonical?: true;
+  /**
    * «משוואת המעגל היא …» — the equation of THE circle, definite and unnamed (#1633, ADR-AG-196): a statement
    * about the circle the figure has when it has one, lowered through `the-circle`; only with none is it the
    * circle's own creation.
@@ -1022,16 +1027,17 @@ function matchCurve(line: string): CurveHit | null {
    * (02c R7, `kind-mismatch`).
    */
   const heNamed = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?ה?(מעגל|פרבולה|אליפסה)(?:\\s+קנונית)?\\s*${CIRCLE_NUMERAL_RUN}${NAMING_TAIL_HE}(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?ה?(מעגל|פרבולה|אליפסה)(\\s+קנונית)?\\s*${CIRCLE_NUMERAL_RUN}${NAMING_TAIL_HE}(.+)$`),
   );
   if (heNamed) {
     const kind = KIND_NOUNS[heNamed[1]] as NumeralKind;
-    const numeral = heNamed[2] ?? '';
+    const numeral = heNamed[3] ?? '';
     return {
-      id: numeral ? numeralCurveId(kind, numeral) : `curve-${anonIndex(heNamed[3])}`,
+      id: numeral ? numeralCurveId(kind, numeral) : `curve-${anonIndex(heNamed[4])}`,
       name: numeral ? `${heNamed[1]} ${numeral}` : '',
       kind,
-      eqSrc: heNamed[3],
+      eqSrc: heNamed[4],
+      ...(heNamed[2] ? { canonical: true as const } : {}),
       ...(kind === 'circle' && !numeral && CONTEXTUAL_CIRCLE_EQ_HE.test(line) ? { contextual: true } : {}),
     };
   }
@@ -1055,17 +1061,18 @@ function matchCurve(line: string): CurveHit | null {
    * lowercase `i`/`v` as a name (the ADR-AG-006 / #1093 trap), so the words carry their own case.
    */
   const enNamed = line.match(
-    new RegExp(`^(?:[Tt]he\\s+)?(?:[Cc]anonical\\s+)?([Cc]ircle|[Pp]arabola|[Ee]llipse)\\s*${CIRCLE_NUMERAL_RUN}${NAMING_TAIL_EN}(.+)$`),
+    new RegExp(`^(?:[Tt]he\\s+)?([Cc]anonical\\s+)?([Cc]ircle|[Pp]arabola|[Ee]llipse)\\s*${CIRCLE_NUMERAL_RUN}${NAMING_TAIL_EN}(.+)$`),
   );
   if (enNamed) {
-    const noun = enNamed[1].toLowerCase();
+    const noun = enNamed[2].toLowerCase();
     const kind = KIND_NOUNS[noun] as NumeralKind;
-    const numeral = enNamed[2] ?? '';
+    const numeral = enNamed[3] ?? '';
     return {
-      id: numeral ? numeralCurveId(kind, numeral) : `curve-${anonIndex(enNamed[3])}`,
+      id: numeral ? numeralCurveId(kind, numeral) : `curve-${anonIndex(enNamed[4])}`,
       name: numeral ? `${noun} ${numeral}` : '',
       kind,
-      eqSrc: enNamed[3],
+      eqSrc: enNamed[4],
+      ...(enNamed[1] ? { canonical: true as const } : {}),
     };
   }
 
@@ -10494,7 +10501,7 @@ function parseClauseRules(raw: string): ParseResult {
            * sentence about it. A named one does not: its name is how the student refers to it.
            */
           label: { name: curve.name, kind: curve.kind, ...(curve.name ? {} : { eqSrc: trim(curve.eqSrc) }) },
-          curve: { kind: curve.kind, eq },
+          curve: { kind: curve.kind, eq, ...(curve.canonical ? { canonical: true as const } : {}) },
           // The student named the curve and gave its equation — this sentence IS the curve, UNLESS a
           // bounded noun said the drawn object is the segment (then the line is its carrier).
           stated: !bounded,

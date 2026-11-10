@@ -641,6 +641,37 @@ describe('#2625 (ADR-AG-454) — a diameter of the parabola is refused with its 
   });
 });
 
+describe('#2664 (ADR-AG-455) — the reader of a non-canonical conic', () => {
+  it('a line opening and closing with brackets that are not one pair is not unwrapped: «(y-1)^2 = 4(x-2)» reads', () => {
+    const r = parseLine('(y-1)^2 = 4(x-2)');
+    expect(r.ok && r.facts[0].t).toBe('curve');
+    // A whole line in brackets is still the line.
+    const wrapped = parseLine('(O היא ראשית הצירים)');
+    expect(wrapped.ok && wrapped.facts.map((f) => f.t)).toEqual((({ ok, ...r }) => ok && 'facts' in r ? r.facts.map((f) => f.t) : null)(parseLine('O היא ראשית הצירים')));
+  });
+  it.each([
+    ['נתונה פרבולה קנונית שמשוואתה (y-1)^2=4(x-2)', true],
+    ['נתונה אליפסה קנונית (x-3)^2/25+y^2/9=1', true],
+    ['the canonical parabola y^2=8x', true],
+    ['נתונה פרבולה שמשוואתה (y-1)^2=4(x-2)', false],
+  ])('«%s» carries the word «קנונית» as a claim: %s', (line, claimed) => {
+    const r = parseLine(line);
+    const curve = r.ok ? r.facts.find((f) => f.t === 'curve') : undefined;
+    expect(curve && curve.t === 'curve' ? curve.curve.canonical === true : null).toBe(claimed);
+  });
+  it('the refusal names the equation and the word, in both locales', () => {
+    type T = (k: string, o?: Record<string, unknown>) => string;
+    const plain = (x: string) => x.replace(/[⁦-⁩]/g, '');
+    const err = { key: 'not-canonical', detail: 'פרבולה קנונית (y-1)^2=4(x-2)', line: '(y-1)^2=4(x-2)', curve: 'parabola' } as const;
+    expect(plain(errorText(err, analyticI18n.getFixedT('he') as unknown as T))).toBe(
+      'המשוואה «(y-1)^2=4(x-2)» אינה של פרבולה קנונית: פרבולה זו אינה בראשית הצירים. הסירו את המילה «קנונית» כדי לבנות אותה.',
+    );
+    expect(plain(errorText(err, analyticI18n.getFixedT('en') as unknown as T))).toBe(
+      'The equation «(y-1)^2=4(x-2)» is not of a parabola in canonical position: it is not at the origin. Remove the word «canonical» to build it.',
+    );
+  });
+});
+
 describe('#2625 (ADR-AG-454 Am. 1) — the centre of a parabola is refused with its reason (ruling Q-2625b (a))', () => {
   it.each([
     ['מרכז הפרבולה'],
