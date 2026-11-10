@@ -852,6 +852,13 @@ must be one `readShapePhrase` lowers whole, its arity must match the letters and
 phrase's own or the generic «מרובע». Anything else is returned unchanged. It is the second copy of analytic's
 `frameAnalytic.ts` (copied, BOUNDARIES.json); a third copy (3-D, #1679/#1888) moves the pure part to `shell/`.
 
+**The subject frame** ([ADR-819](06-decisions.md#adr-819), #2062): `readSubjectFrame` reads «(ה)נקודה? X מקיי(ם|מת|מים|מות)
+:? rest» / "(the)? (point)? X satisf(ies|y) :? rest" and gives `rest` only when `rest` names X as a label; `readFrame`
+applies it after `UNWRAP`. `normalizeUtterance` = `readFrame(normalizeText(raw))`, and `subjectFrameOf(raw)` reads the
+frame off `normalizeText` before it comes off, for `unreadParts`' exemption: the frame's subject is a co-reference to
+its statement's label (the substitution probe would otherwise see it unread, since a frame about a substituted letter
+that the statement also names still comes off). Analytic's `satisfiesClause` and 3-D's `readSubjectFrame3` are copies.
+
 ### The bar spelling of a length, folded at the normalize boundary ([ADR-719](06-decisions.md#adr-719))
 
 `normalizeUtterance` folds a **two-label** absolute-value pair to the pair — `|AB|` → `AB`, `| A1B1 |` → `A1B1` — right

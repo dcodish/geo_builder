@@ -379,7 +379,8 @@ that rewrite to the twin's own text, so no second lowering exists: `circleCentre
 named by its centre with an equation), `centresRespectivelyClauses` (two namings paired by the shared `respectively`
 helper), `namedCirclesClauses` (a plural subject distributed over its named members), the copula/construct forms in
 `centreClauses` and `diameterClauses`, and `satisfiesClause` (taken in `readLine` only when the statement's facts name
-the point; the point is then declared). `circleCentreClauses` keeps the A2 ordinal («M מרכז המעגל האחד EQ»; English "one of
+the point; the point is then declared; the colon after the verb and the masculine «מקיים» since ADR-AG-460, #2062 — the
+spelling 2-D's `readSubjectFrame` and 3-D's `readSubjectFrame3` share). `circleCentreClauses` keeps the A2 ordinal («M מרכז המעגל האחד EQ»; English "one of
 the circles" / "the other circle"), which `centreOfCircle` reads off the tail (`PAIR_ORDINAL`) as `centre-of { ofPair }`
 ([ADR-AG-322](06c-decisions-analytic.md#adr-ag-322), #2397). `orthography` folds a capital's underscored digit index into the subscript
 glyph (`SUB_INDEX`), and `unwrap`'s glued «ש-» after a given-word never takes the first letter of a cardinal

@@ -806,7 +806,8 @@ export function distributedCrossingClauses(line: string): string[] | null {
  * is not this sentence and M is never silently dropped.
  */
 export function satisfiesClause(line: string): { subject: string; clause: string } | null {
-  const m = new RegExp(`^(?:ה?נקודה\\s+|(?:[Tt]he\\s+)?[Pp]oint\\s+)?(${NAME})\\s+(?:מקיימ(?:ת|ים|ות)?|satisfies)\\s+(.+)$`).exec(line);
+  // #2062 (ADR-AG-460): the colon after the verb («הנקודה M מקיימת: AM = MB») is the same frame, as 2-D and 3-D read it.
+  const m = new RegExp(`^(?:ה?נקודה\\s+|(?:[Tt]he\\s+)?[Pp]oint\\s+)?(${NAME})\\s+(?:מקיי(?:ם|מת|מים|מות)|satisf(?:ies|y))(?:\\s*:\\s*|\\s+)(.+)$`).exec(line);
   return m ? { subject: m[1], clause: m[2].trim() } : null;
 }
 

@@ -97,6 +97,8 @@ describe('#1746 — the class: every query kind\'s JOINED row names its subject 
       { lines: ['A(1,2,3)', 'B(2,4,6)'], q: 'משוואת AB', want: 'משוואת AB = x = (1, 2, 3) + t·(1, 2, 3)' },
       { lines: ['ישר l x=(1,2,3)+t(1,0,2)'], q: 'משוואת הישר l', want: 'משוואת הישר l = x = (1, 2, 3) + t·(1, 0, 2)' },
     ],
+    // #2062 (ADR-3D-480): a membership question has no value — its note points at the panel row
+    membership: [{ lines: [...CUBE, 'M אמצע AB', "מישור ACC'"], q: "האם M נמצאת במישור ACC'?", want: "האם M נמצאת במישור ACC'? — inPanel" }],
   };
 
   for (const [kind, cases] of Object.entries(CASES)) {
