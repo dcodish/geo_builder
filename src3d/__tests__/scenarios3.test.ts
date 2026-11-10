@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { freeDofCount3 } from '../engine/evaluate';
 import { dist3, ringSelfCrossing3 } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
+import { answerQuery } from '../engine/queries';
 import { dataView, panelIsEmpty } from '../engine/dataView';
 import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
@@ -986,5 +987,15 @@ describe('pyramid-dart-base-2702 — «פירמידה SABCD שבסיסה דלת�
     submit('מרובע ABDC');
     expect(state().lastError).toEqual({ code: 'ring-crossed', stated: 'מרובע ABDC' });
     expect(state().facts.map((f) => f.utterance)).toEqual([first]);
+// #1541 (ADR-3D-475) — the operator's exact sequence (prod, 2026-09-29): the panel printed B and B', and the
+// ask box answered «משוואת BB'» with «לא זוהה». The line is now asked the way it is stated, answered as given.
+describe('line-ask-by-points-1541 — «משוואת BB\'» answers the line through two known points', () => {
+  beforeEach(reset);
+
+  it("his figure: «משוואת BB'» → x = (0, 7, 8) + t·(2, 8, -16)", () => {
+    ["קוביה ABCDA'B'C'D'", "משוואת מישור A'B'C'D' היא x+4y-8z-126=0", 'B(0,7,8)'].forEach(submit);
+    expectAllOk();
+    const r = answerQuery(derived().construction, "משוואת BB'", state().seed);
+    expect(r).toMatchObject({ answer: 'x = (0, 7, 8) + t·(2, 8, -16)', echo: 'plain' });
   });
 });

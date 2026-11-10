@@ -703,8 +703,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   (planes by name or by points, named lines, the plural «הזווית בין המישורים X ו-Y») and every
   solid-of-revolution measure (volume, lateral area, total surface) that the tool checks as a given is
   answered as a question with the value dropped: «הזווית בין המישורים π1 ו-π2» → 54.74°, «נפח החרוט» →
-  100π.
-  - Sources: ADR-052, ADR-3D-279, #1449.
+  100π. A **line's equation** is askable the same way: «משוואת BB'» / «משוואת הישר BB'» / «הישר BB'» answers
+  `x = (0, 7, 8) + t·(2, 8, -16)` — anchored at the first-named point, the pair's own direction, unreduced —
+  when both points are known on a figure with coordinates (otherwise the reason, never a sampled number);
+  «משוואת הישר ℓ» answers what the canvas label shows.
+  - Sources: ADR-052, ADR-3D-279, #1449, ADR-3D-475, #1541.
 
 ## Rendering
 

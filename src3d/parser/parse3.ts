@@ -5692,6 +5692,30 @@ export function angleAskOperands(raw: string): { a: Operand3; b: Operand3 } | nu
 }
 
 /**
+ * #1541 (ADR-3D-475) — the ask form of a LINE's equation, read the way {@link angleAskOperands} reads an
+ * angle: «משוואת BB'» is «משוואת BB' היא x = …» without its value. The question is lowered by the
+ * statement grammar (`parametricLine`) with a placeholder body, and only the NAME it binds is kept — a
+ * point pair («BB'») or a line name («ℓ», «l1» → «ℓ1»). Every head the statement reads («משוואת הישר AB»,
+ * «הצגה פרמטרית של הישר AB», «הישר ℓ», "the equation of line AB") is askable by construction; no second
+ * grammar (ADR-3D-279's Rejected clause).
+ */
+export function lineAskOf(raw: string): { name: string; pair: [string, string] | null } | null {
+  const q = raw.replace(/\s*[?？]\s*$/, '').trim();
+  // A line question NAMES its subject with a head («משוואת», «הישר», "equation of line"): a single bare
+  // token («BB'», «l») stays the vector / symbol / point lanes' question, where it has always been read.
+  if (!q || !/\s/.test(q)) return null;
+  for (const copula of [':', ' היא', ' הוא', ' is']) {
+    const r = parse3(`${q}${copula} x = (0,0,0) + t(1,0,0)`);
+    if (!r.ok || r.commands.length === 0) continue;
+    const [head, ...rest] = r.commands;
+    if (head.type !== 'line3' || !rest.every((cmd) => cmd.type === 'on-line' && cmd.line === head.name)) continue;
+    const pair = head.name.match(/^([A-Z]\d*'?)([A-Z]\d*'?)$/);
+    return { name: head.name, pair: pair ? [pair[1], pair[2]] : null };
+  }
+  return null;
+}
+
+/**
  * #1449 (ADR-3D-279) — the ask form of a solid-of-revolution measure, read the same way as
  * {@link angleAskOperands}: «נפח החרוט» is «נפח החרוט = 100π» without its value. A sphere's
  * «שטח הפנים» lowers to `lateral-area-eq` (its only surface), which measures the same number.
