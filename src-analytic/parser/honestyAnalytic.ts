@@ -287,8 +287,8 @@ function factAccounts(line: string): { names: string[]; numbers: number[]; perp:
  * through) is read by its stated role, in {@link roleVerdicts} (ADR-AG-405):
  * - a line `y = mx + n`: m and n; a vertical `x = k`: k;
  * - a circle `(x−a)² + (y−b)² = r²`: a, b, r;
- * - a canonical ellipse `x²/a² + y²/b² = 1`: its centre (0, 0), a, b;
- * - a canonical parabola `y² = 2px`: its vertex (0, 0), p.
+ * - an ellipse `(x−h)²/a² + (y−k)²/b² = 1`: its centre (h, k) — (0, 0) when canonical — a, b;
+ * - a parabola `(y−k)² = 2p(x−h)` (or opening along y): its vertex (h, k), p (#2664).
  * Unsigned, like every account (the scanner is unsigned).
  */
 function curveParameters(c: NumCurve): number[] {
@@ -297,10 +297,11 @@ function curveParameters(c: NumCurve): number[] {
       return Math.abs(c.b) > 1e-12 ? [-c.a / c.b, -c.c / c.b] : [-c.c / c.a];
     case 'circle':
       return [c.cx, c.cy, c.r];
+    // Its vertex or centre, wherever it sits (#2664): (0, 0) at the origin.
     case 'parabola':
-      return [0, 0, c.p];
+      return [c.h ?? 0, c.k ?? 0, c.p];
     case 'ellipse':
-      return [0, 0, c.a, c.b];
+      return [c.h ?? 0, c.k ?? 0, c.a, c.b];
   }
 }
 

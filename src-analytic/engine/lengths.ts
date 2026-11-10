@@ -586,7 +586,7 @@ export function evalLengthExpr(
    */
   lineAt?: (name: string) => { a: number; b: number; c: number } | null,
   /** Resolve a curve by id — an ellipse's role points (#2616) and a tangent's circle (#2620) need it; absent, such a term cannot be judged. */
-  curveAt?: (id: Id) => { kind: string; a?: number; b?: number; cx?: number; cy?: number; r?: number } | null,
+  curveAt?: (id: Id) => { kind: string; a?: number; b?: number; h?: number; k?: number; cx?: number; cy?: number; r?: number } | null,
 ): number | null {
   const bound: Record<string, number> = { ...env };
   for (let i = 0; i < le.terms.length; i += 1) {

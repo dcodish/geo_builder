@@ -575,8 +575,11 @@ export function roundEllipseCentresOf(figure: Figure, c: Construction, letter: s
   const ellipses = figure.curves.filter((cu) => cu.curve.kind === 'ellipse');
   if (ellipses.length !== 1) return [];
   const e = ellipses[0];
-  if (!e.stated || !isRoundEllipse(c, e.id) || pointAt(figure, 0, 0) !== null) return [];
-  return [{ id: `centre-${e.id}`, x: 0, y: 0, sentence: `${letter} ${CONIC_ROLE_WORDS.ellipseCentre}`, centreOf: e.id }];
+  // Its own centre (#2664): the origin when it was not moved.
+  const cx = e.curve.kind === 'ellipse' ? (e.curve.h ?? 0) : 0;
+  const cy = e.curve.kind === 'ellipse' ? (e.curve.k ?? 0) : 0;
+  if (!e.stated || !isRoundEllipse(c, e.id) || pointAt(figure, cx, cy) !== null) return [];
+  return [{ id: `centre-${e.id}`, x: cx, y: cy, sentence: `${letter} ${CONIC_ROLE_WORDS.ellipseCentre}`, centreOf: e.id }];
 }
 
 export function centreSentenceOf(figure: Figure, offerId: string, letter: string, c?: Construction): string | null {
