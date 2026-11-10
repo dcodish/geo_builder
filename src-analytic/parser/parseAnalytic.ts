@@ -140,6 +140,11 @@ export type ParseFailure =
    */
   | { code: 'parabola-no-diameter'; detail: string }
   /**
+   * #2625 (ADR-AG-454 Am. 1; operator ruling 2026-11-10, Q-2625b (a)) — «מרכז הפרבולה», «O מרכז הפרבולה», "the centre of the
+   * parabola": the same reason as the diameter's, read by the centre role's reader. `detail` is the line.
+   */
+  | { code: 'parabola-no-centre'; detail: string }
+  /**
    * #1919 (ADR-626, the operator's ruling of 2026-10-08: *"we only support english or hebrew … rejected.
    * in all tools"*) — a letter this tool cannot read. Analytic had no member of the class: it handed
    * «משולש ДЖФ» to the model, where 2-D and 3-D drew A, B, C. It joins for ONE verdict (ADR-W-118 B1).
@@ -2729,8 +2734,11 @@ export type RoleRef =
   | { role: 'vertex'; side?: EllipseSide; axis?: 'major' | 'minor' }
   /** «קודקודי האליפסה» — the ask (#2616). */
   | { role: 'vertices' }
-  /** «מרכז האליפסה» — the ellipse's centre (#1863, ADR-AG-377). */
-  | { role: 'centre' }
+  /**
+   * «מרכז האליפסה» — the ellipse's centre (#1863, ADR-AG-377). «מרכז הפרבולה» is read by the same reader with
+   * `host: 'parabola'` (#2625, ADR-AG-454 Am. 1): understood, and refused — a parabola has no centre.
+   */
+  | { role: 'centre'; host?: 'parabola' }
   /** «(אורך) הציר הגדול/הראשי/הקטן/המשני (של האליפסה|שלה)» — a size of the ellipse (#2617, ADR-AG-353). */
   | { role: 'axis'; which: 'major' | 'minor' }
   /** «הצירים שלה» · «צירי האליפסה» — both sizes, «… הם 12 ו-8» (#2617). */
@@ -2772,8 +2780,9 @@ const ROLE_VERTEX_SIDE_EN = new RegExp(`^(?:the\\s+)?(?:coordinates\\s+of\\s+(?:
 const ROLE_VERTEX_ANY_HE = /^(?:ה?שיעורי\s+)?ה?קו?דקוד\s+(?:של\s+)?ה?אליפסה$/;
 const ROLE_VERTEX_ANY_EN = /^(?:a\s+|the\s+)?vertex\s+of\s+(?:the\s+)?ellipse$/i;
 // #1863 (ADR-AG-377): «מרכז האליפסה» — the book's own noun («מיתר העובר דרך מרכז האליפסה נקרא קוטר»)
-const ROLE_ELLIPSE_CENTRE_HE = /^(?:ה?שיעורי\s+)?(?:ה?נקודת\s+)?מרכז\s+(?:של\s+)?ה?אליפסה$/;
-const ROLE_ELLIPSE_CENTRE_EN = /^(?:the\s+)?cent(?:re|er)\s+of\s+(?:the\s+)?ellipse$/i;
+// #2625 (ADR-AG-454 Am. 1; operator ruling 2026-11-10, Q-2625b (a)): the parabola is a host of the same reader, refused.
+const ROLE_ELLIPSE_CENTRE_HE = /^(?:ה?שיעורי\s+)?(?:ה?נקודת\s+)?מרכז\s+(?:של\s+)?ה?(אליפסה|פרבולה)$/;
+const ROLE_ELLIPSE_CENTRE_EN = /^(?:the\s+)?cent(?:re|er)\s+of\s+(?:the\s+)?(ellipse|parabola)$/i;
 const ELLIPSE_AXIS_WORD_HE = '(גדול|ראשי|קטן|משני)';
 const ROLE_AXIS_END_HE = new RegExp(`^(?:ה?שיעורי\\s+)?(?:ה?קצה|ה?קו?דקוד)(?:\\s+ה?${SIDE_HE})?\\s+(?:של\\s+)?ה?ציר\\s+ה?${ELLIPSE_AXIS_WORD_HE}${OF_ELLIPSE_HE}$`);
 const ROLE_AXIS_END_EN = new RegExp(`^(?:the\\s+|an\\s+)?(?:${SIDE_EN}\\s+)?(?:end|vertex)\\s+of\\s+the\\s+(major|minor)\\s+axis${OF_ELLIPSE_EN}$`, 'i');
@@ -2810,7 +2819,8 @@ export function readRoleRef(raw: string): RoleRef | null {
   const vertexSide = ROLE_VERTEX_SIDE_HE.exec(text) ?? ROLE_VERTEX_SIDE_EN.exec(text);
   if (vertexSide) return { role: 'vertex', side: ellipseSideOf(vertexSide[1]) };
   if (ROLE_VERTEX_ANY_HE.test(text) || ROLE_VERTEX_ANY_EN.test(text)) return { role: 'vertex' };
-  if (ROLE_ELLIPSE_CENTRE_HE.test(text) || ROLE_ELLIPSE_CENTRE_EN.test(text)) return { role: 'centre' };
+  const centre = ROLE_ELLIPSE_CENTRE_HE.exec(text) ?? ROLE_ELLIPSE_CENTRE_EN.exec(text);
+  if (centre) return /פרבולה|parabola/i.test(centre[1]) ? { role: 'centre', host: 'parabola' } : { role: 'centre' };
   const axisEnd = ROLE_AXIS_END_HE.exec(text) ?? ROLE_AXIS_END_EN.exec(text);
   if (axisEnd) return { role: 'vertex', axis: axisWhich(axisEnd[2]), ...(axisEnd[1] ? { side: ellipseSideOf(axisEnd[1]) } : {}) };
   if (ROLE_VERTICES_HE.test(text) || ROLE_VERTICES_EN.test(text)) return { role: 'vertices' };
@@ -2881,6 +2891,9 @@ function parseMeasureRoles(line: string): RuleOutcome {
   // «הרדיוס MB» NAMES the radius MB — the piece and its claim (#1651, ADR-AG-200), `parseShape`'s — not "the radius
   // is the length MB", which the last-token split below would read and which says nothing of where the centre is.
   if (PIECE_DECL.test(trim(line)) && nounRow(PIECE_DECL.exec(trim(line))![1])?.claim === 'radius') return null;
+  // «מרכז הפרבולה» on a line of its own (#2625, ADR-AG-454 Am. 1): the role read, about a curve that has none — refused.
+  const bareRole = readRoleRef(line);
+  if (bareRole && bareRole.role === 'centre' && bareRole.host === 'parabola') return refuse('parabola-no-centre', line);
   if (RADIUS_PREDICATE.test(trim(line))) return null;
   const body = trim(line)
     .replace(/^נתו(?:ן|נה|נים|נות)\s+(?:כי\s+|ש(?=\S))?/, '')
@@ -2934,6 +2947,8 @@ function parseMeasureRoles(line: string): RuleOutcome {
         // #1863 (ADR-AG-377): the ellipse's centre, NAMED — what the centre cross's click records, as «P מרכז המעגל» does
         const slot = pointSlot(value.replace(/^ב(?=ה?נקודה\s)/, ''));
         if (!slot) continue;
+        // «O מרכז הפרבולה» (#2625, ADR-AG-454 Am. 1): a parabola has no centre — understood, refused, never escalated.
+        if (ref.host === 'parabola') return refuse('parabola-no-centre', line);
         const facts = (id: Id): Fact[] => [{ t: 'ellipse-centre-of', id, src: line }];
         return 'name' in slot ? made(facts(slot.name)) : withMint(line, slot, facts);
       }
