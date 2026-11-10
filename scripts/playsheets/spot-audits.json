@@ -183,6 +183,19 @@
         "z1 = 3+4i"
       ],
       "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i»."
+    },
+    {
+      "sheet": "prod-2026-11-10",
+      "id": "P11",
+      "kind": "complex:assertion",
+      "queued": "2026-11-10",
+      "product": "complex",
+      "base": "https://themathbible.com",
+      "path": "/complex-builder/",
+      "lines": [
+        "z1 = 3+4i"
+      ],
+      "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i»."
     }
   ],
   "results": [

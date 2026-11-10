@@ -1,0 +1,220 @@
+{
+ "name": "prod-2026-11-10",
+ "title": "Prod smoke — deploy prod/2026-11-10 (round #2808)",
+ "cases": [
+  {
+   "id": "P1",
+   "title": "3-D: a true statement about the midpoint is accepted (#2798) [round T3]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "P(1,2,3)",
+    "M אמצע AP",
+    "AM = MP"
+   ],
+   "lookFor": "The last line is no longer refused: it answers «זה כבר קיים באיור» (3-D's answer for a held fact until #2790 lands).",
+   "before": "Refused as wrong (claim-refuted).",
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "expectAbsent": [
+    "claim-refuted"
+   ]
+  },
+  {
+   "id": "P2",
+   "title": "3-D: size first, then the axis point (#2789) [round T7]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "אורך AB = 4",
+    "P נמצא על החלק החיובי של ציר ה-x"
+   ],
+   "expectRows": [
+    "אורך AB = 4"
+   ],
+   "expectAbsent": [
+    "size-on-solid"
+   ],
+   "lookFor": "The length stays green and the edge stays 4.",
+   "before": "The length turned red and the cube shrank back."
+  },
+  {
+   "id": "P3",
+   "title": "3-D: a cube's size beside a line through the origin is accepted (#2789) [round T9]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "l1:x=t(1,1,1)",
+    "אורך AB = 4"
+   ],
+   "expectRows": [
+    "אורך AB = 4"
+   ],
+   "expectAbsent": [
+    "size-on-solid"
+   ],
+   "lookFor": "The size is accepted.",
+   "before": "Refused."
+  },
+  {
+   "id": "P4",
+   "title": "3-D REFUSAL: a cube's size beside a stated point off the origin is still refused (#2789; #2792 next) [round T10]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "P(2,0,0)",
+    "אורך AB = 4"
+   ],
+   "expectRefusal": "גודל מספרי",
+   "lookFor": "The size is still refused: «נתון גודל מספרי על גוף עם ממדים חופשיים עדיין לא נתמך כאן» (that family is #2792, next round).",
+   "before": "Unchanged."
+  },
+  {
+   "id": "P5",
+   "title": "3-D: a point equally far from two triangle vertices builds (#2804, the report) [round T11]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "משולש ABC",
+    "TA = TB"
+   ],
+   "expectFigure": [
+    "T"
+   ],
+   "expectAbsent": [
+    "no-solution"
+   ],
+   "lookFor": "T is drawn with the «created T» notice; the row reads «|TA| = |TB|»; «הציגו תצורה אחרת» moves T.",
+   "before": "Refused: no position of T."
+  },
+  {
+   "id": "P6",
+   "title": "3-D: a definition still defines — «AT = TB» makes T the midpoint (#2804, regression guard) [round T14]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "משולש ABC",
+    "AT = TB"
+   ],
+   "expectFigure": [
+    "T"
+   ],
+   "lookFor": "T is the midpoint of AB.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "P7",
+   "title": "3-D: a quadrilateral in a circle stays put when an unrelated rhombus is added (#2764) [round T17]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "מעגל חוסם את ABCD",
+    "מעוין EFGH"
+   ],
+   "lookFor": "ABCD does not move when the rhombus appears.",
+   "before": "It moved by up to 0.34.",
+   "verifiedBy": "lock: src3d/__tests__/issue-2764-independent-parts.test.ts asserts ABCD moves 0 when the rhombus (and a second circle on EFGH) is added, seeds 0–3 (#2791 rows); a single screenshot cannot show «did not move»",
+   "expectRows": [
+    "מעוין EFGH"
+   ]
+  },
+  {
+   "id": "P8",
+   "title": "3-D: a line linking two squares still holds (#2764, your Q-2764a «b») [round T18]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "ריבוע ABCD",
+    "ריבוע EFGH",
+    "AB ∥ EF"
+   ],
+   "expectRows": [
+    "AB ∥ EF"
+   ],
+   "lookFor": "Every row green.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "P9",
+   "title": "2-D: a pair forced apart stays apart on every press (#2240, riskiest) [round T20]",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "שני מעגלים",
+    "מעגל O שרדיוסו 3",
+    "מעגל P שרדיוסו 2",
+    "OP = 10"
+   ],
+   "cycles": 3,
+   "lookFor": "The forced pair holds its one case at every press (by the lock). In the browser this spelling draws four circles — #2413.",
+   "before": "The same picture; each press now takes about 0.15 s instead of 0.02 s (accepted, «8 - 1»).",
+   "verifiedBy": "lock: the #2240 scenario bare-circle-pair-configurations-2240 and displayable-config.test.ts (forced pair settles on its one case, every press). The browser spelling here does not reach the bare pair: the naming lines draw two NEW circles (an existing bug, #2413, commented 2026-11-10)",
+   "expectRows": [
+    "OP = 10"
+   ]
+  },
+  {
+   "id": "P10",
+   "title": "Analytic: a median drawn as part of a meet ends at the midpoint already named (#2648)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "משולש ABC",
+    "M אמצע BC",
+    "התיכון מ-A והישר BC נפגשים בנקודה E"
+   ],
+   "expect": [
+    "M ו-E נפלו על אותה נקודה"
+   ],
+   "expectAbsent": [
+    "N"
+   ],
+   "lookFor": "The median AM; E sits on M; no point N; the triangle does not move; the page says «M ו-E נפלו על אותה נקודה.».",
+   "before": "Prod before this deploy: E sat 0.6–8 away from M, on a line from A to a stray point N.",
+   "section": "prod"
+  },
+  {
+   "id": "P11",
+   "title": "Complex loads and builds (untouched this round)",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z1 = 3+4i"
+   ],
+   "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i».",
+   "before": "Unchanged.",
+   "section": "prod",
+   "expect": [
+    "z₁ = 3+4i"
+   ]
+  }
+ ]
+}
