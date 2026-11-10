@@ -156,7 +156,8 @@ operator asks to watch it.
 **In parallel, by chokepoint stream** ([ADR-W-114](../../../docs/06w-decisions-workspace.md#adr-w-114), #1813).
 Items that share a chokepoint form ONE stream: they run in composition order, each on its own branch
 stacked on the previous one, inside one agent. Every other item is its own stream. Dispatch every
-stream at once as a background agent (up to ~10 at a time, then dispatch the next as one finishes),
+stream at once as a background agent (**up to ~6 at a time**, then dispatch the next as one finishes — round #2822 ran ~10
+and every stream waited 20–45 min per gate on the suite lock, more than its fixing time),
 each in its own worktree. That is what makes parallel safe: "one tree" was the reason for the old
 sequential rule, and it no longer holds. Round #1776 ran its 16 items one after another (~12.5 agent-hours
 over ~21 h); the parallel rounds #1721/#1736/#1767 built 5–12 items in 1.5–3 h.
@@ -226,7 +227,11 @@ Each item, inside its stream:
    3-D ~3.6, analytic ~2.3) plus
    **every test file the item added or changed, run by path** (a slow-tier file is excluded from
    `test:fast`, so the item's own heavy locks must be named), plus **`npm run test:exams -- --changed`**
-   (the exams of the builders the diff touches; [ADR-W-172](../../../docs/06w-decisions-workspace.md#adr-w-172)). **Not the product lane:** a lane
+   (the exams of the builders the diff touches; [ADR-W-172](../../../docs/06w-decisions-workspace.md#adr-w-172)), plus **every
+   whole-figure case file of each builder the diff touches, by path** through `test:locked` (`src3d/__tests__/issue-*.test.ts`,
+   `src-analytic/__tests__/issue-*.test.ts`, 2-D's `src/__tests__/scenarios-e2e-*.test.ts` and `src/**/__tests__/issue-*.test.ts`):
+   `--changed` skips the case files the diff did not touch (ADR-W-191), and in rounds #2808 and #2822 those were exactly
+   the files the wave tip turned red (#2806, #2797, #2799, #2735). **Not the product lane:** a lane
    costs 4–11 min because it waits on its slowest file, and only 4 of 59 recorded red full runs
    were caught by slow files alone ([ADR-W-113](../../../docs/06w-decisions-workspace.md#adr-w-113),
    #1813). Those surface at the batch, whose full suite and in-round bisect are built for it. The
@@ -290,10 +295,15 @@ between based on what you said so this can go on forever."*
   (`round/<date>-w<N>`, its own worktree) **as soon as its gates are green**, and plain `npm run test:fast`
   runs on the tip after each merge, so a cross-figure regression surfaces while its stream is still alive
   (round #2808's three late regressions). A wave closes every few hours, or when no stream is running, or
-  at a stop; then the steps below run once on its tip, it lands, and it deploys per Step 7. The next wave
+  at a stop. **Once a wave's full-suite gate starts, the wave is FROZEN**: nothing more merges into it; a newly ready
+  item (or an approved PR) waits for the next wave. Round #2822 reopened wave 1 three times, and each reopening
+  restarted its quick run; then the steps below run once on its tip, it lands, and it deploys per Step 7. The next wave
   branches from the new `main`. An item whose sheet has a 🎮 case does NOT merge into a wave: it opens a PR
   and waits for his pass, so a waiting case never holds a deploy.
-  Conflicts are reconciled on the tip (ADR-log tails always collide — keep both, in order). **Before the
+  Conflicts are reconciled on the tip with **`node scripts/round-merge-insertions.mjs`** first: it resolves every file where
+  both branches only inserted at the same point (ADR-log tails, appended describe blocks, fixture-map entries) from the
+  three stage blobs, keeping shared lines once — never by concatenating conflict halves, which dropped two closing braces
+  in round #2822. What it lists as "needs a hand merge" is merged by hand; then `npx tsc -b` before anything else. **Before the
   full suite, clear what it would only find late** ([ADR-W-190](../../../docs/06w-decisions-workspace.md#adr-w-190), #2736;
   #2722 ran it four times, 5.3 h, on merge artefacts and golden drift): `npx tsc -b`, `npm run test:fast`,
   then the parity golden files by name (`npm run test:locked -- npx vitest run` on `decide-parity-1395-*`
