@@ -111,7 +111,7 @@ describe('an angle named by a Greek letter — free until pinned (ADR-052)', () 
   it('two pins on an unused alias: the second is refused `unsatisfiable`, naming it; a repeat is already known', () => {
     expect(typed(['α = 50', 'α = 40'])).toEqual(['record', 'refused:unsatisfiable']);
     expect(derive(['α = 50', 'α = 40'], 0).faults.find((f) => f.index === 1)).toMatchObject({ code: 'unsatisfiable', detail: 'α = 40' });
-    expect(typed(['α = 50', 'α = 50'])).toEqual(['record', 'already-known']);
+    expect(typed(['α = 50', 'α = 50'])).toEqual(['record', 'record']);
     expect(typed(['θ = 2β', 'β = 20', 'θ = 50'])).toEqual(['record', 'record', 'refused:unsatisfiable']);
   });
   it('a consistent pin on an unused alias records, holds its value, and binds the angle that uses it later', () => {
@@ -128,7 +128,7 @@ describe('an angle named by a Greek letter — free until pinned (ADR-052)', () 
   it('the sweep: two pins, then the angle; the angle, then two pins; the angle, then a repeated pin', () => {
     expect(typed(['α = 50', 'α = 40', 'משולש ABC', '∢ABC = α'])[1]).toBe('refused:unsatisfiable');
     expect(typed(['משולש ABC', '∢ABC = α', 'α = 50', 'α = 40'])).toEqual(['record', 'record', 'record', 'refused:unsatisfiable']);
-    expect(typed(['משולש ABC', '∢ABC = α', 'α = 50', 'α = 50'])).toEqual(['record', 'record', 'record', 'already-known']);
+    expect(typed(['משולש ABC', '∢ABC = α', 'α = 50', 'α = 50'])).toEqual(['record', 'record', 'record', 'record']);
   });
 
   it('a pin the figure AGREES with builds (the determined angle’s own value)', () => {

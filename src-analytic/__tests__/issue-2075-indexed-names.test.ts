@@ -51,7 +51,7 @@ describe('#2075 — every spelling of an indexed name is one point, X₁', () =>
     ['X_{1}(2,3)', 'X1(2,3)'],
   ])('«%s» · «%s» is one point stated twice, never two', (a, b) => {
     const { held, kinds } = typed([a, b]);
-    expect(kinds[1]).toBe('already-known');
+    expect(kinds[1]).toBe('record');
     expect(pointIds(held)).toEqual(['X₁']);
   });
 

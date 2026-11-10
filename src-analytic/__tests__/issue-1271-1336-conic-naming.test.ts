@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { parseLine } from '../parser/parseAnalytic';
 import { runFallback } from '../app/fallback';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { HOST_KINDS, errorText, type Translate } from '../app/errorText';
 import { refKindOf, statedName } from '../engine/names';
 import { analyticI18n } from '../i18n';
@@ -279,7 +279,7 @@ describe('Am. 2 · «1» and «I» are ONE name — and mixing the notations is 
   });
 
   it('the restatement in the same notation is still one object (already known / contradiction)', () => {
-    expect(decideSubmit('נתונה פרבולה 1: y^2=2x', ['נתונה פרבולה 1: y^2=2x'], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('נתונה פרבולה 1: y^2=2x', ['נתונה פרבולה 1: y^2=2x'], 0))).toBe(true);
     const v = decideSubmit('נתונה פרבולה 1: y^2=8x', ['נתונה פרבולה 1: y^2=2x'], 0);
     expect(v.kind === 'refused' && v.error.key).toBe('conflicting-restatement');
   });
@@ -423,7 +423,7 @@ describe('Merge with #1511 + #1513 — one host seam, one naming chokepoint', ()
 
   it('the notation rule holds for #1513’s named radius, given and asked', () => {
     expect(refusal(['נתון מעגל 1 שמשוואתו x^2+y^2=4', 'רדיוס המעגל I הוא 2']).key).toBe('numeral-notation');
-    expect(decideSubmit('רדיוס המעגל 1 הוא 2', ['נתון מעגל 1 שמשוואתו x^2+y^2=4'], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('רדיוס המעגל 1 הוא 2', ['נתון מעגל 1 שמשוואתו x^2+y^2=4'], 0))).toBe(true);
     const d = derive(['נתון מעגל 1 שמשוואתו x^2+y^2=4'], 0);
     expect(ask(d, 'רדיוס המעגל 1', String).value).toBe('2');
     expect(ask(d, 'רדיוס המעגל I', String).missing).toEqual({ name: 'I', kind: 'curve', used: '1' });
@@ -437,7 +437,7 @@ describe('Merge with #1511 + #1513 — one host seam, one naming chokepoint', ()
     // Same notation: understood. Equation circles can be tangent since ADR-AG-306 (#2387), and these two already touch
     // (|centres| = 5 = 2 + 3), so the sentence adds nothing: «זה כבר נובע».
     for (const line of ['מעגל 1 ומעגל II משיקים', 'המעגלים 1 ו-II משיקים']) {
-      expect(decideSubmit(line, setup, 0).kind, line).toBe('already-follows');
+      expect(isHeld(decideSubmit(line, setup, 0)), line).toBe(true);
     }
     // No phantom centre point «I» is ever minted from a numeral subject.
     expect(parseLine('המעגלים I ו-II משיקים').ok && (parseLine('המעגלים I ו-II משיקים') as { facts: { t: string }[] }).facts.map((f) => f.t)).toEqual(['tangent-circles']);

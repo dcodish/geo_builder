@@ -1,0 +1,12 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "משולש ABC",
+    "AB = AC",
+    "∢ABC = ∢ACB"
+  ],
+  "seed": 0,
+  "name": "#2790 — שורה שכבר קיימת באיור נשארת נתון גם כשהשורה הקודמת מושבתת",
+  "disabled": [1]
+}

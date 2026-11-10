@@ -58,7 +58,7 @@ describe("#2621 C — «A'» is a point name everywhere a letter is", () => {
   it('every prime glyph is one name: ′ ’ ׳ ` fold to the same point', () => {
     for (const g of ['′', '’', '׳', '`', 'ʹ']) {
       const v = submit(["A'(1,2)", `A${g}(1,2)`]);
-      expect(v.map((x) => x.kind), g).toEqual(['record', 'already-known']);
+      expect(v.map((x) => x.kind), g).toEqual(['record', 'record']);
     }
   });
 

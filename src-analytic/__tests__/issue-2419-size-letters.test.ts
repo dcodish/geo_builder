@@ -120,10 +120,10 @@ describe('#2419 — the role gives the letter its domain', () => {
   });
 
   it('«r > 0» after a radius the role already makes positive is «already known», as after «שרדיוסו r»', () => {
-    expect(lastVerdict([...exam.lines, 'r > 0']).kind).toBe('already-known');
-    expect(lastVerdict(['x²+y²=r²', 'r > 0']).kind).toBe('already-known');
-    expect(lastVerdict(['A(0,0)', 'נקודה B', 'AB = k', 'k > 0']).kind).toBe('already-known');
-    expect(lastVerdict(['M(1,2)', 'נתון מעגל M שרדיוסו r', 'r > 0']).kind).toBe('already-known');
+    expect(lastVerdict([...exam.lines, 'r > 0']).kind).toBe('record');
+    expect(lastVerdict(['x²+y²=r²', 'r > 0']).kind).toBe('record');
+    expect(lastVerdict(['A(0,0)', 'נקודה B', 'AB = k', 'k > 0']).kind).toBe('record');
+    expect(lastVerdict(['M(1,2)', 'נתון מעגל M שרדיוסו r', 'r > 0']).kind).toBe('record');
     // A bound that NARROWS further is a real given.
     expect(lastVerdict(['x²+y²=r²', 'r < 4']).kind).toBe('record');
   });
