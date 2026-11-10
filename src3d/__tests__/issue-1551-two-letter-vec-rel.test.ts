@@ -109,6 +109,12 @@ describe('#1551 — a relation that holds only for some shapes reshapes the box 
     useGeo3.getState().submit("EB' = a·EA + b·EC");
     expect(useGeo3.getState().lastError).toEqual({ code: 'givens-contradict', stated: "EB' = a·EA + b·EC", others: [] });
   });
+
+  it('(f) one letter between two placed vertices no shape aligns: refused naming the sentence (#932: never the apex)', () => {
+    submitAll(['פירמידה SABCD שבסיסה ריבוע']);
+    useGeo3.getState().submit('SB = t·SA');
+    expect(useGeo3.getState().lastError).toEqual({ code: 'givens-contradict', stated: 'SB = t·SA', others: [] });
+  });
 });
 
 describe('#1551 — a new point: each letter a free number', () => {
