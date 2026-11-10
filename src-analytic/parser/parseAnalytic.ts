@@ -136,6 +136,7 @@ export type ParseFailure =
   /**
    * #2625 (ADR-AG-454; operator ruling 2026-11-02, the text chosen under ADR-W-174) — «AB קוטר בפרבולה»: a diameter is a
    * chord through the centre, and a parabola has none. Understood, so refused with its reason and never escalated.
+   * `detail` is the segment's letters: the sentence teaches the chord with them («AB מיתר בפרבולה»), which the next Enter reads.
    */
   | { code: 'parabola-no-diameter'; detail: string }
   /**
@@ -5059,7 +5060,7 @@ function parseCircleThru(line: string): RuleOutcome {
   if (he) {
     const [, a, b, prep, article, circle, fresh, ellipse, parabola] = he;
     // A parabola has no centre, so it has no diameter (#2625): understood, and refused with that reason.
-    if (parabola) return refuse('parabola-no-diameter', line);
+    if (parabola) return refuse('parabola-no-diameter', a + b);
     // A diameter of THE ellipse is about the figure's one ellipse — it never defines a curve (#2618).
     if (ellipse) return made([{ t: 'diameter-of', a, b, define: false, host: 'ellipse', src: line }, ...pieceFacts('segment', a, b, line)]);
     // «של מעגל» — OF A circle, indefinite — defines one; «במעגל חדש» says so outright.
@@ -5069,7 +5070,7 @@ function parseCircleThru(line: string): RuleOutcome {
   const en = DIAM_EN.exec(line);
   if (en) {
     const [, a, b, det, fresh, circle, ellipse, parabola] = en;
-    if (parabola) return refuse('parabola-no-diameter', line);
+    if (parabola) return refuse('parabola-no-diameter', a + b);
     if (ellipse) return made([{ t: 'diameter-of', a, b, define: false, host: 'ellipse', src: line }, ...pieceFacts('segment', a, b, line)]);
     const isDefine = Boolean(fresh) || (det !== undefined && /^a\s/i.test(det));
     return made([{ t: 'diameter-of', a, b, define: isDefine, ...(circle ? { circle } : {}), src: line }, ...pieceFacts('segment', a, b, line)]);
