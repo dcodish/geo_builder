@@ -99,6 +99,7 @@ const ERRORS3: Record<Code3, Payload[]> = {
   'ambiguous-main-diagonal': [{ pairs: 'AG, BH' }, { pairs: '' }],
   'ambiguous-angle-vertex': [{ vertex: 'B', angles: '∠ABC, ∠ABD' }, { vertex: 'B', angles: '' }],
   'proof-target': [{ sentence: 'הוכיחו כי AB = CD' }],
+  'answer-in-panel': [{ point: 'P', plane: 'ABC', known: true }, { point: 'P', plane: 'ABC', known: false }], // #2062
   'radian-angle': [{}],
   'juxtaposed-numbers': [{ detail: '2 3', decimal: '2.3', joined: '23', product: '6' }, { detail: '2.5 3', product: '7.5' }],
   'unread-name': [{ detail: 'ДЖФ' }],

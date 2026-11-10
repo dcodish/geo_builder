@@ -20,7 +20,7 @@ import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { congruentShapes3 } from './configs3';
-import { evalAffine, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
+import { evalAffine, openPinSymsOf, pinSymsOf, scalarPinOrigin3, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
 import { hasLetters3, vecEqLetters3 } from './vecExpr';
 import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
@@ -244,6 +244,8 @@ export interface PivotResult {
    *  rank of the scalar residuals' response to a perturbation of each dim. Lazy and memoised — the cue is
    *  the only reader, so the residual evaluations happen on the display path, never on a submit. */
   scalarConsumed?: () => { dims: number; block: number };
+  /** #2795 (ADR-3D-483) — lazy: the scalar pins this solution holds without driving them (see `heldPinsAt`). */
+  heldPins?: () => ScalarPin[];
   /** #2368 (ADR-3D-375) — lazy: the placement's LEFTOVER rigid freedom at this solution (set by the
    *  measuring / walking probes only — see {@link PlacementFreedom3}). */
   placementFreedom?: () => PlacementFreedom3;
@@ -734,6 +736,8 @@ export function scalarPinRows3(
     /** #2806: the dims-only `invariantOnly` solve, gauge frozen at identity — no scale unknown to shrink, so the
      *  ratio rows keep their raw form there and every figure without a pin solves bit-identically to before. */
     gaugeFrozen?: boolean;
+    /** #2795 (ADR-3D-483): when given, receives the first row of each pin (in `c.scalarPins` order). */
+    starts?: number[];
   },
 ): void {
   // #2806 (ADR-3D-462): a magnitude ratio, degree 0 in the gauge scale wherever the scale is an unknown
@@ -763,6 +767,7 @@ export function scalarPinRows3(
     return acc;
   };
   for (const pin of c.scalarPins) {
+    env.starts?.push(out.length);
     if (pin.kind === 'free-joint') {
       // #2684 (ADR-3D-421): the enrolled unknowns ride the rider lane; one that no residual reads keeps its sample
       const u0 = new Map(pin.unknowns.map((u) => [u.key, u.t0]));
@@ -1326,6 +1331,8 @@ export function solvePivot(
   /** #990: the index range the scalar pins' rows occupy in the residual vector — recorded by every
    *  evaluation, so the rank probe below reads exactly the rows those pins wrote. */
   let scalarRows: [number, number] = [0, 0];
+  /** #2795 (ADR-3D-483): the first row of each scalar pin (in `c.scalarPins` order), recorded with {@link scalarRows}. */
+  let scalarPinStarts: number[] = [];
   /**
    * #990 ([ADR-3D-248](../../docs/06b-decisions-3d.md#adr-3d-247)) — MEASURE what the scalar pins consume.
    * `− scalarPins.length` subtracted one shape dim per pin unconditionally — a count that infers what the
@@ -1370,6 +1377,66 @@ export function solvePivot(
       const allCols = [...dimCols, ...blockIdx.map(colAt)];
       const rankAll = blockIdx.length ? numericRank(allCols) : rankDims;
       return (memo = { dims: rankDims, block: Math.max(0, rankAll - rankDims) });
+    };
+  };
+  /**
+   * #2795 ([ADR-3D-483](../../docs/06b-decisions-3d.md#adr-3d-483)) — THE PINS THIS SOLUTION HOLDS WITHOUT DRIVING THEM.
+   * A restatement («AB = AC» · «זווית ABC = זווית ACB») adds a pin whose rows lie in the span of the others': it removes
+   * no freedom, yet joins the Levenberg–Marquardt residual set, changes its path, and the solve stops at another point of
+   * the same solution set (≈1e-3 on a free triangle) — the drawing moves. Measured here, at this solution: the response of
+   * each pin's rows to every unknown (central differences, the #990 probe), and, newest stating fact first, a fact's pins
+   * are DEPENDENT when leaving their rows out keeps the rank. Only pins whose origin is known (`scalarPinOrigin3`: a fact
+   * and the claim they drive) are candidates, all of one fact together; a fact's own pins never release each other.
+   * Lazy + memoised: the caller (`resolveHeld3`) asks only when some pin is a candidate.
+   */
+  const heldPinsAt = (x: number[], mirror: boolean): (() => ScalarPin[]) => {
+    let memo: ScalarPin[] | null = null;
+    return () => {
+      if (memo !== null) return memo;
+      const byFact = new Map<number, number[]>();
+      c.scalarPins.forEach((pin, i) => {
+        const o = scalarPinOrigin3.get(pin);
+        const k = o?.fact ?? -1;
+        byFact.set(k, [...(byFact.get(k) ?? []), i]);
+      });
+      const facts = [...byFact.keys()]
+        .filter((k) => k >= 0 && byFact.get(k)!.every((i) => scalarPinOrigin3.get(c.scalarPins[i])?.claim !== undefined))
+        .sort((a, b) => b - a);
+      if (facts.length === 0) return (memo = []);
+      const f = residualsFor(mirror);
+      f(x);
+      const [s, e] = scalarRows;
+      const starts = scalarPinStarts;
+      if (starts.length !== c.scalarPins.length) return (memo = []);
+      const rowsOf = (i: number): number[] => {
+        const end = i + 1 < starts.length ? starts[i + 1] : e;
+        return Array.from({ length: end - starts[i] }, (_, k) => starts[i] + k - s);
+      };
+      const cols = x.map((_, at) => {
+        const h = 1e-4 * Math.max(1, Math.abs(x[at]));
+        const xp = [...x];
+        xp[at] += h;
+        const xm = [...x];
+        xm[at] -= h;
+        const rp = f(xp).slice(s, e);
+        const rm = f(xm).slice(s, e);
+        return rp.map((v, r) => (v - rm[r]) / (2 * h));
+      });
+      const rankOf = (rows: number[]): number => (rows.length === 0 ? 0 : numericRank(cols.map((col) => rows.map((r) => col[r]))));
+      let kept = c.scalarPins.flatMap((_, i) => rowsOf(i));
+      let rank = rankOf(kept);
+      const out: ScalarPin[] = [];
+      for (const k of facts) {
+        const group = byFact.get(k)!;
+        const drop = new Set(group.flatMap(rowsOf));
+        const without = kept.filter((r) => !drop.has(r));
+        const r2 = rankOf(without);
+        if (r2 !== rank) continue;
+        out.push(...group.map((i) => c.scalarPins[i]));
+        kept = without;
+        rank = r2;
+      }
+      return (memo = out);
     };
   };
   /** #2368 (ADR-3D-375): the rank probe over the six rigid gauge unknowns — see {@link PlacementFreedom3}. */
@@ -1603,9 +1670,11 @@ export function solvePivot(
     }
 
     const scalarStart = out.length; // #990: the scalar pins' rows begin here
+    const pinStarts: number[] = []; // #2795 (ADR-3D-483): where each pin's own rows begin
     scalarPinRows3(c, at, out, {
       lines,
       gaugeFrozen: invariantOnly,
+      starts: pinStarts,
       symAt: (sym) => symAt(x, sym),
       riderAt: (key) => {
         const i = riders.findIndex((r) => r.id === key);
@@ -1613,6 +1682,7 @@ export function solvePivot(
       },
     });
     scalarRows = [scalarStart, out.length]; // #990: …and end here
+    scalarPinStarts = pinStarts;
     // V8-c coupled symbol conditions: the vec-defined endpoint is baked into `pos` at the
     // trial symbol value (via `override`), so its ⟂/∥-to-plane residual drives the symbol
     // AND the free dim jointly (a perp adds 2 residuals, a parallel 1).
@@ -2040,7 +2110,7 @@ export function solvePivot(
       transform: (p) => applyGauge(p, g), mirror, dims: x.slice(7, 7 + nDims),
       ...(nPinSym > 0 ? { pinSymbols: pinSymbolsAt(x) } : {}),
       ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, x[riderBase + i]])) } : {}),
-      scalarConsumed: scalarConsumedAt(x, mirror),
+      scalarConsumed: scalarConsumedAt(x, mirror), heldPins: heldPinsAt(x, mirror),
       err: residualsFor(mirror)(x).reduce((sum, v) => sum + v * v, 0),
       x: [...x],
     }];
@@ -2301,7 +2371,7 @@ export function solvePivot(
         ? [{
             transform: (p) => p, mirror: false, dims: [], err: primary,
             ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, x0[7 + i]])) } : {}),
-            scalarConsumed: scalarConsumedAt(x0, false), // #990 (no dims ⇒ 0)
+            scalarConsumed: scalarConsumedAt(x0, false), heldPins: heldPinsAt(x0, false), // #990 (no dims ⇒ 0)
             x: x0,
           }]
         : [];
@@ -2353,7 +2423,7 @@ export function solvePivot(
       const invSol: PivotResult[] = [{
         transform: (p) => p, mirror: false, dims: bx.slice(0, nDims), err: primary,
         ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, bx[nDims + i]])) } : {}),
-        scalarConsumed: scalarConsumedAt([0, 0, 0, 0, 0, 0, 0, ...bx], false), // #990
+        scalarConsumed: scalarConsumedAt([0, 0, 0, 0, 0, 0, 0, ...bx], false), heldPins: heldPinsAt([0, 0, 0, 0, 0, 0, 0, ...bx], false), // #990
         x: [0, 0, 0, 0, 0, 0, 0, ...bx],
       }];
       const uncollapsed = settleFlatRings(invSol); // #1499 / #1849: a declared ring the solve collapsed — retried, else refused
@@ -2532,7 +2602,7 @@ export function solvePivot(
         transform: (q) => applyGauge(q, g), mirror, dims: xr.slice(7, 7 + nDims),
         symbols: coupled ? xr.slice(7 + nDims, 7 + nDims + nSym) : undefined, pinSymbols: pinSymbolsAt(xr),
         riderTs: nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, xr[riderBase + i]])) : undefined,
-        scalarConsumed: scalarConsumedAt(xr, mirror), placementFreedom: placementFreedomAt(xr, mirror),
+        scalarConsumed: scalarConsumedAt(xr, mirror), heldPins: heldPinsAt(xr, mirror), placementFreedom: placementFreedomAt(xr, mirror),
         err: pErr(xr), x: [...xr],
       };
     };
@@ -2703,7 +2773,7 @@ export function solvePivot(
     const symbols = coupled ? xr.slice(7 + nDims, 7 + nDims + nSym) : undefined;
     const pinSymbols = pinSymbolsAt(xr);
     const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, xr[riderBase + i]])) : undefined;
-    return [{ transform: (q) => applyGauge(q, g), mirror: probe.mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt(xr, probe.mirror), err: pErr(xr), x: [...xr] }];
+    return [{ transform: (q) => applyGauge(q, g), mirror: probe.mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt(xr, probe.mirror), heldPins: heldPinsAt(xr, probe.mirror), err: pErr(xr), x: [...xr] }];
   }
   /** #1735: per mirror, the deferred re-seat of its off-host candidates — run only when the pool is empty. */
   const reseatStages: (() => void)[] = [];
@@ -2745,7 +2815,7 @@ export function solvePivot(
         results.push({
           transform: (p) => applyGauge(p, g), mirror, dims: dims0, err: bestA.err,
           ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r) => [r.id, r.t0])) } : {}),
-          scalarConsumed: scalarConsumedAt([...bestA.x, 0, ...dims0, ...symPad, ...riders.map((r) => r.t0)], mirror),
+          scalarConsumed: scalarConsumedAt([...bestA.x, 0, ...dims0, ...symPad, ...riders.map((r) => r.t0)], mirror), heldPins: heldPinsAt([...bestA.x, 0, ...dims0, ...symPad, ...riders.map((r) => r.t0)], mirror),
           x: [...bestA.x, 0, ...dims0, ...symPad, ...riders.map((r) => r.t0)],
         });
         continue; // this mirror solved by placement alone
@@ -2916,7 +2986,7 @@ export function solvePivot(
       const symbols = coupled ? cx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
       const pinSymbols = pinSymbolsAt(cx);
       const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, cx[riderBase + i]])) : undefined;
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...cx], mirror), err: rAccept, x: [...cx] });
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...cx], mirror), heldPins: heldPinsAt([...cx], mirror), err: rAccept, x: [...cx] });
     };
     const fSeed = fFor(symAnchorTargets);
     for (const x0 of starts) {
@@ -3140,7 +3210,7 @@ export function solvePivot(
         const symbols = coupled ? sx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
         const pinSymbols = pinSymbolsAt(sx);
         const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, sx[riderBase + i]])) : undefined;
-        results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...sx], mirror), err, x: [...sx] });
+        results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...sx], mirror), heldPins: heldPinsAt([...sx], mirror), err, x: [...sx] });
       };
       pushSolution(bx, bestAccept);
       /**

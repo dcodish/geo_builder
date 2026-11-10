@@ -54,18 +54,23 @@ import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
 import { coincidences3, namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
-import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, figureSymbolsOf, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3, type SolidCommand } from '../engine/types';
+import { claimPointIds, defaultPlaneDisplay3, scalarPinOrigin3, emptyConstruction3, figureSymbolsOf, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3, type SolidCommand } from '../engine/types';
 import { partsOf3, sameSeed3, seedKey3, seedNumber3, type Seed3 } from '../engine/components3';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
-import { isBareAltitude3, namesQuadBase3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
+import { isBareAltitude3, membershipQuestion3, namesQuadBase3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
+import { dataView, pointPlaneRow3 } from '../engine/dataView';
 
 export interface Fact3 {
   id: string;
   utterance: string;
   cmds: Command3[];
   enabled: boolean;
+  /** #2790 (ADR-3D-484, Q-2790c): the line was recorded as a HELD row — the figure already held it when it was typed. Its
+   *  one note is the held notice; the derive's older «already known» relation notes stay quiet for its claims. Not saved:
+   *  a row loaded from a file is read as typed. */
+  held?: true;
 }
 
 export type FactStatus3 = 'ok' | 'disabled' | EngineError3;
@@ -246,6 +251,10 @@ export type StoreError3 =
   /** #1666 (ADR-3D-295, ADR-W-107): a PROOF TARGET («הוכיחו כי …», "prove that …") — what the student must
    *  show, never a given. `sentence` is the proof sentence as typed. Typed, so it never escalates. */
   | { code: 'proof-target'; sentence: string }
+  /** #2062 (ADR-3D-480): «האם הנקודה M נמצאת במישור AEC?» — an exam QUESTION, never a given. Answered by pointing at
+   *  the data panel's point × plane row when it is there (`known`), else with the ask lane's «לא נקבע על ידי הנתונים».
+   *  Typed, so it never escalates and nothing is added to the figure. */
+  | { code: 'answer-in-panel'; point: string; plane: string; known: boolean }
   /** #1837 (ADR-W-142, ADR-710): a plane-geometry angle written in radians («∠ABC = π/2») — radians are the
    *  complex builder's notation only. «∠ABC = π» RECORDED an angle mark labelled π; the rest went to the model.
    *  Typed, so it never escalates; answered with 2-D's degrees sentence. */
@@ -1086,6 +1095,12 @@ function deriveCore3(
     }
     for (const k of probe.circles3) if (!before.circles3.some((x) => x.id === k.id)) circleOwner.set(k.id, f.id);
     Object.assign(boundCircle, bound);
+    // #2795 (ADR-3D-483): each driving pin this row added is the row's — the held-pin release leaves the newest row's out first
+    if (probe.scalarPins !== before.scalarPins) {
+      const had = new Set(before.scalarPins);
+      const at = factsIn.findIndex((x) => x.id === f.id);
+      for (const pin of probe.scalarPins) if (!had.has(pin)) scalarPinOrigin3.set(pin, { ...scalarPinOrigin3.get(pin), fact: at });
+    }
     c = probe;
     if (c.points.size > pointsBefore) pointAdders.add(f.id); // #1310: the row put a point on the figure
     if (exp.cmds !== f.cmds) resolvedCmds[f.id] = [...exp.cmds];
@@ -1133,6 +1148,11 @@ function deriveCore3(
     if (st.code === 'angle-coef-conflict') return { code: 'givens-contradict', stated: f.utterance, others: by ? [by.utterance] : [] };
     return by ? { ...st, line: by.utterance } : st;
   };
+  /** #2790 (ADR-3D-484): an earlier enabled row, applied ok, that states exactly what `f` states (the twin rule's own test). */
+  const exactTwinApplied = (f: Fact3): boolean => {
+    const at = facts.indexOf(f);
+    return facts.slice(0, at).some((g) => g.enabled && status[g.id] === 'ok' && sameStatement(g.cmds, f.cmds));
+  };
   for (const f of facts) {
     if (!f.enabled) {
       status[f.id] = 'disabled';
@@ -1141,6 +1161,13 @@ function deriveCore3(
     const inOrder = refusedInOrder?.[f.id];
     if (inOrder !== undefined) {
       status[f.id] = inOrder; // #2705: judged in list order by an earlier fold of this list; never applied
+      continue;
+    }
+    // #2790 (ADR-3D-484, ADR-W-200): a row that repeats an enabled, applied row word for word is its own row and HOLDS —
+    // applying it again would re-declare what the twin declared (a pyramid's apex, a midpoint: `already-defined`), so it
+    // steps aside while its twin stands. Untick or delete the twin and this row applies itself (the relation stays).
+    if (exactTwinApplied(f)) {
+      status[f.id] = 'ok';
       continue;
     }
     status[f.id] = restatedAgainst(f, applyFact(f));
@@ -2379,7 +2406,10 @@ function deriveCore3(
   // #1996 (ADR-3D-343): a declared ring the givens forced into a narrower named kind, with the statements that did
   // it — needs the facts and their utterances, so it is computed here and handed to the notice builder.
   const narrowed = narrow ? narrowingNotes3(facts, seedNumber3(seed), c, (id) => status[id] === 'ok', { construct: (sub) => deriveCore3(sub as Fact3[], seed, false).construction }) : [];
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), coincidences: coincidences3(c, positions), resolvedCmds, created, createdCircles, readings };
+  // #2790 (ADR-3D-484, Q-2790c [judged]): a HELD row's claims say the held notice only — the #396/#842/#850 notes retire there
+  const heldIds = new Set(facts.filter((f) => f.held).map((f) => f.id));
+  const heldClaims = new Set(claimOwners.filter((o) => heldIds.has(o.factId)).flatMap((o) => c.claims.slice(o.from, o.to)));
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed, heldClaims), shapeWarnings: shapeWarnings3(c, positions), coincidences: coincidences3(c, positions), resolvedCmds, created, createdCircles, readings };
 }
 
 export interface Geo3State {
@@ -2395,7 +2425,7 @@ export interface Geo3State {
    * longer carries the earlier line; a MUTED twin re-ticked by the line was not on the figure, and 2-D re-ticks it
    * silently, so that case sets no notice.
    */
-  lastNotice: { code: 'already-stated' } | { code: 'vertex-angle-read-as'; angles: string } | null;
+  lastNotice: { code: 'already-held' } | { code: 'vertex-angle-read-as'; angles: string } | null;
   /** #1467 (ADR-3D-382): the points the last recorded line created by reference, and that line's fact id — what the
    *  «נוצרה נקודה חדשה …» notice names; its ✕ removes the fact. Null after any other verdict. */
   lastCreated: { factId: string; ids: readonly string[]; circle?: string } | null;
@@ -2685,6 +2715,13 @@ function readStatement3(
   // what the student was asked to prove. The rule is shared with 2-D and analytic (`shell/proofTarget`).
   const proof = findProofTarget(utterance);
   if (proof) return { ok: false, error: { code: 'proof-target', sentence: proof.sentence } };
+  // #2062 (ADR-3D-480): the exam's membership QUESTION, read at the same reader — never a given, never the model. It
+  // points at the panel's point × plane row (the ask lane reads the same row, `answerQuery`).
+  const member = membershipQuestion3(utterance);
+  if (member) {
+    const row = pointPlaneRow3(dataView(derive3(st.facts, st.seed).construction, st.seed), member.point, member.plane);
+    return { ok: false, error: { code: 'answer-in-panel', point: member.point, plane: member.plane, known: row !== null } };
+  }
   // #1837 (ADR-W-142): a plane-geometry angle written in radians, refused at the same reader with 2-D's rule
   // (`shell/radianAngle`) — never recorded as a π-labelled mark, never sent to the model.
   if (findRadianAngle(utterance)) return { ok: false, error: { code: 'radian-angle' } };
@@ -2866,10 +2903,11 @@ export type Verdict3 =
   /** the line reads as nothing the grammar knows — the one verdict the App escalates to the model */
   | { readonly kind: 'not-understood' }
   | { readonly kind: 'refused'; readonly error: NonNullable<StoreError3> }
-  /** #613 (ADR-W-031): already stated — nothing is appended; a MUTED twin is re-enabled instead */
-  | { readonly kind: 'already-stated'; readonly twin: Fact3; readonly facts: Fact3[] }
-  /** `readAs` (#1942): the polygon angle a lone vertex was read as — said aloud on the committed step, 2-D's note */
-  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: Seed3; readonly readAs?: readonly string[] };
+  /** #613 / #1748 (FR-EN-9): the line restates a MUTED row — that row is re-ticked, nothing is appended, no notice */
+  | { readonly kind: 'retick'; readonly twin: Fact3; readonly facts: Fact3[] }
+  /** `readAs` (#1942): the polygon angle a lone vertex was read as — said aloud on the committed step, 2-D's note.
+   *  `held` (#2790, ADR-3D-484, ADR-W-200): the figure already holds the line — it is its own row, with the notice. */
+  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: Seed3; readonly readAs?: readonly string[]; readonly held?: true };
 
 export function decideSubmit3(
   st: { facts: Fact3[]; seed: Seed3 },
@@ -2941,16 +2979,17 @@ export function decideCommands3(
   // the student stated, and what `.geo3.json` saves and replays — grew entries that state nothing.
   // This is the store-level rule 2-D has always had in `foldFact`, which is why this is a port and
   // not a new mechanism. A disabled twin is RE-ENABLED rather than duplicated (2-D's FR-EN-9).
+  //
+  // #2790 (ADR-3D-484, ADR-W-200, operator ruling 2026-11-09: *"if user enters an input that is already existing in the
+  // diagram, it should be accepted but with a notice that it already exists. this should be on all tools"*) — a twin ON
+  // the figure no longer ends the decision: the line is built like any line and recorded as its own row, `held`, so the
+  // relation survives when the earlier row is unticked or deleted. A MUTED twin is still re-ticked (FR-EN-9).
+  let held = false;
   if (opts.twins) {
     const found = statedFacts.find((f) => sameStatement(f.cmds, stated)) ?? ringRestatementTwin3(statedFacts, stated) ?? numbersRestatementTwin3(statedFacts, stated);
     const twin = found && facts.find((f) => f.id === found.id);
-    if (twin) {
-      return {
-        kind: 'already-stated',
-        twin,
-        facts: twin.enabled ? facts : facts.map((f) => (f.id === twin.id ? { ...f, enabled: true } : f)),
-      };
-    }
+    if (twin && !twin.enabled) return { kind: 'retick', twin, facts: facts.map((f) => (f.id === twin.id ? { ...f, enabled: true } : f)) };
+    held = twin !== undefined;
   }
   const fact: Fact3 = { id: newId(), utterance: utterance.trim(), cmds: [...commands], enabled: true };
   let candidate = [...facts, fact];
@@ -2960,9 +2999,11 @@ export function decideCommands3(
   // #2674 (ADR-3D-415): the student's letter on a point the TOOL lettered takes the tool's letter over
   const named = toolLetterTakenOver3(candidate, fact.id, seed);
   if (named) [candidate, derived, status] = [named.facts, named.derived, named.derived.status[fact.id]];
-  if (opts.twins) {
-    const twin = knownSegmentEquationTwin3(facts, seed, fact, derived) ?? impliedByPrior3(facts, seed, fact, derived);
-    if (twin) return { kind: 'already-stated', twin, facts };
+  if (opts.twins && !held) held = (knownSegmentEquationTwin3(facts, seed, fact, derived) ?? impliedByPrior3(facts, seed, fact, derived)) !== null;
+  if (held) {
+    // the figure already holds it: nothing to search; the row is marked held (its one note is the held notice, Q-2790c)
+    const heldFact: Fact3 = { ...fact, held: true };
+    return { kind: 'record', fact: heldFact, facts: candidate.map((f) => (f.id === fact.id ? heldFact : f)), seed, held: true };
   }
   if (!opts.seedSearch) return { kind: 'record', fact, facts: candidate, seed };
   // ADR-3D-053 (#273): a stated inequality determines nothing, so it can only be honoured by
@@ -3109,68 +3150,17 @@ const IMPLIED_TOL3 = 1e-7;
 const STATEMENT_PARTS3: ReadonlySet<keyof Construction3> = new Set<keyof Construction3>([
   'claims', 'requirements', 'scalarPins', 'pairPins', 'planePins', 'pins', 'vectorPins', 'paramGivens', 'determinations',
   'lineRels', 'coordPlanePins', 'planeLinePerps', 'linePerps', 'memberships', 'onLines', 'segments', 'pointPlanes',
+  'angleMarks', 'lengthMarks', 'redundantShapes',
 ]);
-/** ...and of those, the ink a statement draws over its own operands: drawing it says nothing on its own. */
-const STATEMENT_INK3: ReadonlySet<keyof Construction3> = new Set<keyof Construction3>(['segments', 'pointPlanes']);
+/** ...and of those, the ink a statement draws over its own operands: drawing it says nothing on its own. #2790 (ADR-3D-484):
+ *  a statement's own marks (its angle arcs, its length ticks or value) are its ink too, as 2-D's held test reads them. */
+const STATEMENT_INK3: ReadonlySet<keyof Construction3> = new Set<keyof Construction3>(['segments', 'pointPlanes', 'angleMarks', 'lengthMarks']);
 
-/** One step of the fact list, by object identity, so a prefix shared between two commits is one node (the claim-lead memo). */
-interface LeadNode3 {
-  next: WeakMap<Fact3, LeadNode3>;
-  /** Did this row's claims all hold on the figure before it? Unset until asked. */
-  held?: boolean;
-}
-const leadRoot3: LeadNode3 = { next: new WeakMap() };
-let leadFolds3 = 0;
-/** The memo's counter lock seam (the 2-D `conflictSearchStats` idiom): how many rows paid a fold since the last read. */
-export function takeLeadFolds3(): number {
-  const n = leadFolds3;
-  leadFolds3 = 0;
-  return n;
-}
-
-/**
- * #1542 (ADR-3D-429, operator ruling Q2, 2026-09-29; widened by ADR-3D-431, sr-19) — THE CLAIM ROWS THAT WERE A GIVEN, NOT A
- * CHECK. A claim that pins is a pin and a claim (ADR-3D-030): *"When the plane equation moved the figure (it pinned), the row
- * is a given and shows ● like every other given."* sr-19, ADR-W-175: *"No ✓ "verified" ever appears on a given."* So it is
- * every claim row, not only a plane equation: «AB = 3» on a free cube is a given.
- *
- * Judged on the figure before the row, the way `knownSegmentEquationTwin3` judges: the claim was CHECKED when it already held
- * there in every sample (`verifyClaim`), and otherwise the row is what made it true. Not `freeDims` or
- * `statementReachesFreeDof3`: those ask what COULD move, and a cube of a stated side still floats in space while a cube
- * fixed by its vertices still counts its side. A view read, never part of `derive3`.
- *
- * COST. One fold of the prefix per claim row, so it is memoised: the walk descends a trie keyed on the fact OBJECTS (a store
- * action reuses every unchanged fact), and a row's verdict lives on its node. A commit pays for the new row only; an edit
- * pays for the claim rows after it. `verifyClaim` asks every sample, so the answer is the facts', not the display seed's: it is
- * asked at seed 0, «הציגו תצורה אחרת» pays nothing, and a row's mark never changes on a press. Measured in ADR-3D-431.
+/*
+ * #2790 (ADR-3D-484) — the ✓ "verified" lead is retired. Every claim row is a given in its own right (ADR-W-200 §1: a
+ * restated row is "a given in its own right"; sr-19, ADR-W-175: *"No ✓ "verified" ever appears on a given"*), so every row
+ * leads with its status dot and `claimGivens3` / `factLead3` (ADR-3D-429, ADR-3D-431) and their prefix-fold memo are gone.
  */
-export function claimGivens3(facts: readonly Fact3[]): ReadonlySet<string> {
-  const givens = new Set<string>();
-  let node = leadRoot3;
-  facts.forEach((f, i) => {
-    let step = node.next.get(f);
-    if (!step) {
-      step = { next: new WeakMap() };
-      node.next.set(f, step);
-    }
-    node = step;
-    const said = f.enabled ? f.cmds.flatMap((k) => (k.type === 'claim' ? [k.claim] : [])) : [];
-    if (said.length === 0) return;
-    if (step.held === undefined) {
-      leadFolds3++;
-      const before = derive3(facts.slice(0, i) as Fact3[], 0).construction;
-      step.held = said.every((claim) => verifyClaim(claim, before, 0));
-    }
-    if (!step.held) givens.add(f.id);
-  });
-  return givens;
-}
-
-/** The mark a row leads with: ✓ for a claim verified against the figure, else the status dot (a row's whole rule, so a
- *  test reaches it). A row whose claim drove the figure is a given ({@link claimGivens3}). */
-export function factLead3(f: Pick<Fact3, 'id' | 'cmds'>, status: FactStatus3 | undefined, claimGivens: ReadonlySet<string>): 'verified' | 'status' {
-  return status === 'ok' && f.cmds.some((k) => k.type === 'claim') && !claimGivens.has(f.id) ? 'verified' : 'status';
-}
 
 /**
  * The LLM lane's decision (#1692, ADR-3D-305): the model's canonical lines, each re-parsed by the tested
@@ -3235,10 +3225,9 @@ export const useGeo3 = create<Geo3State>()(
           case 'refused':
             set({ lastError: v.error }); // keep-prior: the refused statement is not added
             return;
-          case 'already-stated':
-            // #1990 (ADR-3D-377): «זה כבר קיים באיור» is true only of a twin that was ON the figure; a muted twin the
-            // line re-ticks is 2-D's silent re-enable (FR-EN-9, `foldCommand`), never "already on the figure".
-            set({ facts: v.facts, lastError: null, lastNotice: v.twin.enabled ? { code: 'already-stated' } : null });
+          case 'retick':
+            // #1990 (ADR-3D-377): a muted twin the line re-ticks was not on the figure — 2-D's silent re-enable (FR-EN-9)
+            set({ facts: v.facts, lastError: null, lastNotice: null });
             return;
           case 'record': {
             const added = v.facts[v.facts.length - 1];
@@ -3251,7 +3240,8 @@ export const useGeo3 = create<Geo3State>()(
               lastError: null,
               lastCreated: added && circle !== undefined ? { factId: added.id, ids: [], circle } : added && ids?.length ? { factId: added.id, ids } : null,
               // #1942: a lone vertex read as its polygon's angle is said aloud, never a silent pick (2-D's note)
-              lastNotice: v.readAs?.length ? { code: 'vertex-angle-read-as', angles: v.readAs.map((a) => `∠${a}`).join(', ') } : null,
+              // #2790 (ADR-3D-484): a line the figure already held is its own row, said so with the suite's notice
+              lastNotice: v.held ? { code: 'already-held' } : v.readAs?.length ? { code: 'vertex-angle-read-as', angles: v.readAs.map((a) => `∠${a}`).join(', ') } : null,
             });
             return;
           }

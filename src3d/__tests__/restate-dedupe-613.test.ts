@@ -11,6 +11,10 @@
  * Operator ruling (2026-08-16): *"if a fact is already known - it should not be added. this is true to
  * all tools."* — option (b): the submit succeeds, no row is appended, and a notice says it was already
  * stated. Refusing (a) was rejected: a refusal for something that is not an error reads harshly.
+ *
+ * ⚠ #2790 ([ADR-3D-484](../../docs/06b-decisions-3d.md#adr-3d-484)) supersedes the "no row" half (operator 2026-11-09,
+ * ADR-W-200: *"it should be accepted but with a notice that it already exists"*): the restatement is its own row, with the
+ * held notice, so deleting or unticking the earlier row leaves it in force. A MUTED twin is still re-ticked, not duplicated.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useGeo3 } from '../store/store3';
@@ -24,11 +28,11 @@ const st = () => useGeo3.getState();
 
 beforeEach(reset);
 
-describe('#613 — a restated fact adds no row', () => {
+describe('#613 → #2790 — a restated fact is its own row', () => {
   it.each([
-    [['פירמידה SABC', 'משולש ABC', 'משולש ABC'], 2],
-    [['פירמידה SABC', 'זווית ABC = 90', 'זווית ABC = 90'], 2],
-    [['פירמידה ABCDS שבסיסה ריבוע', 'ריבוע ABCD', 'ריבוע ABCD'], 2],
+    [['פירמידה SABC', 'משולש ABC', 'משולש ABC'], 3],
+    [['פירמידה SABC', 'זווית ABC = 90', 'זווית ABC = 90'], 3],
+    [['פירמידה ABCDS שבסיסה ריבוע', 'ריבוע ABCD', 'ריבוע ABCD'], 3],
   ])('%s → %i rows', (lines, rows) => {
     for (const u of lines) submit(u);
     expect(st().lastError, 'the restatement is not an error').toBeNull();
@@ -41,7 +45,7 @@ describe('#613 — a restated fact adds no row', () => {
     submit('משולש ABC');
     submit('משולש ABC');
     expect(st().lastError).toBeNull();
-    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+    expect(st().lastNotice).toEqual({ code: 'already-held' });
   });
 
   it('the notice is CLEARED by the next ordinary statement', () => {
@@ -51,7 +55,7 @@ describe('#613 — a restated fact adds no row', () => {
     expect(st().lastNotice).not.toBeNull();
     submit('E אמצע AB');
     expect(st().lastNotice, 'a fresh statement clears it').toBeNull();
-    expect(st().facts.length).toBe(3);
+    expect(st().facts.length).toBe(4);
   });
 
   it('a DISABLED twin is re-enabled, never duplicated (2-D\'s FR-EN-9)', () => {
@@ -78,7 +82,7 @@ describe('#613 — a restated fact adds no row', () => {
     submit('פירמידה SABC');
     submit('משולש ABC');
     submit('triangle ABC');
-    expect(st().facts.length, 'lowered commands are equal, so it is one statement').toBe(2);
-    expect(st().lastNotice?.code).toBe('already-stated');
+    expect(st().facts.length, 'lowered commands are equal, so it is one statement — held, its own row').toBe(3);
+    expect(st().lastNotice?.code).toBe('already-held');
   });
 });

@@ -36,8 +36,8 @@ function play(steps: readonly string[]): { st: St; last: 'restates' | 'refines' 
     const v = decideSubmit3(st, line, () => `f${++n}`);
     if (v.kind === 'record') {
       st = { facts: v.facts, seed: v.seed };
-      out = { last: 'refines' };
-    } else if (v.kind === 'already-stated') out = { last: 'restates' };
+      out = { last: v.held ? 'restates' : 'refines' }; // #2790 (ADR-3D-484): a restatement is its own row, held
+    } else if (v.kind === 'retick') out = { last: 'restates' };
     else {
       out = { last: 'refused', refusal: v.kind === 'refused' ? plain(errorText3(t as never, v.error) ?? '') : v.kind };
       if (i < steps.length - 1) earlierAccepted = false;
@@ -88,10 +88,10 @@ describe('#2171 — a trapezoid adjective after «טרפז» narrows the ring, a
     }
   }, 120_000);
 
-  it('«ריבוע ABCD» · «מלבן ABCD» still says «adds nothing» (an implied noun is redundant)', () => {
+  it('«ריבוע ABCD» · «מלבן ABCD» is a restatement (an implied noun is held: its own row since #2790)', () => {
     const { st, last } = play(['ריבוע ABCD', 'מלבן ABCD']);
     expect(last).toBe('restates');
-    expect(st.facts).toHaveLength(1);
+    expect(st.facts).toHaveLength(2);
   });
 });
 
@@ -117,10 +117,10 @@ describe('#2180 — a third noun after a sibling merge is the same statement', (
     [['מקבילית ABCD', 'דלתון ABCD', 'מעוין ABCD']],
     [['מלבן ABCD', 'מעוין ABCD', 'ריבוע BCDA']],
     [['מלבן ABCD', 'דלתון ABCD', 'ריבוע ABCD']],
-  ])('«%s» adds no row', (steps) => {
+  ])('«%s» is held (its own row since #2790, ADR-3D-484)', (steps) => {
     const v = play(steps);
     expect(v.last).toBe('restates');
-    expect(v.st.facts).toHaveLength(2);
+    expect(v.st.facts).toHaveLength(3);
   }, 120_000);
 
   it('a muted sibling does not count: «מלבן» · «מעוין» (muted) · «ריבוע» records the square', () => {

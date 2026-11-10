@@ -27,7 +27,7 @@ import { orderToolActions } from '../shell/frame/toolRow';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's own buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import registry from '../products.json';
-import { dataView, panelIsEmpty, radiusRowLabel3 } from './engine/dataView';
+import { dataView, mutualRowKey3, panelIsEmpty, pointPlaneRowKey3, radiusRowLabel3 } from './engine/dataView';
 import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { defaultPlaneDisplay3 } from './engine/types';
@@ -68,7 +68,7 @@ import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
-import { derive3, factLead3, claimGivens3, redo3, undo3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
+import { derive3, redo3, undo3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
 import { letterRename3 } from './store/rename3';
 import type { LetterRenameResult } from '../shell/frame/letterOffer';
 import { planeChipsByFact } from './store/planeChips';
@@ -129,6 +129,13 @@ export default function App3() {
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
   );
   const [showWitness, setShowWitness] = useState(true); // #397: distance witnesses, default on
+  // #2062 (ADR-3D-480): the panel row a membership question points at — highlighted and scrolled into view
+  const [highlightRow, setHighlightRow] = useState<string | null>(null);
+  useEffect(() => {
+    if (!highlightRow) return;
+    const el = document.querySelector(`[data-row-key="${CSS.escape(highlightRow)}"]`);
+    el?.scrollIntoView?.({ block: 'nearest' });
+  }, [highlightRow, showData]);
   // #742: the row disables (never hides) — the 2-D canUndo/canRedo mechanism, mirrored.
   const canUndo3 = useStore(useGeo3.temporal, (s) => s.pastStates.length > 0);
   const canRedo3 = useStore(useGeo3.temporal, (s) => s.futureStates.length > 0);
@@ -182,8 +189,6 @@ export default function App3() {
   // #842 (ADR-3D-192) → #1550 (ADR-3D-281): which row owns each plane's display chip — the FIRST ok row
   // whose sentence names the plane, declaration or relation; one chip per plane. Derived from the fact list.
   // #847: a row that is not `ok` owns nothing. #1550: a plane the figure does not draw has no chip.
-  // #1542 (ADR-3D-429): a plane equation that drove the figure leads with the given's dot, never the verified ✓
-  const claimGivens = useMemo(() => claimGivens3(facts), [facts]);
   const planeChips = useMemo(
     () => planeChipsByFact(facts, (id) => derived.status[id] === 'ok', (name) => derived.resolved.planes.has(name)),
     [facts, derived.status, derived.resolved.planes],
@@ -597,6 +602,11 @@ export default function App3() {
     }
     dispatchVerdict(v);
     let err = useGeo3.getState().lastError;
+    // #2062 (ADR-3D-480): the exam's membership question points at a panel row — open the panel and highlight it
+    if (err?.code === 'answer-in-panel') {
+      setHighlightRow(err.known ? pointPlaneRowKey3(err.point, err.plane) : null);
+      if (err.known) setShowData(true);
+    } else setHighlightRow(null);
     logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
     // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
     if (err?.code === 'not-understood') {
@@ -896,8 +906,8 @@ export default function App3() {
           )}
           {lastNotice && !lastError && !busy && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              {lastNotice.code === 'already-stated'
-                ? t('suite.notice.alreadyDrawn') /* #1990 (ADR-3D-377): 2-D's sentence, one suite key */
+              {lastNotice.code === 'already-held'
+                ? t('suite.notice.alreadyHeld') /* #2790 (ADR-3D-484, ADR-W-204): the suite's held-row notice, 2-D's sentence */
                 : t('notice.vertexAngleReadAs', { angles: lastNotice.angles }) /* #1942: 2-D's «הובן כ-∠CAB» */}
             </div>
           )}
@@ -946,14 +956,8 @@ export default function App3() {
               // #934 (ADR-3D-228) → #1401 (ADR-W-088): the row's DIRECTION is the shared chrome's now,
               // derived with `textDir3` from this text — this callback used to set `dir` itself.
               text: factRowText3(f, new Set(vectorNames3(derived.construction)), derived.readings[f.id]),
-              lead:
-                factLead3(f, derived.status[f.id], claimGivens) === 'verified' ? (
-                  <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
-                    ✓
-                  </span>
-                ) : (
-                  statusDot(derived.status[f.id])
-                ),
+              // #2790 (ADR-3D-484): every row leads with its status dot — a claim row is a given, never a ✓
+              lead: statusDot(derived.status[f.id]),
               content: (
                 <span className="block min-w-0 truncate text-sm">
                   {/* #900 (ADR-3D-216): the routing lives in FactRow3, not in this callback — a decision
@@ -1228,8 +1232,14 @@ export default function App3() {
                             : `dataPanel.mutual.${m.rel}`,
                           { a: m.a, b: m.b },
                         );
+                        const rowKey = mutualRowKey3(m);
                         return (
-                          <span key={`${m.rel}-${m.a}-${m.b}`} dir={textDir3(line)} className="block font-medium">
+                          <span
+                            key={rowKey}
+                            data-row-key={rowKey}
+                            dir={textDir3(line)}
+                            className={`block font-medium${highlightRow === rowKey ? ' rounded bg-amber-100 ring-2 ring-amber-400' : ''}`}
+                          >
                             {line}
                           </span>
                         );
@@ -1277,10 +1287,10 @@ export default function App3() {
                                 </span>
                               ))}
                               {/* #813: a note may ACCOMPANY an answer (a frameless plane reports its shape and says why no equation follows) */}
-                              {r.note && <span className="font-normal text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>}
+                              {r.note && <span className="font-normal text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param, ...r.inPanel })}</span>}
                             </span>
                           ) : (
-                            <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>
+                            <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param, ...r.inPanel })}</span>
                           )}
                         </span>
                         <button type="button" onClick={() => removeQuery(i)} className="shrink-0 text-slate-400 hover:text-rose-600" aria-label={t('query.remove')}>
@@ -1316,6 +1326,9 @@ export default function App3() {
                   unreadableHint={t('query.note.notUnderstood')}
                   onSubmit={(text) => {
                     addQuery(text);
+                    // #2062 (ADR-3D-480): a membership question asked here highlights the row its answer points at
+                    const a = answerQuery(derived.construction, text, seed);
+                    setHighlightRow(a.inPanel ? pointPlaneRowKey3(a.inPanel.point, a.inPanel.plane) : null);
                   }}
                   palette={{ symbols: SYMBOL_SPECS_3, startCollapsed: true, compact: true, toggleTitle: t('palette.show') }}
                 />

@@ -52,11 +52,37 @@ export interface MutualRow {
   b: string;
   /** #577: `contained` is the linear×planar cell's own answer — a segment lying IN a plane is not
    *  'parallel' to it, and saying so would be a false statement. */
-  rel: MutualRel3 | 'perpendicular' | 'contained';
+  rel: MutualRel3 | 'perpendicular' | 'contained' | 'on-plane' | 'off-plane';
   /** #577: a LINEAR×PLANAR pair, with `a` the linear side. The wording is asymmetric here — «FG
    *  מקביל למישור ABCD», never the symmetric «מקבילים», which misreads for a plane — so the row
    *  carries its own kind rather than the App re-deriving it from the labels. */
   mixed?: true;
+}
+
+/**
+ * #2062 ([ADR-3D-480](../../docs/06b-decisions-3d.md#adr-3d-480)) — the stable key of a POINT × PLANE row, which the
+ * membership question («האם הנקודה M נמצאת במישור AEC?») points at and the App highlights. A plane named by a point
+ * run is keyed by its letters as a set, so «מישור ACE» finds the row of «מישור AEC».
+ */
+export function pointPlaneRowKey3(point: string, plane: string): string {
+  const run = plane.match(/[A-Z]\d*'?/g);
+  const planeKey = run && run.join('') === plane ? [...run].sort().join('') : plane;
+  return `point~plane:${point}:${planeKey}`;
+}
+
+/** The row's key, when it is a point × plane row. */
+export function mutualRowKey3(m: MutualRow): string {
+  return m.rel === 'on-plane' || m.rel === 'off-plane' ? pointPlaneRowKey3(m.a, m.b) : `${m.rel}-${m.a}-${m.b}`;
+}
+
+/**
+ * #2062 (ADR-3D-480) — what the panel knows about a point and a plane: the point × plane row, when the panel has one.
+ * The ONE decision both question surfaces read (the main input's `answer-in-panel` refusal and the ask lane), so the
+ * pointer never points at a row the panel does not show.
+ */
+export function pointPlaneRow3(panel: DataPanel, point: string, plane: string): MutualRow | null {
+  const key = pointPlaneRowKey3(point, plane);
+  return panel.mutual.find((m) => (m.rel === 'on-plane' || m.rel === 'off-plane') && mutualRowKey3(m) === key) ?? null;
 }
 
 export interface DataPanel {
@@ -1533,6 +1559,28 @@ export function dataView(c: Construction3, seed: Seed3): DataPanel {
           mutual.push({ a: lin.label, b: pln.label, rel: 'perpendicular', mixed: true });
         }
         // a generic crossing is noise — the #384 precedent, applied to the mixed column too
+      }
+    }
+
+    // #2062 (ADR-3D-480; the operator's ruling of 2026-10-14, card `d14b-2062-question` A, *"if now - we should"*): a
+    // POINT side. The exam asks «האם הנקודה M נמצאת במישור AEC?», and the panel had no row for a point at all. Flood
+    // control, as #558's edge rule: only a point the student INTRODUCED (not a vertex of a solid — a box's eight
+    // vertices against every plane would be noise), against a planar side, never against a plane it defines (E × AEC).
+    // The relation is reported only when it is the same in every sampled configuration (the panel's knowledge rule).
+    const solidVertex = new Set(c.solids.flatMap((sd) => sd.ids));
+    const pointSides = [...c.points.keys()].filter((id) => /^[A-Z]\d*'?$/.test(id) && !solidVertex.has(id));
+    for (const id of pointSides) {
+      for (const pln of planar) {
+        if (pln.ids.includes(id)) continue;
+        const devs = resolved.map((res, k) => {
+          const p = res.positions.get(id);
+          const g = resolveOperand(pln.op, c, { lines: res.lines, planes: res.planes })((x: Id) => res.positions.get(x) ?? null);
+          const d = p && g ? distanceBetween({ point: p }, g) : null;
+          return d === null ? null : d / Math.max(1, figureExtent(positions[k]));
+        });
+        if (devs.some((d) => d === null)) continue;
+        if (devs.every((d) => d! < TOL)) mutual.push({ a: id, b: pln.label, rel: 'on-plane' });
+        else if (devs.every((d) => d! >= TOL)) mutual.push({ a: id, b: pln.label, rel: 'off-plane' });
       }
     }
   }
