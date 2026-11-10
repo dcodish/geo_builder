@@ -2336,3 +2336,7 @@ over all four (ADR-041).
 ### `bare-circle-pair-configurations-2240` — «שני מעגלים»: every view «הציגו תצורה אחרת» offers is the configuration it stands for (#2240, ADR-815)
 
 **Guards against:** a "separate" or "one inside the other" view of the bare pair drawn crossing, so the button showed one case twice in a cycle. **Asserts** 12 presses of the real view search, each view in its variant's case (crossing / apart / nested) and all three shown; with both radii stated, «OP = 10» settles apart, «OP = 0.5» nested and «OP = 5» on the touch (the boundary is never rejected), each meeting every requirement; a common point through two riders is never drawn apart.
+
+### `pentagon-impossible-closing-side-refuses` — «מחומש ABCDE» · … · ∠CDE = 100° · «EA = 1» is refused naming the statement, never parked as waiting (#2797, ADR-817)
+
+**Guards against:** a closing side no configuration reaches (E rides the ray from D and comes no closer to A than 2.11) committed as a red «waiting for givens» row once the solver samples the pentagon's free side. **Asserts** the seven lines build green; «EA = 1» is refused by the gate as an over-constraint naming |EA| = 1; «EA = 4.5» commits.
