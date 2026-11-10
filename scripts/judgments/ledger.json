@@ -4061,6 +4061,28 @@
       ],
       "at": "2026-11-10T15:32:39.429Z",
       "status": "escalated"
+    },
+    {
+      "id": "Q-2793c",
+      "issue": 2793,
+      "question": "«תיבה» · «X_B=3» (one off-origin component, no sign): should «הציגו תצורה אחרת» slide the figure along its unanchored axes? (a) keep ADR-3D-373, it stays put; (b) slide at every configuration.",
+      "class": "stated-component-unanchored-axis-slide",
+      "verdict": "escalate",
+      "reason": "(b) would reverse ADR-3D-373 §4 with no ruling ordering it; his words conflict (ADR-052 no fixed position vs FR-SP-4 keep it flat on the floor); ADR-3D-373's figure decision is a session's scoping, not his words.",
+      "nearest": [
+        {
+          "quote": "4 - b",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2746#issuecomment-6745659180"
+        },
+        {
+          "quote": "Keep it flat on the floor",
+          "date": "2026-10-31",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/02b-requirements-3d.md"
+        }
+      ],
+      "at": "2026-11-10T15:52:09.298Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
