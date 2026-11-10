@@ -93,7 +93,7 @@ describe('#1432 — the ASKS', () => {
    * box alike). The focus still has no invariant VALUE and is never a sampled point; it is the student's own letter
    * read and verified at every configuration, (a/2, 0).
    */
-  it('a PARAMETERISED parabola has no invariant focus — never a sampled point; it answers in the student's letter', () => {
+  it('a PARAMETERISED parabola has no invariant focus — never a sampled point; it answers in the student’s letter', () => {
     const a = answer(['נתונה פרבולה שמשוואתה y^2=2ax'], 'מוקד הפרבולה');
     expect(a.value).toBe('(a/2, 0)');
   });
