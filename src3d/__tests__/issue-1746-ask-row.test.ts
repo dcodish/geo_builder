@@ -92,6 +92,11 @@ describe('#1746 — the class: every query kind\'s JOINED row names its subject 
     volume: [{ lines: CUBE_FRAMED, q: "נפח ABCDA'B'C'D'", want: "נפח ABCDA'B'C'D' = 8" }],
     rev: [{ lines: ['חרוט שרדיוס בסיסו 5 וגובהו 12'], q: 'נפח החרוט', want: 'נפח החרוט = 100π' }],
     plane: [{ lines: ['A(0,0,0)', 'B(1,0,0)', 'C(0,1,0)'], q: 'מישור ABC', want: 'מישור ABC = z = 0' }],
+    // #1541 (ADR-3D-475): the equation is the value; the echo names the line once
+    line: [
+      { lines: ['A(1,2,3)', 'B(2,4,6)'], q: 'משוואת AB', want: 'משוואת AB = x = (1, 2, 3) + t·(1, 2, 3)' },
+      { lines: ['ישר l x=(1,2,3)+t(1,0,2)'], q: 'משוואת הישר l', want: 'משוואת הישר l = x = (1, 2, 3) + t·(1, 0, 2)' },
+    ],
   };
 
   for (const [kind, cases] of Object.entries(CASES)) {

@@ -12,7 +12,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  curveInLetters,
   parametricShape,
+  readInLetters,
   shapeOfTrace,
   snapAndVerify,
   snapExact,
@@ -140,7 +142,7 @@ describe('#2734 — snapAndVerify: a surd locus states its equation, and the sel
   });
 });
 
-describe('#2734 — fitMonomial: the third verdict reads a surd ratio (`√2·a`, `3√2a/2`)', () => {
+describe('#2734 — readInLetters: the third verdict reads a surd ratio (`√2·a`, `3√2a/2`)', () => {
   const samples = (k: number, cy: number, noise: (i: number) => number = () => 0): LocusSample[] =>
     [1, 2, 3.5, 5].map((a) => ({ env: { a }, points: circle(k * a, cy, 3, 80, noise) }));
 
@@ -169,5 +171,50 @@ describe('#2734 — fitMonomial: the third verdict reads a surd ratio (`√2·a`
   it('the self-check still runs on a surd monomial: a wrong one is refused', () => {
     const smp = samples(R2, 0);
     expect(verifySymbolic({ kind: 'circle', cx: { c: 1.41, pow: { a: 1 } }, cy: { c: 0, pow: {} }, r2: { c: 9, pow: {} } }, smp)).toBe(false);
+  });
+});
+
+describe('#2735 (ADR-AG-458) — the one letter reader, asked of a value and of a drawn curve', () => {
+  const ks = [0.5, 1, 2.5, 4];
+  const envs = ks.map((k) => ({ k }));
+
+  it('a value that is 2k at every configuration reads 2k; k/2 and 3k² read too', () => {
+    expect(readInLetters(ks.map((k) => 2 * k), envs, ['k'])).toEqual({ c: 2, pow: { k: 1 } });
+    expect(readInLetters(ks.map((k) => k / 2), envs, ['k'])).toEqual({ c: 0.5, pow: { k: 1 } });
+    expect(readInLetters(ks.map((k) => 3 * k * k), envs, ['k'])).toEqual({ c: 3, pow: { k: 2 } });
+  });
+
+  it('a dependence that is not a monomial is not read: k + 1, √(144 − 4k²)', () => {
+    expect(readInLetters(ks.map((k) => k + 1), envs, ['k'])).toBeNull();
+    expect(readInLetters(ks.map((k) => Math.sqrt(144 - 4 * k * k)), envs, ['k'])).toBeNull();
+  });
+
+  it('every configuration is substituted back: one sample off the shared ratio and nothing is read', () => {
+    const vals = ks.map((k) => 2 * k);
+    vals[3] += 0.01;
+    expect(readInLetters(vals, envs, ['k'])).toBeNull();
+  });
+
+  it('2|k| over both signs of k is no monomial: the domain decides, never a guess', () => {
+    const both = [-2, -0.5, 1, 3];
+    expect(readInLetters(both.map((k) => 2 * Math.abs(k)), both.map((k) => ({ k })), ['k'])).toBeNull();
+  });
+
+  it('a drawn circle about (3k, 0) of radius 2k reads as one; a line x = -2k at any scale reads monic', () => {
+    const circles = ks.map((k) => ({ kind: 'circle' as const, cx: 3 * k, cy: 0, r: 2 * k }));
+    expect(curveInLetters(circles, envs, ['k'])).toEqual({ kind: 'circle', cx: { c: 3, pow: { k: 1 } }, cy: { c: 0, pow: {} }, r2: { c: 4, pow: { k: 2 } } });
+    const lines = ks.map((k, i) => ({ kind: 'line' as const, a: -(i + 1), b: 0, c: -(i + 1) * 2 * k }));
+    expect(curveInLetters(lines, envs, ['k'])).toEqual({ kind: 'line', D: { c: 1, pow: {} }, E: { c: 0, pow: {} }, F: { c: 2, pow: { k: 1 } } });
+  });
+
+  it('a constant curve, a non-monomial parameter and a changing family read nothing', () => {
+    expect(curveInLetters(ks.map(() => ({ kind: 'circle' as const, cx: 1, cy: 0, r: 2 })), envs, ['k'])).toBeNull();
+    expect(curveInLetters(ks.map((k) => ({ kind: 'circle' as const, cx: k + 1, cy: 0, r: 2 })), envs, ['k'])).toBeNull();
+    const mixed = [
+      { kind: 'circle' as const, cx: 1, cy: 0, r: 2 },
+      { kind: 'parabola' as const, p: 2 },
+      { kind: 'circle' as const, cx: 1, cy: 0, r: 2 },
+    ];
+    expect(curveInLetters(mixed, envs.slice(0, 3), ['k'])).toBeNull();
   });
 });

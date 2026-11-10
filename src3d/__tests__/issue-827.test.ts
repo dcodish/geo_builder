@@ -63,8 +63,18 @@ const PYRAMID = [
   '|u| = |v|',
 ];
 
-/** 17 and 99 are the seeds that printed a value before the fix; the rest were already honest. */
-const SEEDS = [0, 1, 3, 17, 42, 99];
+/**
+ * 17 and 99 printed a value before the #827 fix. #2814 (ADR-3D-461): the lock samples EVERY configuration 0–23 — at
+ * `main` @ 86768862 the pool carried only +4 at 10 of 24 seeds and the panel printed «D(3, 4, 0)» at seed 2, a seed
+ * the old six-seed sample never looked at. A lock that samples a seed-luck property at a few seeds passes by luck.
+ */
+const SEEDS = [...Array.from({ length: 24 }, (_, i) => i), 42, 99];
+/** #2814 (operator ruling 2026-11-10, option (a)): the data-panel row lists both configurations. */
+const BOTH_D = 'D(3, 4, 0) או (3, -4, 0)';
+const rowAt = (seed: number, id: string) => {
+  const d = derive3(st().facts, seed);
+  return dataView(d.construction, seed).points.filter((r) => r.startsWith(`${id}(`));
+};
 
 describe('#827 — with NO sign given, the two-branch coordinate reads open', () => {
   beforeEach(reset);
@@ -183,5 +193,30 @@ describe('#827 — determined coordinates are untouched', () => {
       expect(coordsAt(seed, 'A'), `seed ${seed}`).toBe('(0, 0, 0)');
       expect(coordsAt(seed, 'B'), `seed ${seed}`).toBe('(4, 0, 0)');
     }
+  });
+});
+
+describe('#2814 — the two configurations are both listed, and «הציגו תצורה אחרת» alternates them (ADR-3D-461)', () => {
+  beforeEach(reset);
+
+  it('the row lists BOTH points at every configuration; never one branch value alone', () => {
+    // operator ruling 2026-11-10: "since there are only 2 options, we give both"
+    build(PYRAMID);
+    for (const seed of SEEDS) {
+      expect(rowAt(seed, 'D'), `seed ${seed}`).toEqual([BOTH_D]);
+      expect(coordsAt(seed, 'D'), `seed ${seed}: the figure's label keeps the letter`).toBe(OPEN_D);
+    }
+  });
+
+  it('both configurations are drawn, and each press of «הציגו תצורה אחרת» shows the other one', () => {
+    build(PYRAMID);
+    const drawn = new Set(SEEDS.map((s) => derive3(st().facts, s).positions.get('D')!.y.toFixed(2)));
+    expect([...drawn].sort().join(' ')).toBe('-4.00 4.00');
+    const ys: string[] = [];
+    for (let k = 0; k < 6; k++) {
+      st().resample();
+      ys.push(derive3(st().facts, st().seed).positions.get('D')!.y.toFixed(0));
+    }
+    for (let k = 1; k < ys.length; k++) expect(ys[k], `press ${k + 1}`).not.toBe(ys[k - 1]);
   });
 });

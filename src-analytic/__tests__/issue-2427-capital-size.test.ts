@@ -30,7 +30,7 @@ function submitAll(lines: readonly string[]): string[] {
   for (const line of lines) {
     const v = decideSubmit(line, recorded, 0);
     if (v.kind === 'record') recorded.push(v.line);
-    else if (v.kind !== 'already-known' && v.kind !== 'already-follows') throw new Error(`«${line}» → ${v.kind} ${v.kind === 'refused' ? v.error.key : ''}`);
+    else throw new Error(`«${line}» → ${v.kind} ${v.kind === 'refused' ? v.error.key : ''}`);
   }
   return recorded;
 }

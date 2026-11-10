@@ -10,11 +10,13 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, labelRows, narrowedDomain, noFreedomReaches, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
+import { curveInLetters, readInLetters, type Monomial, type SymbolicCurve } from './locusFit';
+import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, isRadiusSymbol, labelRows, narrowedDomain, noFreedomReaches, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
 import { curveParentsOf, parentsOf } from './derived';
-import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
+import { enumerateBlockRoots, pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
-import { resolveCurve, curveExtent, type Box } from './curves';
+import { resolveCurve, curveExtent, parabolaFocus, type Box } from './curves';
+import { toWorld } from './conicFrame';
 import type { ClassifyResult } from './conic';
 import { evalExpr, symbolsOf as symbolsOfExpr, type Env } from './expr';
 import { evalLengthExpr, type LengthExpr } from './lengths';
@@ -62,7 +64,7 @@ export interface FigureCurve {
 export interface Vacancy {
   id: Id;
   reason: Extract<ClassifyResult, { ok: false }>['reason'];
-  /** For `kind-mismatch`: what the equation actually describes (02c R7, #1514 pre-play). */
+  /** For `kind-mismatch` and `not-canonical` (#2664): what the equation actually describes (02c R7, #1514 pre-play). */
   actual?: NumCurve['kind'];
 }
 
@@ -1257,8 +1259,11 @@ export function spanOf(c: Construction, at: Map<Id, Pt>, env: Env): number {
     const k = numCurveOf(c, env, o, atFn);
     if (!k || k.kind === 'line') continue;
     if (k.kind === 'parabola') {
-      add(0, 0);
-      add(k.p / 2, 0);
+      // Its vertex and its focus, wherever the curve sits (#2664).
+      const v = toWorld(k, 0, 0);
+      const f = parabolaFocus(k);
+      add(v.x, v.y);
+      add(f.x, f.y);
       continue;
     }
     const e = curveExtent(k);
@@ -3734,6 +3739,144 @@ function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number
 }
 
 /**
+ * THE ROOTS OF A DETERMINED BLOCK SEED THE SOLVE (#2731, [ADR-AG-451](../../docs/06c-decisions-analytic.md#adr-ag-451)) — ADR-AG-303's
+ * scan covers a given that reads one open symbol and no carrier; a block whose givens read a free point («KF = 20» reads
+ * K, so p is no pin) was left to descent from a sample the seed barely moves, and the pool held one root of several.
+ *
+ * WHEN: configuration 0 of this assignment converged (nothing unsatisfied) with no freedom left (`carrierDof` 0), and an
+ * unknown is left that no pin fixed. The selectors and rings do not decide WHETHER it runs, only which roots count: a
+ * comparison only another root satisfies («x_K < 10») leaves configuration 0 unadmitted, and the listing is what finds
+ * the configuration that holds it (search first, refuse last — the 2026-11-08 ruling on #2731).
+ *
+ * WHAT: `enumerateBlockRoots` over the figure's own `carrierSystem` at that root, every pinned symbol held at its root
+ * (the pin's other roots are ADR-AG-303's axis). A candidate counts when the solve's judge admits it — nothing unsatisfied
+ * on the real residuals, the declared domains at the open-bound floor, the free-direction signs, the selectors and the
+ * hard ring faults (`admissibleAt`). Directions compare mod π; duplicates merge at `SOLVE_RESOLUTION` of the span. At most
+ * `OPTION_CAP + 1` roots. Memoised per (construction, assignment), anchored on configuration 0, so the list depends only
+ * on the input and every seed reuses it.
+ *
+ * WHICH: configuration 0 draws its own root, unchanged. A configuration s ≥ 1 whose pins took configuration 0's roots
+ * starts stage one AT root ⌊jitter(s + BLOCK_STREAM)·n⌋ of the admitted list — vertices and parameters both — so the
+ * pool misses one of two roots with probability 2⁻²³. A root is part of the assignment (`rootKey`, ADR-AG-303 §5), so
+ * the first drawing's spread walk never crosses to another root. A start, never a verdict: the solve and the judge keep
+ * the last word.
+ */
+const BLOCK_STREAM = 300043;
+/** Listings run so far and the solves they cost — the #1473 perf lock reads them (counted, never timed). */
+export const blockRootStats = { listings: 0, solves: 0 };
+interface BlockList {
+  /** The anchor's pinned symbols and their values: a configuration whose pins differ is not steered. */
+  pinned: ReadonlyMap<string, number>;
+  ids: Id[];
+  syms: string[];
+  /** The admitted roots, each with its index in the listing (0 is configuration 0's own root). */
+  roots: Array<{ x: number[]; index: number }>;
+}
+const blockMemo = new WeakMap<Construction, Map<string, BlockList | null>>();
+function blockRootsOf(raw: Construction, choiceSeed: number): BlockList | null {
+  const akey = assignmentAt(raw, choiceSeed).key;
+  let perRaw = blockMemo.get(raw);
+  if (!perRaw) {
+    perRaw = new Map();
+    blockMemo.set(raw, perRaw);
+  }
+  if (perRaw.has(akey)) return perRaw.get(akey)!;
+  perRaw.set(akey, null); // a re-entry while the anchor is evaluated reads "none"
+  const out = listBlockRoots(raw, choiceSeed, akey);
+  perRaw.set(akey, out);
+  return out;
+}
+
+function listBlockRoots(raw: Construction, choiceSeed: number, akey: string): BlockList | null {
+  // Configuration 0 of THIS assignment: the memoised first drawing when it took it, else its own evaluation.
+  const first = evaluate(raw, 0, 1, false);
+  let anchorSeed = first.choiceSeed ?? 0;
+  let f = first;
+  if (assignmentAt(raw, anchorSeed).key !== akey) {
+    anchorSeed = choiceSeed;
+    evaluateStats.uncached += 1;
+    f = evaluateUncached(raw, 0, choiceSeed, 1, false);
+  }
+  if (f.unsatisfied.length > 0 || f.carrierDof !== 0 || f.vacant.length > 0) return null;
+  const c = resolvedAt(raw, 0, anchorSeed);
+  const sys = carrierSystem(c, f.env);
+  if (sys.ids.length + sys.syms.length === 0 || c.constraints.length === 0) return null;
+  const at = new Map(f.points.map((p) => [p.id, { x: p.x, y: p.y }] as const));
+  if (!sys.ids.every((id) => at.has(id))) return null;
+  // The pins configuration 0 took: held at their roots, and what a later configuration must agree on to be steered.
+  const pins = seedPinRoots(raw, c, f.env, 0, anchorSeed).pins;
+  const pinned = new Map(pins.map((p) => [p.sym, p.roots[p.index]] as const));
+  if (sys.ids.length === 0 && sys.syms.every((sym) => pinned.has(sym))) return null;
+  const anchor = sys.toVec(at, f.env);
+  const base = 2 * sys.ids.length;
+  const pinIdx = new Set(sys.syms.map((sym, j) => (pinned.has(sym) ? base + j : -1)).filter((i) => i >= 0));
+  const held = (x: readonly number[]) => x.map((v, i) => (pinIdx.has(i) ? anchor[i] : v));
+  const span = Math.max(spanOf(c, sys.positionsAt(anchor), f.env), 1e-9);
+  const isDir = (i: number) => i >= base && isDirectionSymbol(sys.syms[i - base]);
+  const delta = (a: readonly number[], b: readonly number[], i: number) => {
+    if (pinIdx.has(i)) return 0;
+    if (!isDir(i)) return (a[i] - b[i]) / span;
+    // a direction is a line: θ and θ + π are one root
+    const d = ((((a[i] - b[i]) % Math.PI) + 1.5 * Math.PI) % Math.PI) - Math.PI / 2;
+    return d / Math.PI;
+  };
+  const domains = new Map(paramRegister(c).map((p) => [p.sym, p.domain] as const));
+  const sampledScale = figureScale(sys.positionsAt(anchor), f.env, sys.syms);
+  const admit = (x: number[]) => {
+    const e = sys.envAt(x);
+    const pos = sys.positionsAt(x);
+    if (sys.ids.some((id) => !pos.has(id))) return false;
+    if (sys.residualsAt(x).some((r) => !(Math.abs(r) <= SATISFIED_EPS))) return false;
+    const floor = openBoundFloor(pos, e, sys.syms, sampledScale);
+    if (!sys.syms.every((sym) => inDomain(domains.get(sym) ?? {}, e[sym], floor))) return false;
+    for (const sel of c.selectors) {
+      if (sel.kind !== 'sign') continue;
+      const sym = freeAngleOf(c, sel);
+      if (sym === null || !Number.isFinite(e[sym])) continue;
+      if ((Math.tan(e[sym]) > 0) !== sel.positive) return false;
+    }
+    return admissibleAt(c, placeOrderFree(c, e, pos, 0) ?? pos, e);
+  };
+  blockRootStats.listings += 1;
+  const listed = enumerateBlockRoots({
+    anchor,
+    residuals: (x) => sys.residualsAt(held(x)),
+    solve: (x0, fn) => {
+      const r = solveLM(held(x0), (x) => fn(held(x)), 120);
+      return { values: held(r.values), ok: r.ok };
+    },
+    admit: (x) => admit(held(x)),
+    delta,
+    same: SOLVE_RESOLUTION,
+    cap: OPTION_CAP + 1,
+  });
+  blockRootStats.solves += listed.solves;
+  const roots = listed.roots.map((x, index) => ({ x, index })).filter((_, i) => listed.admitted[i]);
+  // No admitted root, or only configuration 0's own: nothing to choose, so nothing is steered.
+  if (roots.length === 0 || (roots.length === 1 && roots[0].index === 0)) return null;
+  return { pinned, ids: sys.ids, syms: sys.syms, roots };
+}
+
+/**
+ * Configuration `seed`'s start at a listed root (`blockRootsOf`): the vertices and parameters written in, and the root's
+ * index for `rootKey`. Configuration 0, an unlisted block, or pins that took another root: `null`, nothing moves.
+ */
+function steerToBlockRoot(raw: Construction, seed: number, choiceSeed: number, env: Env, seeded: Map<Id, Pt>): { env: Env; index: number } | null {
+  if (seed === 0) return null;
+  const list = blockRootsOf(raw, choiceSeed);
+  if (!list) return null;
+  for (const [sym, v] of list.pinned) if (!(Math.abs((env[sym] ?? Number.NaN) - v) <= SOLVE_RESOLUTION * Math.max(1, Math.abs(v)))) return null;
+  if (!list.ids.every((id) => seeded.has(id))) return null;
+  const root = list.roots[Math.min(list.roots.length - 1, Math.floor(jitter(seed + BLOCK_STREAM, 1) * list.roots.length))];
+  list.ids.forEach((id, i) => seeded.set(id, { x: root.x[2 * i], y: root.x[2 * i + 1] }));
+  const out: Record<string, number> = { ...env };
+  list.syms.forEach((sym, j) => {
+    out[sym] = root.x[2 * list.ids.length + j];
+  });
+  return { env: out, index: root.index };
+}
+
+/**
  * The names (`labelRows`) whose symbol carries no STATED range — a name whatever the figure measures, so the structural
  * stages (which vertices a row moves, the fit's budget) can treat its row as met before any value is read (#2632). A
  * symbol the student bounded («α < 30» · «∢ABC = α») is a name only where the figure's measure lies inside the range:
@@ -4327,6 +4470,9 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   // A symbol a row names from the figure starts at the figure's own measure (#2632, ADR-AG-365): the row already holds.
   const named = labelsFromFigure(c, env, seeded);
   env = named.env;
+  // #2731 (ADR-AG-451): a determined block's configuration s ≥ 1 starts AT one of its listed roots — the seed chooses.
+  const block = steerToBlockRoot(raw, seed, choiceSeed, env, seeded);
+  if (block) env = block.env;
 
   const unsatisfied: Constraint[] = [];
   /** Declared rings the givens hold on only COLLAPSED (the thin-ring arm below, #1334) — #1849's evidence. */
@@ -4981,7 +5127,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       case 'curve': {
         const res = resolveCurve(o.curve, env);
         if (res.ok) curves.push({ id: o.id, label: o.label, curve: res.curve, stated: o.stated });
-        else vacant.push({ id: o.id, reason: res.reason, ...(res.reason === 'kind-mismatch' ? { actual: res.actual } : {}) });
+        else vacant.push({ id: o.id, reason: res.reason, ...(res.reason === 'kind-mismatch' || res.reason === 'not-canonical' ? { actual: res.actual } : {}) });
         break;
       }
       case 'derived': {
@@ -5225,7 +5371,9 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     ...(metPairs.length > 0 ? { metPairs } : {}),
     usedSymbols: [...usedSymbols(c)],
     ...(choiceSeed !== seed ? { choiceSeed } : {}),
-    ...(pinned.pins.length > 0 ? { rootKey: pinned.pins.map((q) => q.index).join(',') } : {}),
+    ...(pinned.pins.length > 0 || (block && block.index > 0)
+      ? { rootKey: pinned.pins.map((q) => q.index).join(',') + (block && block.index > 0 ? `;b${block.index}` : '') }
+      : {}),
     provenance: Object.fromEntries(
       points.map((p) => [p.id, provenanceOf(c, p.id, env, curves) ?? { x: { known: false }, y: { known: false } }]),
     ),
@@ -5880,10 +6028,11 @@ function curveNumbers(c: NumCurve): [string, number[]] {
     }
     case 'circle':
       return ['circle', [c.cx, c.cy, c.r]];
+    // A moved conic's frame is part of its shape (#2664); a canonical one compares as before.
     case 'parabola':
-      return ['parabola', [c.p]];
+      return c.h === undefined && c.k === undefined && c.axis === undefined ? ['parabola', [c.p]] : [`parabola${c.axis === 'y' ? '-y' : ''}`, [c.p, c.h ?? 0, c.k ?? 0]];
     case 'ellipse':
-      return ['ellipse', [c.a, c.b]];
+      return c.h === undefined && c.k === undefined ? ['ellipse', [c.a, c.b]] : ['ellipse', [c.a, c.b, c.h ?? 0, c.k ?? 0]];
   }
 }
 
@@ -6138,7 +6287,10 @@ export function reportPending(c: Construction): void {
  * configurations — set only by {@link knownValue}, never by {@link isKnowledge}, which answers the narrower
  * question "is this ONE value".
  */
-export type Knowledge = { known: true; value: number } | { known: false; pending?: true; options?: readonly number[] };
+export type Knowledge =
+  | { known: true; value: number }
+  /** `letters` (#2735, ADR-AG-458): the value moves, and moves as this monomial in the student's letters — {@link valueInLetters}. */
+  | { known: false; pending?: true; options?: readonly number[]; letters?: Monomial };
 
 /**
  * The seeds a DEFAULT gate reads, or `null` for "fill and read all". On a deferred pool, first the
@@ -6697,23 +6849,50 @@ export function knownValue(c: Construction, read: (f: Figure) => number | null):
  * is two whole equations, never a mix of their coefficients. `null` when the curve is known (ask `knownCurve`),
  * open, or pending.
  */
+/**
+ * A curve's COEFFICIENTS as the knowledge gate reads them (#2664, ADR-AG-455): its numeric fields, and for a parabola or
+ * an ellipse its offset `h`, `k` even where absent (absent is 0). A conic canonical at the first configuration may be
+ * moved at another, so the offset is read at every one rather than only when the first sample carries it.
+ */
+function coefficientFields(first: NumCurve): string[] {
+  const fields = Object.keys(first).filter((k) => typeof (first as unknown as Record<string, unknown>)[k] === 'number');
+  if (first.kind === 'parabola' || first.kind === 'ellipse') for (const k of ['h', 'k']) if (!fields.includes(k)) fields.push(k);
+  return fields;
+}
+/** One coefficient of a curve, an absent conic offset reading 0 (#2664). */
+function coefficientOf(cur: NumCurve, field: string): number | null {
+  const v = (cur as unknown as Record<string, unknown>)[field];
+  if (typeof v === 'number') return v;
+  return (field === 'h' || field === 'k') && (cur.kind === 'parabola' || cur.kind === 'ellipse') ? 0 : null;
+}
+/** The same FAMILY at another configuration: the kind, and a parabola's axis (#2664) — a discriminant, not a coefficient. */
+function sameFamily(cur: NumCurve, first: NumCurve): boolean {
+  if (cur.kind !== first.kind) return false;
+  return cur.kind !== 'parabola' || first.kind !== 'parabola' || (cur.axis ?? 'x') === (first.axis ?? 'x');
+}
+
 export function knownCurveOptions(c: Construction, id: Id): NumCurve[] | null {
   const read = (f: Figure) => f.curves.find((q) => q.id === id)?.curve ?? null;
   const first = read(drawableAt(c, 0));
   if (!first) return null;
-  const fields = (Object.keys(first) as Array<keyof NumCurve>).filter((k) => typeof first[k] === 'number');
+  const fields = coefficientFields(first);
   const v = knownValues(
     c,
     (f) => {
       const cur = read(f);
       // A curve of a DIFFERENT family at another configuration is no member of a set of equations.
-      if (!cur || cur.kind !== first.kind) return null;
-      return fields.map((k) => (cur as unknown as Record<string, number>)[k as string]);
+      if (!cur || !sameFamily(cur, first)) return null;
+      return fields.map((k) => coefficientOf(cur, k) ?? NaN);
     },
     fields.length,
   );
   if (v.known || !v.options) return null;
-  return v.options.map((vals) => ({ ...first, ...Object.fromEntries(fields.map((k, i) => [k, vals[i]])) }) as NumCurve);
+  // A zero offset stays absent, so a canonical option is the canonical curve (#2664).
+  return v.options.map((vals) => {
+    const out = { ...first, ...Object.fromEntries(fields.map((k, i) => [k, vals[i]])) } as Record<string, unknown>;
+    for (const k of ['h', 'k']) if (out[k] === 0) delete out[k];
+    return out as unknown as NumCurve;
+  });
 }
 /**
  * Is this curve's SHAPE knowledge — every coefficient invariant across the free DOFs — or is the
@@ -6752,15 +6931,14 @@ export function knownCurve(
   const first = read(drawableAt(c, seeds ? seeds[0] : 0));
   if (!first) return null;
   let pending = false;
-  for (const field of Object.keys(first) as Array<keyof NumCurve>) {
-    if (typeof first[field] !== 'number') continue; // `kind` — the discriminant, not a coefficient
+  // `kind` (and a parabola's `axis`) are discriminants, not coefficients; a conic's offset is read even where absent (#2664).
+  for (const field of coefficientFields(first)) {
     const readField = (f: Figure) => {
       const cur = read(f);
       // A curve that is a DIFFERENT family at another seed is not knowledge either: the shape
       // itself varies, which is 02c R13's third row and strictly worse than a moving coefficient.
-      if (!cur || cur.kind !== first.kind) return null;
-      const v = (cur as Record<string, unknown>)[field as string];
-      return typeof v === 'number' ? v : null;
+      if (!cur || !sameFamily(cur, first)) return null;
+      return coefficientOf(cur, field);
     };
     const k = seeds ? isKnowledge(c, readField, seeds) : knowledgeOf(c, readField);
     if (k.known) continue;
@@ -6774,6 +6952,124 @@ export function knownCurve(
     return null;
   }
   return first;
+}
+
+/**
+ * ═══ THE THIRD VERDICT FOR A VALUE — IT MOVES, AND MOVES AS A MONOMIAL IN THE STUDENT'S LETTERS (#2735, ADR-AG-458) ═══
+ *
+ * The gates above have two verdicts for a value: the same at every configuration (print it) or not (open). Operator,
+ * 2026-11-07: *"yes - we should support (2k,0) in the data panel"*; 2026-11-09, option C: coordinates, curve equations
+ * and lengths, in the panel and the question box. F₁ on x²/144 + y²/(144 − 4k²) = 1 with 0 < k < 6 is (2k, 0) at every
+ * configuration and was printed «(x_F₁, 0)».
+ *
+ * So over the SAME admitted configuration pool every gate judges (ADR-AG-180 — no new sweep), each configuration's
+ * letter values (`f.env`) and the value read there go to {@link readInLetters}, the one reader the locus's third verdict
+ * uses (ADR-AG-351): measure → snap a ratio `value / letterᵉ` → substitute back at every configuration. **Not CAS**: a
+ * dependence that is not a monomial (`k + 1`, `√(144 − 4k²)`) is not found, and the caller keeps today's row. A
+ * `2|k|` reads only when the stated domain keeps `k` on one side of 0, because the pool samples only admissible values.
+ *
+ * Only the student's own letters (never a tool symbol), only those that move across the pool, at most two. A figure
+ * with no letter costs nothing: the register is empty and the pool is never touched. On the page a pool not yet
+ * complete answers `'pending'` — a read over part of the pool is not knowledge, exactly as for a value (#1473).
+ */
+const MAX_VALUE_LETTERS = 2;
+type LetterPool = { figs: Figure[]; envs: Array<Readonly<Record<string, number>>>; varying: string[] };
+function letterPool(c: Construction): LetterPool | 'pending' | null {
+  const used = usedSymbols(c);
+  const letters = paramRegister(c)
+    .map((p) => p.sym)
+    .filter((sym) => used.has(sym) && !isDirectionSymbol(sym) && !isRadiusSymbol(sym));
+  if (letters.length === 0) return null;
+  const pool = poolOf(c);
+  if (pool.deferred && !pool.complete()) {
+    pool.notePending();
+    return 'pending';
+  }
+  pool.fill();
+  const figs = admittedOf(c, pool.ready());
+  /*
+   * A LETTER TO ANSWER IN IS A FREE PARAMETER, never an unknown the givens pin (round #2822, with #2731). A DETERMINED
+   * figure (no continuous freedom in any configuration) has no parameter: its letters take finitely many values, one per
+   * root, and the book's p2-15 ellipse read «x²/a² + y²/b² = 1» across its three roots, a² = a² — true and empty, where
+   * the honest answer is that the figure has three solutions (ADR-AG-451).
+   */
+  if (figs.length < 3 || figs.every((f) => f.carrierDof === 0)) return null;
+  const envs = figs.map((f) => f.env);
+  const varying = letters.filter((sym) => {
+    const vs = envs.map((e) => e[sym]);
+    if (vs.some((v) => v === undefined || !Number.isFinite(v))) return false;
+    const lo = Math.min(...vs);
+    const hi = Math.max(...vs);
+    return hi - lo > 1e-9 * Math.max(1, Math.abs(hi), Math.abs(lo));
+  });
+  if (varying.length === 0 || varying.length > MAX_VALUE_LETTERS) return null;
+  return { figs, envs, varying: varying.sort() };
+}
+
+/** A value as a monomial in the student's letters, of degree ≥ 1; `null` when it is not one; `'pending'` on a partial pool. */
+export function valueInLetters(c: Construction, read: (f: Figure) => number | null): Monomial | 'pending' | null {
+  const lp = letterPool(c);
+  if (lp === null || lp === 'pending') return lp;
+  const vals: number[] = [];
+  for (const f of lp.figs) {
+    const v = read(f);
+    if (v === null || !Number.isFinite(v)) return null;
+    vals.push(v);
+  }
+  const m = readInLetters(vals, lp.envs, lp.varying);
+  return m && Object.keys(m.pow).length > 0 ? m : null;
+}
+
+/**
+ * A VECTOR of values in the letters — each component a monomial, a constant allowed (degree 0), at least one moving —
+ * for an answer printed from several numbers at once (a role's coordinates, a directrix's position). `read` returns the
+ * same number of components at every configuration, or `null` when the answer's shape changes there.
+ */
+export function vectorInLetters(c: Construction, read: (f: Figure) => number[] | null): Monomial[] | 'pending' | null {
+  const lp = letterPool(c);
+  if (lp === null || lp === 'pending') return lp;
+  const rows: number[][] = [];
+  for (const f of lp.figs) {
+    const v = read(f);
+    if (v === null || v.length === 0 || (rows.length > 0 && v.length !== rows[0].length) || v.some((n) => !Number.isFinite(n))) return null;
+    rows.push(v);
+  }
+  const monos: Monomial[] = [];
+  for (let i = 0; i < rows[0].length; i += 1) {
+    const m = readInLetters(
+      rows.map((r) => r[i]),
+      lp.envs,
+      lp.varying,
+    );
+    if (!m) return null;
+    monos.push(m);
+  }
+  return monos.some((m) => Object.keys(m.pow).length > 0) ? monos : null;
+}
+
+/** A curve's equation in the student's letters ({@link curveInLetters}), `null` when it has none, `'pending'` on a partial pool. */
+export function curveEquationInLetters(c: Construction, id: Id): SymbolicCurve | 'pending' | null {
+  const lp = letterPool(c);
+  if (lp === null || lp === 'pending') return lp;
+  const curves: NumCurve[] = [];
+  for (const f of lp.figs) {
+    const cur = f.curves.find((q) => q.id === id)?.curve;
+    if (!cur) return null;
+    curves.push(cur);
+  }
+  return curveInLetters(curves, lp.envs, lp.varying);
+}
+
+/**
+ * The value gate's verdict with the third verdict added (#2735): an OPEN verdict — not known, no option set, not pending —
+ * is asked {@link valueInLetters}. Opted into by the rows the ruling names (a point's coordinates, a segment's length);
+ * a slope, an angle or a parameter's own row never reads it.
+ */
+export function withLetters(c: Construction, k: Knowledge, read: (f: Figure) => number | null): Knowledge {
+  if (k.known || k.pending || k.options) return k;
+  const m = valueInLetters(c, read);
+  if (m === 'pending') return { known: false, pending: true };
+  return m ? { known: false, letters: m } : k;
 }
 
 // ---------------------------------------------------------------------------

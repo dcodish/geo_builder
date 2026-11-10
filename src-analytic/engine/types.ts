@@ -102,9 +102,9 @@ export function domainText(sym: string, d: Domain): string {
 // ---------------------------------------------------------------------------
 
 /**
- * The whole curve vocabulary of twenty exams. No hyperbola, no rotated conic, no translated conic
- * — every parabola sits on the x-axis and every ellipse is centred at the origin. A student who
- * types one anyway gets an honest refusal naming what is out of scope, never a mis-drawn figure.
+ * The whole curve vocabulary of twenty exams. No hyperbola and no rotated conic: a student who types one gets an
+ * honest refusal naming what is out of scope, never a mis-drawn figure. A parabola or an ellipse whose axes are
+ * parallel to the coordinate axes may sit anywhere, and a parabola may open along y (#2664, ADR-AG-455).
  */
 export type CurveKind = 'line' | 'circle' | 'parabola' | 'ellipse';
 
@@ -126,6 +126,11 @@ export interface Curve {
    * knows the kind (#1037). Absent means "the student named no family", never "unknown kind".
    */
   kind?: CurveKind;
+  /**
+   * The statement called it CANONICAL («פרבולה קנונית», «אליפסה קנונית», "canonical") — a claim, like `kind`, checked by
+   * `classify` (#2664, ADR-AG-455): a curve the equation puts off the origin is refused naming the word, never drawn.
+   */
+  canonical?: true;
   /** `f(x, y; params)`; the curve is the zero set. `x` and `y` are reserved symbols. */
   eq: Expr;
 }
@@ -134,10 +139,14 @@ export interface Curve {
 export type NumCurve =
   | { kind: 'line'; a: number; b: number; c: number }
   | { kind: 'circle'; cx: number; cy: number; r: number }
-  /** `y² = 2p·x`. Focus `(p/2, 0)`, directrix `x = −p/2`. */
-  | { kind: 'parabola'; p: number }
-  /** `x²/a² + y²/b² = 1`, semi-axes. */
-  | { kind: 'ellipse'; a: number; b: number };
+  /**
+   * `y² = 2p·x`. Focus `(p/2, 0)`, directrix `x = −p/2`. Moved (#2664, ADR-AG-455): the vertex at `(h, k)`, and with
+   * `axis: 'y'` opening along y, `(x−h)² = 2p(y−k)`. ABSENT fields are the canonical curve: `h = k = 0`, `axis = 'x'`,
+   * so a curve at the origin is the same object as before; `engine/conicFrame.ts` is the one reader of the frame.
+   */
+  | { kind: 'parabola'; p: number; h?: number; k?: number; axis?: 'x' | 'y' }
+  /** `x²/a² + y²/b² = 1`, semi-axes; the centre at `(h, k)` when moved (#2664), absent at the origin. */
+  | { kind: 'ellipse'; a: number; b: number; h?: number; k?: number };
 
 /**
  * How a curve is NAMED (ADR-AG-005 D6, taken from what the corpus does): circles are named because

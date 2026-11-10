@@ -17,10 +17,9 @@ import { readKnown, writeKnown, writeMode } from '../../shell/__tests__/fixtures
 
 function outcomeOf(v: SubmitVerdictCx): Outcome {
   switch (v.kind) {
+    // #2790 (ADR-CX-089): a held line is a row too, with the already-held note
     case 'record':
-      return { verdict: 'builds' };
-    case 'known':
-      return { verdict: 'builds', code: v.note.key };
+      return v.note ? { verdict: 'builds', code: v.note.key } : { verdict: 'builds' };
     case 'ask':
       return { verdict: 'asks', code: 'ask-lane' };
     case 'refuse':

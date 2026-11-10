@@ -17,6 +17,8 @@ import { derive3, type Fact3 } from '../store/store3';
 import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
 import { nounOfKind } from '../engine/solidSubject';
+import { leastSquaresStats } from '../engine/solve3';
+import type { Positions3 } from '../engine/types';
 
 const SEEDS_24 = Array.from({ length: 24 }, (_, i) => i);
 const he = (k: string, o?: Record<string, unknown>) => i18n3d.getFixedT('he')(k, o) as string;
@@ -121,4 +123,101 @@ describe('#1860 — a thin but real solid builds, with no notice and no refusal'
   ])('%s, at all 24 seeds', (_n, lines) => {
     for (const seed of SEEDS_24) builds(lines, seed);
   }, 120_000);
+});
+
+/**
+ * #2799 (ADR-3D-464) — A SOLID THE GIVENS HOLD ONLY AT ONE POINT IS REFUSED THE SAME WAY. «קובייה» · A, B, C on the
+ * x-axis (three corners of a square are never collinear) was all green with the whole cube drawn at one point: the
+ * collapse judge read the canonical figure and never the gauge's scale, so a solve that drove the scale to 0 passed.
+ * The judge reads the drawn size now; the line that completes the set is refused in the flat-solid words, and quickly
+ * (the cold sweeps stop on a candidate already exact at a point, docs/17 §7), where it took 8–176 s.
+ */
+describe('#2799 — vertices stated on one axis that hold only at a point are refused, naming the statements', () => {
+  const CUBE = "קובייה ABCDA'B'C'D'";
+  const ax = (v: string, a = 'x') => `הקודקוד ${v} נמצא על ציר ה-${a}`;
+  const SEEDS_8 = [0, 1, 2, 3, 4, 5, 6, 7];
+
+  it('the report «A, B, C on the x-axis», at seeds 0–7', () => {
+    for (const seed of SEEDS_8) refused([CUBE, ax('A'), ax('B'), ax('C')], seed, 'cube', "ABCDA'B'C'D'", [ax('A'), ax('B')]);
+  }, 120_000);
+
+  it('every order of the three axis lines refuses the line that completes the set', () => {
+    const three = [ax('A'), ax('B'), ax('C')];
+    for (const [i, j, k] of [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]) {
+      refused([CUBE, three[i], three[j], three[k]], 3, 'cube', "ABCDA'B'C'D'", [three[i], three[j]]);
+    }
+  }, 120_000);
+
+  it.each<[string, string[], string, string, string[]]>([
+    ['the z-axis', [CUBE, ax('A', 'z'), ax('B', 'z'), ax('C', 'z')], 'cube', "ABCDA'B'C'D'", [ax('A', 'z'), ax('B', 'z')]],
+    ["A, B and A'", [CUBE, ax('A'), ax('B'), ax("A'")], 'cube', "ABCDA'B'C'D'", [ax('A'), ax('B')]],
+    ['A at the origin, then B and C', [CUBE, 'A בראשית הצירים', ax('B'), ax('C')], 'cube', "ABCDA'B'C'D'", ['A בראשית הצירים', ax('B')]],
+    ['a box', ["תיבה ABCDA'B'C'D'", ax('A'), ax('B'), ax('C')], 'box', "ABCDA'B'C'D'", [ax('A'), ax('B')]],
+    ['a square pyramid, A, B, C', ['פירמידה SABCD שבסיסה ריבוע', ax('A'), ax('B'), ax('C')], 'pyramid', 'SABCD', [ax('A'), ax('B')]],
+    ['a square pyramid, the apex on a base edge’s line', ['פירמידה SABCD שבסיסה ריבוע', ax('S'), ax('A'), ax('B')], 'pyramid', 'SABCD', [ax('S'), ax('A')]],
+    ['a triangular pyramid', ['פירמידה משולשת SABC', ax('A'), ax('B'), ax('C')], 'pyramid', 'SABC', [ax('A'), ax('B')]],
+    ['a prism', ["מנסרה ABCA'B'C'", ax('A'), ax('B'), ax('C')], 'prism', "ABCA'B'C'", [ax('A'), ax('B')]],
+    ['a right triangular prism', ['מנסרה ישרה משולשת ABC', ax('A'), ax('B'), ax('C')], 'prism', "ABCA'B'C'", [ax('A'), ax('B')]],
+  ])('%s', (_n, lines, solid, ring, others) => {
+    for (const seed of [0, 5]) refused(lines, seed, solid, ring, others);
+  }, 120_000);
+
+  it('the refused line is cheap: a bounded number of residual evaluations (was 144k–751k, 8–176 s)', () => {
+    for (const lines of [[CUBE, ax('A'), ax('B'), ax('C')], ['פירמידה SABCD שבסיסה ריבוע', ax('A'), ax('B'), ax('C')]]) {
+      let st: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed: 0 };
+      let n = 0;
+      for (const l of lines.slice(0, -1)) {
+        const v = decideDeterministic3(st, l, () => `f${++n}`);
+        if (v.kind !== 'record') throw new Error(l);
+        st = { facts: v.facts, seed: v.seed };
+      }
+      const evals0 = leastSquaresStats.evals;
+      const v = decideDeterministic3(st, lines[lines.length - 1], () => `f${++n}`);
+      expect(v.kind).toBe('refused');
+      expect(leastSquaresStats.evals - evals0, lines[0]).toBeLessThan(80_000);
+    }
+  }, 120_000);
+
+  /** Every line ok, and every declared solid drawn at its normal size (|AB| ≥ 0.5). */
+  const fullSize = (lines: readonly string[], seed: Seed3): Positions3 => {
+    builds(lines, seed);
+    const r = run(lines, seed);
+    const pos = derive3(r.st.facts, r.st.seed).positions;
+    expect(Math.hypot(pos.get('A')!.x - pos.get('B')!.x, pos.get('A')!.y - pos.get('B')!.y, pos.get('A')!.z - pos.get('B')!.z), `|AB| @${seed}`).toBeGreaterThan(0.5);
+    return pos;
+  };
+
+  it('controls that hold: B, D on the x-axis; A, C; A, C′; A, B on x with C on z; B on +x with D on −x', () => {
+    for (const lines of [
+      [CUBE, ax('B'), ax('D')],
+      [CUBE, ax('A'), ax('C')],
+      [CUBE, ax('A'), ax("C'")],
+      [CUBE, ax('A'), ax('B'), ax('C', 'z')],
+      [CUBE, 'הקודקוד B נמצא על החלק החיובי של ציר ה-x', 'הקודקוד D נמצא על החלק השלילי של ציר ה-x'],
+    ]) for (const seed of [0, 1, 2, 3]) fullSize(lines, seed);
+  }, 120_000);
+
+  it('a figure the student placed at a small stated size is not a point («A(0,0,0)» · «B(0.01,0,0)»)', () => {
+    for (const seed of [0, 1, 2, 3]) {
+      builds([CUBE, 'A(0,0,0)', 'B(0.01,0,0)'], seed);
+      const r = run([CUBE, 'A(0,0,0)', 'B(0.01,0,0)'], seed);
+      const pos = derive3(r.st.facts, r.st.seed).positions;
+      expect(pos.get('B')!.x - pos.get('A')!.x).toBeCloseTo(0.01, 9);
+    }
+  });
+
+  it('a figure that exists is drawn at its normal size: «B, D on +x» (was a point at five seeds of eight), and in English', () => {
+    for (const lines of [
+      [CUBE, 'הקודקוד B נמצא על החלק החיובי של ציר ה-x', 'הקודקוד D נמצא על החלק החיובי של ציר ה-x'],
+      [CUBE, 'B is on the positive x-axis', 'D is on the positive x-axis'],
+    ]) {
+      for (const seed of SEEDS_24) {
+        const pos = fullSize(lines, seed);
+        for (const v of ['B', 'D']) {
+          expect(pos.get(v)!.x, `${v}.x @${seed}`).toBeGreaterThan(0);
+          expect(Math.abs(pos.get(v)!.y) + Math.abs(pos.get(v)!.z)).toBeLessThan(1e-9);
+        }
+      }
+    }
+  }, 240_000);
 });

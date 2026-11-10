@@ -44,7 +44,7 @@ describe('#1431 — the given surface reads the same atom', () => {
     'המרחק של הנקודה A מהישר l1 הוא 4',
   ])('«%s» is accepted', (g) => {
     const v = decideSubmit(g, lines(), 0);
-    expect(v.kind === 'record' || v.kind === 'already-known' || v.kind === 'already-follows', JSON.stringify(v)).toBe(true);
+    expect(v.kind, JSON.stringify(v)).toBe('record');
   });
 });
 

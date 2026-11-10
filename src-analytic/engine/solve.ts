@@ -30,6 +30,7 @@ import type { Id, NumCurve } from './types';
 import { residual as curveResidual } from './curves';
 import { SEGMENT_EXTENT_TOL, segmentParam } from './extent';
 import { conicSize, lineQuadratic, type Walk } from './lineQuadratic';
+import { frameOf, toLocal, toWorld, vecFrame } from './conicFrame';
 import {
   describeLengthExpr,
   evalLengthExpr,
@@ -932,8 +933,10 @@ export function dirVector(
       if (!c || !p) return null;
       // An ELLIPSE's ray from its centre (#2618, ADR-AG-355): canonical, so the centre is the origin. What makes
       // «AB קוטר באליפסה» the chord through the centre, exactly as the circle's diameter lowering reads it.
+      // Moved (#2664): the ray from wherever its centre is.
       if (c.kind === 'ellipse') {
-        v = { x: p.x, y: p.y };
+        const { h, k } = frameOf(c);
+        v = h === 0 && k === 0 ? { x: p.x, y: p.y } : { x: p.x - h, y: p.y - k };
         break;
       }
       if (c.kind !== 'circle') return null;
@@ -946,9 +949,14 @@ export function dirVector(
       const p = at(d.at);
       if (!c || !p) return null;
       if (c.kind === 'circle') v = { x: p.x - c.cx, y: p.y - c.cy };
-      else if (c.kind === 'ellipse') v = { x: p.x / (c.a * c.a), y: p.y / (c.b * c.b) };
-      else if (c.kind === 'parabola') v = { x: -c.p, y: p.y };
-      else return null;
+      else if (c.kind === 'ellipse') {
+        // The gradient in the conic's own frame, carried back (#2664): the offset moves no direction, the swap does.
+        const q = toLocal(c, p.x, p.y);
+        v = vecFrame(c, { x: q.x / (c.a * c.a), y: q.y / (c.b * c.b) });
+      } else if (c.kind === 'parabola') {
+        const q = toLocal(c, p.x, p.y);
+        v = vecFrame(c, { x: -c.p, y: q.y });
+      } else return null;
       break;
     }
     case 'bisector': {
@@ -1322,13 +1330,17 @@ export function residualRows(
         if (conic.kind !== 'ellipse') return null;
         const [a, b] = [Math.abs(conic.a), Math.abs(conic.b)];
         const want = k.rel.k === 'inscribed' ? Math.min(a, b) : Math.max(a, b);
-        return { eq: [centre.x / size, centre.y / size, (r - want) / size] };
+        // The ellipse's own centre (#2664): the origin when it was not moved.
+        const o = toLocal(conic, centre.x, centre.y);
+        return { eq: [o.x / size, o.y / size, (r - want) / size] };
       }
       const s = evalExpr(k.rel.s, env);
       if (!Number.isFinite(s)) return null;
       // P(s) on the conic, and the conic's normal there (the `normal` direction's gradient).
-      const at: Pt = conic.kind === 'ellipse' ? { x: conic.a * Math.cos(s), y: conic.b * Math.sin(s) } : { x: (conic.p * s * s) / 2, y: conic.p * s };
-      const n: Pt = conic.kind === 'ellipse' ? { x: at.x / (conic.a * conic.a), y: at.y / (conic.b * conic.b) } : { x: -conic.p, y: at.y };
+      // In the conic's own frame, carried back (#2664) — the identity at the origin.
+      const local: Pt = conic.kind === 'ellipse' ? { x: conic.a * Math.cos(s), y: conic.b * Math.sin(s) } : { x: (conic.p * s * s) / 2, y: conic.p * s };
+      const at: Pt = toWorld(conic, local.x, local.y);
+      const n: Pt = vecFrame(conic, conic.kind === 'ellipse' ? { x: local.x / (conic.a * conic.a), y: local.y / (conic.b * conic.b) } : { x: -conic.p, y: local.y });
       const d = { x: centre.x - at.x, y: centre.y - at.y };
       const dist = Math.hypot(d.x, d.y);
       const nn = Math.hypot(n.x, n.y);

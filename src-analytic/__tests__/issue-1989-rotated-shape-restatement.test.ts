@@ -16,7 +16,7 @@
  * thing in that reading.
  */
 import { describe, expect, it } from 'vitest';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { SHAPES, isGenericNoun, sameStatementUnder, shapeRow } from '../engine/shapes';
 import type { Id } from '../engine/types';
 
@@ -31,11 +31,11 @@ const RING4 = ['A', 'B', 'C', 'D'];
 
 describe('#1989 — the operator’s lines: a square restated in a rotated reading adds no row', () => {
   it('«ריבוע ABCD» · «ריבוע BCDA» answers «כבר ידוע» and records nothing', () => {
-    expect(decideSubmit('ריבוע BCDA', ['ריבוע ABCD'], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('ריבוע BCDA', ['ריבוע ABCD'], 0))).toBe(true);
   });
 
   it('the declared spelling answers exactly the same (the unchanged control)', () => {
-    expect(decideSubmit('ריבוע ABCD', ['ריבוע ABCD'], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('ריבוע ABCD', ['ריבוע ABCD'], 0))).toBe(true);
   });
 });
 
@@ -45,19 +45,19 @@ describe('#1989 — the class: every rotation and reversal of a noun symmetric u
   it.each(['ריבוע', 'מלבן', 'מעוין', 'מקבילית', 'מרובע'])('«%s ABCD» restated in all eight readings', (noun) => {
     for (const r of readings(RING4)) {
       const line = `${noun} ${r.join('')}`;
-      expect(decideSubmit(line, [`${noun} ABCD`], 0).kind, line).toBe('already-known');
+      expect(isHeld(decideSubmit(line, [`${noun} ABCD`], 0)), line).toBe(true);
     }
   });
 
   it.each(['משולש'])('«%s ABC» restated in all six readings', (noun) => {
     for (const r of readings(['A', 'B', 'C'])) {
       const line = `${noun} ${r.join('')}`;
-      expect(decideSubmit(line, [`${noun} ABC`], 0).kind, line).toBe('already-known');
+      expect(isHeld(decideSubmit(line, [`${noun} ABC`], 0)), line).toBe(true);
     }
   });
 
   it('a bare pentagon read from another vertex is the same pentagon', () => {
-    expect(decideSubmit('מחומש CDEAB', ['מחומש ABCDE'], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('מחומש CDEAB', ['מחומש ABCDE'], 0))).toBe(true);
   });
 
   it('a SPECIFIC noun over a square’s ring takes the verdict its declared spelling takes', () => {
@@ -88,7 +88,7 @@ describe('#1989 — what is NOT re-spelled: a reading that says something else',
 
   it('a trapezoid read so the SAME pair is named is the restatement its declared spelling is', () => {
     for (const r of ['ABCD', 'CDAB', 'DCBA', 'BADC']) {
-      expect(decideSubmit(`טרפז ${r}`, ['טרפז ABCD'], 0).kind, r).toBe('already-known');
+      expect(isHeld(decideSubmit(`טרפז ${r}`, ['טרפז ABCD'], 0)), r).toBe(true);
     }
   });
 

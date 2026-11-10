@@ -626,7 +626,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['נתון מעגל שמרכזו M', 'C(1,2)', 'D(4,6)'],
   },
 
-  // --- F6 · conics by equation (canonical only — D6/§2a) ---
+  // --- F6 · conics by equation (axis-parallel; anywhere since #2664 — D6/§2a) ---
   { featured: true, category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },
   // A conic may be NAMED like a circle (#1271) — two parabolas in one figure are referable.
   { featured: true, category: 'conics', family: 'F6', he: 'נתונה פרבולה I שמשוואתה y^2=2x', en: 'parabola I: y^2=2x' },
@@ -642,6 +642,11 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'נתונה אליפסה שמשוואתה x^2/9+y^2/16=1',
     en: 'ellipse x^2/9+y^2/16=1',
   },
+  // #2664 (ADR-AG-455) — a conic whose axes are parallel to the coordinate axes, anywhere, and a parabola opening along y.
+  // Not featured, for the same reason as the rows below.
+  { category: 'conics', family: 'F6', he: 'נתונה אליפסה שמשוואתה (x-3)^2/25+(y+1)^2/9=1', en: 'ellipse (x-3)^2/25+(y+1)^2/9=1' },
+  { category: 'conics', family: 'F6', he: 'נתונה פרבולה שמשוואתה (y-1)^2=4(x-2)', en: 'parabola (y-1)^2=4(x-2)' },
+  { category: 'conics', family: 'F6', he: 'נתונה פרבולה שמשוואתה x^2=8y', en: 'parabola x^2=8y' },
   // #2616/#2617/#2619 (ADR-AG-353/354) — the ellipse's roles and sizes, and the canonical curve with no equation. Not
   // featured: the section's six featured rows are the six it showed before these were added, so the guide is unchanged.
   { category: 'conics', family: 'F6', he: 'נתונה אליפסה קנונית שהציר הגדול שלה על ציר ה-x', en: 'a canonical ellipse whose major axis is on the x-axis' },

@@ -269,7 +269,17 @@ export const CLAIM_RESIDUALS3 = {
         const u2 = sub3(p2, v);
         return dot3(u1, u2) / Math.max(norm3(u1) * norm3(u2), 1e-12);
       };
-      return { r: cosAt(A, B, D) + cosAt(C, B, D), tol: REL_TOL * 10 };
+      // #2810 (ADR-3D-467): the VERIFIER is in-order concyclicity, not the pin's descent form alone. Unsigned,
+      // cos∠BAD + cos∠BCD = 0 also holds on a DART (A and C on one side of BD, ∠A + ∠C = 180°) and on four points
+      // off one plane, so a circle through a ring verified green over points no circle passes through (ADR-3D-307
+      // item 7: refuted, never drawn). Four points lie on one circle in this order iff they are coplanar, the
+      // diagonals AC and BD cross, and the opposite angles are supplementary. Each term is first order in the
+      // error (Ptolemy's defect is second order: it touches zero, so a tolerance on it admits √tol off the circle).
+      const scale = Math.max(norm3(sub3(C, A)), norm3(sub3(D, B)), 1e-12);
+      const flat = Math.abs(dot3(sub3(D, A), cross3(sub3(B, A), sub3(C, A)))) / scale ** 3;
+      const crosses = (p: Vec3, s: Vec3, x: Vec3, y: Vec3) => dot3(cross3(sub3(s, p), sub3(x, p)), cross3(sub3(s, p), sub3(y, p))) < 0;
+      if (!crosses(B, D, A, C) || !crosses(A, C, B, D)) return { r: 1, tol: REL_TOL * 10 };
+      return { r: Math.max(Math.abs(cosAt(A, B, D) + cosAt(C, B, D)), flat), tol: REL_TOL * 10 };
     },
   },
   // V8-f (G6): cos of the angle between two operands = value («AB ⊥ AC» is cos = 0)

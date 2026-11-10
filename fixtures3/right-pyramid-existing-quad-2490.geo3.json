@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-09T22:27:06.078Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מרובע ABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon4",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "פירמידה ישרה ABCDS",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid4r",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    }
+  ]
+}

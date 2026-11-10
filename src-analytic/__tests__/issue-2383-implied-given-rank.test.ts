@@ -66,11 +66,11 @@ describe('#2383 — the exam figure keeps its one degree of freedom', () => {
 
   it.each(SEEDS)('seed %i: the named line gains nothing, so «M על הישר l1» already follows', (seed) => {
     const named = [...SECTION_A, 'נתון הישר l1: 4x+y+3=0'];
-    expect(step(named, 'M על הישר l1', seed).kind).toBe('already-follows');
+    expect(step(named, 'M על הישר l1', seed).kind).toBe('record');
   });
 
   it.each(SEEDS)('seed %i: the reverse order — the line first, then «MA = MB» already follows', (seed) => {
-    expect(step([...Q1, INLINE], 'MA = MB', seed).kind).toBe('already-follows');
+    expect(step([...Q1, INLINE], 'MA = MB', seed).kind).toBe('record');
   });
 });
 

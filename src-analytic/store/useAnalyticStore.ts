@@ -120,6 +120,10 @@ export type InputError =
   | { key: 'radian-angle'; detail: string }
   /** #2032 (ADR-AG-408) — a statement of an arc's length, which this tool does not read yet (#2710); `detail` is the arc's letters. */
   | { key: 'arc-length-unread'; detail: string }
+  /** #2625 (ADR-AG-454) — «AB קוטר בפרבולה»: a parabola has no centre, so it has no diameter; `detail` is the line. */
+  | { key: 'parabola-no-diameter'; detail: string }
+  /** #2625 (ADR-AG-454 Am. 1) — «O מרכז הפרבולה»: a parabola has no centre. */
+  | { key: 'parabola-no-centre'; detail: string }
   /** #1919 — a letter the tool cannot read; `detail` is the run(s) as typed (`shell/inputScript`). */
   | { key: 'unread-name' | 'unread-word'; detail: string }
   /** #2222 (ADR-AG-284) — an ASCII mixed number «5 1/2», refused with its unambiguous spellings (`engine/expr.findMixedNumber`). */
@@ -164,6 +168,8 @@ export type InputError =
    * A third crossing asked of a line through two points already on the circle (#1893, ADR-AG-271; #1834's ruled
    * sentence): the line's two letters as written, and the two points it already crosses the circle at.
    */
+  /** #2664 (ADR-AG-455) — «קנונית» said of a conic whose equation `line` is off the origin; `curve` is its family. */
+  | { key: 'not-canonical'; detail: string; line?: string; curve?: 'circle' | 'parabola' | 'ellipse' }
   | { key: 'third-crossing'; detail: string; line?: string; a?: string; b?: string; curve?: 'circle' | 'parabola' | 'ellipse' }
   /** A crossing asked of a line tangent to the circle at a point the figure has (#1924, ADR-AG-272; 2-D's sentence): the point. */
   | { key: 'tangent-no-second-crossing'; detail: string; id?: string; curve?: 'circle' | 'parabola' | 'ellipse' }
@@ -251,11 +257,6 @@ export type InputError =
    * The refusal names the holder so the student sees the collision, not a scolding about their letter.
    */
   | { key: 'already-named'; detail: string; holder?: string; holderKind?: 'line' }
-  /**
-   * #2584 (ADR-AG-346) — a line the figure already draws, restated under a new name: `declared` is the row that drew it,
-   * `lineName` the name typed, `offer` the naming sentence the input is pre-filled with (absent when none would record).
-   */
-  | { key: 'line-exists'; detail: string; declared?: string; lineName: string; offer?: string }
   /** «נסמן זוית MAC כ-A1» where A1 already names another angle, or a point (#1622 E5, ADR-AG-221) — `holder` is the label. */
   | { key: 'alias-taken'; detail: string; holder?: string }
   /** #2054 (ADR-AG-277) — a second letter for an angle or a segment: the first letter, the target as written, the earlier line. */

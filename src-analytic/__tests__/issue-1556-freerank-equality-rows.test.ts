@@ -155,6 +155,6 @@ describe('#1556 — the entailment gate still says so when a given really follow
     // the other letter order adds no equation — the bound rows must not make it look like one.
     const lines = [...PINNED, 'משולש ABC', 'מעגל M משיק לצלע AB', 'מעגל M משיק לצלע BC', 'מעגל M משיק לצלע CA'];
     expect(derive(lines, 0).figure.carrierDof).toBe(0);
-    expect(['already-follows', 'already-known']).toContain(decideSubmit('מעגל M משיק לצלע BA', lines, 0).kind);
+    expect(['record', 'record']).toContain(decideSubmit('מעגל M משיק לצלע BA', lines, 0).kind);
   });
 });

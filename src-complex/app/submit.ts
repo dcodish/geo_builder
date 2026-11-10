@@ -402,12 +402,13 @@ export interface SubmitStateCx {
  * verdict kind cannot be added without both the dispatcher and the triage replay's switch seeing it.
  */
 export type SubmitVerdictCx =
-  /** accepted — the caller records the line, adopting the configuration the gate found for it */
-  | { readonly kind: 'record'; readonly line: string; readonly seed: number }
+  /**
+   * accepted — the caller records the line, adopting the configuration the gate found for it. `note` (#2790,
+   * ADR-CX-089, ADR-W-200): the exact solve already entailed it — its own row, with the already-held notice.
+   */
+  | { readonly kind: 'record'; readonly line: string; readonly seed: number; readonly note?: InputNote }
   /** a question typed in the givens box — routed to the ask lane (#789) */
   | { readonly kind: 'ask'; readonly line: string }
-  /** a statement the exact solve already entails — no row, 2-D's noop sentence (#2268) */
-  | { readonly kind: 'known'; readonly note: InputNote }
   | { readonly kind: 'refuse'; readonly error: InputError };
 
 export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = false): SubmitVerdictCx {
@@ -445,13 +446,15 @@ export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = fa
   const parsed = parseInFigure(line, active);
   if (!parsed.ok) return { kind: 'refuse', error: unreadRefusal(parsed, line, active) };
 
-  // #2268 (ADR-CX-084, LADDER-CX stage 0e′) — a statement the exact solve already entails adds nothing:
-  // no row, 2-D's noop sentence. Seed-free, so a value that merely holds in this drawing is still recorded.
-  if (!replaying && lineEntailed(active, line)) return { kind: 'known', note: { key: 'already-known', detail: line } };
-
   // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)
   const verdict = acceptLine(active, line, state.seed);
-  return verdict.ok ? { kind: 'record', line, seed: verdict.seed } : { kind: 'refuse', error: verdict.error };
+  if (!verdict.ok) return { kind: 'refuse', error: verdict.error };
+  // #2268 (ADR-CX-084, LADDER-CX stage 0e′) → #2790 (ADR-CX-089, ADR-W-200; operator 2026-11-09): a statement the exact
+  // solve already entails is ACCEPTED as its own row, with the already-held notice — it holds its relation alone once the
+  // row that implied it is muted or deleted. Seed-free, so a value that merely holds in this drawing records silently.
+  // A load replays the student's rows as saved and asks nothing (`replaying`).
+  const held = !replaying && lineEntailed(active, line);
+  return { kind: 'record', line, seed: verdict.seed, ...(held ? { note: { key: 'already-held', detail: line } as const } : {}) };
 }
 
 /**
@@ -465,9 +468,8 @@ export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = fa
 export function submitLine(
   raw: string,
   /**
-   * #2268 — a LOAD replays the saved lines as the student recorded them: a restatement saved by an
-   * older build stays a row (the session is the student's record). Only a typed line is answered
-   * «already known».
+   * #2268 — a LOAD replays the saved lines as the student recorded them: every row stays a row (the session is the
+   * student's record), and only a typed line is told it was already held (#2790, ADR-CX-089).
    */
   replaying = false,
 ): boolean {
@@ -482,11 +484,8 @@ export function submitLine(
       st().addQuery(v.line);
       st().clearError();
       return true;
-    case 'known':
-      st().setNote(v.note);
-      return true;
     case 'record':
-      st().recordLine(v.line, v.seed);
+      st().recordLine(v.line, v.seed, v.note);
       return true;
   }
 }

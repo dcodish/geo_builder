@@ -6,12 +6,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import { classify, fitConic } from '../engine/conic';
-import { isOn, polylines, residual, resolveCurve, ellipseFoci, parabolaFocus } from '../engine/curves';
+import { isOn, polylines, residual, resolveCurve, ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves';
 import { admittedToPool, drawableAt, evaluate, isKnowledge, POOL_SIZE, sampleParam, selectorsHold, spanOf, viewBox } from '../engine/evaluate';
 import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
 import { derive } from '../engine/derive';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { inDomain, pointsOf, type Construction, type Fact } from '../engine/types';
 import { equationExpr, parseLine } from '../parser/parseAnalytic';
 
@@ -89,13 +89,69 @@ describe('conic — the exact fit and the canonicity gate', () => {
   it('REFUSES what twenty exams never contain, by name', () => {
     expect(classify(fitConic(eq('xy=1'), {})!)).toEqual({ ok: false, reason: 'rotated' });
     expect(classify(fitConic(eq('x^2/9-y^2/16=1'), {})!)).toEqual({ ok: false, reason: 'hyperbola' });
-    // A translated ellipse: understood, and out of scope.
-    expect(classify(fitConic(eq('(x-2)^2/9+y^2/16=1'), {})!)).toEqual({
-      ok: false,
-      reason: 'translated-conic',
-    });
-    // A parabola off the axis is the same refusal, not a mis-drawn canonical one.
-    expect(classify(fitConic(eq('(y-1)^2=4x'), {})!)).toEqual({ ok: false, reason: 'translated-conic' });
+  });
+
+  /** #2664 (ADR-AG-455): an axis-parallel conic anywhere is READ, its square completed; the canonical one is unchanged. */
+  it.each([
+    ['(x-2)^2/9+y^2/16=1', { kind: 'ellipse', a: 3, b: 4, h: 2 }],
+    ['(x-3)^2/25+(y+1)^2/9=1', { kind: 'ellipse', a: 5, b: 3, h: 3, k: -1 }],
+    ['x^2+4y^2-6x+8y=3', { kind: 'ellipse', a: 4, b: 2, h: 3, k: -1 }],
+    ['(y-1)^2=4x', { kind: 'parabola', p: 2, k: 1 }],
+    ['(y-1)^2=4(x-2)', { kind: 'parabola', p: 2, h: 2, k: 1 }],
+    ['x=2+y^2/4', { kind: 'parabola', p: 2, h: 2 }],
+    ['x^2=8y', { kind: 'parabola', p: 4, axis: 'y' }],
+    ['y=x^2-4x+3', { kind: 'parabola', p: 0.5, h: 2, k: -1, axis: 'y' }],
+    ['x^2/25+y^2/9=1', { kind: 'ellipse', a: 5, b: 3 }],
+    ['y^2=8x', { kind: 'parabola', p: 4 }],
+  ])('#2664 — %s reads as %o', (src, want) => {
+    const r = classify(fitConic(eq(src), {})!);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(Object.keys(r.curve).sort()).toEqual(Object.keys(want).sort());
+    for (const [k, v] of Object.entries(want)) {
+      if (typeof v === 'number') expect((r.curve as unknown as Record<string, number>)[k]).toBeCloseTo(v, 9);
+      else expect((r.curve as unknown as Record<string, unknown>)[k]).toBe(v);
+    }
+  });
+
+  it('#2664 — the roles are read where the curve is drawn', () => {
+    const at = (src: string) => {
+      const r = classify(fitConic(eq(src), {})!);
+      if (!r.ok) throw new Error(src);
+      return r.curve;
+    };
+    const e = at('(x-3)^2/25+(y+1)^2/9=1');
+    if (e.kind !== 'ellipse') throw new Error('ellipse');
+    const [f1, f2] = ellipseFoci(e);
+    expect([f1.x, f1.y, f2.x, f2.y].map((v) => +v.toFixed(9))).toEqual([7, -1, -1, -1]);
+    const p = at('(y-1)^2=4(x-2)');
+    if (p.kind !== 'parabola') throw new Error('parabola');
+    expect(parabolaFocus(p)).toEqual({ x: 3, y: 1 });
+    expect(parabolaDirectrix(p)).toEqual({ kind: 'line', a: 1, b: 0, c: -1 }); // x = 1
+    const y = at('x^2=8y');
+    if (y.kind !== 'parabola') throw new Error('parabola');
+    expect(parabolaFocus(y)).toEqual({ x: 0, y: 2 });
+    expect(parabolaDirectrix(y)).toEqual({ kind: 'line', a: 0, b: 1, c: 2 }); // y = −2
+    // On the curve: the residual is zero at sampled points of the drawn polyline, and at the vertex.
+    for (const c of [e, p, y]) {
+      for (const [x0, y0] of polylines(c, { minX: -10, minY: -10, maxX: 10, maxY: 10 })[0]) expect(Math.abs(residual(c, x0, y0))).toBeLessThan(1e-9);
+    }
+  });
+
+  it('#2664 — «קנונית» is a claim: a moved conic said canonical is refused, the canonical one is read', () => {
+    expect(classify(fitConic(eq('(y-1)^2=4(x-2)'), {})!, 'parabola', true)).toEqual({ ok: false, reason: 'not-canonical', actual: 'parabola' });
+    expect(classify(fitConic(eq('(x-3)^2/25+y^2/9=1'), {})!, 'ellipse', true)).toEqual({ ok: false, reason: 'not-canonical', actual: 'ellipse' });
+    expect(classify(fitConic(eq('y^2=8x'), {})!, 'parabola', true).ok).toBe(true);
+  });
+
+  it('#2664 — a line meets a moved conic where the conic is (the walk in its frame)', () => {
+    const r = classify(fitConic(eq('(y-1)^2=4(x-2)'), {})!);
+    if (!r.ok) throw new Error('parabola');
+    // y = 1 is the axis: it meets the parabola once, at the vertex (2, 1); x = 3 meets it at (3, −1) and (3, 3).
+    expect(isOn(r.curve, 2, 1)).toBe(true);
+    expect(isOn(r.curve, 3, 3)).toBe(true);
+    expect(isOn(r.curve, 3, -1)).toBe(true);
+    expect(isOn(r.curve, 3, 1)).toBe(false);
   });
 
   it('carries a parameter through the fit', () => {
@@ -313,12 +369,18 @@ describe('#896 — a non-canonical conic is refused by name, not dropped', () =>
     return { faults: d.faults, drawn: d.figure.curves.length, vacant: d.figure.vacant };
   };
 
-  it('a TRANSLATED parabola is refused on its own line', () => {
+  it('a TRANSLATED parabola is READ since #2664 (ADR-AG-455)', () => {
     const r = only('נתונה פרבולה שמשוואתה (y-2)^2=8(x-1)');
+    expect(r.drawn).toBe(1);
+    expect(r.faults).toEqual([]);
+  });
+
+  it('«פרבולה קנונית» with a translated equation is refused naming the word (#2664)', () => {
+    const r = only('נתונה פרבולה קנונית שמשוואתה (y-2)^2=8(x-1)');
     expect(r.drawn).toBe(0);
-    expect(r.vacant.map((v) => v.reason)).toEqual(['translated-conic']);
+    expect(r.vacant.map((v) => v.reason)).toEqual(['not-canonical']);
     expect(r.faults).toEqual([
-      { index: 0, code: 'out-of-scope', detail: 'נתונה פרבולה שמשוואתה (y-2)^2=8(x-1)' },
+      { index: 0, code: 'not-canonical', detail: 'נתונה פרבולה קנונית שמשוואתה (y-2)^2=8(x-1)', line: '(y-2)^2=8(x-1)', curve: 'parabola' },
     ]);
   });
 
@@ -329,8 +391,14 @@ describe('#896 — a non-canonical conic is refused by name, not dropped', () =>
     expect(r.faults.map((f) => f.code)).toEqual(['out-of-scope']);
   });
 
-  it('a TRANSLATED ellipse is refused', () => {
+  it('a TRANSLATED ellipse is READ since #2664 (ADR-AG-455)', () => {
     const r = only('נתונה אליפסה שמשוואתה (x-1)^2/9+y^2/16=1');
+    expect(r.drawn).toBe(1);
+    expect(r.faults).toEqual([]);
+  });
+
+  it('a HYPERBOLA is still refused (#2664 widens the parabola and the ellipse only)', () => {
+    const r = only('x^2/16-y^2/9=1');
     expect(r.drawn).toBe(0);
     expect(r.faults.map((f) => f.code)).toEqual(['out-of-scope']);
   });
@@ -621,9 +689,8 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
     const v = decideSubmit(line, before, 0);
     switch (v.kind) {
       case 'refused': return `refused:${v.error.key}`;
-      case 'already-known': return 'restated';
-      case 'already-follows': return 'entailed';
-      case 'record': return 'recorded';
+      // #2790 (ADR-AG-462, ADR-W-200): a restated or entailed line records as its own row, with the already-held notice
+      case 'record': return isHeld(v) ? 'held' : 'recorded';
       case 'ignored': return 'ignored';
       // #1353 — an imperative wrapper teaches instead of committing. None of the cases below is
       // wrapped, so reaching this here would itself be the finding.
@@ -638,13 +705,13 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
   const PINNED = ['A(0,0)', 'B(4,0)', 'C(0,3)'];
 
   it('says so for a given the determined figure already satisfies', () => {
-    expect(verdict(PINNED, 'B נמצא על ציר ה-x')).toBe('entailed'); // the operator's B12
+    expect(verdict(PINNED, 'B נמצא על ציר ה-x')).toBe('held'); // the operator's B12
     // #1639 (ADR-AG-198): a relation DRAWS the pairs it names, so over bare points it records (it drew AB and
     // AC); with the pieces already drawn it adds nothing, and says so — #1080's shape for the area.
-    expect(verdict([...PINNED, 'AB', 'AC'], 'AB מאונך ל-AC')).toBe('entailed');
-    expect(verdict(PINNED, 'AB מאונך ל-AC')).toBe('recorded');
-    expect(verdict([...PINNED, 'AB'], 'AB מקביל לציר ה-x')).toBe('entailed');
-    expect(verdict(PINNED, 'AB מקביל לציר ה-x')).toBe('recorded');
+    expect(verdict([...PINNED, 'AB', 'AC'], 'AB מאונך ל-AC')).toBe('held');
+    expect(verdict(PINNED, 'AB מאונך ל-AC')).toBe('held'); // #2790 (ADR-AG-462): held — its own row, with the notice, its operand ink drawn
+    expect(verdict([...PINNED, 'AB'], 'AB מקביל לציר ה-x')).toBe('held');
+    expect(verdict(PINNED, 'AB מקביל לציר ה-x')).toBe('held'); // #2790: held, its operand AB drawn
   });
 
   it('and for the AREA once the shape it names is already there (#1080 narrowed this)', () => {
@@ -661,7 +728,7 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
      * the line records and «S=6» is drawn (#2491, ADR-AG-401; operator ruling 2026-10-24, card e18 A, reversing
      * ADR-AG-030's 2026-09-15 B11 answer for areas).
      */
-    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('recorded');
+    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('held'); // #2790 (ADR-AG-462): held — its own row, with the notice
     expect(verdict(PINNED, 'שטח המשולש ABC הוא 6')).toBe('recorded');
     // …and the figure it recorded really is the triangle.
     expect(derive([...PINNED, 'שטח המשולש ABC הוא 6'], 0).figure.segments).toHaveLength(3);
@@ -694,7 +761,7 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
   });
 
   it('leaves #1045 alone: a structural restatement is still "restated"', () => {
-    expect(verdict([...PINNED, 'שטח המשולש ABC הוא 6'], 'שטח המשולש ABC הוא 6')).toBe('restated');
+    expect(verdict([...PINNED, 'שטח המשולש ABC הוא 6'], 'שטח המשולש ABC הוא 6')).toBe('held');
   });
 
   /**
@@ -709,10 +776,10 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
     // #1652 (ADR-AG-200): a length given NAMES its pair and draws it, so over bare points it records (it drew
     // something — #1639's shape for a relation); with the segment already drawn it records too, because its 4 is a
     // value the figure then shows (#2491, ADR-AG-401: the operator's *"the tool can draw 4 on the segment"*), as the area does.
-    expect(verdict(['A(0,0)', 'B(4,0)'], 'AB = 4')).toBe('recorded');
-    expect(verdict(['A(0,0)', 'B(4,0)', 'AB'], 'AB = 4')).toBe('recorded');
-    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('recorded');
-    expect(verdict([...PINNED, 'משולש ABC'], 'B נמצא על ציר ה-x')).toBe('entailed');
+    expect(verdict(['A(0,0)', 'B(4,0)'], 'AB = 4')).toBe('held'); // #2790 (ADR-AG-462): held — its own row, with the notice
+    expect(verdict(['A(0,0)', 'B(4,0)', 'AB'], 'AB = 4')).toBe('held');
+    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('held');
+    expect(verdict([...PINNED, 'משולש ABC'], 'B נמצא על ציר ה-x')).toBe('held');
   });
 
   /**

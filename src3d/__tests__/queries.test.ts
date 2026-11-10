@@ -12,7 +12,11 @@ import { resolve3 } from '../engine/evaluate';
 import { answerQuery } from '../engine/queries';
 import { dataView } from '../engine/dataView';
 import { serializeFigure3, deserializeFigure3 } from '../store/figureFile3';
-import { parse3 } from '../parser/parse3';
+import { lineAskOf, parse3 } from '../parser/parse3';
+import { buildScene3 } from '../render/scene3';
+import { HOME_CAMERA } from '../render/camera';
+import heLocale from '../i18n/locales/he.json';
+import enLocale from '../i18n/locales/en.json';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
 
 const reset = () => {
@@ -468,5 +472,98 @@ describe('#1829 — answers that keep the free letters', () => {
     const row = dataView(c, seed).vectors.find((v) => v.label === 'AE');
     expect(row?.decomp).toBe(answerQuery(c, 'AE', seed).answer);
     expect(row?.decomp).toBe('u + t·v');
+  });
+});
+
+/**
+ * #1541 (ADR-3D-475) — a LINE's equation is askable: «משוואת BB'» answered «לא זוהה» on a figure whose panel
+ * printed B and B'. The question is read BY the statement grammar (`lineAskOf`, the ADR-3D-279 mechanism), a
+ * point pair answers `x = P + t·PQ` as given (operator ruling 2026-09-29), and a named line answers from the
+ * canvas echo's own decision (`lineEquationForms3`).
+ */
+describe('#1541 — the line-equation ask', () => {
+  beforeEach(reset);
+  const HIS = ["קוביה ABCDA'B'C'D'", "משוואת מישור A'B'C'D' היא x+4y-8z-126=0", 'B(0,7,8)'];
+  const WANT = 'x = (0, 7, 8) + t·(2, 8, -16)';
+
+  it.each([
+    "משוואת BB'",
+    "משוואת הישר BB'",
+    'משוואת BB׳', // the Hebrew geresh is a prime (#1545)
+    "הישר BB'", // the bare noun answers, as «מישור ABC» does (ruling 2026-09-29)
+    "הצגה פרמטרית של הישר BB'",
+    "the equation of line BB'",
+    "משוואת BB'?",
+  ])('a point pair: «%s» → the line as given', (q) => {
+    expect(ans(HIS, q)).toMatchObject({ answer: WANT, echo: 'plain' });
+  });
+
+  it('anchored at the FIRST-named point, the direction the pair\'s own vector (no reduction)', () => {
+    expect(ans(HIS, "משוואת הישר B'B").answer).toBe('x = (2, 15, -8) + t·(-2, -8, 16)');
+  });
+
+  it('a bare token stays its own lane: «BB\'» the vector, «|BB\'|» the length, the plane head unchanged', () => {
+    expect(ans(HIS, "BB'").answer).toBe('(2, 8, -16)');
+    expect(ans(HIS, "|BB'|").answer).toBe('18');
+    expect(ans(HIS, 'משוואת המישור ABC').answer).toBe('x + 4y - 8z + 36 = 0');
+    expect(ans(['ישר l x=(1,2,3)+t(1,0,2)'], 'l').note).toBe('notUnderstood');
+  });
+
+  it('a frameless cube refuses with the line-worded no-frame note — never numbers', () => {
+    expect(ans(["קוביה ABCDA'B'C'D'"], "משוואת BB'")).toMatchObject({ answer: null, note: 'noFrameLine' });
+  });
+
+  it('no line through one point, a symbolic coordinate is not a given, a missing point is not in the figure', () => {
+    expect(ans(['A(1,2,3)', 'B(1,2,3)'], 'משוואת AB')).toMatchObject({ answer: null, note: 'undetermined' });
+    expect(ans(['A(0,0,0)', 'B(1, t, 2)'], 'משוואת AB')).toMatchObject({ answer: null, note: 'undetermined' });
+    expect(ans(HIS, 'משוואת הישר XY')).toMatchObject({ answer: null, note: 'unavailable' });
+  });
+
+  it('a named line answers — numeric and symbolic-unforced — and a missing one is no object', () => {
+    for (const q of ['משוואת הישר l', 'ישר l', 'equation of line l', 'משוואת הישר ℓ']) {
+      expect(ans(['ישר l x=(1,2,3)+t(1,0,2)'], q).answer, q).toBe('x = (1, 2, 3) + t·(1, 0, 2)');
+    }
+    expect(ans(['הישר ℓ1: x = t(0,m,2m-2)'], 'משוואת הישר ℓ1').answer).toBe('x = (0,0,0) + t·(0,m,2m-2)');
+    expect(ans(['ישר l x=(1,2,3)+t(1,0,2)'], 'משוואת הישר l2').note).toBe('noObject');
+  });
+
+  it('a named line\'s answer IS its canvas echo (one decision, two surfaces)', () => {
+    for (const steps of [['ישר l x=(1,2,3)+t(1,0,2)'], ['הישר ℓ1: x = t(0,m,2m-2)'], ['המישור π1: z = 0', 'המישור π2: x = 0', 'ℓ ישר החיתוך בין המישורים π1 ו-π2'], ['פירמידה ABCDS', 'ℓ ישר החיתוך של המישורים ABC ו-SBC']]) {
+      const { c, seed } = build(steps);
+      const scene = buildScene3(c, resolve3(c, seed), HOME_CAMERA, { width: 800, height: 600 });
+      expect(scene.lines.length, steps.join(' · ')).toBeGreaterThan(0);
+      for (const ln of scene.lines) {
+        const r = answerQuery(c, `משוואת הישר ${ln.name}`, seed);
+        expect(ln.form, steps.join(' · ')).toBe(r.answer === null ? ln.name : `${ln.name}: ${r.answer}`);
+      }
+    }
+  });
+
+  // The class guard (the #1449 catalog walk): every catalog statement `parametricLine` lowers is askable with
+  // its value dropped — a head the statement grammar learns cannot stay sayable-but-not-askable.
+  const BODY = /\s*(?::|\s-|היא|הוא|is)\s*(?:x\s*=\s*)?(?:\([^()]*\)\s*\+\s*)?[a-w]\s*[·×*]?\s*\([^()]*\)\s*$/;
+  const lineRows = COMMAND_CATALOG_3D.flatMap((e) => [e.he, e.en]).filter((u): u is string => {
+    if (typeof u !== 'string' || !BODY.test(u)) return false;
+    const r = parse3(u);
+    return r.ok && r.commands[0]?.type === 'line3';
+  });
+  it('the catalog carries line statements (the guard checks something)', () => {
+    expect(lineRows.length).toBeGreaterThanOrEqual(4);
+  });
+  it.each(lineRows.map((u) => [u]))('«%s» — its question is read', (u) => {
+    expect(lineAskOf(u.replace(BODY, '')), u).not.toBeNull();
+  });
+
+  // Taught remedies are hypotheses: every spelling the «not recognised» hint names is answered on a figure that carries it.
+  it('every example the notUnderstood hint names is read by the lane', () => {
+    const he = heLocale as { query: { note: { notUnderstood: string } } };
+    const en = enLocale as { query: { note: { notUnderstood: string } } };
+    const FIG = ['A(0,0,0)', 'B(1,0,0)', 'C(0,1,0)', 'D(1,1,0)', 'S(0,0,1)', 'AB = w', 'AD = v'];
+    const { c, seed } = build(FIG);
+    for (const hint of [he.query.note.notUnderstood, en.query.note.notUnderstood]) {
+      const examples = hint.split(/—|-\s/).slice(1).join(' ').split(',').map((x) => x.replace(/^\s*(?:נסו|try)\s+/, '').trim()).filter(Boolean);
+      expect(examples.length).toBeGreaterThanOrEqual(7);
+      for (const ex of examples) expect(answerQuery(c, ex, seed).note, ex).not.toBe('notUnderstood');
+    }
   });
 });

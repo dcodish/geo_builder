@@ -15,7 +15,8 @@ import { openCrossings3 } from '../engine/crossings3';
 import { layoutFreeVectorScene3 } from './freeVectorLayout';
 import { cleanMag } from '../engine/dataView';
 import { ANGLE_TOL_DEG, lineAngleDeg, vertexAngleDeg } from '../engine/claims';
-import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
+import { hasAbsoluteFrameObject, intersectPlanes, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
+import { FLAT_SOLID_KINDS } from '../engine/solve3';
 import { DIRECTION_REL_TOL, distanceWitness, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
 import { defaultPlaneDisplay3, lengthMarkText, type Construction3, type Id, type Operand3, type Positions3, type SolidObj } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
@@ -26,7 +27,7 @@ import { firstFreeLetter } from '../engine/freeLetter';
 import type { DihedralPair3 } from '../store/dihedralChips';
 import { isRightAngleValue, meetingPoint, rightAngles3 } from './rightAngles';
 import { collectWedges } from './wedges';
-import { statedLengths } from '../engine/dataView';
+import { lineEquationForms3, statedLengths } from '../engine/dataView';
 
 export interface ScenePoint3 {
   id: Id;
@@ -237,11 +238,79 @@ export const displayLabel = (id: Id): string => id.replace(/'/g, '′');
 
 const edgeKey = (a: Id, b: Id): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-/** World-space face normal (first-two-edges cross), oriented OUTWARD from `center`. */
+/** World-space face normal (first-two-edges cross), oriented OUTWARD from `center`. Exact for a CONVEX solid only. */
 function outwardNormal(ring: Vec3[], center: Vec3): Vec3 {
   const n = cross3(sub3(ring[1], ring[0]), sub3(ring[2], ring[0]));
   const toFace = sub3(centroid3(ring), center);
   return dot3(n, toFace) >= 0 ? n : { x: -n.x, y: -n.y, z: -n.z };
+}
+
+/** A planar ring's Newell normal — its area vector, right for a ring with a reflex corner too (a dart base). */
+function newellNormal(ring: readonly Vec3[]): Vec3 {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    x += (a.y - b.y) * (a.z + b.z);
+    y += (a.z - b.z) * (a.x + b.x);
+    z += (a.x - b.x) * (a.y + b.y);
+  }
+  return { x, y, z };
+}
+
+/**
+ * #2702 ([ADR-3D-469](../../docs/06b-decisions-3d.md#adr-3d-469)) — every face's OUTWARD normal, for a solid that may be
+ * NON-CONVEX (a pyramid or prism over a dart base). The centroid test (`outwardNormal`) is exact only on a convex solid:
+ * beside a reflex base corner the solid's centroid lies outside a lateral face's half-space, and that face read
+ * backwards (measured: 12 of 60 faces on the kite dart). So the faces are wound CONSISTENTLY (each shared edge
+ * traversed in opposite directions by its two faces, walked from face 0), and the closed surface's signed volume says
+ * which way is out. A surface that is not a closed manifold — a flat polygon's double-sided ring, a collapsed sample —
+ * keeps the centroid test, so a convex solid's signs are the ones it always had.
+ */
+export function solidFaceNormals(solid: SolidObj, positions: Positions3): Vec3[] {
+  const rings = solid.faces.map((f) => f.map((id) => positions.get(id)!));
+  const center = centroid3(solid.ids.map((id) => positions.get(id)!));
+  const fallback = () => rings.map((r) => outwardNormal(r, center));
+  const n = solid.faces.length;
+  // directed edge a→b → the faces that traverse it that way (as listed)
+  const edgeFaces = new Map<string, { f: number; fwd: boolean }[]>();
+  solid.faces.forEach((face, f) => {
+    for (let i = 0; i < face.length; i++) {
+      const a = face[i];
+      const b = face[(i + 1) % face.length];
+      const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+      const list = edgeFaces.get(k) ?? [];
+      list.push({ f, fwd: a < b });
+      edgeFaces.set(k, list);
+    }
+  });
+  if ([...edgeFaces.values()].some((l) => l.length !== 2)) return fallback(); // not a closed 2-manifold
+  const sign = new Array<number>(n).fill(0);
+  sign[0] = 1;
+  const queue = [0];
+  while (queue.length) {
+    const f = queue.shift()!;
+    for (const list of edgeFaces.values()) {
+      const me = list.find((e) => e.f === f);
+      if (!me) continue;
+      const other = list.find((e) => e !== me)!;
+      // consistent winding: the two faces traverse the shared edge in OPPOSITE directions once their signs apply
+      const want = me.fwd === other.fwd ? -sign[f] : sign[f];
+      if (sign[other.f] === 0) {
+        sign[other.f] = want;
+        queue.push(other.f);
+      } else if (sign[other.f] !== want) return fallback(); // non-orientable as listed
+    }
+  }
+  if (sign.some((s) => s === 0)) return fallback();
+  const normals = rings.map((r, f) => scale3(newellNormal(r), sign[f]));
+  // signed volume (divergence theorem): Σ (area vector · a point of the face) / 3
+  let volume = 0;
+  normals.forEach((nv, f) => { volume += dot3(nv, centroid3(rings[f])) / 6; });
+  if (!(Math.abs(volume) > 1e-12)) return fallback();
+  return volume > 0 ? normals : normals.map((nv) => scale3(nv, -1));
 }
 
 /**
@@ -250,10 +319,10 @@ function outwardNormal(ring: Vec3[], center: Vec3): Vec3 {
  */
 function strictlyInside(solid: SolidObj, positions: Positions3, p: Vec3): boolean {
   if (!solid.ids.every((id) => positions.has(id))) return false; // an unplaced vertex: no body to be inside
-  const center = centroid3(solid.ids.map((id) => positions.get(id)!));
-  for (const face of solid.faces) {
+  const normals = solidFaceNormals(solid, positions);
+  for (const [f, face] of solid.faces.entries()) {
     const ring = face.map((id) => positions.get(id)!);
-    const raw = outwardNormal(ring, center);
+    const raw = normals[f];
     if (norm3(raw) < 1e-12) continue;
     if (dot3(normalize3(raw), sub3(p, ring[0])) > -1e-7) return false;
   }
@@ -272,8 +341,23 @@ export function hiddenEdgeKeys(c: Construction3, positions: Positions3, cam: Cam
   const { eye } = cameraFrame(cam);
   const hidden = new Set<string>();
   const faceKey = (f: readonly Id[]): string => [...f].sort().join('|');
-  const faceCount = new Map<string, number>();
-  for (const s of c.solids) for (const f of s.faces) faceCount.set(faceKey(f), (faceCount.get(faceKey(f)) ?? 0) + 1);
+  // #2819 (ADR-3D-481): a face is inside a union only when two different solids WITH A BODY carry its vertex set — count
+  // the bodied SOLIDS, never the faces. A flat polygon carries its ring twice (ring and reverse, so one side always faces
+  // the camera) and has no body: counting faces read that one shape as two solids sharing a face (every edge dashed),
+  // and counting it as a carrier made a pyramid's base on it an interior face (its edges dashed from below too). A flat
+  // polygon's face that a bodied solid also carries decides nothing: that solid's own face is the surface there.
+  const bodied = new Map<string, Set<number>>();
+  c.solids.forEach((s, i) => {
+    if (FLAT_SOLID_KINDS.has(s.kind)) return;
+    for (const f of s.faces) {
+      const k = faceKey(f);
+      const set = bodied.get(k) ?? new Set<number>();
+      set.add(i);
+      bodied.set(k, set);
+    }
+  });
+  const isSurface = (solid: SolidObj, f: readonly Id[]): boolean =>
+    (bodied.get(faceKey(f))?.size ?? 0) < (FLAT_SOLID_KINDS.has(solid.kind) ? 1 : 2);
   /** the other solids `solid` shares vertices with — the only ones whose body can hold its faces */
   const partners = (solid: SolidObj): SolidObj[] => c.solids.filter((o) => o !== solid && o.ids.filter((id) => solid.ids.includes(id)).length >= 3);
   const inPartner = (solid: SolidObj, p: Vec3): boolean => partners(solid).some((o) => strictlyInside(o, positions, p));
@@ -282,11 +366,11 @@ export function hiddenEdgeKeys(c: Construction3, positions: Positions3, cam: Cam
   const anyFront = new Map<string, boolean>();
   for (const solid of c.solids) {
     if (!solid.ids.every((id) => positions.has(id))) continue; // a bound apex its degenerate ring left unplaced draws nothing
-    const center = centroid3(solid.ids.map((id) => positions.get(id)!));
-    for (const face of solid.faces) {
+    const normals = solidFaceNormals(solid, positions); // #2702: right on a non-convex (dart-base) solid too
+    for (const [f, face] of solid.faces.entries()) {
       const ring = face.map((id) => positions.get(id)!);
-      const surface = (faceCount.get(faceKey(face)) ?? 0) < 2 && !inPartner(solid, centroid3(ring));
-      const front = surface && dot3(outwardNormal(ring, center), eye) > 1e-12;
+      const surface = isSurface(solid, face) && !inPartner(solid, centroid3(ring));
+      const front = surface && dot3(normals[f], eye) > 1e-12;
       for (let i = 0; i < face.length; i++) {
         const k = edgeKey(face[i], face[(i + 1) % face.length]);
         anyFront.set(k, (anyFront.get(k) ?? false) || front);
@@ -321,11 +405,11 @@ export function auxSegmentHidden(c: Construction3, positions: Positions3, a: Id,
 
   for (const solid of c.solids) {
     if (!solid.ids.every((id) => positions.has(id))) continue; // #2490: an unplaced bound apex has no body to occlude
-    const center = centroid3(solid.ids.map((id) => positions.get(id)!));
+    const normals = solidFaceNormals(solid, positions);
     let inside = true;
     let onAnyFrontFace = false;
     let onAnyFace = false;
-    for (const face of solid.faces) {
+    for (const [f, face] of solid.faces.entries()) {
       const ring = face.map((id) => positions.get(id)!);
       // #817 (ADR-3D-176): a COLLAPSED face (zero area) has no normal to speak of — `normalize3` throws
       // on it, and this call sat on the path of every «הציגו תצורה אחרת», so one degenerate sample took
@@ -334,7 +418,7 @@ export function auxSegmentHidden(c: Construction3, positions: Positions3, a: Id,
       // several normalize sites in this file are guarded — this one was missed. The renderer is a pure
       // consumer of engine output (CLAUDE.md) and must be TOTAL over it: a bad drawing is a bug to fix
       // upstream (the seed preference), never grounds to crash.
-      const raw = outwardNormal(ring, center);
+      const raw = normals[f];
       if (norm3(raw) < 1e-12) continue;
       const n = normalize3(raw);
       const d = dot3(n, sub3(mid, ring[0]));
@@ -1020,41 +1104,9 @@ export function buildScene3(
     }
   }
 
-  // #371: a number on the canvas must be seed-invariant KNOWLEDGE ([ADR-3D-030](docs/06b-decisions-3d.md)
-  // Am. 2 — the rule that removed sampled coordinate labels from nodes). A line whose components carry a
-  // parameter the givens do not FORCE is drawn at one value of it, so echoing the resolved numbers shows
-  // ONE configuration's line as if it were the given (measured: the same `l1:x=t(0,m,2m-2)` echoed four
-  // different directions over four seeds). Echo the student's own symbolic form instead. Once the givens
-  // determine the parameter the numbers ARE knowledge, so they come back.
-  //
-  // #479: "the givens determine it" is asked of the engine (`paramIsKnowledge`), not re-derived here. The
-  // predicate this replaced — "nothing pins the parameter" — was a proxy that held only while every pin had
-  // a single root; the operator's `ℓ ∥ π1` pins m to ±√2, whereupon the echo printed one branch's numbers
-  // and CHANGED them on "show another configuration".
-  // #1474 (ADR-3D-283): this is the ONE derived use of `paramIsKnowledge` that is exact — a line whose
-  // numbers carry m (k + p·m, p ≠ 0) has different numbers on every branch, so "one branch" IS
-  // "invariant" for this question. Every other derived value asks `knowledgeSamples3` instead.
-  const paramUnforced = !!c.param && !paramIsKnowledge(resolved.param);
-  // #611 (ADR-3D-157): the rule the two branches above were each a special case of.
-  //
-  // Both were added by a report — #552 for free lines, #371/#479 for symbolic ones — and each was
-  // bound to a line KIND. Every kind nobody wrote a branch for therefore printed sampled numbers
-  // unconditionally, which is how a `plane-plane` line on a 5-DOF pyramid came to echo
-  // «ℓ: x = (0.678, 0.467, 0) + t·(-0.568, 0.823, 0)»: one configuration's line, shown as the given.
-  // An enumeration is not a rule, and a guard bound to a code path rather than to the EVENT it guards
-  // gets bypassed (docs/17). The event is "are these numbers knowledge?", and nothing was asking it.
-  //
-  // Asked of the engine, never re-derived here (the #479 lesson): numbers are knowledge only when the
-  // figure is in the ABSOLUTE lane — otherwise placement and scale are a gauge, so coordinates are
-  // arbitrary even for a fully determined shape — AND nothing is left free to resample. The DOF count
-  // is the very number the UI shows the student, so the canvas and «דרגות חופש שטרם נקבעו» cannot
-  // contradict each other.
-  //
-  // Deliberately conservative: this is a whole-figure test, so a free DOF that does not actually touch
-  // a given line withholds numbers that would have been true. For DISPLAY that is the correct
-  // asymmetry — withholding a true number costs a little information, printing a false one is the
-  // honesty violation (and it is what the `free`-line branch already did unconditionally).
-  const numbersAreKnowledge = laneA && freeDofCount3(c, resolved) === 0;
+  // #1541 (ADR-3D-475): whether a line's numbers are knowledge is ONE decision, shared with the ask lane
+  // («משוואת הישר ℓ») — `lineEquationForms3` carries the #371 / #479 / #611 / #801 reasoning that lived here.
+  const lineForm = lineEquationForms3(c, resolved);
   const wLines: { name: string; a: Vec3; b: Vec3; form: string }[] = [];
   for (const [name, ln] of resolved.lines) {
     const mid = projectOntoLine(center, ln);
@@ -1066,31 +1118,11 @@ export function buildScene3(
     // not depend on how the student happened to scale its direction.
     const dir = norm3(ln.dir) > 1e-9 ? normalize3(ln.dir) : ln.dir;
     const reach = radius * 1.1;
-    const def = c.lines.get(name);
-    const carriesParam =
-      def?.kind === 'parametric' && [...def.anchor, ...def.dir].some((e) => e.p !== 0);
-    // #801 (ADR-3D-174): the SAME question for a line written in a PIN symbol — `paramUnforced` reads
-    // the algebraic lane and cannot answer for the pivot's letter. Same rule, one lane over: the
-    // resolved numbers are the student's given only when the figure is determined; otherwise their own
-    // equation is echoed, never a configuration's version of it.
-    const echoSrc =
-      def?.kind === 'parametric' && (def.sym !== undefined ? !numbersAreKnowledge : carriesParam && paramUnforced);
     wLines.push({
       name,
       a: sub3(mid, scale3(dir, reach)),
       b: add3(mid, scale3(dir, reach)),
-      form:
-        // #611: a STATED line is the student's own given, printed back — it echoes verbatim whatever
-        // the figure's DOF, because those numbers came from them, not from a sample. Everything else
-        // is DERIVED and echoes numbers only when they are forced; otherwise the bare name, which is
-        // what #552 already did for free lines and what the free PLANE precedent does with its patch.
-        echoSrc && def?.kind === 'parametric'
-          ? `${name}: ${def.src}`
-          : def?.kind === 'parametric' || numbersAreKnowledge
-          // #422: the student's own running letter, when they chose one — the numeric echo used to
-          // rewrite «m» back to «t», telling them their line in a notation they did not use.
-          ? `${name}: x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + ${def?.kind === 'parametric' ? (def.runner ?? 't') : 't'}·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`
-          : name,
+      form: ((f) => (f === null ? name : `${name}: ${f}`))(lineForm(name)),
     });
   }
 

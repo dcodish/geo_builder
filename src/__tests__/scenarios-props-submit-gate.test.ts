@@ -51,15 +51,14 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     st.clear();
   });
 
-  it('[re-entry-noop-message] re-typing an existing construct is a friendly no-op, not an escalation (ADR-156)', () => {
+  it('[re-entry-noop-message] re-typing an existing construct is a held row, not an escalation (ADR-156; its own row since #2790, ADR-W-200)', () => {
     const st = useGeoStore.getState();
     st.clear();
     // #960 (ADR-495): the same one driver. `escalate` is what a refusal MEANS at this seam — the app
     // hands the utterance to the LLM — so the mapping is a rename, not a second classification.
-    const classify = (utterance: string): { kind: 'commit' | 'noop' | 'escalate'; commands?: AnyCommand[] } => {
+    const classify = (utterance: string): { kind: 'commit' | 'held' | 'escalate'; commands?: AnyCommand[] } => {
       const v = gateVerdict(useGeoStore.getState().facts, utterance, useGeoStore.getState().seed);
-      if (v.kind === 'commit') return { kind: 'commit', commands: v.commands };
-      if (v.kind === 'noop') return { kind: 'noop' };
+      if (v.kind === 'commit') return { kind: v.held ? 'held' : 'commit', commands: v.commands };
       return { kind: 'escalate' };
     };
     const commit = (u: string) => {
@@ -67,13 +66,13 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       expect(res.kind, `first ${u}`).toBe('commit');
       res.commands!.forEach((c) => useGeoStore.getState().execute(c, u, 'g-' + u));
     };
-    // re-typing a shape → no-op (not escalate)
+    // re-typing a shape → a held row with the notice (not escalate) — #2790 (ADR-822)
     commit('square ABCD');
-    expect(classify('square ABCD').kind, 're-typed square is a no-op').toBe('noop');
-    // re-inscribing points already on a circle → no-op (no duplicate, no escalate)
+    expect(classify('square ABCD').kind, 're-typed square is a held row').toBe('held');
+    // re-inscribing points already on a circle → a held row (no escalate)
     st.clear();
     commit('מרובע ABCD חסום במעגל');
-    expect(classify('מרובע ABCD חסום במעגל').kind, 're-inscribe is a no-op').toBe('noop');
+    expect(classify('מרובע ABCD חסום במעגל').kind, 're-inscribe is a held row').toBe('held');
     // a genuinely NEW construct still commits (the no-op gate doesn't swallow real work)
     expect(classify('E על AB').kind, 'a new point still commits').toBe('commit');
     st.clear();

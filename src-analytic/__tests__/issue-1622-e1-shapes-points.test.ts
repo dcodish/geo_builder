@@ -12,7 +12,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { decideRename, type RenameState } from '../app/rename';
 
 type P = { x: number; y: number };
@@ -54,7 +54,8 @@ const verdictOf = (lines: readonly string[]): string => {
     last = decideSubmit(line, prior, 0);
     if (last.kind === 'record') prior.push(last.line);
   }
-  return last!.kind === 'refused' ? last!.error.key : last!.kind;
+  // #2790 (ADR-AG-462): a held line is a record with the already-held notice
+  return last!.kind === 'refused' ? last!.error.key : isHeld(last!) ? 'already-held' : last!.kind;
 };
 
 describe('every #1622 E1 sentence builds — the verdict 2-D gives (decideSubmit)', () => {
