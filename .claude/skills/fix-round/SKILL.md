@@ -1,6 +1,6 @@
 ---
 name: fix-round
-description: Execute a batch of operator-approved (auto-ok) fix plans autonomously — pick up to 20 work items off the queue by priority, fix each at the root in its own worktree under the full gates, land bugs on main and features as PRs, escalate instead of patching when a plan fails contact with the code, and finish with ONE round issue (awaiting-play) plus a published HTML report carrying the batch play sheet. Use when the operator says to run a fix round, "run the loop", clear the queue, or work through the auto-ok'd issues. Never run uninvoked, and never as a substitute for triage — it executes plans, it does not write them.
+description: Execute a batch of operator-approved (auto-ok) fix plans autonomously — run continuously through the queue in plan order (no item cap; stop at 24 hours, more than 10 cases waiting for the operator, or nothing eligible), landing and deploying in waves while the operator answers alongside, fix each at the root in its own worktree under the full gates, land bugs on main and features as PRs, escalate instead of patching when a plan fails contact with the code, and finish with ONE round issue (awaiting-play) plus a published HTML report carrying the batch play sheet. Use when the operator says to run a fix round, "run the loop", clear the queue, or work through the auto-ok'd issues. Never run uninvoked, and never as a substitute for triage — it executes plans, it does not write them.
 ---
 
 # Fix round — autonomous execution of triaged, operator-approved fix plans
@@ -56,10 +56,12 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
 
 - **Bundle** issues sharing one root cause or mechanism into a single work item (the plans say
   so when it's true — same class, same chokepoint). Bundling is encouraged when it is the right
-  fix shape; the cap below never forbids a correct bundle.
-- **Cap: up to 20 work items** per round — one number, no band (a bundle counts as ONE item) —
-  [ADR-W-067](../../../docs/06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028). **Fewer is always fine**: the cap is not a
-  quota, and a round with two eligible items runs rather than waits to fill up. **The round follows the
+  fix shape.
+- **No item cap: the round runs continuously** ([ADR-W-201](../../../docs/06w-decisions-workspace.md#adr-w-201),
+  operator 2026-11-10, replacing ADR-W-067's 20). The composition is an **ordered queue**, not a fixed
+  set: whenever a stream finishes, the round takes the next eligible item from it (re-reading
+  `plan/current` and the labels, so an item he armed or answered mid-run joins). It stops only on
+  Step 2b's stops. A round with two eligible items still runs. **The round follows the
   plan strictly** ([ADR-W-165](../../../docs/06w-decisions-workspace.md#adr-w-165), operator
   2026-10-30, "rule A"; docs/22 §2). Read `plan/current` from the overview page's database (the
   roadmap-refresh skill names the page and the tool), then compose **in this order and from nothing
@@ -79,16 +81,12 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
   the plan back** (it needs a fix plan, or a feature build session), never replaced. A round with
   nothing eligible says so and does not run. A P1 still preempts under Step 0's gate. **Never compose a
   `later` issue.** Value density (per the /status-update rubric) breaks ties within a step.
-  **Price the sitting before composing big:** ~30 min/item measured, so a full 20 is an 8–11 hour
-  run — that is the unattended overnight shape ([ADR-W-054](../../../docs/06w-decisions-workspace.md));
-  an attended round composes to what the operator can play in one go.
-- **Spread one chokepoint across rounds:** more than ~2 items touching the same chokepoint — they
-  rebase over each other and each one's full-suite run can break the previous one's scenario — means
-  composing the rest into the NEXT round, not reconciling repeatedly inside this one. **This does NOT
-  scale with the cap** (it is a property of the chokepoint, not of the round) and is usually what holds
-  a composition below 20 — say so at composition time rather than discovering it at item 14.
-- **Announce the composition** — one line per item (issues, plan gist, route bug/feature) —
-  before any code. This is the round's contract; anything not listed is not touched.
+- **One chokepoint, one stream:** items touching the same chokepoint rebase over each other, so they
+  run in ONE stream, in queue order, each stacked on the previous one — never in parallel streams.
+- **Announce the queue** — one line per item for the first streams, then the ordered remainder
+  (issues, plan gist, route bug/feature) — before any code. Items join only from the eligible queue in
+  plan order; anything else is not touched. Each item the round starts later is emitted `queued` to the
+  dashboard and appended to the round issue.
 - **Park what nobody hit** ([ADR-W-169](../../../docs/06w-decisions-workspace.md#adr-w-169)): with
   `plan/current` saved to a file, run `node scripts/known-gaps.mjs --apply --plan <that file>`. It parks
   idle, never-hit P3 features and debt (`icebox`, closed, a row in `docs/known-gaps.md`, their parity
@@ -105,7 +103,7 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
   The body's first line is `Searched: n/a — round ledger, not a work item`, which the issue-creation hook
   requires (ADR-W-168).
   Initial body: the announced composition verbatim (per item: issues, plan gist, route), **plus
-  every current- and next-week plan item NOT picked and why** (unarmed, needs a build session, cap,
+  every current- and next-week plan item NOT picked and why** (unarmed, needs a build session,
   chokepoint, `needs-operator`), **and the pull candidates** (outside the plan, so not composed) — so
   "why wasn't #N in this round?" is answerable later. The `in-round` label means *executing now
   or died mid-flight*; a session that finds an open `in-round` issue at start reports it instead
@@ -256,15 +254,46 @@ Each item, inside its stream:
    round issue (`round #RR`) — from any commit you can find the round, from the round every
    commit.
 
+## Step 2b — run alongside him, and the stops (ADR-W-201)
+
+Operator, 2026-11-10: *"you work, i answer, you continue working, i continue answering and you deploy in
+between based on what you said so this can go on forever."*
+
+- **His queue grows alongside the work.** Every escalation (Step 4), judge escalation and 🎮 case goes on
+  ONE "waiting on you" list: the round issue's `## Waiting on you` section and the dashboard
+  (`round-event.mjs emit <R> item <key> escalated|ready`). Each line is the question itself, or the case
+  with its Server URL and Hebrew lines, so he can answer from his phone. Post the list in chat whenever it
+  grows, as plain text — never a blocking prompt.
+- **An item waiting on him is parked; the round goes on** with the next eligible item.
+- **Read his answers at every wake**: his chat messages, the report page's verdicts (`read_db`), and new
+  `## Operator ruling` comments on parked issues. A ruling is transcribed (docs/22 §2e), the plan is
+  re-armed, and the item re-enters the queue at its plan position. A 🎮 pass releases its held PR to the
+  next wave (Step 3); a fail is a report, handled as one.
+- **Re-arm the Monitor and re-sync the dashboard every wake** (Step 1b): a run of many hours leans on them.
+- **Stops**, whichever comes first:
+  1. **24 hours** since the round issue opened;
+  2. **more than 10 🎮 cases** waiting for him (spot audits do not count);
+  3. **nothing eligible**: the queue is empty, or everything left waits on him;
+  4. **the escalation rate** (Step 4).
+
+  A stop dispatches nothing new, lets the streams in flight finish, lands their wave (Step 3), finalizes
+  (Step 5) and waits. When he answers, the next round starts from where this one stopped.
+
 ## Step 3 — land per the existing routes
 
 - **Fetch before every landing.** If `origin/main` has moved beyond the round's own landings
   (the other PC pushed mid-round), STOP landing and reconcile — report, don't silently rebase
   over external movement. The round's own earlier landings are the only movement it absorbs
   unannounced.
-- **Bugs/debt — one push at the end** ([ADR-W-034](../../../docs/06w-decisions-workspace.md)):
-  item branches merge, in composition order, into a STAGING tip (`round/<date>`, its own worktree);
-  conflicts are reconciled there (ADR-log tails always collide — keep both, in order). **Before the
+- **Bugs/debt — one push per WAVE** ([ADR-W-201](../../../docs/06w-decisions-workspace.md#adr-w-201),
+  replacing ADR-W-034's one push at the end): each item branch merges into the wave's STAGING tip
+  (`round/<date>-w<N>`, its own worktree) **as soon as its gates are green**, and plain `npm run test:fast`
+  runs on the tip after each merge, so a cross-figure regression surfaces while its stream is still alive
+  (round #2808's three late regressions). A wave closes every few hours, or when no stream is running, or
+  at a stop; then the steps below run once on its tip, it lands, and it deploys per Step 7. The next wave
+  branches from the new `main`. An item whose sheet has a 🎮 case does NOT merge into a wave: it opens a PR
+  and waits for his pass, so a waiting case never holds a deploy.
+  Conflicts are reconciled on the tip (ADR-log tails always collide — keep both, in order). **Before the
   full suite, clear what it would only find late** ([ADR-W-190](../../../docs/06w-decisions-workspace.md#adr-w-190), #2736;
   #2722 ran it four times, 5.3 h, on merge artefacts and golden drift): `npx tsc -b`, `npm run test:fast`,
   then the parity golden files by name (`npm run test:locked -- npx vitest run` on `decide-parity-1395-*`
@@ -319,17 +348,18 @@ escaped item is a GOOD outcome — it is the mechanism working. The stats line (
 accumulates the escalation rate across rounds; it is the data the Phase-2 (unattended runs)
 landing-policy decision needs (#543).
 
-**Stop condition — escalations reaching A QUARTER OF THE ITEMS ATTEMPTED, minimum 2, finalize the round**
-([ADR-W-067](../../../docs/06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028)). So: 2 of the first 8, 3 of 12,
-5 of 20 — and a single escalation never stops a round. Land what is already done, finalize the ledger
+An escalated item is **parked on his list** (Step 2b), not dropped: when he rules, it re-enters the queue.
+
+**Stop condition — escalations reaching A QUARTER OF THE LAST ITEMS ATTEMPTED (a window of 12), minimum 2, finalize the round**
+([ADR-W-067](../../../docs/06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028)). So: 2 of the last 8, 3 of the last 12 —
+and a single escalation never stops a round. Land what is already done, finalize the ledger
 honestly (remaining picked items go to **Skipped** with "round stopped on the escalation rate: N of M
 attempted"), and report. A failure rate that far above the measured ~10% baseline says the QUEUE's plans
 are going stale — that is a triage signal, and grinding through the rest is exactly the loop pressure the
 escalation exit exists to relieve. This is a stop, not a failure; the stats line records it.
 
-The threshold is a RATE, not the old flat "second escalation", because at 20 items two escalations IS the
-healthy baseline — an absolute stop would truncate most rounds around item 12 and the cap would have moved
-on paper only.
+The threshold is a RATE over a window, not a flat count, because in a long round a few escalations ARE the
+healthy ~10% baseline; only a cluster of them says the plans went stale.
 
 ## Step 5 — finalize the round issue: ledger → play sheet + validation marker
 
@@ -398,7 +428,7 @@ Final body, in order:
 
 **Who closes what** ([ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168)):
 - **✅ and 👁 cases are closed by the session**, on an assertion or a blind review, with spot audits (the `/playsheet` skill §3b).
-- **No 🎮 case and no PR:** the round deploys itself (Step 7) and closes its own round issue, and it never takes `awaiting-play`.
+- **Each wave without a 🎮 case deploys itself** (Step 7). At the stop, a round with no 🎮 case or PR still open closes its own round issue, and never takes `awaiting-play`.
 - **Otherwise** the operator plays the 🎮 cases, at most about ten, ranked by risk, plus the spot audits. He files normal reports for anything wrong and **closes the round issue when done**. That close is the validation signal, and the deploy follows it. `/status-update` reads open
 `awaiting-play` issues as the validation queue and open `in-round` issues as a round
 executing now or crashed mid-flight.
@@ -472,9 +502,9 @@ reply). Keep it to one short list; `/status-update` stays the full surface.
 Operator, 2026-11-01: *"if nothing needs my attention, you should deploy automatically."*
 ([ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168).)
 
-**When the round deploys itself.** All of these must hold:
-- the round has no 🎮 case and opened no feature PR;
-- the batch's full suite is green (read from `reports/suite-verdict.json`);
+**Each WAVE deploys itself** (ADR-W-201) when all of these hold:
+- the wave holds no 🎮 case (an item with one waits as a PR, Step 3; features are PRs and never in a wave);
+- the wave's full suite is green (read from `reports/suite-verdict.json`);
 - every ✅/👁 case is closed under the `/playsheet` skill §3b.
 
 **How.**
@@ -482,12 +512,12 @@ Operator, 2026-11-01: *"if nothing needs my attention, you should deploy automat
 2. Run the prod smoke: a `scripts/playsheets/prod-<date>.json` sheet against https://themathbible.com, with the round's own cases and one load case per builder.
 3. A red smoke rolls back to the previous `prod/*` tag and reports it.
 
-The final message names the tag and lists the spot-audit cases queued for his next sitting. A round with any 🎮 case or PR does not deploy. Its deploy follows his play.
+A chat line names each wave's tag and what it shipped. A held PR he passes merges into the next wave and ships with it.
 
 ## What a round NEVER does
 
 Pick anything without `auto-ok` · write a fix plan for an unplanned issue · merge a feature PR
-· deploy before his play when it has a 🎮 case or a PR (Step 7) · take a P1 silently · run over a dirty/behind tree · stall every stream on a blocking
+· land or deploy an item with a 🎮 case before his pass (Step 3, Step 7) · run past a stop (Step 2b) · take a P1 silently · run over a dirty/behind tree · stall every stream on a blocking
 question (ask in text; Step 2) · overlap two test runs (the suite lock queues them) · keep a symptom patch to avoid
 an escalation · exceed the announced composition mid-round (found new work of the same cause is fixed in its item, Step 2 4c; anything else → a line on its parent, or an issue only when no parent exists, never armed by the round:
 a bug with the priority the round judges by docs/22 §2 — a round's own find is never `reported`, so a

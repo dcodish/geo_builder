@@ -168,10 +168,12 @@ decides how much can be closed in one session.
 The operator-invoked batch loop that replaces one-at-a-time fix dispatch. Full procedure:
 **`.claude/skills/fix-round/SKILL.md`**; the contract in one paragraph:
 
-A round picks **up to 20 work items** (a bundle of issues sharing one root cause counts as
-one item; fewer is always fine — the cap is not a quota — [ADR-W-067](06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028), which
-consumed a nineteen-round measured escalation rate of 9.8% and a measured ~30 min/item to replace
-[ADR-W-028](06w-decisions-workspace.md)'s 5–8, itself a replacement for ADR-W-012's untested Phase-1 3–5) from
+**A round runs continuously, with no item cap** ([ADR-W-201](06w-decisions-workspace.md#adr-w-201), operator
+2026-11-10, replacing [ADR-W-067](06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028)'s 20): whenever a stream
+finishes it takes the next eligible item in plan order; items waiting on the operator are parked while the
+rest go on, and his answers given mid-run return them to the queue; finished items **land and deploy in
+waves**; the round **stops at 24 hours, at more than 10 🎮 cases waiting for him, when nothing is eligible**,
+or on the escalation rate below. It takes its items from
 the open issues labeled **`auto-ok`** — the label records an **operator approval** of the issue's fix
 plan; `needs-operator` disqualifies. The approval is the operator's alone, but its *application* may be
 transcription ([ADR-W-014](06w-decisions-workspace.md)): when a session has presented a concrete batch
@@ -201,10 +203,8 @@ after a fetch confirms `origin/main` has not moved externally mid-round; feature
 docs/17 escalation template goes on the issue, `auto-ok` → `needs-operator`, and the round moves on —
 and escalations reaching **a quarter of the items attempted, minimum 2**, finalize the round (land what is
 done, the rest to Skipped), because a failure rate that far above the ~10% baseline is a triage signal about
-the QUEUE rather than something to grind through — an absolute “second escalation” would simply BE the
-baseline once a round is 20 items long (ADR-W-067). More than ~2 items on one chokepoint is composed into
-the next round instead, since they rebase over each other — that rule does NOT scale with the cap, and is
-usually what holds a composition below 20.
+the QUEUE rather than something to grind through (ADR-W-067; in a continuous round it is counted over the
+last items attempted). Items on one chokepoint run in one stream, in order, since they rebase over each other.
 The round finishes by finalizing the round issue — per-item evidence (commit, ADR ids, gate record, a
 required *deviations-from-plan* line), landed/PR'd/escalated/**skipped** sections, the batch play sheet
 (Hebrew utterances per item, **split into batch/landed-on-`main` and individual/PR sections** — the PRs

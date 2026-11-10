@@ -45,10 +45,10 @@ A case is a claim about the product, so it is measured before it goes on the she
 - **Class every case.** 🎮 play (needs his hands or judgment) · 👁 look (judged from the screenshot) ·
   ✅ verified (an assertion decides it). **Since [ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168)
   he plays only 🎮**: you close ✅ and 👁 yourself (§3b).
-  - **Always 🎮:** anything beyond what he asked for, named in the Heads-up ([ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)); every feature PR's cases.
+  - **🎮 only for his judgment** ([ADR-W-201](../../../docs/06w-decisions-workspace.md#adr-w-201), operator 2026-11-10: *"i found myself testing cases i would expect i need to. they were clearly visual items. so perhaps you need to be more relaxed on what you ask me to test vs what you can close"*). A case whose pass a screenshot or an assertion can show is ✅ or 👁, whatever it covers. 🎮 is kept for: anything beyond what he asked for, named in the Heads-up ([ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)); a feature PR's **one headline acceptance case** (its other cases close as ✅/👁); and a feel no screenshot carries (a drag, a delay, an animation).
   - **👁 at most:** a case for a bug he reported. It goes in the skim digest (§3b).
   - **Prefer a check the driver decides** (§3b lists them: page text, a refusal, a drawn label, a givens row, a changed configuration) over a Look-for only an eye can check.
-  - **Cap his sitting at about ten 🎮 cases**, ranked by risk; the rest move to the next sitting.
+  - **More than ten 🎮 cases waiting stops a fix round** (fix-round Step 2b); rank them by risk.
 - **His screenshot shows the whole run.** Before diagnosing a reported case from one, re-run the case's own
   lines on a clear canvas and read his run in the dev log (docs/17 §5 step 1); earlier cases' marks are in
   the frame (#1116 T32).

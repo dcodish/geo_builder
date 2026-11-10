@@ -3436,6 +3436,8 @@ The question put to him was short: **when «D = חיתוך AB ו-BC» draws the 
 
 ## ADR-W-067 — The fix-round cap is 20 items, and the escalation stop becomes a RATE (#1290, amends ADR-W-028)
 
+> **⚠ Superseded in part by [ADR-W-201](#adr-w-201)** (operator 2026-11-10, #2816): there is no item cap; a round runs until 24 hours, more than 10 🎮 cases waiting, or nothing eligible. The escalation-rate stop (§3) stays.
+
 **Status:** accepted, 2026-09-20 · **Amends:** [ADR-W-028](#adr-w-028--the-fix-round-cap-is-58-items-with-stop-conditions-35-was-a-phase-1-number-that-has-now-been-measured-767) (which amended [ADR-W-012](#adr-w-012--fix-round-autonomous-execution-of-operator-approved-fix-plans-543-544))
 · **Issue:** [#1290](https://github.com/dcodish/geo_builder/issues/1290) · operator: *"I want to change the number of issues a fix round can fix to about 20"*
 **Requirements:** none (internal) · **Design:** none (internal) — this is a workflow contract; the product promises nothing about round size.
@@ -7408,3 +7410,25 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 **Not changed.** A statement the figure contradicts is still refused, naming it ([ADR-W-199](#adr-w-199)).
 
 **Consequence.** The four 3-D guide examples that answer «כבר קיים» since ADR-3D-449 (Q-2341d) build again, with the notice; the operator's "7 - a" (rewrite them) falls away.
+
+## ADR-W-201 — A fix round runs continuously: no item cap, land and deploy in waves, the operator answers alongside, stop at 24 hours or more than 10 🎮 cases waiting (#2816)
+
+**Status:** accepted · 2026-11-10 · operator ruling · process (workspace) · **supersedes** [ADR-W-067](#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028)'s cap (its escalation-rate stop stays) and the one-push-at-the-end clause of [ADR-W-034](#adr-w-034) · amends [ADR-W-168](#adr-w-168) (what is 🎮) · supersedes the cap half of #1558
+**Operator:** 2026-11-10, in chat, after round #2808:
+> "I think that the 20 item limit is wrong. we need a limit based on time estimate. a fix round can run basically forever as long as it doesnt need me. … stop criteria would be system ran more than 24 hours or there are more than 10 items waiing for my testing."
+>
+> "the 24 hours is more accurate. the way i envision it is that we work in parallel - there is an open items for me to test or decide on that grows as the fixing progresses. I might answer some of it througout the day when i have time and then you can use that input to continue working or i might not get around to it and then i will just answer all of them when the session stops and waits for me. in theory - you work, i answer, you continue working, i continue answering and you deploy in between based on what you said so this can go on forever.
+> cases waiting for me - in the past rounds, i found myself testing cases i would expect i need to. they were clearly visual items. so perhaps you need to be more relaxed on what you ask me to test vs what you can close"
+
+**Requirements:** none (internal) · **Design:** [docs/22 §2d](22-workflow.md) and the fix-round skill
+
+**Why.** Rounds #2786 and #2808 closed 4 and 5 items in 3–4 hours. Per-item fixing measures 30–45 min, but every round pays a fixed cost (the batch's full suite, bisecting a regression, the suite lock) that barely changes with its size. A count cap made rounds small and the fixed cost large; the operator's play was also loaded with visual cases a screenshot reader can close.
+
+**Decision.**
+1. **No item cap.** A round keeps composing: whenever a stream finishes, it takes the next eligible item in plan order (ADR-W-165 rule A, ADR-W-178 bug-first). The chokepoint rule stays: items on one chokepoint run in one stream, in order.
+2. **His queue grows alongside the work.** Escalated items, judge escalations, and 🎮 cases form one "waiting on you" list on the round's dashboard and issue. An item waiting on him is parked, and the round goes on with other items. An answer he gives mid-run (in chat or on the report page) is read at the session's next wake, and the item re-enters the queue.
+3. **Land in waves; deploy between them.** Finished items merge into a staging tip as they finish, and `test:fast` runs on the tip as each merges, so a cross-figure regression surfaces while its stream is alive. When a wave is assembled (every few hours, or when no stream is running), its full suite runs once; green, it lands on `main`. A wave with no 🎮 case deploys itself (ADR-W-168). Features stay PRs. A bug item with a 🎮 case is held off `main` as a PR until he passes it, so a waiting case never blocks a deploy.
+4. **Stops**, whichever comes first: **24 hours** of running · **more than 10 🎮 cases** waiting for him · **nothing eligible** left (everything done, or waiting on him) · the escalation-rate stop (ADR-W-067 §3: a quarter of the last attempted items, minimum 2 — plans going stale). A stop finishes the streams in flight, lands their wave, reports, and waits.
+5. **🎮 only for his judgment.** A case whose pass a screenshot or an assertion can show is ✅ or 👁 and is closed by the session (assertion, blind review, spot audits). 🎮 is kept for: a feature PR's acceptance (one headline case per PR; its other cases close as ✅/👁); anything shipped beyond what he asked; and a feel no screenshot carries (a drag, a delay, an animation).
+
+**Not changed.** Eligibility (`auto-ok`, no `[proposed]`, no open question), the never-patch escalation exit, item gates, the full suite per landing, the round issue as the live ledger, the published report.
