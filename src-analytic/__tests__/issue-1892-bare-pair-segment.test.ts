@@ -97,7 +97,7 @@ describe('#1892 — the class: every spelling of a point on a bare pair is the s
 
   it('a typed point outside the segment is refused as a reused letter; an end of the pair already follows', () => {
     expect(play([...AB, 'P(6,0)', 'P על AB']).verdicts[3]).toMatchObject({ kind: 'refused', key: 'unsatisfiable', reusedId: 'P' });
-    expect(kinds([...AB, 'A על AB'])).toEqual(['record', 'record', 'already-follows']);
+    expect(kinds([...AB, 'A על AB'])).toEqual(['record', 'record', 'record']);
   });
 });
 

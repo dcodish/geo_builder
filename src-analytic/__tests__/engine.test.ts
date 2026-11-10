@@ -11,7 +11,7 @@ import { admittedToPool, drawableAt, evaluate, isKnowledge, POOL_SIZE, samplePar
 import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
 import { derive } from '../engine/derive';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { inDomain, pointsOf, type Construction, type Fact } from '../engine/types';
 import { equationExpr, parseLine } from '../parser/parseAnalytic';
 
@@ -621,9 +621,8 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
     const v = decideSubmit(line, before, 0);
     switch (v.kind) {
       case 'refused': return `refused:${v.error.key}`;
-      case 'already-known': return 'restated';
-      case 'already-follows': return 'entailed';
-      case 'record': return 'recorded';
+      // #2790 (ADR-AG-462, ADR-W-200): a restated or entailed line records as its own row, with the already-held notice
+      case 'record': return isHeld(v) ? 'held' : 'recorded';
       case 'ignored': return 'ignored';
       // #1353 — an imperative wrapper teaches instead of committing. None of the cases below is
       // wrapped, so reaching this here would itself be the finding.
@@ -638,13 +637,13 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
   const PINNED = ['A(0,0)', 'B(4,0)', 'C(0,3)'];
 
   it('says so for a given the determined figure already satisfies', () => {
-    expect(verdict(PINNED, 'B נמצא על ציר ה-x')).toBe('entailed'); // the operator's B12
+    expect(verdict(PINNED, 'B נמצא על ציר ה-x')).toBe('held'); // the operator's B12
     // #1639 (ADR-AG-198): a relation DRAWS the pairs it names, so over bare points it records (it drew AB and
     // AC); with the pieces already drawn it adds nothing, and says so — #1080's shape for the area.
-    expect(verdict([...PINNED, 'AB', 'AC'], 'AB מאונך ל-AC')).toBe('entailed');
-    expect(verdict(PINNED, 'AB מאונך ל-AC')).toBe('recorded');
-    expect(verdict([...PINNED, 'AB'], 'AB מקביל לציר ה-x')).toBe('entailed');
-    expect(verdict(PINNED, 'AB מקביל לציר ה-x')).toBe('recorded');
+    expect(verdict([...PINNED, 'AB', 'AC'], 'AB מאונך ל-AC')).toBe('held');
+    expect(verdict(PINNED, 'AB מאונך ל-AC')).toBe('held'); // #2790 (ADR-AG-462): held — its own row, with the notice, its operand ink drawn
+    expect(verdict([...PINNED, 'AB'], 'AB מקביל לציר ה-x')).toBe('held');
+    expect(verdict(PINNED, 'AB מקביל לציר ה-x')).toBe('held'); // #2790: held, its operand AB drawn
   });
 
   it('and for the AREA once the shape it names is already there (#1080 narrowed this)', () => {
@@ -661,7 +660,7 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
      * the line records and «S=6» is drawn (#2491, ADR-AG-401; operator ruling 2026-10-24, card e18 A, reversing
      * ADR-AG-030's 2026-09-15 B11 answer for areas).
      */
-    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('recorded');
+    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('held'); // #2790 (ADR-AG-462): held — its own row, with the notice
     expect(verdict(PINNED, 'שטח המשולש ABC הוא 6')).toBe('recorded');
     // …and the figure it recorded really is the triangle.
     expect(derive([...PINNED, 'שטח המשולש ABC הוא 6'], 0).figure.segments).toHaveLength(3);
@@ -694,7 +693,7 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
   });
 
   it('leaves #1045 alone: a structural restatement is still "restated"', () => {
-    expect(verdict([...PINNED, 'שטח המשולש ABC הוא 6'], 'שטח המשולש ABC הוא 6')).toBe('restated');
+    expect(verdict([...PINNED, 'שטח המשולש ABC הוא 6'], 'שטח המשולש ABC הוא 6')).toBe('held');
   });
 
   /**
@@ -709,10 +708,10 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
     // #1652 (ADR-AG-200): a length given NAMES its pair and draws it, so over bare points it records (it drew
     // something — #1639's shape for a relation); with the segment already drawn it records too, because its 4 is a
     // value the figure then shows (#2491, ADR-AG-401: the operator's *"the tool can draw 4 on the segment"*), as the area does.
-    expect(verdict(['A(0,0)', 'B(4,0)'], 'AB = 4')).toBe('recorded');
-    expect(verdict(['A(0,0)', 'B(4,0)', 'AB'], 'AB = 4')).toBe('recorded');
-    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('recorded');
-    expect(verdict([...PINNED, 'משולש ABC'], 'B נמצא על ציר ה-x')).toBe('entailed');
+    expect(verdict(['A(0,0)', 'B(4,0)'], 'AB = 4')).toBe('held'); // #2790 (ADR-AG-462): held — its own row, with the notice
+    expect(verdict(['A(0,0)', 'B(4,0)', 'AB'], 'AB = 4')).toBe('held');
+    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('held');
+    expect(verdict([...PINNED, 'משולש ABC'], 'B נמצא על ציר ה-x')).toBe('held');
   });
 
   /**

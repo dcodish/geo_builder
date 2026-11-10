@@ -13,7 +13,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { errorText } from '../app/errorText';
 import { narrowingNotesOf, narrowingText } from '../app/narrowing';
 import { shapeWarningsOf } from '../app/shapeWarnings';
@@ -34,9 +34,9 @@ function play(steps: readonly string[], seed = 0): { lines: string[]; last: 'res
     const v = decideSubmit(step, lines, seed);
     if (v.kind === 'record') {
       lines.push(v.line);
-      out = { last: 'refines' };
-    } else if (v.kind === 'already-known' || v.kind === 'already-follows') out = { last: 'restates' };
-    else {
+      // #2790 (ADR-AG-462): a restatement is its own row now, with the already-held notice — still a restatement
+      out = { last: isHeld(v) ? 'restates' : 'refines' };
+    } else {
       out = { last: 'refused', refusal: v.kind === 'refused' ? plain(errorText(v.error, he as never)) : v.kind };
       if (i < steps.length - 1) earlierAccepted = false;
     }
@@ -90,10 +90,10 @@ describe('#2169 — an implied noun restates the ring in any reading it holds in
     [['מעוין ABCD', 'דלתון ABCD']],
     [['מלבן ABCD', 'מעוין ABCD', 'ריבוע ABCD']],
     [['מקבילית ABCD', 'דלתון ABCD', 'מעוין ABCD']],
-  ])('«%s» — already known, no row', (steps) => {
+  ])('«%s» — held: its own row, with the notice (#2790, ADR-AG-462)', (steps) => {
     const v = play(steps);
     expect(v.last).toBe('restates');
-    expect(v.lines).toHaveLength(steps.length - 1);
+    expect(v.lines).toHaveLength(steps.length);
   });
 
   it('a restated noun keeps the figure green and unwarned', () => {

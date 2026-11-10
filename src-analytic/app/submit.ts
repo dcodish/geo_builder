@@ -25,7 +25,7 @@ import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { holdsInEveryConfiguration, type Seed } from '../engine/evaluate';
-import { circleByName, type ApplyNotice } from '../engine/apply';
+import { circleByName, curveKindOf, type ApplyNotice } from '../engine/apply';
 import { RING_OF_FIGURE } from '../engine/names';
 import { factsWithin, type Fact } from '../engine/types';
 import { activeOf, activePins, rowOf } from './active';
@@ -33,7 +33,6 @@ import { namesOfKind, nearMissOf, withName } from './nearMiss';
 import { declinedPart, declinedPointProperty, declinedThrough, unreadPart, type LostPart } from './lostPart';
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
 import { pointSpelling } from './pointOrder';
-import { lineOfferCandidate } from '../parser/lineOffer';
 import type { SentenceOutcome } from '../../shell/sentences';
 import type { CevianHost } from '../../shell/cevianHost';
 import { isPointName, splitPointNames } from '../engine/pointName';
@@ -88,21 +87,24 @@ export function addsStatedValue(current: Pick<Derivation, 'stated'>, trial: Pick
 /** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */
 export type RecordNotice = ApplyNotice;
 
+/** #2790 (ADR-AG-462): the verdict records a line the figure already held — its own row, with the already-held notice. */
+export const isHeld = (v: SubmitVerdict): boolean => v.kind === 'record' && v.notice?.code === 'already-held';
+
 /** What the submit path decided. One of these, always — there is no fall-through. */
 export type SubmitVerdict =
   /** Blank input. Nothing happens, not even an error. */
   | { kind: 'ignored' }
   /** The line did not parse, or it parsed and the fold refused it. The caller shows the error. */
   | { kind: 'refused'; error: InputError }
-  /** #1045 — every fact was structurally absorbed: the student stated this exact thing already. */
-  | { kind: 'already-known'; line: string }
-  /** #1063 — the line is TRUE and the figure already settled it; it adds nothing to the list. */
-  | { kind: 'already-follows'; line: string }
   /**
    * The line contributes. Record it — and when the statement landed with something the student should
    * be told (#1350: «ישר 3» beside an existing «l3» — two different lines), `notice` carries it so the
    * caller shows it IN THE SAME COMMIT that records the line (`recordLine(line, notice)`): a notice set
    * before the record would be cleared by it.
+   *
+   * #2790 (ADR-AG-462, ADR-W-200): a line the figure ALREADY HOLDS — a restatement (#1045's `known`), a given the figure
+   * already settles (#1063), a held value or its operand ink — records too, as its own row, with `notice.code`
+   * `already-held` ({@link isHeld}). The two no-row verdicts `already-known` / `already-follows` are gone.
    */
   /**
    * `created` (#1467, ADR-AG-342): the points the line's references created. `createdCircle` (#2552 D9, ADR-AG-344): the
@@ -167,6 +169,16 @@ const constraintsAdded = (before: Derivation, after: Derivation): number =>
  * ADR-AG-319). Counted here, the line it drew is never «כבר נובע».
  */
 const drawnCurves = (d: Derivation): number => d.construction.objects.filter((o) => o.kind === 'curve' && o.stated).length;
+/**
+ * {@link objectsGained} without the line's OPERAND INK (#2790, ADR-AG-462): segments and stated lines a statement draws
+ * over the points it names. A held value is shown by them, so they are no part of what the figure lacked.
+ */
+const isInk = (o: Derivation['construction']['objects'][number]): boolean => o.kind === 'segment' || (o.kind === 'curve' && curveKindOf(o) === 'line');
+const inklessGained = (before: Derivation, after: Derivation): number =>
+  after.construction.objects.filter((o) => !isInk(o)).length -
+  before.construction.objects.filter((o) => !isInk(o)).length +
+  (after.construction.params.length - before.construction.params.length) +
+  (after.construction.selectors.length - before.construction.selectors.length);
 const objectsGained = (before: Derivation, after: Derivation): number =>
   after.construction.objects.length - before.construction.objects.length +
   (after.construction.params.length - before.construction.params.length) +
@@ -380,12 +392,11 @@ function decideOnce(
      * #1620 (ADR-AG-206) — for the EXAM's construction register, a sentence the figure ALREADY HOLDS is
      * taught too. The exam restates its givens in imperative form («בחרו נקודה E כרצונכם, הנמצאת על הצלע
      * DC» after «במלבן ABCD, הנקודה E נמצאת על הצלע DC», 2/4), and refusing it would tell the student the
-     * tool cannot read a sentence it reads perfectly. The pre-filled sentence is still one the next Enter
-     * ACCEPTS — it answers «already known» there, recording nothing, which is the honest answer about it.
-     * The tool wrapper («הוסף …») keeps #1353's stricter promise: what it teaches, the next Enter records.
+     * tool cannot read a sentence it reads perfectly. Since #2790 (ADR-AG-462) a held sentence RECORDS, with the
+     * already-held notice, so both registers keep #1353's promise: what it teaches, the next Enter records.
      */
     const next = decideSubmit(candidate.remainder, lines, seed, current).kind;
-    if (next === 'record' || (candidate.exam && (next === 'already-known' || next === 'already-follows'))) {
+    if (next === 'record') {
       return { kind: 'teach', verb: candidate.verb, canonical: candidate.remainder };
     }
   }
@@ -407,7 +418,7 @@ function decideOnce(
       const spelling = pointSpelling(line, lines);
       if (spelling) {
         const next = decideSubmit(spelling.canonical, lines, seed, current).kind;
-        if (next === 'record' || next === 'already-known') return { kind: 'teach', verb: '', ...spelling };
+        if (next === 'record') return { kind: 'teach', verb: '', ...spelling };
       }
     }
     /**
@@ -421,7 +432,7 @@ function decideOnce(
         // #1947 (ADR-AG-301) — a further piece is asked in the figure the prefix (and the pieces before it) make
         const held = before.length ? [...lines, ...before] : lines;
         const k = decideOnce(piece, held, seed, before.length ? derive(held, seed, {}, current.pins) : current).kind;
-        return k === 'record' || k === 'already-known' || k === 'already-follows';
+        return k === 'record';
       };
       // #2547 (ADR-AG-334) — arm 3, after arm 2 so a co-reference it refuses keeps its parts: a through-clause on a
       // segment whose point carries no fresh letter («AB מיתר העובר דרך מרכז המעגל») is refused whole, as 2-D refuses it.
@@ -488,7 +499,7 @@ function decideOnce(
   const circle = trial.createdCircles.find((c) => c.index === lines.length)?.centre;
   /** #1973 (ADR-AG-430): the shape this line's cevian was resolved in — recorded with it, so it keeps meaning that shape. */
   const host = trial.hosts.find((h) => h.index === lines.length)?.host;
-  const recorded: SubmitVerdict = {
+  const recorded: Extract<SubmitVerdict, { kind: 'record' }> = {
     kind: 'record',
     line,
     configuration: trial.configuration,
@@ -529,20 +540,6 @@ function decideOnce(
     const reused = subjectIdsOf(parsed).find(
       (id) => !restatedCentres.has(id) && current.construction.objects.some((o) => o.id === id),
     );
-    /*
-     * #2584 (ADR-AG-346; operator ruling 2026-10-27, T32) — A DRAWN LINE RESTATED UNDER A NEW NAME is refused naming the row
-     * that drew it, and the box is pre-filled with the sentence that names it (`parser/lineOffer.ts`). Offered only when this
-     * same decision would record it, so the next Enter never meets a refusal (ADR-W-030's promise).
-     */
-    if (fault.code === 'line-exists') {
-      const name = fault.lineName ?? '';
-      const candidate = fault.twin ? lineOfferCandidate(current.construction, fault.twin, name, /[א-ת]/.test(line) ? 'he' : 'en') : null;
-      const offer = candidate && decideSubmit(candidate, lines, seed, current).kind === 'record' ? candidate : undefined;
-      return {
-        kind: 'refused',
-        error: { key: 'line-exists', detail: fault.detail, lineName: name, ...(fault.declared ? { declared: fault.declared } : {}), ...(offer ? { offer } : {}) },
-      };
-    }
     const definedBy = reused ? definingLineOf(lines, reused) : null;
     return {
       kind: 'refused',
@@ -577,22 +574,52 @@ function decideOnce(
    * and fault logic below are untouched: this only turns a no-op into a record for a line the fold already proved
    * harmless (it reached here with no fault).
    */
-  if (addsStatedValue(current, trial)) return recorded;
+  const gained = objectsGained(current, trial);
+  const constraints = constraintsAdded(current, trial);
+  const assumptions = (d: Derivation) =>
+    d.construction.constraints.filter((k) => k.t === 'relation' && k.assumed).length;
+  const freedomBefore = reportedDof(current.construction, current.figure.carrierDof);
+  const freedomAfter = reportedDof(trial.construction, trial.figure.carrierDof);
+  /**
+   * DOES THE FIGURE ALREADY HOLD THIS LINE? (#2790, [ADR-AG-462](../../docs/06c-decisions-analytic.md#adr-ag-462)) — the
+   * #1063 entailment gate below, asked of a line that records anyway. `gainedHere` is what the line added beyond its own
+   * ink: a value line draws its operand segment («AC = 3√2» on a square of side 3), and that is the line's way of being
+   * shown, not something the figure lacked (2-D's `impliedByPrior` operand-ink rule, ADR-822). A line that pinned the
+   * tool's own assumption (#1159) is not held: it turned a guess into a given.
+   */
+  const entailedGiven = (gainedHere: number): boolean =>
+    parsed.facts.length > 0 &&
+    gainedHere === 0 &&
+    trial.figure.unsatisfied.length === 0 &&
+    freedomAfter === freedomBefore &&
+    assumptions(trial) >= assumptions(current) &&
+    holdsInEveryConfiguration(
+      current.construction,
+      trial.construction.constraints.filter((_, at) => trial.constraintLine[at] === lines.length),
+    );
+  /** A held line records as its own row, with the one notice (ADR-W-200; operator 2026-11-09). A notice the fold raised wins. */
+  const held: Extract<SubmitVerdict, { kind: 'record' }> = { ...recorded, notice: recorded.notice ?? { code: 'already-held', detail: line, holder: '' } };
+  /**
+   * A HELD VALUE OR HELD INK records WITH the notice (#2790, ADR-AG-462; ADR-W-200 §1 "a value the points already decide",
+   * and the operator 2026-11-10: *"in this case there is also drawing that needs to happen"*): the value is drawn and
+   * marked, and the student is told the figure already held it. Held = structurally restated (`known`), or a constraint
+   * the figure already entails with nothing gained but its operand ink.
+   */
+  const heldValue = (): boolean =>
+    trial.outcomes[lines.length] === 'known' || (constraints > 0 && entailedGiven(inklessGained(current, trial)));
+
+  if (addsStatedValue(current, trial)) return heldValue() ? held : recorded;
 
   // A LINE THAT DRAWS A LINE RECORDS (#2408, ADR-AG-415): «T על הישר AB» may hold already, but it speaks of the line under
-  // the segment, and that line now shows.
-  if (trial.figure.curves.some((u) => u.stated && !current.figure.curves.some((v) => v.id === u.id && v.stated))) return recorded;
+  // the segment, and that line now shows. Held, it says so (#2790).
+  if (trial.figure.curves.some((u) => u.stated && !current.figure.curves.some((v) => v.id === u.id && v.stated))) return heldValue() ? held : recorded;
 
   // A LINE THAT PUTS A LETTER ON THE FIGURE RECORDS (#2674, ADR-AG-404): «E(-3,7)» on the tool's P₁ states what the figure
   // holds, but the letter is new, and P₁ yields to it. The line owns the letter, as 2-D's naming by use is its line's (ADR-653).
   if (trial.figure.points.some((p) => !current.figure.points.some((q) => q.id === p.id))) return recorded;
 
-  if (trial.outcomes[lines.length] === 'known') {
-    return { kind: 'already-known', line };
-  }
-
-  const gained = objectsGained(current, trial);
-  const constraints = constraintsAdded(current, trial);
+  // #1045's restatement — now its own row, with the notice (#2790, ADR-AG-462)
+  if (trial.outcomes[lines.length] === 'known') return held;
 
   /**
    * A line that PROMOTED a carrier to a stated curve (#1076) changes no count — the object was
@@ -670,8 +697,6 @@ function decideOnce(
    * deliver this on its own, because pinning changes neither the count nor the freedom. The signal is
    * that an assumption stopped being one.
    */
-  const assumptions = (d: Derivation) =>
-    d.construction.constraints.filter((k) => k.t === 'relation' && k.assumed).length;
   if (assumptions(trial) < assumptions(current)) return recorded;
 
   /**
@@ -688,20 +713,9 @@ function decideOnce(
    * judged — the configuration pool (ADR-AG-180), read by `holdsInEveryConfiguration`, not a sampler
    * of its own. Last, because it is the only condition that can cost evaluations.
    */
-  const freedomBefore = reportedDof(current.construction, current.figure.carrierDof);
-  const freedomAfter = reportedDof(trial.construction, trial.figure.carrierDof);
-  if (
-    parsed.facts.length > 0 &&
-    gained === 0 &&
-    trial.figure.unsatisfied.length === 0 &&
-    freedomAfter === freedomBefore &&
-    holdsInEveryConfiguration(
-      current.construction,
-      trial.construction.constraints.filter((_, at) => trial.constraintLine[at] === lines.length),
-    )
-  ) {
-    return { kind: 'already-follows', line };
-  }
+  // #1063's entailed given — now its own row, with the notice (#2790, ADR-AG-462). A constraint that drew only its operand
+  // ink is held too: «|AC| = |BD|» on an isosceles trapezoid draws both diagonals, and the figure already held the relation.
+  if (entailedGiven(constraints > 0 ? inklessGained(current, trial) : gained)) return held;
 
   return recorded;
 }
@@ -728,6 +742,8 @@ export type NoticeT = (key: string, vars?: Record<string, string>) => string;
 /** A recorded line's notice, worded for the student — one wording for the typed and the LLM lanes (#1350). */
 export const noticeText = (n: RecordNotice | undefined, t: NoticeT): string | null =>
   !n ? null
+    // #2790 (ADR-AG-462, ADR-W-204): a held line is its own row — the one suite notice every builder says
+    : n.code === 'already-held' ? t('suite.notice.alreadyHeld')
     // #1445 (ADR-AG-243): a lone vertex read as its one shape's interior angle is said aloud — «הובן כ-∠ABC».
     : n.code === 'angle-read-as' ? t('noticeAngleReadAs', { holder: n.holder.split(', ').map((h) => `∠${h}`).join(', ') })
     : t('noticeNameReadsAs', { detail: n.detail, holder: n.holder });
@@ -875,14 +891,9 @@ export const reachesFallback = (verdict: SubmitVerdict): boolean =>
 export function sentenceOutcome(verdict: SubmitVerdict): SentenceOutcome {
   switch (verdict.kind) {
     case 'record':
-    case 'already-known':
-    case 'already-follows':
       return 'consumed';
     case 'teach':
       return { prefill: verdict.canonical };
-    // #2584 (ADR-AG-346): a restated line's refusal puts the naming sentence in the box, as a lesson does
-    case 'refused':
-      return verdict.error.key === 'line-exists' && verdict.error.offer ? { prefill: verdict.error.offer } : 'kept';
     default:
       return 'kept';
   }

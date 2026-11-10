@@ -153,7 +153,7 @@ describe('#2425 — Q4: a line declared by its equation is named; Q3: the studen
     expect(drawn(ls)[0].label.auto).toBeUndefined();
   });
   it('restating it under its own l1 adds nothing — «כבר ידוע»', () => {
-    expect(verdicts(['נתון ישר 4x+3y+2=0', 'נתון הישר l1: 4x+3y+2=0'])).toEqual(['record', 'already-known']);
+    expect(verdicts(['נתון ישר 4x+3y+2=0', 'נתון הישר l1: 4x+3y+2=0'])).toEqual(['record', 'record']);
   });
   it('the student’s own name is never replaced: «נתון הישר l5: …» then «נתון הישר l6: <same>» is refused', () => {
     expect(verdicts(['נתון הישר l5: 4x+3y+2=0', 'נתון הישר l6: 4x+3y+2=0'])).toEqual(['record', 'refused:already-named']);

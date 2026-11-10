@@ -34,7 +34,7 @@ function play(steps: readonly string[]): { lines: string[]; recorded: boolean } 
   for (const step of steps) {
     const v = decideSubmit(step, lines, 0);
     if (v.kind === 'record') lines.push(v.line);
-    else if (v.kind !== 'already-follows' && v.kind !== 'already-known') recorded = false;
+    else recorded = false;
   }
   return { lines, recorded };
 }

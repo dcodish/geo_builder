@@ -143,7 +143,7 @@ describe('#2018 — the class: the base and the legs, the median and the altitud
         expect(new Set(sides).size, `seed ${seed}: two legs`).toBe(2);
         for (const s of sides) expect(s.includes(apex) && s !== baseOf(apex), `seed ${seed}: ${s} is a leg at apex ${apex}`).toBe(true);
       }
-      expect(submit([ISO, line, line, line]).map((v) => v.kind)).toEqual(['record', 'record', 'record', 'already-known']);
+      expect(submit([ISO, line, line, line]).map((v) => v.kind)).toEqual(['record', 'record', 'record', 'record']);
     });
   }
 

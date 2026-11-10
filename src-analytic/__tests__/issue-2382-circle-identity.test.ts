@@ -37,7 +37,7 @@ function submitAll(lines: readonly string[]): { recorded: string[]; verdicts: Ve
     const v = decideSubmit(line, recorded, 0) as Verdict;
     verdicts.push(v);
     if (v.kind === 'record') recorded.push(v.line ?? line);
-    else if (v.kind !== 'already-follows' && v.kind !== 'already-known') throw new Error(`«${line}» → ${v.kind} ${v.error?.key ?? ''}`);
+    else throw new Error(`«${line}» → ${v.kind} ${v.error?.key ?? ''}`);
   }
   return { recorded, verdicts };
 }
@@ -83,7 +83,7 @@ describe('#2382 (1) — the subject spellings about two circles with given radii
     it.each(SENTENCES)(`${ctxName}: «%s» keeps both radii, M, N and both equations known`, (s) => {
       const lines = [...ctx, s];
       // The touch already holds (|MN| = 5 + 10), so the line adds nothing: consumed, never a phantom freedom.
-      expect(['already-follows', 'already-known', 'record']).toContain(lastVerdict(lines).kind);
+      expect(['record', 'record', 'record']).toContain(lastVerdict(lines).kind);
       const d = expectAllKnown(lines);
       expect(d.construction.objects.filter((o) => o.kind === 'circle-at').map((o) => o.id).sort()).toEqual(['circle-at-M', 'circle-at-N']);
     });
@@ -145,7 +145,7 @@ describe('#2382 (2) — C5: a centre named after an equation circle names THAT c
     expect(pk.params.find((p) => p.sym === 'k')!.k.known).toBe(false);
   });
   it('«נתון מעגל M שרדיוסו 4» is a statement about circle I (already known), 5 a contradiction', () => {
-    expect(lastVerdict([...CIRCLE_I, 'נתון מעגל M שרדיוסו 4']).kind).toBe('already-known');
+    expect(lastVerdict([...CIRCLE_I, 'נתון מעגל M שרדיוסו 4']).kind).toBe('record');
     expect(lastVerdict([...CIRCLE_I, 'נתון מעגל M שרדיוסו 5']).kind).toBe('refused');
   });
 });

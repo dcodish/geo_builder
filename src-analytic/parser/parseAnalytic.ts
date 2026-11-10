@@ -7557,7 +7557,7 @@ function parseDirectionLine(line: string): RuleOutcome {
  * «l הוא המשיק למעגל בנקודה A» · «הישר l הוא המשיק לאליפסה בנקודה A» · "l is the tangent to the circle at A" — A LINE NAMED
  * AS THE TANGENT AT A POINT (#2621 A, [ADR-AG-368](../../docs/06c-decisions-analytic.md#adr-ag-368)). The same statement as
  * «הישר l משיק למעגל בנקודה A», and read as it: about l when the figure has l, else the tangent at A named l (M1), and a
- * new name for a tangent already drawn is ADR-AG-346's `line-exists`, offering «נסמן את המשיק בנקודה A ב-l».
+ * new name for a tangent already drawn names it, with the already-held notice (#2790, ADR-AG-463).
  */
 const NAMED_AS_TANGENT_HE = new RegExp(`^(?:ה?ישר\\s+)?(${FREE_LINE_NAME})\\s+(?:הוא|היא)\\s+(ה?משיק\\s+.+)$`);
 const NAMED_AS_TANGENT_EN = new RegExp(`^(?:[Tt]he\\s+)?(?:[Ll]ine\\s+)?(${FREE_LINE_NAME})\\s+is\\s+((?:[Tt]he\\s+)?[Tt]angent\\s+.+)$`);
@@ -7706,7 +7706,7 @@ function parseNameLine(line: string): RuleOutcome {
  * «נסמן את האנך האמצעי ל-EK ב-l2» · «נסמן ב-l1 את הישר העובר דרך E המקביל לציר ה-x» · "denote the perpendicular bisector
  * of EK by l2" — A LINE NAMED BY ITS DESCRIPTION (#2584, ADR-AG-346; #1126's grammar half, ruled 2026-09-17: a line can be
  * named). The operand is any clause the grammar reads as ONE constructed line (a \`line-at\`): what builds it is the line's
- * identity, so M1 names the figure's line that is that construction. The sentence the \`line-exists\` refusal offers.
+ * identity, so M1 names the figure's line that is that construction.
  */
 const NAME_VERB_HE = '(?:(?:נסמן|נסמנה|מסמנים|לסמן)\\s+)?';
 const NAME_OBJECT_HE = new RegExp(`^${NAME_VERB_HE}את\\s+(.+?)\\s+ב-?\\s*(${FREE_LINE_NAME})$`);

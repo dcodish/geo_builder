@@ -18,7 +18,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { errorText } from '../app/errorText';
 import { derive } from '../engine/derive';
 import { evaluateStats, type Figure } from '../engine/evaluate';
@@ -71,7 +71,7 @@ describe('#1639 — a sentence that names a pair draws it', () => {
     const lines = ['נתון מעגל שמרכזו M', 'BC משיק למעגל בנקודה B'];
     expect(play(lines).verdicts).toEqual(['record', 'record']);
     expect(objectIds(lines)).toContain('seg-BC');
-    expect(decideSubmit('BC', lines, 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('BC', lines, 0))).toBe(true);
   });
 
   it('«הישר BC משיק למעגל בנקודה B» draws the LINE BC (the noun decides), and «הישר BC» afterwards is known', () => {
@@ -80,14 +80,14 @@ describe('#1639 — a sentence that names a pair draws it', () => {
     expect(d.faults).toEqual([]);
     expect(d.figure.curves.some((c) => c.id === 'line-BC' && c.curve.kind === 'line')).toBe(true);
     expect(objectIds(lines)).not.toContain('seg-BC');
-    expect(decideSubmit('הישר BC', lines, 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('הישר BC', lines, 0))).toBe(true);
   });
 
   it('T6: «נתון: AC הוא קוטר במעגל» draws AC, and the bare «AC» afterwards answers «כבר ידוע»', () => {
     const lines = ['מעגל M', 'הנקודות A, B ו-C נמצאות על המעגל', 'נתון: AC הוא קוטר במעגל'];
     expect(play(lines).verdicts).toEqual(['record', 'record', 'record']);
     expect(objectIds(lines)).toContain('seg-AC');
-    expect(decideSubmit('AC', lines, 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('AC', lines, 0))).toBe(true);
   });
 
   // Amended by #1669 (ADR-AG-204, operator 2026-10-02 "analytic should mimic 2d"): a ROLE sentence introduces the
@@ -108,7 +108,7 @@ describe('#1639 — a sentence that names a pair draws it', () => {
   });
 
   it('a pair the figure already draws as a side is that side: «AB ∥ CD» in a parallelogram draws nothing new', () => {
-    expect(decideSubmit('AB ∥ CD', ['מקבילית ABCD'], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('AB ∥ CD', ['מקבילית ABCD'], 0))).toBe(true);
     expect(objectIds(['משולש ABC', 'AB'])).not.toContain('seg-AB');
   });
 
@@ -137,7 +137,7 @@ describe('#1640 + #1636 — the extent belongs to the statement', () => {
     ];
     const { verdicts, kept } = play(lines);
     // BC is «כבר ידוע» since #1652 (ADR-AG-200): «OC = 15, BC = 3» names BC and draws it — the line-5 length drew it.
-    expect(verdicts).toEqual(['record', 'record', 'record', 'record', 'record', 'record', 'record', 'already-known', 'already-known']);
+    expect(verdicts).toEqual(['record', 'record', 'record', 'record', 'record', 'record', 'record', 'record', 'record']);
     for (const seed of [0, 1, 2, 3]) {
       const d = derive(kept, seed);
       expect(d.faults, `seed ${seed}`).toEqual([]);
@@ -173,13 +173,13 @@ describe('#1640 + #1636 — the extent belongs to the statement', () => {
     expect(['P על הצלע AB', 'P על הקטע AB', 'P על הישר AB', 'P על AB'].map((l) => kind(l, drawn))).toEqual([
       'unsatisfiable',
       'unsatisfiable',
-      'already-follows',
+      'record',
       'unsatisfiable',
     ]);
     expect(['P על הצלע AB', 'P על הקטע AB', 'P על הישר AB', 'P על AB'].map((l) => kind(l, bare))).toEqual([
       'unsatisfiable',
       'unsatisfiable',
-      'already-follows',
+      'record',
       'unsatisfiable',
     ]);
   });

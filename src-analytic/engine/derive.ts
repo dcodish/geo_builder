@@ -17,7 +17,7 @@ import { resolveToolLetters, typedLetters } from './toolLetters';
 import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
-import { EMPTY_CONSTRUCTION, circleDefPoints, diameterCircleId, factsWithin, namesObject, objectById, tangentLineId, type Construction, type Fact } from './types';
+import { EMPTY_CONSTRUCTION, circleDefPoints, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
 import { SOLVE_RESOLUTION, sameConstraint, type Constraint } from './solve';
 import { assignmentAt, flattenPicked } from './discreteAxes';
 import { followObjects } from './roles';
@@ -41,9 +41,6 @@ export interface LineFault {
   holder?: ApplyError['holder'];
   /** For `already-named` (#2584, ADR-AG-346): the holder is a line's name. */
   holderKind?: 'line';
-  /** For `line-exists` (#2584, ADR-AG-346): the drawn line restated, and the name the restatement gave it (`declared` is its row). */
-  twin?: string;
-  lineName?: string;
   /** For an ambiguous one-letter angle: the three-letter name to write instead (#1407). */
   example?: ApplyError['example'];
   /** For an ambiguous one-letter angle naming several: every candidate, three letters each (#1445). */
@@ -270,18 +267,6 @@ export function derive(
     const other = rings.find(({ f, j }) => owner[j] !== at && (refusedIsInscription ? !!f.noun && !!shapeRow(f.noun)?.notCyclic : !!f.cyclic));
     return { shape: e.shape, forced: e.forced, ...(other ? { declared: lines[owner[other.j]] } : {}) };
   };
-  /**
-   * #2584 (ADR-AG-346): a restated line's refusal names the ROW THAT DREW IT — the first line whose facts build the line
-   * by that id (a constructed line's id is what builds it, so this is exact) — and carries the name the student typed.
-   */
-  const lineExistsFields = (e: ApplyError): Partial<LineFault> => {
-    if (e.code !== 'line-exists' || e.twin === undefined) return {};
-    // The tangent at A is built by its `tangent-line-at` (#2621 A, ADR-AG-368), under the id `tangentLineId(at)`.
-    const j = facts.findIndex((f) =>
-      factsWithin(f).some((g) => ((g.t === 'line-at' || g.t === 'curve') && g.id === e.twin) || (g.t === 'tangent-line-at' && tangentLineId(g.at) === e.twin)),
-    );
-    return { twin: e.twin, ...(e.lineName !== undefined ? { lineName: e.lineName } : {}), ...(j >= 0 ? { declared: lines[owner[j]] } : {}) };
-  };
   /** #1737 (ADR-AG-265): the shape a height named, or the pair and ring a diagonal claim named — what the refusal says. */
   const roleClaimFields = (e: ApplyError): Partial<LineFault> =>
     e.code === 'shape-not-found'
@@ -336,7 +321,7 @@ export function derive(
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i), ...(e.code === 'radius-letter-taken' ? letterAgainst(e, i) : {}), ...(e.holderKind ? { holderKind: e.holderKind } : {}), ...(e.tangents ? { tangents: e.tangents } : {}), ...lineExistsFields(e) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i), ...(e.code === 'radius-letter-taken' ? letterAgainst(e, i) : {}), ...(e.holderKind ? { holderKind: e.holderKind } : {}), ...(e.tangents ? { tangents: e.tangents } : {}) });
   });
 
   /**

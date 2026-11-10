@@ -24,6 +24,8 @@ function submit(lines: readonly string[]): V[] {
     return v;
   });
 }
+/** #2790 (ADR-AG-462): a line the figure already holds records as its own row, with the already-held notice. */
+const HELD = { kind: 'record', notice: { code: 'already-held' } };
 const kinds = (lines: readonly string[]) => submit(lines).map((v) => v.kind);
 const last = (lines: readonly string[]) => submit(lines).at(-1)!;
 const text = (v: V) => errorText(v.error as never, he).replace(/[⁦-⁩]/g, '');
@@ -95,7 +97,7 @@ describe('#2621 A — the tangent named', () => {
       expect(ats).toHaveLength(1);
       expect(ats[0]).toMatchObject({ id: 'tangent-A', name: 'l' });
       expect(ask(derive(lines, 0), 'משוואת המשיק למעגל בנקודה A', fmtAnalytic).value).toBe(ask(derive(base, 0), 'משוואת המשיק למעגל בנקודה A', fmtAnalytic).value);
-      expect(last([...lines, 'שיפוע l הוא -3/4']).kind).toBe('already-follows');
+      expect(last([...lines, 'שיפוע l הוא -3/4'])).toMatchObject(HELD); // #2790: its own row, with the notice
       expect(last([...lines, 'P על המשיק בנקודה A']).kind).toBe('record');
     }
   });
@@ -111,14 +113,16 @@ describe('#2621 A — the tangent named', () => {
       const ats = lineAts(lines);
       expect(ats).toHaveLength(1);
       expect(ats[0]).toMatchObject({ id: 'tangent-A', name: 'l' });
-      expect(last([...lines, 'שיפוע l הוא -3/4']).kind).toBe('already-follows');
+      expect(last([...lines, 'שיפוע l הוא -3/4'])).toMatchObject(HELD); // #2790: its own row, with the notice
     }
   });
 
-  it('…and after the unnamed tangent it is ADR-AG-346\'s refusal, offering the naming sentence that records', () => {
+  it('…and after the unnamed tangent it names the drawn tangent, with the already-held notice (#2790, ADR-AG-463; T32 withdrawn)', () => {
     const v = last([...base, 'l הוא המשיק למעגל בנקודה A']);
-    expect(v.error?.key).toBe('line-exists');
-    expect(v.error?.offer).toBe('נסמן את המשיק בנקודה A ב-l');
+    expect(v).toMatchObject({ kind: 'record', notice: { code: 'already-held', holder: 'l' } });
+    const named = lineAts([...base, 'l הוא המשיק למעגל בנקודה A']);
+    expect(named).toHaveLength(1);
+    expect(named[0]).toMatchObject({ id: 'tangent-A', name: 'l' });
     expect(kinds([...base, 'נסמן את המשיק בנקודה A ב-l'])).toEqual(['record', 'record', 'record', 'record']);
     expect(lineAts([...base, 'הישר l משיק למעגל בנקודה A'])).toHaveLength(1);
   });

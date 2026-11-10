@@ -201,7 +201,7 @@ describe('#1622 E5 — «נסמן זוית BAM כ-A1»: an angle named by a labe
     const v = typed([...base, 'נסמן זוית BAM כ-A1', 'נסמן זוית MAC כ-A1']).verdicts;
     expect(v[3]).toMatchObject({ kind: 'refused', error: { key: 'alias-taken', holder: 'A₁' } });
     // The same binding restated (rays in either order) is absorbed.
-    expect(kinds([...base, 'נסמן זוית BAM כ-A1', 'נסמן זוית MAB כ-A1'])[3]).toBe('already-known');
+    expect(kinds([...base, 'נסמן זוית BAM כ-A1', 'נסמן זוית MAB כ-A1'])[3]).toBe('record');
   });
 
   it('a label that is a POINT\'s name is refused, in either order (2-D: aliasTaken both ways)', () => {
