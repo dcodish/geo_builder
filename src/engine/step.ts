@@ -8,7 +8,7 @@
  */
 
 import { engineErrorDebugText } from './errors';
-import { statedSegmentRatio, statedSegmentT } from './verify';
+import { declaredRingsHold, statedSegmentRatio, statedSegmentT } from './verify';
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SideChoice, SolveDirective, Vec } from './types';
 import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, refinesDeclaredRing, heldRiderOfRelation, riderPerpendicularAsFoot, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
@@ -1170,6 +1170,29 @@ function commitDrawnFreeVertices(r: StepResult): StepResult {
 }
 
 /**
+ * #2795 ([ADR-821](../../docs/06-decisions.md#adr-821), H2) — is a `collinear-order`'s SIGN entailed by what the prior
+ * figure already STATES? Structural, never sampled: (a) the prior holds the same order, in either direction (an exact
+ * repeat, «D על המשך AB» twice); or (b) for three points [a, x, b], x is BETWEEN a and b by riders — an interior
+ * `on-segment` rider of a→b, or of a segment whose two ends are themselves a, b or between them («D על BA» after
+ * «D על AB»; «E על AB» after «D על הקטע AB» · «E על הקטע AD»). Anything else is a new region and keeps its carrier.
+ */
+function orderEntailedByPrior(prev: Construction, prevCons: readonly Constraint[], con: Extract<Constraint, { type: 'collinear-order' }>): boolean {
+  const same = (p: readonly Id[]) => p.length === con.points.length && (p.every((id, i) => id === con.points[i]) || p.every((id, i) => id === con.points[con.points.length - 1 - i]));
+  if (prevCons.some((k) => k.type === 'collinear-order' && same(k.points))) return true;
+  if (con.points.length !== 3) return false;
+  const byId = new Map(prev.objects.map((o) => [o.id, o] as const));
+  const between = (x: Id, a: Id, b: Id, depth: number): boolean => {
+    const o = byId.get(x);
+    if (!o || o.kind !== 'on-segment' || o.extension || depth > 4) return false;
+    if (!o.free && !(o.t > 0 && o.t < 1)) return false;
+    const within = (y: Id) => y === a || y === b || between(y, a, b, depth + 1);
+    return (o.a === a && o.b === b) || (o.a === b && o.b === a) || (o.a !== o.b && within(o.a) && within(o.b));
+  };
+  const [a, x, b] = con.points;
+  return between(x, a, b, 0);
+}
+
+/**
  * THE RE-STATED GIVEN YIELDS (#1943/#1819, [ADR-623](../../docs/06-decisions.md#adr-623)) — the mirror of
  * {@link ensureOwnership}, at the same seam.
  *
@@ -1240,6 +1263,24 @@ function releaseImpliedOwnership(prev: Construction, r: StepResult): StepResult 
     if (prevCons.includes(con)) continue; // the figure's own row, not this step's
     if (constraintRefs(con).some((id) => !prevPositions.has(id))) return r;
     if (!isSatisfied(con, get)) return r; // the figure does NOT satisfy it — it must move
+    // #2795 (ADR-821, hole H2): an ORDER row is a region, never a rank row (ADR-039), so `impliedByFigure`
+    // rightly answers `false` for it. A `collinear-order` is judged by its two halves instead: its
+    // COLLINEARITY by the rank test over collinear rows on its points (identically satisfied for a rider, so
+    // a zero gradient), and its SIGN by rung (5) below — `evaluate` checks the order, so "the released figure
+    // evaluates at every counted re-sampled seed" is the sign test over the prior's own layouts. Any other
+    // order row (a bound) has no equality half to prove and keeps today's answer.
+    if (isOrderConstraint(con)) {
+      if (con.type !== 'collinear-order' || con.points.length < 3) return r;
+      // its SIGN must be entailed by the prior's own statements, never read off sampled layouts: an order is a
+      // region, and a sign that holds at every sample of THIS prior can stop holding once a later line frees what
+      // it rode on (#2545's incircle set-lines, found in round #2822)
+      if (!orderEntailedByPrior(prev, prevCons, con)) return r;
+      const [p0, ...rest] = con.points;
+      const pn = rest[rest.length - 1];
+      const halves = rest.slice(0, -1).map((q): Constraint => ({ type: 'collinear', a: q, b: p0, c: pn }));
+      if (!halves.every((h) => impliedByFigure(prev, movableIds(prev), prevCons, h))) return r;
+      continue;
+    }
     if (!impliedByFigure(prev, movableIds(prev), prevCons, con)) return r; // only coincidentally true here
   }
   // (3) RELEASE — the claimed carriers go back to exactly what the prior figure had.
@@ -1257,7 +1298,20 @@ function releaseImpliedOwnership(prev: Construction, r: StepResult): StepResult 
   // so the released figure must stay green under re-sampling. Without it, a row coincidentally true AND
   // coincidentally dependent at one symmetric default draw would be released and then violated at every
   // other seed — a figure that reads green here and red on «הציגו תצורה אחרת».
-  for (const s of [1, 2, 3]) if (!evaluate(applySeed(released, s)).ok) return r;
+  //
+  // #2795 (ADR-821, hole H3): a re-sampled seed COUNTS only where the PRIOR is a figure there — it evaluates
+  // and every declared ring keeps its identity (`declaredRingsHold`, the `checkGivens` trapezoid rule). At a
+  // seed where the isosceles trapezoid's own legs equality lands on its parallelogram root, the prior is no
+  // figure (the seed search never shows it), so the released figure failing there proves nothing. Seeds 1..6
+  // are drawn until 3 count; with fewer than 3 counted the proof is not made and today's answer stands.
+  let counted = 0;
+  for (let s = 1; s <= 6 && counted < 3; s++) {
+    const pe = evaluate(applySeed(prev, s));
+    if (!pe.ok || !declaredRingsHold(prev, pe.positions)) continue;
+    counted += 1;
+    if (!evaluate(applySeed(released, s)).ok) return r;
+  }
+  if (counted < 3) return r;
   return { ...r, construction: released, positions: e.positions, ladder: [...(r.ladder ?? []), 'implied:release'] };
 }
 

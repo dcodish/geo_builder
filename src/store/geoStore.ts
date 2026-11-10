@@ -197,7 +197,8 @@ export interface GeoState {
   /** Commit ONE user action's whole command group in ONE set — one undo entry removes the whole step
    *  (E4/STO-4; the per-command `execute` loop recorded N entries, so one undo peeled one command off a
    *  step whose row still showed ✓). Applies the same idempotency/move-in-place policy per command. */
-  executeMany: (cmds: AnyCommand[], utterance?: string, host?: CevianHost) => void;
+  /** `ownRow` (#2790, ADR-822): a held restatement is its own row — an enabled twin does not absorb it (`foldCommand`) */
+  executeMany: (cmds: AnyCommand[], utterance?: string, host?: CevianHost, opts?: { ownRow?: boolean }) => void;
   /** Undo/redo wrappers (E5/STO-5): zundo restores `facts` + `seed` (the figure the student SAW — the
    *  seed is in the temporal state, so an auto-advanced/resampled view rolls back with its facts). */
   undo: () => void;
@@ -338,10 +339,10 @@ const cleanUtterance = (u: string | undefined): string | undefined =>
  * them can model a list the commit would not save. `committed` is the list's length before this batch.
  * Returns the same array when nothing changed.
  */
-function foldFact(facts: Fact[], cmd: AnyCommand, committed: number, utterance?: string, group?: string, host?: CevianHost): Fact[] {
+function foldFact(facts: Fact[], cmd: AnyCommand, committed: number, utterance?: string, group?: string, host?: CevianHost, ownRow = false): Fact[] {
   utterance = cleanUtterance(utterance);
   // #1973 (ADR-797): every fact the line appends carries the host its cevian was accepted in
-  return foldCommand(facts, cmd, (c) => ({ id: nanoid(), cmd: c, utterance, group, enabled: true, ...(host ? { host } : {}) }), utterance, committed);
+  return foldCommand(facts, cmd, (c) => ({ id: nanoid(), cmd: c, utterance, group, enabled: true, ...(host ? { host } : {}) }), utterance, committed, ownRow);
 }
 
 /**
@@ -357,10 +358,11 @@ function commitCommands(
   utterance?: string,
   group?: string,
   host?: CevianHost,
+  ownRow = false,
 ): void {
   const facts = get().facts;
   let next = facts;
-  for (const cmd of cmds) next = foldFact(next, cmd, facts.length, utterance, group, host);
+  for (const cmd of cmds) next = foldFact(next, cmd, facts.length, utterance, group, host, ownRow);
   if (next === facts) return; // every command was an idempotent duplicate — nothing to record
   // Settle a NEWLY-appended cyclable variant's default configuration (ADR-339) before the seed search,
   // in the same transaction — one undo restores the pre-step state whole.
@@ -412,9 +414,9 @@ export const useGeoStore = create<GeoState>()(
         commitCommands(get, set, [cmd], utterance, group);
       },
 
-      executeMany: (cmds, utterance, host) => {
+      executeMany: (cmds, utterance, host, opts) => {
         // One utterance → one group id → ONE set → one undo entry for the whole step (E4/STO-4).
-        commitCommands(get, set, cmds, utterance, cmds.length > 1 ? nanoid() : undefined, host);
+        commitCommands(get, set, cmds, utterance, cmds.length > 1 ? nanoid() : undefined, host, opts?.ownRow ?? false);
       },
 
       undo: () => {

@@ -20,7 +20,7 @@
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
 import { autoNamedLabels, groupKey, impliedIdentityBinding, mergeFacts, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
-import { ambiguousDefiniteShapeNote, juxtaposedPairNote, lettersOnScreen, proofTargetNote, roleReadingConfig, type DecideBind } from './decideDeterministic';
+import { HELD_NOTICE, ambiguousDefiniteShapeNote, juxtaposedPairNote, lettersOnScreen, proofTargetNote, roleReadingConfig, type DecideBind } from './decideDeterministic';
 import { renderNote } from './renderNote';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
@@ -164,10 +164,12 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   // #2064 (ADR-643): a height named by two existing vertices — the submit seam's one predicate (ADR-W-006), against the
   // PREFIX the edited row is replayed after. Already true → «כבר קיים»; with a tail, the long form that carries it.
   const vp = vertexPairVerdict(editText, ectx, prefixRaw, store().seed, roleReadingConfig.cap);
+  // #2790 (ADR-822, ADR-W-200): a held restatement is ACCEPTED as the edited row, with the notice — the submit seam's
+  // rule. The vertex pair's right angle that already holds is that row's reading.
+  let held = vp?.kind === 'implied';
   if (vp?.kind === 'implied') {
-    logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-implied-restatement', detail: 'vertex-pair' });
-    setInputNote(t('suite.notice.alreadyDrawn'));
-    return false;
+    const readings = vp.readings.map((reading) => parse(reading, ectx));
+    if (readings.every((x) => x.ok)) r = { ...readings[0], commands: readings.flatMap((x) => (x.ok ? x.commands : [])) } as typeof r;
   }
   if (vp?.kind === 'adopt') r = parse(vp.reading, ectx);
   if (!r.ok && r.reason === 'cevian-redefines-vertex') {
@@ -256,10 +258,9 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     return false;
   }
   // #2122 (ADR-653): a MERGE naming made the statement true by construction — the submit seam's rule: a success, kept
-  if (!identityBound && impliedByPrior(prefixFacts, r.commands, store().seed)) {
-    logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-implied-restatement', commands: r.commands });
-    setInputNote(t('suite.notice.alreadyDrawn'));
-    return false;
+  if (held || (!identityBound && impliedByPrior(prefixFacts, r.commands, store().seed))) {
+    held = true;
+    logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-held-restatement', commands: r.commands });
   }
   const wasOk = replay(store().facts, store().seed).status;
   // #1697: the edit's naming goes in its own group; LATER facts were read in the world before it, so they follow
@@ -269,7 +270,7 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   logDebug({ kind: 'action', action: 'edit', detail: `${key} → ${editText.trim()}` }); // #84: so a reported session replays edits
   const after = replay(store().facts, store().seed).status;
   const orphaned = store().facts.filter((f) => wasOk[f.id] === 'ok' && after[f.id] !== 'ok' && after[f.id] !== 'disabled');
-  setInputNote(orphaned.length > 0 ? t('steps.editBrokeDependents', { items: orphaned.map((f) => `«${f.utterance ?? f.cmd.type}»`).join(', ') }) : '');
+  setInputNote(orphaned.length > 0 ? t('steps.editBrokeDependents', { items: orphaned.map((f) => `«${f.utterance ?? f.cmd.type}»`).join(', ') }) : held ? t(HELD_NOTICE) : '');
   /**
    * The edit is committed — now search for a configuration that honours it (#1041).
    *

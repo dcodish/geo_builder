@@ -4136,6 +4136,16 @@
       "confidence": "high",
       "at": "2026-11-10T18:58:37.525Z",
       "status": "pending"
+    },
+    {
+      "id": "text-2790-held-notice",
+      "kind": "text",
+      "issue": "#2790",
+      "what": "The notice a held restatement's row carries in every builder (ADR-W-200 / ADR-W-204), replacing «זה כבר קיים באיור — אין מה להוסיף.»",
+      "choice": "«זה כבר קיים באיור — נוסף כנתון נפרד.» / \"That's already on the figure — added as a separate given.\" (the plan's text, suite key suite.notice.alreadyHeld)",
+      "chosen": true,
+      "at": "2026-11-10T16:16:52.922Z",
+      "status": "pending"
     }
   ],
   "demoted": {
