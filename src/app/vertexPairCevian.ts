@@ -22,7 +22,8 @@ import { cevianPairReadings, parse, type ParseContext } from '@/parser';
 import { dryRunOutcome, type Fact } from '@/store/geoStore';
 import { withWorkBudget } from '@/engine/solveBudget';
 
-export type VertexPairVerdict = { readonly kind: 'implied' } | { readonly kind: 'adopt'; readonly reading: string };
+/** `implied` carries the bare reading of each named segment that already holds — #2790 (ADR-822): the line commits it as its own row. */
+export type VertexPairVerdict = { readonly kind: 'implied'; readonly readings: readonly string[] } | { readonly kind: 'adopt'; readonly reading: string };
 
 export function vertexPairVerdict(utterance: string, ctx: ParseContext, facts: Fact[], seed: number, cap: number): VertexPairVerdict | null {
   const vp = cevianPairReadings(utterance, ctx);
@@ -38,6 +39,6 @@ export function vertexPairVerdict(utterance: string, ctx: ParseContext, facts: F
     if (at < 0) return null;
     held.push(at);
   }
-  if (!vp.tail) return { kind: 'implied' };
+  if (!vp.tail) return { kind: 'implied', readings: vp.segments.map((seg, i) => seg.bare[held[i]]) };
   return { kind: 'adopt', reading: vp.segments[0].readings[held[0]] };
 }
