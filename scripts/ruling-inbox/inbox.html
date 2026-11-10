@@ -60,7 +60,12 @@ main{display:grid;gap:10px;margin-top:14px}
 .empty{padding:28px 18px;text-align:center;color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:var(--r)}
 .empty b{display:block;color:var(--ink);font-weight:600;margin-bottom:4px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-.card.answered{border-color:var(--accent)}
+.card{border-left:4px solid var(--accent)}
+.card.sent{border-left-color:var(--line);opacity:.62}
+.card.sent:hover,.card.sent[open]{opacity:1}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted);margin:2px 0 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--accent)}
+.legend i.s{background:var(--line)}
 .card > summary{list-style:none;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 10px}
 .card > summary::-webkit-details-marker{display:none}
 .card > summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
@@ -129,7 +134,6 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
     <nav class="tabs" aria-label="Lists">
       <a href="#decide" id="tab-decide">Decide <span class="n" id="n-decide">0</span></a>
       <a href="#test" id="tab-test">Test <span class="n" id="n-test">0</span></a>
-      <a href="#answered" id="tab-answered">Answered <span class="n" id="n-answered">0</span></a>
     </nav>
   </div>
 </header>
@@ -138,7 +142,7 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
   <main id="list" aria-live="polite">
     <div class="empty"><b>Loading what is waiting on you</b>Decisions and test cases appear here as the fix round finds them.</div>
   </main>
-  <p class="note">Your answer is saved the moment you send it. Claude reads answers each time it wakes (at least every 30 minutes while a round runs) and moves the item to Answered with what it did, where it stays for 24 hours before it leaves the inbox. You can change an answer until Claude picks it up. If the round has stopped and is waiting, send any message in the chat to wake it.</p>
+  <p class="note">Your answer is saved the moment you send it. Claude reads answers each time it wakes (at least every 30 minutes while a round runs) and removes the item once it has acted on it; what it did is in its chat reply and on GitHub. Until then an answered item stays here, dimmed, and you can change your answer. If the round has stopped and is waiting, send any message in the chat to wake it.</p>
 </div>
 
 <dialog class="lb" id="lb"><img id="lbimg" alt=""><p id="lbcap"></p></dialog>
@@ -147,7 +151,7 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
 (function(){
   const $ = s => document.querySelector(s);
   const state = { items: new Map(), answers: new Map(), meta: null, tab: 'decide', loaded: { items:false, answers:false }, db: null, drafts: {} };
-  const TABS = ['decide','test','answered'];
+  const TABS = ['decide','test'];
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const PRODUCT = { '2d':'2-D', '3d':'3-D', analytic:'Analytic', complex:'Complex', workspace:'Workspace', server:'Server' };
 
@@ -164,9 +168,9 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
   }
   function hoursSince(ts){ return ts ? (Date.now() - new Date(ts).getTime())/3600000 : 0; }
 
-  const KEEP_DONE_MS = 24 * 3600 * 1000; // ADR-W-202 Am. 1: a finished item shows for 24 h, then the session deletes it
+  // ADR-W-202 Am. 1: an item the session has acted on is deleted at once; a 'done' one still in the store is hidden
   function bucket(it){
-    if (it.status === 'done') return (Date.now() - new Date(it.updated || 0).getTime()) < KEEP_DONE_MS ? 'answered' : null;
+    if (it.status === 'done') return null;
     return it.kind === 'decision' ? 'decide' : 'test';
   }
 
@@ -303,7 +307,7 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
     if (it.status === 'done') {
       if (ans && ans.verdict) c.push('<span class="chip ' + esc(ans.verdict) + '">' + esc(ans.verdict) + '</span>');
       else c.push('<span class="chip pass">done</span>');
-    } else if (ans) c.push('<span class="chip sent">sent</span>');
+    } else if (ans) c.push('<span class="chip sent">sent · waiting for Claude</span>');
     return '<div class="chips">' + c.join('') + '</div>';
   }
 
@@ -311,29 +315,29 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
   function render(){
     TABS.forEach(t => { const a = $('#tab-' + t); if (t === state.tab) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
     const all = [...state.items.values()];
-    const counts = { decide:0, test:0, answered:0 };
-    all.forEach(it => { const b = bucket(it); if (b) counts[b]++; });
+    const counts = { decide:0, test:0 };
+    all.forEach(it => { const b = bucket(it); if (b && !state.answers.has(it.id)) counts[b]++; }); // counts = what needs him
     TABS.forEach(t => $('#n-' + t).textContent = counts[t]);
     renderStatus();
     const list = $('#list');
     if (!state.loaded.items) return;
     let rows = all.filter(it => bucket(it) === state.tab);
-    if (state.tab === 'answered') rows.sort((a,b) => String(b.updated||'').localeCompare(String(a.updated||'')));
-    else rows.sort((a,b) => (a.rank||999) - (b.rank||999) || String(a.created||'').localeCompare(String(b.created||'')));
+    const sent = it => state.answers.has(it.id) ? 1 : 0;
+    rows.sort((a,b) => sent(a) - sent(b) || (a.rank||999) - (b.rank||999) || String(a.created||'').localeCompare(String(b.created||'')));
     if (!rows.length) {
       const msg = { decide:['No decisions waiting','When a fix plan needs your call, it appears here with its options and a recommendation.'],
-        test:['Nothing to test','Cases that need your eyes or hands appear here with their screenshots.'],
-        answered:['Nothing finished in the last 24 hours','Your answers move here once Claude has acted on them, and leave the inbox after 24 hours. The record stays on GitHub.'] }[state.tab];
+        test:['Nothing to test','Cases that need your eyes or hands appear here with their screenshots.'] }[state.tab];
       list.innerHTML = '<div class="empty"><b>' + msg[0] + '</b>' + msg[1] + '</div>';
       return;
     }
     // keep focus/scroll on re-render: only rebuild when content changed
-    const html = rows.map((it, i) => {
+    let n = 0;
+    const html = '<div class="legend"><span><i></i>Needs you</span><span><i class="s"></i>Sent — Claude acts on it, then it leaves the list</span></div>' + rows.map((it) => {
       const ans = state.answers.get(it.id);
       const body = it.status === 'done' ? answeredBody(it, ans) : (it.kind === 'decision' ? decisionBody(it, ans) : testBody(it, ans));
       const sub = it.kind === 'decision' ? (it.symptom || '') : (it.lookFor ? 'Look for: ' + it.lookFor : '');
-      return '<details class="card' + (ans && it.status !== 'done' ? ' answered' : '') + '" data-id="' + esc(it.id) + '"' + (openSet.has(it.id) ? ' open' : '') + '>'
-        + '<summary><span class="rank">' + (state.tab === 'answered' ? '✓' : (i+1)) + '</span><span class="ttl">' + esc(it.title) + '</span><span class="sub">' + esc(sub.length > 160 ? sub.slice(0,157) + '…' : sub) + chipsFor(it, ans) + '</span></summary>'
+      return '<details class="card' + (ans ? ' sent' : '') + '" data-id="' + esc(it.id) + '"' + (openSet.has(it.id) ? ' open' : '') + '>'
+        + '<summary><span class="rank">' + (ans ? '✓' : (++n)) + '</span><span class="ttl">' + esc(it.title) + '</span><span class="sub">' + esc(sub.length > 160 ? sub.slice(0,157) + '…' : sub) + chipsFor(it, ans) + '</span></summary>'
         + '<div class="body">' + body + '</div></details>';
     }).join('');
     const active = document.activeElement && document.activeElement.id;

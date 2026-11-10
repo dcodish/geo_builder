@@ -281,10 +281,9 @@ between based on what you said so this can go on forever."*
   `## Operator ruling — YYYY-MM-DD` comment quoting his choice and note (docs/22 §2e), the plan re-armed and
   the item back in the queue at its plan position; a spot audit through
   `npm run playsheet:close -- --audit <sheet>:<id> pass|fail --note "<his note>"`; a 🎮 pass releases its
-  held PR to the next wave (Step 3), a fail is a report, handled as one. Then set the item's
-  `status: "done"` with a one-line `resolution` (what was done, with the commit or comment link); the page
-  moves it to Answered. A finished item more than 24 hours old is deleted, with its `answers/<id>`, in the
-  same sync (ADR-W-202 Am. 1); its record lives in the issue or the spot-audit log.
+  held PR to the next wave (Step 3), a fail is a report, handled as one. Then DELETE the item and its
+  `answers/<id>` in one batch, at once (ADR-W-202 Am. 1), and say in chat what was done with it, with the
+  commit or comment link; its record lives in the issue or the spot-audit log.
 - **Re-arm the Monitor and re-sync the dashboard every wake** (Step 1b): a run of many hours leans on them.
 - **Stops**, whichever comes first:
   1. **24 hours** since the round issue opened;
