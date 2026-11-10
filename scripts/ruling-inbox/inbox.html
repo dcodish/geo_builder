@@ -138,7 +138,7 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
   <main id="list" aria-live="polite">
     <div class="empty"><b>Loading what is waiting on you</b>Decisions and test cases appear here as the fix round finds them.</div>
   </main>
-  <p class="note">Your answer is saved the moment you send it. Claude reads answers each time it wakes (at least every 30 minutes while a round runs) and moves the item to Answered with what it did. You can change an answer until then. If the round has stopped and is waiting, send any message in the chat to wake it.</p>
+  <p class="note">Your answer is saved the moment you send it. Claude reads answers each time it wakes (at least every 30 minutes while a round runs) and moves the item to Answered with what it did, where it stays for 24 hours before it leaves the inbox. You can change an answer until Claude picks it up. If the round has stopped and is waiting, send any message in the chat to wake it.</p>
 </div>
 
 <dialog class="lb" id="lb"><img id="lbimg" alt=""><p id="lbcap"></p></dialog>
@@ -164,8 +164,9 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
   }
   function hoursSince(ts){ return ts ? (Date.now() - new Date(ts).getTime())/3600000 : 0; }
 
+  const KEEP_DONE_MS = 24 * 3600 * 1000; // ADR-W-202 Am. 1: a finished item shows for 24 h, then the session deletes it
   function bucket(it){
-    if (it.status === 'done') return 'answered';
+    if (it.status === 'done') return (Date.now() - new Date(it.updated || 0).getTime()) < KEEP_DONE_MS ? 'answered' : null;
     return it.kind === 'decision' ? 'decide' : 'test';
   }
 
@@ -311,7 +312,7 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
     TABS.forEach(t => { const a = $('#tab-' + t); if (t === state.tab) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
     const all = [...state.items.values()];
     const counts = { decide:0, test:0, answered:0 };
-    all.forEach(it => counts[bucket(it)]++);
+    all.forEach(it => { const b = bucket(it); if (b) counts[b]++; });
     TABS.forEach(t => $('#n-' + t).textContent = counts[t]);
     renderStatus();
     const list = $('#list');
@@ -322,7 +323,7 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
     if (!rows.length) {
       const msg = { decide:['No decisions waiting','When a fix plan needs your call, it appears here with its options and a recommendation.'],
         test:['Nothing to test','Cases that need your eyes or hands appear here with their screenshots.'],
-        answered:['Nothing answered yet','Your answers move here once Claude has acted on them.'] }[state.tab];
+        answered:['Nothing finished in the last 24 hours','Your answers move here once Claude has acted on them, and leave the inbox after 24 hours. The record stays on GitHub.'] }[state.tab];
       list.innerHTML = '<div class="empty"><b>' + msg[0] + '</b>' + msg[1] + '</div>';
       return;
     }

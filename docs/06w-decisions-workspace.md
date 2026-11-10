@@ -7460,6 +7460,8 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 
 **Why a page and not the issue list.** He answers from a phone, between other work, through remote control: the evidence (screenshots, options, the student's view) must be one tap away, and the answer must reach the running session without a chat round-trip.
 
+**ADR-W-202 Amendment 1 (2026-11-10): a finished item leaves the inbox after 24 hours.** Operator: *"when you finish with a test i already answered, it should be removed from the ruling inbox. It now appears in answered - question is how long does it stay there"*. A finished item shows on the Answered tab for 24 hours, so he can read what was done with his answer, then the session deletes it and its answer from the page's database. The record stays where it was transcribed (the issue's ruling comment, `scripts/playsheets/spot-audits.json`).
+
 ## ADR-W-203 — A lowercase letter that can only be a point label is accepted and written in uppercase; an ambiguous one asks for uppercase, in every builder (#2823)
 
 **Status:** accepted · 2026-11-10 · operator ruling, all four builders · not yet built (#2823) · changes what 2-D's lowercase-names message and analytic's AI fallback do today · LADDER stage: **none** (the reading of a label)
