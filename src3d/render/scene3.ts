@@ -15,7 +15,7 @@ import { openCrossings3 } from '../engine/crossings3';
 import { layoutFreeVectorScene3 } from './freeVectorLayout';
 import { cleanMag } from '../engine/dataView';
 import { ANGLE_TOL_DEG, lineAngleDeg, vertexAngleDeg } from '../engine/claims';
-import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
+import { hasAbsoluteFrameObject, intersectPlanes, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import { DIRECTION_REL_TOL, distanceWitness, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
 import { defaultPlaneDisplay3, lengthMarkText, type Construction3, type Id, type Operand3, type Positions3, type SolidObj } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
@@ -26,7 +26,7 @@ import { firstFreeLetter } from '../engine/freeLetter';
 import type { DihedralPair3 } from '../store/dihedralChips';
 import { isRightAngleValue, meetingPoint, rightAngles3 } from './rightAngles';
 import { collectWedges } from './wedges';
-import { statedLengths } from '../engine/dataView';
+import { lineEquationForms3, statedLengths } from '../engine/dataView';
 
 export interface ScenePoint3 {
   id: Id;
@@ -1020,41 +1020,9 @@ export function buildScene3(
     }
   }
 
-  // #371: a number on the canvas must be seed-invariant KNOWLEDGE ([ADR-3D-030](docs/06b-decisions-3d.md)
-  // Am. 2 — the rule that removed sampled coordinate labels from nodes). A line whose components carry a
-  // parameter the givens do not FORCE is drawn at one value of it, so echoing the resolved numbers shows
-  // ONE configuration's line as if it were the given (measured: the same `l1:x=t(0,m,2m-2)` echoed four
-  // different directions over four seeds). Echo the student's own symbolic form instead. Once the givens
-  // determine the parameter the numbers ARE knowledge, so they come back.
-  //
-  // #479: "the givens determine it" is asked of the engine (`paramIsKnowledge`), not re-derived here. The
-  // predicate this replaced — "nothing pins the parameter" — was a proxy that held only while every pin had
-  // a single root; the operator's `ℓ ∥ π1` pins m to ±√2, whereupon the echo printed one branch's numbers
-  // and CHANGED them on "show another configuration".
-  // #1474 (ADR-3D-283): this is the ONE derived use of `paramIsKnowledge` that is exact — a line whose
-  // numbers carry m (k + p·m, p ≠ 0) has different numbers on every branch, so "one branch" IS
-  // "invariant" for this question. Every other derived value asks `knowledgeSamples3` instead.
-  const paramUnforced = !!c.param && !paramIsKnowledge(resolved.param);
-  // #611 (ADR-3D-157): the rule the two branches above were each a special case of.
-  //
-  // Both were added by a report — #552 for free lines, #371/#479 for symbolic ones — and each was
-  // bound to a line KIND. Every kind nobody wrote a branch for therefore printed sampled numbers
-  // unconditionally, which is how a `plane-plane` line on a 5-DOF pyramid came to echo
-  // «ℓ: x = (0.678, 0.467, 0) + t·(-0.568, 0.823, 0)»: one configuration's line, shown as the given.
-  // An enumeration is not a rule, and a guard bound to a code path rather than to the EVENT it guards
-  // gets bypassed (docs/17). The event is "are these numbers knowledge?", and nothing was asking it.
-  //
-  // Asked of the engine, never re-derived here (the #479 lesson): numbers are knowledge only when the
-  // figure is in the ABSOLUTE lane — otherwise placement and scale are a gauge, so coordinates are
-  // arbitrary even for a fully determined shape — AND nothing is left free to resample. The DOF count
-  // is the very number the UI shows the student, so the canvas and «דרגות חופש שטרם נקבעו» cannot
-  // contradict each other.
-  //
-  // Deliberately conservative: this is a whole-figure test, so a free DOF that does not actually touch
-  // a given line withholds numbers that would have been true. For DISPLAY that is the correct
-  // asymmetry — withholding a true number costs a little information, printing a false one is the
-  // honesty violation (and it is what the `free`-line branch already did unconditionally).
-  const numbersAreKnowledge = laneA && freeDofCount3(c, resolved) === 0;
+  // #1541 (ADR-3D-475): whether a line's numbers are knowledge is ONE decision, shared with the ask lane
+  // («משוואת הישר ℓ») — `lineEquationForms3` carries the #371 / #479 / #611 / #801 reasoning that lived here.
+  const lineForm = lineEquationForms3(c, resolved);
   const wLines: { name: string; a: Vec3; b: Vec3; form: string }[] = [];
   for (const [name, ln] of resolved.lines) {
     const mid = projectOntoLine(center, ln);
@@ -1066,31 +1034,11 @@ export function buildScene3(
     // not depend on how the student happened to scale its direction.
     const dir = norm3(ln.dir) > 1e-9 ? normalize3(ln.dir) : ln.dir;
     const reach = radius * 1.1;
-    const def = c.lines.get(name);
-    const carriesParam =
-      def?.kind === 'parametric' && [...def.anchor, ...def.dir].some((e) => e.p !== 0);
-    // #801 (ADR-3D-174): the SAME question for a line written in a PIN symbol — `paramUnforced` reads
-    // the algebraic lane and cannot answer for the pivot's letter. Same rule, one lane over: the
-    // resolved numbers are the student's given only when the figure is determined; otherwise their own
-    // equation is echoed, never a configuration's version of it.
-    const echoSrc =
-      def?.kind === 'parametric' && (def.sym !== undefined ? !numbersAreKnowledge : carriesParam && paramUnforced);
     wLines.push({
       name,
       a: sub3(mid, scale3(dir, reach)),
       b: add3(mid, scale3(dir, reach)),
-      form:
-        // #611: a STATED line is the student's own given, printed back — it echoes verbatim whatever
-        // the figure's DOF, because those numbers came from them, not from a sample. Everything else
-        // is DERIVED and echoes numbers only when they are forced; otherwise the bare name, which is
-        // what #552 already did for free lines and what the free PLANE precedent does with its patch.
-        echoSrc && def?.kind === 'parametric'
-          ? `${name}: ${def.src}`
-          : def?.kind === 'parametric' || numbersAreKnowledge
-          // #422: the student's own running letter, when they chose one — the numeric echo used to
-          // rewrite «m» back to «t», telling them their line in a notation they did not use.
-          ? `${name}: x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + ${def?.kind === 'parametric' ? (def.runner ?? 't') : 't'}·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`
-          : name,
+      form: ((f) => (f === null ? name : `${name}: ${f}`))(lineForm(name)),
     });
   }
 

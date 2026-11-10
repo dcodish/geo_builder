@@ -286,7 +286,10 @@ bound the name. **A refusal names a cause the figure does not contradict** (ADR-
 `angleAskOperands` and `revolutionAskOf` (parse3.ts) parse the question plus a placeholder `= 1` and keep
 the relation it lowers to; `parseQuery` turns those into `angle-ops` (measured by `angleBetweenOperands`)
 and `rev` (measured by `revolutionMeasure` in claims.ts) — the verifier's own geometry, so a spelling the
-statement lane learns is askable the same day.
+statement lane learns is askable the same day. `lineAskOf` (ADR-3D-475, #1541) does the same for a line's
+equation — the placeholder is a parametric body and it keeps the NAME `parametricLine` binds; `parseQuery`'s
+`line` kind answers a point pair as `x = P + t·PQ` (frame + both points known) and a named line through
+`lineEquationForms3` (dataView.ts), the one decision `buildScene3`'s line echo also calls.
 
 ### A stated quad shape has three arms, and the middle one always CREATES the corner (#587/#601/#985)
 

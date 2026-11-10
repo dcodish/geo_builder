@@ -19,7 +19,7 @@ import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
 import { seedNumber3, type Seed3 } from './components3';
 import { givenText } from '../../shell/literal';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
-import { knowledgeSamples3, letterIsGaugeLength3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3, type Axis3 } from './evaluate';
+import { freeDofCount3, hasAbsoluteFrameObject, knowledgeSamples3, letterIsGaugeLength3, paramIsKnowledge, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3, type Axis3, type Resolved3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, v3, type Vec3 } from './vec3';
 import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf } from './types';
 import { COMBINING_ARROW } from '../lexicon/marks3';
@@ -215,6 +215,62 @@ export function rootSetsAgree(perSeed: readonly (readonly number[])[], relTol: n
 }
 
 export const coordStr = (v: Vec3): string => `(${cleanMag(v.x)}, ${cleanMag(v.y)}, ${cleanMag(v.z)})`;
+
+/**
+ * #1541 (ADR-3D-475) — a named LINE's equation, as a student may be told it: the ONE decision the canvas
+ * echo and the ask lane share (the #481 rule — one decision, two surfaces). Extracted verbatim from
+ * `buildScene3`, which used to make it inline; the ask lane («משוואת הישר ℓ») now calls the same function,
+ * so the two cannot disagree about whether a line's numbers are knowledge.
+ *
+ * Returns, per line name, the form AFTER the name (`x = (0, -5, 3) + t·(1, 0, 0)`), or null when nothing
+ * but the bare name is honest. The figure-wide predicates are computed once, as the scene computed them.
+ */
+export function lineEquationForms3(c: Construction3, resolved: Resolved3): (name: string) => string | null {
+  // #371: a number on the canvas must be seed-invariant KNOWLEDGE ([ADR-3D-030](docs/06b-decisions-3d.md)
+  // Am. 2 — the rule that removed sampled coordinate labels from nodes). A line whose components carry a
+  // parameter the givens do not FORCE is drawn at one value of it, so echoing the resolved numbers shows
+  // ONE configuration's line as if it were the given (measured: the same `l1:x=t(0,m,2m-2)` echoed four
+  // different directions over four seeds). Echo the student's own symbolic form instead. Once the givens
+  // determine the parameter the numbers ARE knowledge, so they come back.
+  //
+  // #479: "the givens determine it" is asked of the engine (`paramIsKnowledge`), not re-derived here. The
+  // predicate this replaced — "nothing pins the parameter" — was a proxy that held only while every pin had
+  // a single root; the operator's `ℓ ∥ π1` pins m to ±√2, whereupon the echo printed one branch's numbers
+  // and CHANGED them on "show another configuration".
+  // #1474 (ADR-3D-283): this is the ONE derived use of `paramIsKnowledge` that is exact — a line whose
+  // numbers carry m (k + p·m, p ≠ 0) has different numbers on every branch, so "one branch" IS
+  // "invariant" for this question. Every other derived value asks `knowledgeSamples3` instead.
+  const paramUnforced = !!c.param && !paramIsKnowledge(resolved.param);
+  // #611 (ADR-3D-157): the rule the two branches above were each a special case of. A guard bound to a
+  // line KIND printed sampled numbers for every kind nobody wrote a branch for (a `plane-plane` line on a
+  // 5-DOF pyramid echoed one configuration's line as the given). The event is "are these numbers
+  // knowledge?": only when the figure is in the ABSOLUTE lane — otherwise placement and scale are a gauge —
+  // AND nothing is left free to resample. The DOF count is the very number the UI shows the student, so the
+  // canvas and «דרגות חופש שטרם נקבעו» cannot contradict each other. Deliberately conservative (a
+  // whole-figure test): withholding a true number costs a little information, printing a false one is the
+  // honesty violation.
+  const numbersAreKnowledge = hasAbsoluteFrameObject(c) && freeDofCount3(c, resolved) === 0;
+  const fmt = (x: number): string => cleanMag(Object.is(x, -0) ? 0 : x, 3);
+  return (name) => {
+    const ln = resolved.lines.get(name);
+    if (!ln) return null;
+    const def = c.lines.get(name);
+    const carriesParam = def?.kind === 'parametric' && [...def.anchor, ...def.dir].some((e) => e.p !== 0);
+    // #801 (ADR-3D-174): the SAME question for a line written in a PIN symbol — `paramUnforced` reads the
+    // algebraic lane and cannot answer for the pivot's letter. The resolved numbers are the student's given
+    // only when the figure is determined; otherwise their own equation is echoed.
+    const echoSrc = def?.kind === 'parametric' && (def.sym !== undefined ? !numbersAreKnowledge : carriesParam && paramUnforced);
+    // #611: a STATED line is the student's own given, printed back whatever the figure's DOF. Everything else
+    // is DERIVED and prints numbers only when they are forced; otherwise null (the bare name — #552's free lines).
+    if (echoSrc && def?.kind === 'parametric') return def.src;
+    if (def?.kind === 'parametric' || numbersAreKnowledge) {
+      // #422: the student's own running letter, when they chose one
+      const runner = def?.kind === 'parametric' ? (def.runner ?? 't') : 't';
+      return `x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + ${runner}·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`;
+    }
+    return null;
+  };
+}
 
 /** Render a UNIT-normalized plane (lead coefficient positive) as `20x - y + 2z - 5 = 0`:
  *  find the smallest integer scaling (the book form); fall back to the 2-decimal unit form. */
