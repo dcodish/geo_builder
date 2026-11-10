@@ -28,9 +28,6 @@ import { spellingOf } from './types';
 import type { Construction3, FreeVec3, FreeVecMetric3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';
 import { applyCommand3 } from './apply';
 
-/** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
-type VecDef = Construction3['vecDefs'][number];
-
 export interface VecEntry {
   /** Display label, e.g. `EN` or a declared name like `w`. */
   label: string;
