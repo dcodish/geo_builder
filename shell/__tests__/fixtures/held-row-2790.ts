@@ -69,6 +69,11 @@ export const HELD_CASES_ANALYTIC: readonly HeldCase[] = [
     earlier: 2,
     why: 'a drawn line restated under a NEW name — the row names it (operator 2026-11-09 "b", T32 withdrawn)',
   },
+  {
+    lines: ['נתון ישר y=2x+1', 'נתון ישר l2: y=2x+1'],
+    earlier: 0,
+    why: 'a student name over the tool’s l-number — the name replaces it, the row says it was there (judged Q-2790b (a))',
+  },
 ];
 
 /** Analytic's controls: a contradiction is refused; a pinning value and a default-pinning line record with no notice. */
