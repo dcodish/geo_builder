@@ -640,3 +640,27 @@ describe('#2625 (ADR-AG-454) — a diameter of the parabola is refused with its 
     expect(parseLine('PQ is a chord of the parabola').ok).toBe(true);
   });
 });
+
+describe('#2625 (ADR-AG-454 Am. 1) — the centre of a parabola is refused with its reason (ruling Q-2625b (a))', () => {
+  it.each([
+    ['מרכז הפרבולה'],
+    ['O מרכז הפרבולה'],
+    ['O הוא מרכז הפרבולה'],
+    ['מרכז הפרבולה הוא O'],
+    ['מרכז הפרבולה הוא (0,0)'],
+    ['the centre of the parabola'],
+    ['O is the centre of the parabola'],
+    ['O is the center of the parabola'],
+  ])('«%s» → parabola-no-centre', (line) => {
+    expect(parseLine(line)).toEqual({ ok: false, code: 'parabola-no-centre', detail: line });
+  });
+  it.each([['O מרכז האליפסה'], ['O is the centre of the ellipse'], ['O מרכז המעגל'], ['F מוקד הפרבולה']])('control «%s» still reads', (line) => {
+    expect(parseLine(line).ok).toBe(true);
+  });
+  it('the sentence: the reason, then the vertex said plainly to be unread (no next step the tool reads)', () => {
+    type T = (k: string, o?: Record<string, unknown>) => string;
+    const err = { key: 'parabola-no-centre', detail: 'O מרכז הפרבולה' } as const;
+    expect(errorText(err, analyticI18n.getFixedT('he') as unknown as T)).toBe('לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, הכלי עדיין לא קורא אותו.');
+    expect(errorText(err, analyticI18n.getFixedT('en') as unknown as T)).toBe('A parabola has no centre. If you meant its vertex, the tool does not read it yet.');
+  });
+});

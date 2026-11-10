@@ -116,7 +116,7 @@ export interface Answer {
    * whether the intersecting case should answer 0 or refuse, he chose refuse-and-explain — the refusal
    * teaches the concept, while 0 lets the misconception stand.
    */
-  fact?: 'vertical' | 'lines-cross' | 'points';
+  fact?: 'vertical' | 'lines-cross' | 'points' | 'parabola-no-centre';
   /**
    * #1525 — A METHOD HINT instead of a worked trace (operator, 2026-09-29: the tan-difference formula
    * *"is not in the curriculum … maybe just write a comment «ניתן להשתמש בשיפועי הישרים או במשפט
@@ -1058,6 +1058,8 @@ function roleAnswer(
   // and that is `value: null` in the lane's own honest wording — a different answer from "there is none".
   // An ellipse's own roles and sizes (#2616/#2617, ADR-AG-353): THE ellipse. A focus named by no host is the figure's one
   // conic with a focus, parabola or ellipse — the given's reading (M1's `focus-of`).
+  // «מרכז הפרבולה» (#2625, ADR-AG-454 Am. 1): understood, and there is none — the refusal's own sentence, worded by the page.
+  if (role.role === 'centre' && role.host === 'parabola') return { question, value: null, fact: 'parabola-no-centre' };
   const ellipseOnly = role.role !== 'focus' && role.role !== 'directrix';
   const wantKind = ellipseOnly || (role.role === 'focus' && role.host === 'ellipse') ? 'ellipse' : 'parabola';
   const hosts = role.role === 'focus' && !role.host ? [...hostsOf(d, 'parabola'), ...hostsOf(d, 'ellipse')] : hostsOf(d, wantKind);

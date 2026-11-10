@@ -212,6 +212,8 @@ export function errorText(error: InputError, t: Translate): string {
     'arc-length-unread': 'errArcLengthUnread',
     // #2625 (ADR-AG-454) — a parabola has no centre, so no diameter: its own reason, not the generic refusal
     'parabola-no-diameter': 'errParabolaNoDiameter',
+    // #2625 (ADR-AG-454 Am. 1) — the same reason for its centre; the vertex the student may mean is not read yet, said so
+    'parabola-no-centre': 'errParabolaNoCentre',
     // #1919 — the operator chose THIS sentence for a name the tool cannot read, in every builder.
     'unread-name': 'errRenameBadName',
     'unread-word': 'errUnreadWord',

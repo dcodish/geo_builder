@@ -88,3 +88,15 @@ describe('#1027 — an answer passes the same honesty gate as a row', () => {
     expect(answer(SQUARE_ISH, 'שלום').missing).toBeUndefined();
   });
 });
+
+describe('#2625 (ADR-AG-454 Am. 1) — the centre of a parabola: there is none, said so', () => {
+  const P = ['נתונה פרבולה שמשוואתה y^2=8x'];
+  it.each([['מרכז הפרבולה'], ['שיעורי מרכז הפרבולה'], ['the centre of the parabola'], ['the center of the parabola']])('«%s»', (q) => {
+    const a = answer(P, q);
+    expect(a.value).toBeNull();
+    expect(a.fact).toBe('parabola-no-centre');
+  });
+  it('control: the ellipse keeps its centre', () => {
+    expect(answer(['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'], 'מרכז האליפסה').value).toBe('(0, 0)');
+  });
+});
