@@ -2150,7 +2150,19 @@ CAS: measure → snap → verify on a ratio. The kind itself is read by `kindCon
 (#2608): the same `KIND_TOL`, without demanding rational coefficients. So חורף 25 now reads
 `(x − 16a)² + y² = (25a)²`.
 
-*Identifiers:* `parametricShape` · `verifySymbolic` · `kindConic` · `KIND_TOL` · `MONO_TOL` · `MAX_LETTERS` · `symbolic`
+**The same reader, for a value and a drawn curve ([ADR-AG-458](06c-decisions-analytic.md#adr-ag-458), #2735).** The
+monomial fit is one exported function, `readInLetters`, and the locus fit is one of its callers. `evaluate.ts`'s
+`letterPool` takes the admitted configuration pool (filled off the page, `'pending'` on a deferred one not yet
+complete), the student's letters that move across it (no tool symbol, at most two) and their values per
+configuration; `valueInLetters` reads a scalar (degree ≥ 1 only) and `curveEquationInLetters` a curve through
+`curveInLetters`. `withLetters` adds the result to an OPEN verdict as `Knowledge.letters`; only `pointKnowledge`
+(the panel's point rows and the ask point arm), `segmentKnowledge`'s length and the ask lane's bare length opt in, and
+`curveEquationOf` returns `{ letters }` after `known` and `options`. Printing: `lettersText` (a signed monomial),
+`pointText` (each coordinate a number or a monomial), `valueText`, `openCurveText(c, id, symbolic)` (a stated curve
+keeps its own equation) and `curveAnswer`, both through `symbolicLocusEquation`. The ask lane reads
+«הביעו באמצעות k את …» before every rule ([ADR-AG-459](06c-decisions-analytic.md#adr-ag-459)).
+
+*Identifiers:* `parametricShape` · `verifySymbolic` · `kindConic` · `KIND_TOL` · `MONO_TOL` · `MAX_LETTERS` · `symbolic` · `readInLetters` · `curveInLetters` · `valueInLetters` · `vectorInLetters` · `curveEquationInLetters` · `withLetters` · `pointKnowledge` · `lettersText` · `roleInLetters`
 
 #### Drawn is not named: an unnamed set is still drawn ([ADR-AG-380](06c-decisions-analytic.md#adr-ag-380), #2628)
 

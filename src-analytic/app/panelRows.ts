@@ -1,5 +1,6 @@
 import type { Derivation } from '../engine/derive';
-import { admittedPool, isKnowledge, knownCurve, knownValue, knownValues, settled, type Figure, type Knowledge } from '../engine/evaluate';
+import { admittedPool, isKnowledge, knownCurve, knownValue, knownValues, settled, withLetters, type Figure, type Knowledge } from '../engine/evaluate';
+import type { SymbolicCurve } from '../engine/locusFit';
 import type { NumCurve } from '../engine/types';
 import { angleAt, type AngleRef, type Constraint } from '../engine/solve';
 import { VERTICAL_TOL, verticality } from '../engine/lines';
@@ -9,7 +10,8 @@ import { domainText, type Construction, type LineRole, type ParamDecl, positiona
 import { spelledText, symbolsOf, type Expr } from '../engine/expr';
 import { givenText } from '../../shell/literal';
 import { symbolText } from '../engine/lengths';
-import { curveEquationOf, curveEquationText, curveParts, type DetailLabelKey, type DetailLine } from './curveText';
+import { curveEquationOf, curveEquationText, curveParts, lettersText, symbolicLocusEquation, type DetailLabelKey, type DetailLine } from './curveText';
+import { fmtCoefficient } from '../format';
 import { isolateRtlName } from '../../shell/bidi';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 
@@ -149,7 +151,26 @@ export interface PanelKnowledge {
    */
   readonly angles: readonly { at: AngleRef; k: PanelKnown }[];
   /** each LISTED curve, with its equation when every coefficient is invariant, else null; `pending` = not yet settled (#1473) */
-  readonly curves: readonly { id: string; known: ReturnType<typeof knownCurve>; pending: boolean; options: NumCurve[] | null; letters: string | null }[];
+  readonly curves: readonly {
+    id: string;
+    known: ReturnType<typeof knownCurve>;
+    pending: boolean;
+    options: NumCurve[] | null;
+    letters: string | null;
+    /** #2735 (ADR-AG-458): the equation in the student's parameters, when it is neither known nor an option set */
+    symbolic: SymbolicCurve | null;
+  }[];
+}
+
+/**
+ * A POINT'S COORDINATES AS THE PANEL READS THEM (#2735, ADR-AG-458) — one coordinate at a time through the one gate, and an
+ * open coordinate asked the third verdict, `withLetters`: «(2k, 0)». One function the panel row and the ask lane's point
+ * arm both call, so «מהם שיעורי F1?» and F1's row cannot disagree.
+ */
+export function pointKnowledge(c: Construction, id: string): { x: PanelKnown; y: PanelKnown } {
+  const readX = (f: Figure) => f.points.find((q) => q.id === id)?.x ?? null;
+  const readY = (f: Figure) => f.points.find((q) => q.id === id)?.y ?? null;
+  return { x: withLetters(c, isKnowledge(c, readX), readX), y: withLetters(c, isKnowledge(c, readY), readY) };
 }
 
 export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): PanelKnowledge {
@@ -163,11 +184,7 @@ export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): 
         const k: PanelKnown = isUsed ? knownValue(c, (f) => f.env[p.sym] ?? null) : { known: false };
         return { sym: p.sym, domain: p.domain, used: isUsed, k };
       }),
-    points: positionalOf(c).map((p) => ({
-      id: p.id,
-      x: isKnowledge(c, (f) => f.points.find((q) => q.id === p.id)?.x ?? null),
-      y: isKnowledge(c, (f) => f.points.find((q) => q.id === p.id)?.y ?? null),
-    })),
+    points: positionalOf(c).map((p) => ({ id: p.id, ...pointKnowledge(c, p.id) })),
     angles: trigAngles(c.constraints).map((at) => ({
       at,
       k: knownValue(c, (f) => {
@@ -183,9 +200,10 @@ export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): 
       const s = settled(() => curveEquationOf(c, cu.id));
       const known = s.value && 'known' in s.value ? s.value.known : null;
       const options = s.value && 'options' in s.value ? s.value.options : null;
+      const symbolic = s.value && 'letters' in s.value ? s.value.letters : null;
       // A pending pool leaves the role's name on the row, and the row re-reads when it completes (#1473).
       const letters = cu.label.role && cu.label.name === '' ? settled(() => roleLineLetters(c, cu.id)).value : null;
-      return { id: cu.id, known, pending: s.pending, options, letters };
+      return { id: cu.id, known, pending: s.pending, options, letters, symbolic };
     }),
   };
 }
@@ -273,10 +291,12 @@ export function segmentKnowledge(d: Pick<Derivation, 'construction' | 'figure'> 
           const v = read(f);
           return v === null || Math.abs(v.dx) < 1e-12 ? null : v.dy / v.dx;
         });
-    const length = knownValue(c, (f) => {
+    const readLength = (f: Figure) => {
       const v = read(f);
       return v === null ? null : Math.hypot(v.dx, v.dy);
-    });
+    };
+    // #2735 (ADR-AG-458): a length the figure fixes as a monomial in its parameters reads «10k».
+    const length = withLetters(c, knownValue(c, readLength), readLength);
     const stated = d.stated?.lengths.find((l) => (l.a === a && l.b === b) || (l.a === b && l.b === a))?.value;
     const given = stated && 'num' in stated ? stated.src : undefined;
     return { id: seg.id, ends: seg.ends, vertical, slope, angle, length, ...(given !== undefined ? { given } : {}) };
@@ -300,8 +320,14 @@ export function segmentKnowledge(d: Pick<Derivation, 'construction' | 'figure'> 
  * (ADR-W-053).
  */
 export const readsToolSymbol = (e: Expr): boolean => symbolsOf(e).some(isDirectionSymbol);
-export function openCurveText(c: Pick<Construction, 'objects'>, id: string): string {
+export function openCurveText(c: Pick<Construction, 'objects'>, id: string, symbolic: SymbolicCurve | null = null): string {
   const o = c.objects.find((q) => q.id === id);
+  /*
+   * #2735 (ADR-AG-458): an equation in the student's letters, read and verified over the pool, is the row — except where
+   * the row already IS the student's own equation (a stated curve), which stays as they wrote it. An equation's numbers
+   * are coefficients (ADR-AG-085), the locus equations' formatter.
+   */
+  if (symbolic && !(o?.kind === 'curve' && !readsToolSymbol(o.curve.eq))) return symbolicLocusEquation(symbolic, fmtCoefficient);
   // #1299 — notation has ONE owner (`curveText.ts`), and it delegates to `lineText` for a line whose
   // coefficients are numbers, so this row and a determined line's row cannot disagree.
   if (o?.kind === 'curve') return readsToolSymbol(o.curve.eq) ? '—' : curveEquationText(o.curve.eq);
@@ -328,6 +354,8 @@ export function openCurveText(c: Pick<Construction, 'objects'>, id: string): str
  */
 export function valueText(k: PanelKnown, fmt: (v: number) => string, label?: string): string | null {
   if (k.known) return fmt(k.value);
+  // #2735 (ADR-AG-458): set only by the rows that opt into the third verdict (`withLetters`) — «10k».
+  if (k.letters) return lettersText(k.letters, fmt);
   if (!k.options) return null;
   const o = realValueOptions(k.options, 1e-6);
   return o ? valueOptionsText(o, fmt, { or: 'או', ...(label ? { label } : {}) }) : null;

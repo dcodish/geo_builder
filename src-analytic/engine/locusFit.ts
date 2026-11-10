@@ -700,10 +700,13 @@ function exponentVectors(letters: readonly string[]): Array<Record<string, numbe
 }
 
 /**
- * The lowest-degree monomial reproducing `vals` at every sample, its ratio ONE exact form — a small rational, or a
- * (p/q)·√n when the samples agree on the ratio to the tight bar (#2734) — or `null`.
+ * THE ONE LETTER READER (#2735, ADR-AG-458; extracted from the locus fit of #1186) — the lowest-degree monomial
+ * reproducing `vals` at every sample, its ratio ONE exact form — a small rational, or a (p/q)·√n when the samples agree
+ * on the ratio to the tight bar (#2734) — or `null`. Every sample is substituted back: one ratio off the shared form and
+ * nothing is read. A locus's canonical parameters and a value the panel prints (a coordinate, a length, a curve's
+ * parameters) are read by this one function, so the two surfaces cannot disagree on what "a monomial in k" is.
  */
-function fitMonomial(
+export function readInLetters(
   vals: readonly number[],
   envs: ReadonlyArray<Readonly<Record<string, number>>>,
   letters: readonly string[],
@@ -727,7 +730,7 @@ function fitMonomial(
 }
 
 /** The canonical parameters `SymbolicCurve` regresses, read off one configuration's classified curve. */
-function canonicalValues(curve: NumCurve): number[] {
+export function canonicalValues(curve: NumCurve): number[] {
   switch (curve.kind) {
     case 'line':
       return [curve.a, curve.b, curve.c];
@@ -816,7 +819,7 @@ export function parametricShape(samples: readonly LocusSample[], letters: readon
   const cols = curves.map(canonicalValues);
   const monos: Monomial[] = [];
   for (let j = 0; j < cols[0].length; j += 1) {
-    const m = fitMonomial(
+    const m = readInLetters(
       cols.map((col) => col[j]),
       envs,
       varying,
@@ -835,4 +838,47 @@ export function parametricShape(samples: readonly LocusSample[], letters: readon
           ? { kind, twoP: monos[0] }
           : { kind, a2: monos[0], b2: monos[1] };
   return verifySymbolic(sym, samples) ? sym : null;
+}
+
+/**
+ * A DRAWN CURVE'S EQUATION IN THE STUDENT'S LETTERS (#2735, ADR-AG-458) — the locus's third verdict, asked of a curve the
+ * figure holds rather than one a point traces: per configuration its canonical parameters (a line made monic as
+ * `normalized` makes it, a circle's centre and `r²`, a parabola's `2p`, an ellipse's `a²` and `b²`), each read by
+ * {@link readInLetters} over `varying`. `null` when the family changes, a parameter is not a monomial, or nothing depends
+ * on a letter (a constant curve is the knowledge gate's business). Measure → snap → verify, never CAS.
+ */
+export function curveInLetters(
+  curves: readonly NumCurve[],
+  envs: ReadonlyArray<Readonly<Record<string, number>>>,
+  varying: readonly string[],
+): SymbolicCurve | null {
+  if (curves.length < 3 || curves.length !== envs.length || varying.length === 0) return null;
+  const kind = curves[0].kind;
+  if (curves.some((c) => c.kind !== kind)) return null;
+  const cols: number[][] = [];
+  for (const cur of curves) {
+    if (cur.kind === 'line') {
+      const k = normalized({ A: 0, B: 0, C: 0, D: cur.a, E: cur.b, F: cur.c });
+      if (!k) return null;
+      cols.push([k.D, k.E, k.F]);
+    } else cols.push(canonicalValues(cur));
+  }
+  const monos: Monomial[] = [];
+  for (let j = 0; j < cols[0].length; j += 1) {
+    const m = readInLetters(
+      cols.map((col) => col[j]),
+      envs,
+      varying,
+    );
+    if (!m) return null;
+    monos.push(m);
+  }
+  if (monos.every((m) => Object.keys(m.pow).length === 0)) return null;
+  return kind === 'line'
+    ? { kind, D: monos[0], E: monos[1], F: monos[2] }
+    : kind === 'circle'
+      ? { kind, cx: monos[0], cy: monos[1], r2: monos[2] }
+      : kind === 'parabola'
+        ? { kind, twoP: monos[0] }
+        : { kind, a2: monos[0], b2: monos[1] };
 }
