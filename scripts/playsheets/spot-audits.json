@@ -1,64 +1,5 @@
 {
-  "pending": [
-    {
-      "sheet": "fix-2737",
-      "id": "T4",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-07",
-      "product": "analytic",
-      "base": "http://localhost:5173",
-      "path": "/analytic.html",
-      "lines": [
-        "A(0,0)",
-        "B(6,0)",
-        "C(2,4)",
-        "משולש ABC",
-        "M אמצע BC"
-      ],
-      "lookFor": "M = (4, 2), as before."
-    },
-    {
-      "sheet": "round-2745",
-      "id": "T4",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-08",
-      "product": "analytic",
-      "base": "http://localhost:5173",
-      "path": "/analytic.html",
-      "lines": [
-        "x^2+y^2=25",
-        "T(0,5)",
-        "הישר y=5 משיק למעגל בנקודה K"
-      ],
-      "lookFor": "Records: K sits on T, «T ו-K נפלו על אותה נקודה.»"
-    },
-    {
-      "sheet": "prod-2026-11-09-2",
-      "id": "P10",
-      "kind": "complex:assertion",
-      "queued": "2026-11-09",
-      "product": "complex",
-      "base": "https://themathbible.com",
-      "path": "/complex-builder/",
-      "lines": [
-        "z1 = 3+4i"
-      ],
-      "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i»."
-    },
-    {
-      "sheet": "prod-2026-11-10",
-      "id": "P11",
-      "kind": "complex:assertion",
-      "queued": "2026-11-10",
-      "product": "complex",
-      "base": "https://themathbible.com",
-      "path": "/complex-builder/",
-      "lines": [
-        "z1 = 3+4i"
-      ],
-      "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i»."
-    }
-  ],
+  "pending": [],
   "results": [
     {
       "sheet": "round-2665",
@@ -709,6 +650,76 @@
       "pass": true,
       "date": "2026-11-10",
       "note": "operator 2026-11-10: passes; the crossing-dot inconsistency between the two perpendiculars is #2821"
+    },
+    {
+      "sheet": "fix-2737",
+      "id": "T4",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-07",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "A(0,0)",
+        "B(6,0)",
+        "C(2,4)",
+        "משולש ABC",
+        "M אמצע BC"
+      ],
+      "lookFor": "M = (4, 2), as before.",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10, Rulings Inbox"
+    },
+    {
+      "sheet": "prod-2026-11-09-2",
+      "id": "P10",
+      "kind": "complex:assertion",
+      "queued": "2026-11-09",
+      "product": "complex",
+      "base": "https://themathbible.com",
+      "path": "/complex-builder/",
+      "lines": [
+        "z1 = 3+4i"
+      ],
+      "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i».",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10, Rulings Inbox"
+    },
+    {
+      "sheet": "prod-2026-11-10",
+      "id": "P11",
+      "kind": "complex:assertion",
+      "queued": "2026-11-10",
+      "product": "complex",
+      "base": "https://themathbible.com",
+      "path": "/complex-builder/",
+      "lines": [
+        "z1 = 3+4i"
+      ],
+      "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i».",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10, Rulings Inbox"
+    },
+    {
+      "sheet": "round-2745",
+      "id": "T4",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-08",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "x^2+y^2=25",
+        "T(0,5)",
+        "הישר y=5 משיק למעגל בנקודה K"
+      ],
+      "lookFor": "Records: K sits on T, «T ו-K נפלו על אותה נקודה.»",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10, Rulings Inbox"
     }
   ],
   "demoted": {
