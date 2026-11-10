@@ -40,6 +40,7 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
+import { configurationOrder3 } from './configs3';
 import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3, type CanonicalEval3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
@@ -2522,7 +2523,18 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         });
       };
       const satisfying = solutions.filter(satisfiesSigns);
-      const pool = satisfying.length > 0 ? satisfying : solutions;
+      const solverOrder = satisfying.length > 0 ? satisfying : solutions;
+      /**
+       * #2814 (ADR-3D-461, extends ADR-3D-168 Am. 1's interleave) — THE PICK IS OVER DISTINCT CONFIGURATIONS, in an
+       * order the configurations alone decide (`configurationOrder3`). `pool[seed % pool.length]` over the raw pool
+       * indexed COPIES: one configuration found by both mirrors or several starts appeared several times, so the
+       * branch drawn at consecutive seeds followed copy counts and start order (#1499's T7 stayed on «below» for 7
+       * presses), and any change to LM start noise moved it (#2806). The frames computed here are reused below.
+       */
+      const frames = solverOrder.length > 1 ? solverOrder.map(finalFrameOf) : null;
+      const order = frames ? configurationOrder3(solverOrder.map((sol, i) => ({ pos: frames[i], pinSymbols: sol.pinSymbols }))) : solverOrder.map((_, i) => i);
+      const pool = order.map((i) => solverOrder[i]);
+      const poolFrames = frames ? order.map((i) => frames[i]) : null;
       if (pool.length > 0) {
         const chosen = pool[seed % pool.length];
         // #797 (ADR-3D-168 Am. 1): the ADMISSIBLE pool's distinct values per pin symbol —
@@ -2553,12 +2565,12 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
          * no branch to miss, and this is the solver's hot path.
          */
         const pointRoots: Record<string, Vec3[]> = {};
-        if (pool.length > 1) {
-          for (const sol of pool) {
+        if (pool.length > 1 && poolFrames) {
+          for (const frame of poolFrames) {
             // the same lane rule the chosen solution below uses (`finalFrameOf`) — an equation-plane point is
             // Lane-A absolute and must NOT be transformed, or every branch would look distinct; a mixed point is
             // re-derived in the solution's own frame (#2798)
-            for (const [id, q] of finalFrameOf(sol)) {
+            for (const [id, q] of frame) {
               // Stored ONE ENTRY PER POOL SOLUTION, in pool order, deliberately NOT deduplicated:
               // `pointRoots[a][i]` and `pointRoots[b][i]` must describe the same configuration, or a
               // consumer asking about the VECTOR a→b would pair positions from different branches.
@@ -2567,11 +2579,15 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
             }
           }
         }
-        warm.x = [...chosen.x];
-        warm.mirror = chosen.mirror;
+        // #2814 (ADR-3D-461): the drive's warm start stays the SOLVER-order entry — measured, warming from the new pick
+        // moved stage 4's drive start and the #1769 prism's drive lost its k = −1 root. The drawing changes; the
+        // drive's search does not.
+        const warmFrom = solverOrder[seed % solverOrder.length];
+        warm.x = [...warmFrom.x];
+        warm.mirror = warmFrom.mirror;
         // the figure lane rides the chosen similarity, the fixed lane stays verbatim, and a mixed point is re-derived
         // from its own definition in the final frame (#2798, ADR-3D-456)
-        for (const [id, q] of finalFrameOf(chosen)) pos.set(id, q);
+        for (const [id, q] of poolFrames ? poolFrames[seed % pool.length] : finalFrameOf(chosen)) pos.set(id, q);
         pivot = {
           solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols,
           ...(chosen.riderTs ? { riderTs: chosen.riderTs } : {}),

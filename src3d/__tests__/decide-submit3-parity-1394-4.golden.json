@@ -37,6 +37,7 @@
  "suite:[\"מרובע ABCD\",\"∠ACB = 90°\",\"|BA| = 1.0001|BC|\"]": "71fc03cb4b3d36de",
  "suite:[\"מרובע ABCD\",\"|AB| = 5\",\"|BC| = 5\",\"AC ⊥ BC\"]": "22b8acab6a3ea234",
  "suite:[\"מרובע ABCD\",\"אורך AB = 5\",\"אורך BC = 3\"]": "80c1dcbe86853afe",
+ "suite:[\"מרובע ABCD\",\"וקטור DC = 2 וקטור AB\"]": "4669f1507b96a710",
  "suite:[\"מרובע ABCD\",\"AB מקביל ל-DC\"]": "2a1e19da6f07faf2",
  "suite:[\"מרובע ABCD\",\"AB מקביל ל-DC\",\"|AB| = 3\"]": "fd315e296acf0310",
  "suite:[\"מרובע ABCD\",\"מעגל חסום במרובע ABCD\"]": "aff7abfc189c6caa",

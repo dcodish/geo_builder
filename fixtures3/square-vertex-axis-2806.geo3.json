@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-09T22:08:42.765Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "ריבוע ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "square",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "הקודקוד A נמצא על ציר ה-x",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": null,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    }
+  ]
+}

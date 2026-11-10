@@ -45,6 +45,7 @@
  "suite:[\"מלבן ABCD\",\"מלבן ADCB\"]": "c01beec976fde994",
  "suite:[\"מלבן ABCD\",\"מלבן BCDA\",\"מקבילית ADCB\",\"דלתון CDAB\"]": "818b9a6158e28aed",
  "suite:[\"מלבן ABCD\",\"מקבילית ABCD\"]": "53415ea5deed192c",
+ "suite:[\"מלבן ABCD\",\"מקבילית ABCD\",\"טרפז ABCD\",\"משולש ABC\",\"קובייה ABCDA'B'C'D'\",\"תיבה ABCDA'B'C'D'\",\"פירמידה SABCD שבסיסה ריבוע\"]": "268b10402c55e031",
  "suite:[\"מלבן ABCD\",\"מקבילית DCBA\"]": "1f734fcda91da39c",
  "suite:[\"מלבן ABCD\",\"מקבילית ACBD\"]": "cc8f72c3d13ef92f",
  "suite:[\"מלבן ABCD\",\"rectangle\"]": "44d7ad4f493bca14",

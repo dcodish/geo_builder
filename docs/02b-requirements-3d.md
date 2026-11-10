@@ -96,8 +96,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   one is drawn and «הציגו תצורה אחרת» reaches the other; a length no position of the point can meet («AD = 5» on AB = 4)
   is still refused (#1816). **A triangle the givens fix in two ways** («משולש ABC · AB = 5 · BC = 4 · ∠BAC = 40°»,
   two sides and an angle not between them) is drawn one way and «הציגו תצורה אחרת» reaches the other, as 2-D does
-  (#2714); givens that fix one triangle keep showing that one.
-  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour); ADR-3D-432 (#1816, 2-D's behaviour); ADR-3D-447 (#2714, 2-D's behaviour).
+  (#2714); givens that fix one triangle keep showing that one. **The same holds for any solid the givens fix in two
+  ways** (the exam pyramid with «D(3,p,0)» · «|u| = |v|», p = ±4; S above or below a plane): both configurations are
+  always among the drawings, and **each press of «הציגו תצורה אחרת» shows the other one**, as 2-D does (#2814). Which
+  of them is drawn first may be either; every drawing is one the givens allow.
+  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour); ADR-3D-432 (#1816, 2-D's behaviour); ADR-3D-447 (#2714, 2-D's behaviour); [ADR-3D-461](06b-decisions-3d.md#adr-3d-461) (#2814, 2-D's behaviour; first drawing judged 2026-11-10, ADR-W-199).
 - **FR-SP-3 (Must)** — **Defaults yield to statements; nothing unstated is ever invented.** A prism not
   stated to be right is **oblique**. A recognised-but-dropped qualifier is a silent given.
   - Sources: ADR-052 (this is its 3-D form); ADR-3D-436 (a pyramid's unstated base over an existing ring).
@@ -615,7 +618,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «S₁(1.33, 7/2, 3.33)» and «S₂(−4.33, 7/2, −2.33)», each row a WHOLE admissible point (components are
   never mixed across configurations), in a fixed order that does not change with the configuration on
   screen. Only two (operator: *"many exams ask questions that have 2 options. but not more than 2"*).
-  - Sources: ADR-3D-289, #1506.
+  **A coordinate the student wrote as a letter is listed the same way** when the givens leave it two values: the exam
+  pyramid's «D(3,p,0)» with p = ±4 reads «D(3, 4, 0) או (3, -4, 0)» at every configuration, while the point's label
+  on the figure keeps «D(3, p, 0)»; one value alone is never printed (operator, 2026-11-10: *"since there are only 2
+  options, we give both"*).
+  - Sources: ADR-3D-289, #1506; [ADR-3D-461](06b-decisions-3d.md#adr-3d-461), #2814 (operator ruling 2026-11-10).
 - **FR-EQ-4b (Should)** — **A parameter's roots are written as the student writes the answer.** When the
   givens leave a figure parameter two values, the data panel and the ask lane both list them: a pair that
   are negatives of each other reads **«m = ±√2»**; any other pair repeats the symbol after «או», ascending —

@@ -29,6 +29,13 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2814 (ADR-3D-461) — the operator's #827 exam pyramid, p = ±4 with no sign: the row lists both configurations at every
+  // seed and presses alternate them. The sweep over seeds 0–23 is asserted in issue-827.test.ts and the pool in
+  // engine/__tests__/pivot3.test.ts; this is the build + drift + load net.
+  'pyramid-two-branch-827-2814.geo3.json': [
+    'פירמידה SABCD שבסיסה מקבילית', 'המקצוע SA הוא גובה בפירמידה', 'M אמצע אלכסון BD', 'נסמן: AB = u, AD = v, AS = w',
+    'A(0,0,0)', 'B(0,5,0)', 'S(0,0,6)', 'D(3,p,0)', '|u| = |v|',
+  ],
   // #2789 (ADR-3D-457) — the report: a size beside a point on the positive x-axis was refused size-on-solid, and the cube sat with
   // P on edge AB. The size, the axis and the sampled placement are asserted in placement-gauge.test.ts; this is the build + drift + load net.
   'cube-size-half-axis-2789.geo3.json': ["קובייה ABCDA'B'C'D'", 'P נמצא על החלק החיובי של ציר ה-x', 'אורך AB = 4'],
@@ -39,6 +46,10 @@ const SEEDED: SeededCorpus = {
   // cancels, so it reads as lengths and T is created free. The class is asserted in issue-1156-ratio-taught.test.ts; this is
   // the build + drift + load net.
   'new-point-equal-lengths-2804.geo3.json': ['מרובע ABCD', 'מעגל חוסם את ABCD', 'TA = TB'],
+  // #2806 (ADR-3D-462) — the report: a square beside one vertex on an axis, drawn shrunk to a dot (every line green) and
+  // 3.8 s to submit. The size, the square and the work count are asserted in issue-936-degenerate.test.ts; this is the
+  // build + drift + load net.
+  'square-vertex-axis-2806.geo3.json': ['ריבוע ABCD', 'הקודקוד A נמצא על ציר ה-x'],
   // #2707 (ADR-3D-445) — the report: two parallel planes on a blank canvas, which drew as a line and a dot at half the
   // seeds (a crossing read at machine precision). The predicate is asserted in engine/__tests__/lines3.test.ts; this is the build + drift + load net.
   'parallel-planes-free-2707.geo3.json': ['המישור ABCD מקביל למישור EFGH'],
