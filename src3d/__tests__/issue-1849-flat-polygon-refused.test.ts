@@ -199,3 +199,24 @@ describe('#1849 — the mechanism (unit)', () => {
     expect(ringCollapsed3([v3(0, 0, 0), v3(5, 0, 0), v3(2.5, 0.05, 0)])).toBe(false);
   });
 });
+
+/**
+ * #2799 (ADR-3D-464) — a declared polygon held only at a POINT is refused with the polygon words. «משולש ABC» /
+ * «ריבוע ABCD» with A, B, C on the x-axis drew the whole shape at one point, every line green (the collapse judge read
+ * the canonical shape, never the gauge's scale). The limit of flat is flat (2-D ADR-643 B1 refuses a ring squashed to a
+ * point with its flat refusal), so the completing line is refused in the same sentence, under the 2 s gate.
+ */
+describe('#2799 — a polygon whose vertices hold only at a point is refused', () => {
+  const ax = (v: string) => `הקודקוד ${v} נמצא על ציר ה-x`;
+  it.each<[string, string[], string]>([
+    ['a triangle, A, B, C on the x-axis', ['משולש ABC', ax('A'), ax('B'), ax('C')], 'ABC'],
+    ['a square, A, B, C on the x-axis', ['ריבוע ABCD', ax('A'), ax('B'), ax('C')], 'ABCD'],
+  ])('%s', (_n, lines, ring) => {
+    for (const seed of [0, 3]) {
+      const ms = refused(lines, seed, ring, [ax('A'), ax('B')]);
+      expect(ms, 'the refusal arrives under the 2 s gate (was 7.9 s / 176 s)').toBeLessThan(2000);
+    }
+    const r = run(lines, 0);
+    expect(plain(errorText3(he, r.error))).toContain('וקו ישר אינו');
+  }, 120_000);
+});

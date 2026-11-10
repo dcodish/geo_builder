@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-10T13:59:20.758Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "הקודקוד A נמצא על החלק החיובי של ציר ה-x",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": null,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "type": "sign-given",
+          "id": "A",
+          "axis": "x",
+          "positive": true
+        }
+      ]
+    }
+  ]
+}

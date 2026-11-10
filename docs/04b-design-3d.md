@@ -501,7 +501,7 @@ central-difference Jacobian of the primary residuals — the full construction, 
 over a snapshot of the resolved planes and lines — with respect to the six rigid unknowns in `rigidChart`'s
 coordinates (a world translation in figure scales, a world rotation about the origin; regular everywhere, unlike
 raw axis-angle at |w| = 2π), and returns `6 − numericRank` with the null space (`symmetricEigen` of JᵀJ). Scale is
-excluded from `dim` (#518 samples it) and dims are held (seed-sampled); a seventh column, the size, gives `counted` (turn + size, a pure slide excluded), `rotation` and `scaleFree`, which the cue and the drawn walks read (ADR-3D-379). `resolve3(c, s, { placementImage: true })` replays the
+excluded from `dim` (#518 samples it) and dims are held (seed-sampled); a seventh column, the size, gives `counted` (turn + size, a pure slide excluded), `rotation` and `scaleFree`, which the cue and the drawn walks read (ADR-3D-379). `translation` is a basis of null(J_τ), the leftover slide: stage 5 slides only when 0 < rank J_τ < 3 (pinned at 3; a gauge at 0), along a seeded direction inside it, with the step AIMED at the stated signs (each sign is linear in the step along the direction, so the admissible steps are one interval; the seeded step stands inside it, else a seeded step inside it is taken). Stage 6's size park, when it carries a signed vertex across an axis, is followed by the same aimed slide before it is undone ([ADR-3D-465](06b-decisions-3d.md#adr-3d-465)). `resolve3(c, s, { placementImage: true })` replays the
 plain resolve's pivot pools (`pivotStageMemo3`, read by the image only) and then walks the chosen solution along a
 seeded unit combination of the generators — the #803 slide pattern: hard-pin the projection, release on the primary
 residuals, keep it only if exact, non-degenerate and moved; transactional on signs and the parameter. The image
@@ -883,6 +883,13 @@ re-derived (`reseatMixed3`), and a candidate where one no longer exists (a state
 `crossingOnInk3` bound the status pass reads) ranks below every candidate that keeps them all; when none does, the
 solved placement is kept.
 
+**A stated sign is aimed at (#2793, [ADR-3D-465](06b-decisions-3d.md#adr-3d-465)).** The funnel ranks a candidate first by how
+many stated signs it keeps, in statement order to the first that breaks (an impossible set keeps the earlier statements, so
+the completing line is refused), then as above. Per candidate rotation the translation is aimed axis by axis: above every
+"> 0" vertex's −value, below every "< 0" one's, the sampled value kept when inside with a margin of 0.25 extent. When
+none of the 12 keeps every sign, the 24 axis-aligned proper rotations and 24 seeded ones are tried (a work bound, one
+placement each).
+
 **The unknown layout** is [gauge 7 | dims | coupled symbols | pin symbols | rider lane]. The rider lane holds riders,
 offsets, free coordinates and, on the joint rung only, the enrolled free-vector unknowns (`free-joint`, ADR-3D-421).
 
@@ -1134,7 +1141,11 @@ the line `givens-contradict`, naming the statements.
 `settleFlatRings` judges every solid, not only the flat kinds: `closedFigure(r)` adds `solidSliver(r)` — a non-flat
 solid whose `flatnessRatio` is under `SOLID_THIN_RATIO` (1e-2, #936's calibration, moved into `solve3.ts`) is
 released on its own residuals and counts as flat if the re-solved solid is flat (`flatSolidAt`, the #872
-off-plane test, 1e-4 of span), or a limit root by the same `limitRoot` verdict on its `flatnessRatio` (ADR-3D-372). An EXACT candidate the #872 hard gate discards records `flatSolidSeen`
+off-plane test, 1e-4 of span), or a limit root by the same `limitRoot` verdict on its `flatnessRatio` (ADR-3D-372). **The drawn size is judged too** (#2799, [ADR-3D-464](06b-decisions-3d.md#adr-3d-464)): `collapsed()` rejects a solid whose span
+`exp(logScale)·maxD` is ≤ 1e-4 of `lRef` (the seed's drawn size, lowered to the smallest stated absolute length), and
+`noteFlatSolid` records it (`scaleCollapsedAt`) when no solid is flat, so the empty pool is refused as that solid. The cold
+sweeps pass `leastSquares` an early-out (`exactAtPoint`: drawn at a point and exact) so the failure path does not spend the
+full iteration budget on a candidate it will reject. An EXACT candidate the #872 hard gate discards records `flatSolidSeen`
 (`noteFlatSolid`, at every acceptance site); an empty pool with one runs the open-figure retry and otherwise
 comes back `collapse: { ring: solid ids, forced: true, solid: kind }`. `derive3` names it as a solid
 (`polygon-collapsed` with `solid: nounOfKind(kind)`, the letters as the declaring statement wrote them) and

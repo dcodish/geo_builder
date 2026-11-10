@@ -20,6 +20,9 @@ import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 import type { Vec3 } from '../engine/vec3';
 import { scaleGivenActive, scaleGivenSafe } from '../engine/scaleGiven';
+import { decideDeterministic3 } from '../app/decideDeterministic3';
+import type { Fact3 } from '../store/store3';
+import type { Seed3 } from '../engine/components3';
 
 const submit = (u: string) => useGeo3.getState().submit(u);
 const state = () => useGeo3.getState();
@@ -599,5 +602,144 @@ describe('#2798 — the funnel re-seats a mixed point from its own definition', 
       const t = ((E.x - A.x) * (Q.x - A.x) + (E.y - A.y) * (Q.y - A.y) + (E.z - A.z) * (Q.z - A.z)) / gap(A, Q) ** 2;
       return gap(E, lerp(A, Q, t)) + Math.abs(gap(A, E) - 1);
     }, 3); // the drive is a full pivot solve per seed (~1.7 s)
+  });
+});
+
+/**
+ * #2793 Parts 1 + 2a (ADR-3D-465) — A STATED SIGN ON A GAUGE-PLACED VERTEX IS AIMED AT, NOT ONLY FILTERED FOR.
+ * «קובייה» · «הקודקוד A נמצא על החלק החיובי של ציר ה-x» was refused `sign-unsatisfiable` (A, the gauge's own origin, sat
+ * at 0 in every candidate, and the translation slide was gated on "no point pin"), «…על ציר ה-x» drew A at the origin at
+ * every seed, and beside «P(5,5,5)» «x של A חיובי» held or was refused by seed. The slide now asks the measured question
+ * (a leftover translation, null J_τ) and aims the step at the signs; the funnel ranks a candidate that breaks a sign below
+ * every one that keeps them and aims its translation per axis.
+ */
+describe('#2793 — a solid’s vertex on half an axis, and a sign beside a fixed point', () => {
+  const CUBE = "קובייה ABCDA'B'C'D'";
+  const SEEDS24 = Array.from({ length: 24 }, (_, i) => i);
+  type St = { facts: Fact3[]; seed: Seed3 };
+  const run = (lines: readonly string[], seed: Seed3) => {
+    let st: St = { facts: [], seed };
+    let n = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const v = decideDeterministic3(st, lines[i], () => `f${++n}`);
+      if (v.kind !== 'record') return { st, refusedAt: i, error: v.kind === 'refused' ? v.error : null };
+      st = { facts: v.facts, seed: v.seed };
+    }
+    return { st, refusedAt: -1, error: null };
+  };
+  /** Every line records and every fact is ok at `seed`; returns the derived figure. */
+  const drawn = (lines: readonly string[], seed: Seed3) => {
+    const r = run(lines, seed);
+    expect(r.refusedAt, `«${lines[r.refusedAt]}» @${seed}: ${JSON.stringify(r.error)}`).toBe(-1);
+    const d = derive3(r.st.facts, r.st.seed);
+    for (const f of r.st.facts) expect(d.status[f.id], `${f.utterance} @${seed}`).toBe('ok');
+    return d;
+  };
+  const half = (v: string, side: 'החיובי' | 'השלילי', axis: 'x' | 'y' | 'z') => `הקודקוד ${v} נמצא על החלק ${side} של ציר ה-${axis}`;
+  /** `v` on its axis (the other two coordinates 0) on the stated side at every seed; returns how many distinct places. */
+  const onHalfAxis = (lines: readonly string[], v: string, axis: 'x' | 'y' | 'z', sign: 1 | -1, seeds = SEEDS24): number => {
+    const seen = new Set<string>();
+    for (const seed of seeds) {
+      const p = drawn(lines, seed).positions.get(v)!;
+      for (const a of (['x', 'y', 'z'] as const).filter((q) => q !== axis)) expect(Math.abs(p[a]), `${v}.${a} @${seed}`).toBeLessThan(1e-9);
+      expect(Math.sign(p[axis]), `${v}.${axis} @${seed}`).toBe(sign);
+      seen.add(p[axis].toFixed(6));
+    }
+    return seen.size;
+  };
+
+  it('the report: A on the positive x-axis is accepted on a cube, a box and a pyramid, at seeds 0–23, and A moves', () => {
+    for (const solid of [CUBE, "תיבה ABCDA'B'C'D'", 'פירמידה SABCD שבסיסה ריבוע']) {
+      expect(onHalfAxis([solid, half('A', 'החיובי', 'x')], 'A', 'x', 1), solid).toBeGreaterThanOrEqual(12);
+    }
+  }, 240_000);
+
+  it('the other half-axes: −x, +y, −y, +z, −z', () => {
+    const seeds = [0, 1, 2, 3, 4, 5];
+    onHalfAxis([CUBE, half('A', 'השלילי', 'x')], 'A', 'x', -1, seeds);
+    onHalfAxis([CUBE, half('A', 'החיובי', 'y')], 'A', 'y', 1, seeds);
+    onHalfAxis([CUBE, half('A', 'השלילי', 'y')], 'A', 'y', -1, seeds);
+    onHalfAxis([CUBE, half('A', 'החיובי', 'z')], 'A', 'z', 1, seeds);
+    onHalfAxis([CUBE, half('A', 'השלילי', 'z')], 'A', 'z', -1, seeds);
+  }, 120_000);
+
+  it('every spelling of the statement, and a prism and a triangle', () => {
+    const seeds = [0, 1, 2, 3];
+    for (const lines of [
+      [CUBE, 'A is on the positive x-axis'],
+      [CUBE, 'A על ציר ה-x החיובי'],
+      [CUBE, 'הקודקוד A נמצא על ציר ה-x', 'x של A חיובי'],
+      [CUBE, 'A(p,0,0)', 'p חיובי'],
+      ["מנסרה ABCA'B'C'", half('A', 'החיובי', 'x')],
+      ['משולש ABC', half('A', 'החיובי', 'x')],
+    ]) onHalfAxis(lines, 'A', 'x', 1, seeds);
+  }, 120_000);
+
+  it('a vertex on the whole axis is no longer at the origin at every seed: it slides, both sides', () => {
+    const xs = SEEDS24.map((s) => drawn([CUBE, 'הקודקוד A נמצא על ציר ה-x'], s).positions.get('A')!.x);
+    expect(new Set(xs.map((x) => x.toFixed(6))).size).toBeGreaterThanOrEqual(12);
+    expect(xs.some((x) => x > 0) && xs.some((x) => x < 0)).toBe(true);
+  }, 120_000);
+
+  it('the slide is not counted: the free-DOF cue is the same for the whole axis and the half-axis', () => {
+    for (const seed of [0, 1, 2, 3]) {
+      const whole = drawn([CUBE, 'הקודקוד A נמצא על ציר ה-x'], seed);
+      const halfA = drawn([CUBE, half('A', 'החיובי', 'x')], seed);
+      expect(freeDofCount3(halfA.construction, halfA.resolved)).toBe(freeDofCount3(whole.construction, whole.resolved));
+    }
+  });
+
+  it('with a size, in both orders: edge 4 and A on +x', () => {
+    for (const lines of [
+      [CUBE, half('A', 'החיובי', 'x'), 'אורך AB = 4'],
+      [CUBE, 'אורך AB = 4', half('A', 'החיובי', 'x')],
+      ["תיבה ABCDA'B'C'D'", half('A', 'החיובי', 'x'), 'אורך AB = 4'],
+    ]) {
+      for (const seed of [0, 1, 2, 3]) {
+        const pos = drawn(lines, seed).positions;
+        const [A, B] = [pos.get('A')!, pos.get('B')!];
+        expect(Math.hypot(A.x - B.x, A.y - B.y, A.z - B.z)).toBeCloseTo(4, 6);
+        expect(A.x).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('two vertices on +x (the diagonal BD along +x) draw at normal size, on a cube and on a square (was a dot, or refused)', () => {
+    for (const solid of [CUBE, 'ריבוע ABCD']) {
+      for (const seed of SEEDS24) {
+        const pos = drawn([solid, half('B', 'החיובי', 'x'), half('D', 'החיובי', 'x')], seed).positions;
+        for (const v of ['B', 'D']) expect(pos.get(v)!.x, `${solid} ${v} @${seed}`).toBeGreaterThan(0);
+        const [A, B] = [pos.get('A')!, pos.get('B')!];
+        expect(Math.hypot(A.x - B.x, A.y - B.y, A.z - B.z), `${solid} |AB| @${seed}`).toBeGreaterThan(0.5);
+      }
+    }
+  }, 240_000);
+
+  it('a sign beside a fixed point holds at every seed («P(5,5,5)» · «x של A חיובי» / «שלילי»)', () => {
+    for (const [line, sign] of [['x של A חיובי', 1], ['x של A שלילי', -1]] as const) {
+      for (const seed of SEEDS24) expect(Math.sign(drawn([CUBE, 'P(5,5,5)', line], seed).positions.get('A')!.x), `${line} @${seed}`).toBe(sign);
+    }
+  }, 120_000);
+
+  it('still refused, because no figure exists (ADR-W-199)', () => {
+    for (const seed of [0, 1, 2, 3]) {
+      for (const lines of [
+        [CUBE, 'A בראשית הצירים', half('A', 'החיובי', 'x')],
+        [CUBE, half('A', 'החיובי', 'x'), half('A', 'השלילי', 'x')],
+        [CUBE, 'P(5,5,5)', 'x של A חיובי', 'x של B שלילי', 'x של C חיובי', 'x של D שלילי'],
+      ]) {
+        const r = run(lines, seed);
+        expect(r.refusedAt, `${lines.join(' · ')} @${seed}`).toBe(lines.length - 1);
+        expect(r.error).toMatchObject({ code: 'sign-unsatisfiable' });
+      }
+    }
+  });
+
+  it('PlacementFreedom3.translation: one direction, along the axis, for a whole-axis pin; none for a full pin', () => {
+    const tr = (lines: readonly string[]) => drawn(lines, 0).resolved.pivot!.placementFreedom!().translation;
+    const t1 = tr([CUBE, 'הקודקוד A נמצא על ציר ה-x']);
+    expect(t1).toHaveLength(1);
+    expect(Math.abs(t1[0][0])).toBeCloseTo(1, 6);
+    expect(tr([CUBE, 'A(1,2,3)', 'AB = (1,0,0)'])).toHaveLength(0);
   });
 });
