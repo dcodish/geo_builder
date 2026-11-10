@@ -15,7 +15,8 @@ import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, isRadius
 import { curveParentsOf, parentsOf } from './derived';
 import { enumerateBlockRoots, pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
-import { resolveCurve, curveExtent, type Box } from './curves';
+import { resolveCurve, curveExtent, parabolaFocus, type Box } from './curves';
+import { toWorld } from './conicFrame';
 import type { ClassifyResult } from './conic';
 import { evalExpr, symbolsOf as symbolsOfExpr, type Env } from './expr';
 import { evalLengthExpr, type LengthExpr } from './lengths';
@@ -63,7 +64,7 @@ export interface FigureCurve {
 export interface Vacancy {
   id: Id;
   reason: Extract<ClassifyResult, { ok: false }>['reason'];
-  /** For `kind-mismatch`: what the equation actually describes (02c R7, #1514 pre-play). */
+  /** For `kind-mismatch` and `not-canonical` (#2664): what the equation actually describes (02c R7, #1514 pre-play). */
   actual?: NumCurve['kind'];
 }
 
@@ -1258,8 +1259,11 @@ export function spanOf(c: Construction, at: Map<Id, Pt>, env: Env): number {
     const k = numCurveOf(c, env, o, atFn);
     if (!k || k.kind === 'line') continue;
     if (k.kind === 'parabola') {
-      add(0, 0);
-      add(k.p / 2, 0);
+      // Its vertex and its focus, wherever the curve sits (#2664).
+      const v = toWorld(k, 0, 0);
+      const f = parabolaFocus(k);
+      add(v.x, v.y);
+      add(f.x, f.y);
       continue;
     }
     const e = curveExtent(k);
@@ -5123,7 +5127,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       case 'curve': {
         const res = resolveCurve(o.curve, env);
         if (res.ok) curves.push({ id: o.id, label: o.label, curve: res.curve, stated: o.stated });
-        else vacant.push({ id: o.id, reason: res.reason, ...(res.reason === 'kind-mismatch' ? { actual: res.actual } : {}) });
+        else vacant.push({ id: o.id, reason: res.reason, ...(res.reason === 'kind-mismatch' || res.reason === 'not-canonical' ? { actual: res.actual } : {}) });
         break;
       }
       case 'derived': {
@@ -6024,10 +6028,11 @@ function curveNumbers(c: NumCurve): [string, number[]] {
     }
     case 'circle':
       return ['circle', [c.cx, c.cy, c.r]];
+    // A moved conic's frame is part of its shape (#2664); a canonical one compares as before.
     case 'parabola':
-      return ['parabola', [c.p]];
+      return c.h === undefined && c.k === undefined && c.axis === undefined ? ['parabola', [c.p]] : [`parabola${c.axis === 'y' ? '-y' : ''}`, [c.p, c.h ?? 0, c.k ?? 0]];
     case 'ellipse':
-      return ['ellipse', [c.a, c.b]];
+      return c.h === undefined && c.k === undefined ? ['ellipse', [c.a, c.b]] : ['ellipse', [c.a, c.b, c.h ?? 0, c.k ?? 0]];
   }
 }
 
@@ -6844,23 +6849,50 @@ export function knownValue(c: Construction, read: (f: Figure) => number | null):
  * is two whole equations, never a mix of their coefficients. `null` when the curve is known (ask `knownCurve`),
  * open, or pending.
  */
+/**
+ * A curve's COEFFICIENTS as the knowledge gate reads them (#2664, ADR-AG-455): its numeric fields, and for a parabola or
+ * an ellipse its offset `h`, `k` even where absent (absent is 0). A conic canonical at the first configuration may be
+ * moved at another, so the offset is read at every one rather than only when the first sample carries it.
+ */
+function coefficientFields(first: NumCurve): string[] {
+  const fields = Object.keys(first).filter((k) => typeof (first as unknown as Record<string, unknown>)[k] === 'number');
+  if (first.kind === 'parabola' || first.kind === 'ellipse') for (const k of ['h', 'k']) if (!fields.includes(k)) fields.push(k);
+  return fields;
+}
+/** One coefficient of a curve, an absent conic offset reading 0 (#2664). */
+function coefficientOf(cur: NumCurve, field: string): number | null {
+  const v = (cur as unknown as Record<string, unknown>)[field];
+  if (typeof v === 'number') return v;
+  return (field === 'h' || field === 'k') && (cur.kind === 'parabola' || cur.kind === 'ellipse') ? 0 : null;
+}
+/** The same FAMILY at another configuration: the kind, and a parabola's axis (#2664) — a discriminant, not a coefficient. */
+function sameFamily(cur: NumCurve, first: NumCurve): boolean {
+  if (cur.kind !== first.kind) return false;
+  return cur.kind !== 'parabola' || first.kind !== 'parabola' || (cur.axis ?? 'x') === (first.axis ?? 'x');
+}
+
 export function knownCurveOptions(c: Construction, id: Id): NumCurve[] | null {
   const read = (f: Figure) => f.curves.find((q) => q.id === id)?.curve ?? null;
   const first = read(drawableAt(c, 0));
   if (!first) return null;
-  const fields = (Object.keys(first) as Array<keyof NumCurve>).filter((k) => typeof first[k] === 'number');
+  const fields = coefficientFields(first);
   const v = knownValues(
     c,
     (f) => {
       const cur = read(f);
       // A curve of a DIFFERENT family at another configuration is no member of a set of equations.
-      if (!cur || cur.kind !== first.kind) return null;
-      return fields.map((k) => (cur as unknown as Record<string, number>)[k as string]);
+      if (!cur || !sameFamily(cur, first)) return null;
+      return fields.map((k) => coefficientOf(cur, k) ?? NaN);
     },
     fields.length,
   );
   if (v.known || !v.options) return null;
-  return v.options.map((vals) => ({ ...first, ...Object.fromEntries(fields.map((k, i) => [k, vals[i]])) }) as NumCurve);
+  // A zero offset stays absent, so a canonical option is the canonical curve (#2664).
+  return v.options.map((vals) => {
+    const out = { ...first, ...Object.fromEntries(fields.map((k, i) => [k, vals[i]])) } as Record<string, unknown>;
+    for (const k of ['h', 'k']) if (out[k] === 0) delete out[k];
+    return out as unknown as NumCurve;
+  });
 }
 /**
  * Is this curve's SHAPE knowledge — every coefficient invariant across the free DOFs — or is the
@@ -6899,15 +6931,14 @@ export function knownCurve(
   const first = read(drawableAt(c, seeds ? seeds[0] : 0));
   if (!first) return null;
   let pending = false;
-  for (const field of Object.keys(first) as Array<keyof NumCurve>) {
-    if (typeof first[field] !== 'number') continue; // `kind` — the discriminant, not a coefficient
+  // `kind` (and a parabola's `axis`) are discriminants, not coefficients; a conic's offset is read even where absent (#2664).
+  for (const field of coefficientFields(first)) {
     const readField = (f: Figure) => {
       const cur = read(f);
       // A curve that is a DIFFERENT family at another seed is not knowledge either: the shape
       // itself varies, which is 02c R13's third row and strictly worse than a moving coefficient.
-      if (!cur || cur.kind !== first.kind) return null;
-      const v = (cur as Record<string, unknown>)[field as string];
-      return typeof v === 'number' ? v : null;
+      if (!cur || !sameFamily(cur, first)) return null;
+      return coefficientOf(cur, field);
     };
     const k = seeds ? isKnowledge(c, readField, seeds) : knowledgeOf(c, readField);
     if (k.known) continue;

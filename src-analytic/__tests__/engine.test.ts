@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { classify, fitConic } from '../engine/conic';
-import { isOn, polylines, residual, resolveCurve, ellipseFoci, parabolaFocus } from '../engine/curves';
+import { isOn, polylines, residual, resolveCurve, ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves';
 import { admittedToPool, drawableAt, evaluate, isKnowledge, POOL_SIZE, sampleParam, selectorsHold, spanOf, viewBox } from '../engine/evaluate';
 import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
@@ -89,13 +89,69 @@ describe('conic — the exact fit and the canonicity gate', () => {
   it('REFUSES what twenty exams never contain, by name', () => {
     expect(classify(fitConic(eq('xy=1'), {})!)).toEqual({ ok: false, reason: 'rotated' });
     expect(classify(fitConic(eq('x^2/9-y^2/16=1'), {})!)).toEqual({ ok: false, reason: 'hyperbola' });
-    // A translated ellipse: understood, and out of scope.
-    expect(classify(fitConic(eq('(x-2)^2/9+y^2/16=1'), {})!)).toEqual({
-      ok: false,
-      reason: 'translated-conic',
-    });
-    // A parabola off the axis is the same refusal, not a mis-drawn canonical one.
-    expect(classify(fitConic(eq('(y-1)^2=4x'), {})!)).toEqual({ ok: false, reason: 'translated-conic' });
+  });
+
+  /** #2664 (ADR-AG-455): an axis-parallel conic anywhere is READ, its square completed; the canonical one is unchanged. */
+  it.each([
+    ['(x-2)^2/9+y^2/16=1', { kind: 'ellipse', a: 3, b: 4, h: 2 }],
+    ['(x-3)^2/25+(y+1)^2/9=1', { kind: 'ellipse', a: 5, b: 3, h: 3, k: -1 }],
+    ['x^2+4y^2-6x+8y=3', { kind: 'ellipse', a: 4, b: 2, h: 3, k: -1 }],
+    ['(y-1)^2=4x', { kind: 'parabola', p: 2, k: 1 }],
+    ['(y-1)^2=4(x-2)', { kind: 'parabola', p: 2, h: 2, k: 1 }],
+    ['x=2+y^2/4', { kind: 'parabola', p: 2, h: 2 }],
+    ['x^2=8y', { kind: 'parabola', p: 4, axis: 'y' }],
+    ['y=x^2-4x+3', { kind: 'parabola', p: 0.5, h: 2, k: -1, axis: 'y' }],
+    ['x^2/25+y^2/9=1', { kind: 'ellipse', a: 5, b: 3 }],
+    ['y^2=8x', { kind: 'parabola', p: 4 }],
+  ])('#2664 — %s reads as %o', (src, want) => {
+    const r = classify(fitConic(eq(src), {})!);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(Object.keys(r.curve).sort()).toEqual(Object.keys(want).sort());
+    for (const [k, v] of Object.entries(want)) {
+      if (typeof v === 'number') expect((r.curve as unknown as Record<string, number>)[k]).toBeCloseTo(v, 9);
+      else expect((r.curve as unknown as Record<string, unknown>)[k]).toBe(v);
+    }
+  });
+
+  it('#2664 — the roles are read where the curve is drawn', () => {
+    const at = (src: string) => {
+      const r = classify(fitConic(eq(src), {})!);
+      if (!r.ok) throw new Error(src);
+      return r.curve;
+    };
+    const e = at('(x-3)^2/25+(y+1)^2/9=1');
+    if (e.kind !== 'ellipse') throw new Error('ellipse');
+    const [f1, f2] = ellipseFoci(e);
+    expect([f1.x, f1.y, f2.x, f2.y].map((v) => +v.toFixed(9))).toEqual([7, -1, -1, -1]);
+    const p = at('(y-1)^2=4(x-2)');
+    if (p.kind !== 'parabola') throw new Error('parabola');
+    expect(parabolaFocus(p)).toEqual({ x: 3, y: 1 });
+    expect(parabolaDirectrix(p)).toEqual({ kind: 'line', a: 1, b: 0, c: -1 }); // x = 1
+    const y = at('x^2=8y');
+    if (y.kind !== 'parabola') throw new Error('parabola');
+    expect(parabolaFocus(y)).toEqual({ x: 0, y: 2 });
+    expect(parabolaDirectrix(y)).toEqual({ kind: 'line', a: 0, b: 1, c: 2 }); // y = −2
+    // On the curve: the residual is zero at sampled points of the drawn polyline, and at the vertex.
+    for (const c of [e, p, y]) {
+      for (const [x0, y0] of polylines(c, { minX: -10, minY: -10, maxX: 10, maxY: 10 })[0]) expect(Math.abs(residual(c, x0, y0))).toBeLessThan(1e-9);
+    }
+  });
+
+  it('#2664 — «קנונית» is a claim: a moved conic said canonical is refused, the canonical one is read', () => {
+    expect(classify(fitConic(eq('(y-1)^2=4(x-2)'), {})!, 'parabola', true)).toEqual({ ok: false, reason: 'not-canonical', actual: 'parabola' });
+    expect(classify(fitConic(eq('(x-3)^2/25+y^2/9=1'), {})!, 'ellipse', true)).toEqual({ ok: false, reason: 'not-canonical', actual: 'ellipse' });
+    expect(classify(fitConic(eq('y^2=8x'), {})!, 'parabola', true).ok).toBe(true);
+  });
+
+  it('#2664 — a line meets a moved conic where the conic is (the walk in its frame)', () => {
+    const r = classify(fitConic(eq('(y-1)^2=4(x-2)'), {})!);
+    if (!r.ok) throw new Error('parabola');
+    // y = 1 is the axis: it meets the parabola once, at the vertex (2, 1); x = 3 meets it at (3, −1) and (3, 3).
+    expect(isOn(r.curve, 2, 1)).toBe(true);
+    expect(isOn(r.curve, 3, 3)).toBe(true);
+    expect(isOn(r.curve, 3, -1)).toBe(true);
+    expect(isOn(r.curve, 3, 1)).toBe(false);
   });
 
   it('carries a parameter through the fit', () => {
@@ -313,12 +369,18 @@ describe('#896 — a non-canonical conic is refused by name, not dropped', () =>
     return { faults: d.faults, drawn: d.figure.curves.length, vacant: d.figure.vacant };
   };
 
-  it('a TRANSLATED parabola is refused on its own line', () => {
+  it('a TRANSLATED parabola is READ since #2664 (ADR-AG-455)', () => {
     const r = only('נתונה פרבולה שמשוואתה (y-2)^2=8(x-1)');
+    expect(r.drawn).toBe(1);
+    expect(r.faults).toEqual([]);
+  });
+
+  it('«פרבולה קנונית» with a translated equation is refused naming the word (#2664)', () => {
+    const r = only('נתונה פרבולה קנונית שמשוואתה (y-2)^2=8(x-1)');
     expect(r.drawn).toBe(0);
-    expect(r.vacant.map((v) => v.reason)).toEqual(['translated-conic']);
+    expect(r.vacant.map((v) => v.reason)).toEqual(['not-canonical']);
     expect(r.faults).toEqual([
-      { index: 0, code: 'out-of-scope', detail: 'נתונה פרבולה שמשוואתה (y-2)^2=8(x-1)' },
+      { index: 0, code: 'not-canonical', detail: 'נתונה פרבולה קנונית שמשוואתה (y-2)^2=8(x-1)', line: '(y-2)^2=8(x-1)', curve: 'parabola' },
     ]);
   });
 
@@ -329,8 +391,14 @@ describe('#896 — a non-canonical conic is refused by name, not dropped', () =>
     expect(r.faults.map((f) => f.code)).toEqual(['out-of-scope']);
   });
 
-  it('a TRANSLATED ellipse is refused', () => {
+  it('a TRANSLATED ellipse is READ since #2664 (ADR-AG-455)', () => {
     const r = only('נתונה אליפסה שמשוואתה (x-1)^2/9+y^2/16=1');
+    expect(r.drawn).toBe(1);
+    expect(r.faults).toEqual([]);
+  });
+
+  it('a HYPERBOLA is still refused (#2664 widens the parabola and the ellipse only)', () => {
+    const r = only('x^2/16-y^2/9=1');
     expect(r.drawn).toBe(0);
     expect(r.faults.map((f) => f.code)).toEqual(['out-of-scope']);
   });

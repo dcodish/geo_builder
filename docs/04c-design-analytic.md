@@ -36,6 +36,20 @@ source of givens** ([02c](02c-requirements-analytic.md) P2/P3).
 (`y = mx + 8`), with no symbolic algebra. **`conic.ts` — equation → curve, plus the canonicity gate.** **`curves.ts` —
 curve geometry**: resolution, membership residuals and the renderer's polylines, pure.
 
+**The conic's frame** ([ADR-AG-455](06c-decisions-analytic.md#adr-ag-455), #2664). `classify` completes the square, so a
+parabola or an ellipse with axes parallel to the coordinate axes is read anywhere: `NumCurve` carries `h`, `k` (the
+centre or vertex) and, for a parabola opening along y, `axis: 'y'`. The fields are ABSENT on a curve at the origin
+opening along x, so a canonical curve is the same object with the same numbers as before. `engine/conicFrame.ts`, a
+leaf, is the one reader of the frame: `toLocal` / `toWorld` (a point), `vecFrame` (a direction: the swap only),
+`lineToWorld` and `canonicalOf`. Every closed form (the residual, the focus, the directrix, the foci, the role points,
+the walk of a straight in `lineQuadratic`, the normal and the conic-circle rows of `solve.ts`, the polyline, the extent)
+reads the point in the curve's frame and returns through it; none re-derives the offset. Two parabolas in different
+frames meet in up to four points and neither is closed, so `conicsMeet` walks the first along its own parameter over a
+span holding every crossing. The knowledge gate reads `h` and `k` at every configuration, absent as 0, and a
+parabola's axis is part of its family. `curveText.conicEquationText` is the one printer: vertex form when moved, today's
+text at the origin. «קנונית» rides on `Curve.canonical` to `classify`, which refuses a moved curve under it
+(`not-canonical`).
+
 ### The model — objects, and the register that makes them free
 
 The primitive is the **geometric object** ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009)): a `Construction` is

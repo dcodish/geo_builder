@@ -215,6 +215,8 @@ const he = {
   errNearMiss: 'באיור יש את {{names}}. התכוונתם ל-{{suggest}}?',
   listAnd: ' ו-',
   // 02c R7 (#1514 pre-play) — the noun and the equation name different families; never drawn.
+  // #2664 (ADR-AG-455) — «קנונית» said of a conic its equation puts off the origin (the session's text, ADR-W-174)
+  errNotCanonical: 'המשוואה «{{line}}» אינה של {{aCurve}} קנונית: {{aCurve}} זו אינה בראשית הצירים. הסירו את המילה «קנונית» כדי לבנות אותה.',
   errKindMismatch:
     'המשוואה במשפט «{{detail}}» מתארת {{existing}}, לא {{claimed}}. בדקו את המשוואה, או כתבו את שם הצורה שהיא מתארת.',
   // Several NAMED candidates for a contextual reference (#1514 + #1432, chosen by hostKey): the sentence
@@ -853,6 +855,7 @@ const en: typeof he = {
   errUnknownRefEllipse: 'The ellipse {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errNearMiss: 'The figure has {{names}}. Did you mean {{suggest}}?',
   listAnd: ' and ',
+  errNotCanonical: 'The equation «{{line}}» is not of {{aCurve}} in canonical position: it is not at the origin. Remove the word «canonical» to build it.',
   errKindMismatch:
     'The equation in «{{detail}}» describes {{existing}}, not {{claimed}}. Check the equation, or name the shape it describes.',
   'errHost.named':

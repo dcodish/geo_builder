@@ -29,7 +29,7 @@ import type { CevianHost } from '../../shell/cevianHost';
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 export interface LineFault {
   index: number;
-  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'third-crossing' | 'tangent-no-second-crossing' | 'forced-collinear';
+  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'not-canonical' | 'third-crossing' | 'tangent-no-second-crossing' | 'forced-collinear';
   detail: string;
   /** For a name clash: what the name already holds, as a token the locale renders (#1046). */
   existing?: ApplyError['existing'];
@@ -886,6 +886,17 @@ export function derive(
       const o = objectById(construction, v.id);
       const claimed = o && o.kind === 'curve' ? o.curve.kind : undefined;
       faults.push({ index, code: 'kind-mismatch', detail: lines[index], existing: `curve:${v.actual}`, ...(claimed ? { expected: claimed } : {}) });
+      continue;
+    }
+    /**
+     * «פרבולה קנונית» / «אליפסה קנונית» WITH AN EQUATION OFF THE ORIGIN (#2664, ADR-AG-455): the word is a claim the
+     * equation contradicts, refused naming the equation and the word, never drawn and never dropped. `line` is the
+     * equation as typed, `curve` the family it describes.
+     */
+    if (v.reason === 'not-canonical' && (v.actual === 'parabola' || v.actual === 'ellipse')) {
+      const o = objectById(construction, v.id);
+      const eqSrc = o && o.kind === 'curve' ? o.label.eqSrc : undefined;
+      faults.push({ index, code: 'not-canonical', detail: lines[index], line: eqSrc ?? lines[index], curve: v.actual });
       continue;
     }
     if (v.reason !== 'vacant') {
