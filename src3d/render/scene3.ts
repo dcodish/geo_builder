@@ -260,7 +260,7 @@ function newellNormal(ring: readonly Vec3[]): Vec3 {
 }
 
 /**
- * #2702 ([ADR-3D-438](../../docs/06b-decisions-3d.md#adr-3d-438)) — every face's OUTWARD normal, for a solid that may be
+ * #2702 ([ADR-3D-469](../../docs/06b-decisions-3d.md#adr-3d-469)) — every face's OUTWARD normal, for a solid that may be
  * NON-CONVEX (a pyramid or prism over a dart base). The centroid test (`outwardNormal`) is exact only on a convex solid:
  * beside a reflex base corner the solid's centroid lies outside a lateral face's half-space, and that face read
  * backwards (measured: 12 of 60 faces on the kite dart). So the faces are wound CONSISTENTLY (each shared edge

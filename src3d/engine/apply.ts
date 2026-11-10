@@ -1969,7 +1969,7 @@ function boundPyramidOf3(c: Construction3, cmd: SolidCommand): { base: Id[]; ape
 
 /** The quad-pyramid kind whose base is a general quadrilateral and whose apex is free: «פירמידה ABCDS שבסיסה מרובע». */
 const GENERAL_QUAD_PYRAMID = (Object.keys(QUAD_PYRAMIDS) as SolidKind[]).find((k) => QUAD_PYRAMIDS[k]?.base === 'quad' && !QUAD_PYRAMIDS[k]?.right)!;
-/** ...and its right twin, «פירמידה ישרה ABCDS שבסיסה מרובע»: the apex over the ring's circumcentre (ADR-3D-437). */
+/** ...and its right twin, «פירמידה ישרה ABCDS שבסיסה מרובע»: the apex over the ring's circumcentre (ADR-3D-468). */
 const GENERAL_RIGHT_QUAD_PYRAMID = (Object.keys(QUAD_PYRAMIDS) as SolidKind[]).find((k) => QUAD_PYRAMIDS[k]?.base === 'quad' && QUAD_PYRAMIDS[k]?.right)!;
 
 /**
@@ -1989,7 +1989,7 @@ const GENERAL_RIGHT_QUAD_PYRAMID = (Object.keys(QUAD_PYRAMIDS) as SolidKind[]).f
  * pyramid that does not bind (a standalone one, a base only partly drawn) keeps the rectangle: there the default draws
  * the base the pyramid makes. A stated shape is never read here, and stays a given about the ring (ADR-3D-434 §3).
  *
- * #2490 ([ADR-3D-437](../../docs/06b-decisions-3d.md#adr-3d-437)) — A RIGHT kind reads as ITS stated twin, «פירמידה ישרה
+ * #2490 ([ADR-3D-468](../../docs/06b-decisions-3d.md#adr-3d-468)) — A RIGHT kind reads as ITS stated twin, «פירמידה ישרה
  * ABCDS שבסיסה מרובע»: the general right kind PLUS the cyclic fix the parser lowers for that twin (`cyclicFixCommands`,
  * a `concyclic` relation on the ring). Its rightness entails a cyclic base, and over a ring that already exists the
  * ring's own free DOF absorb it (ADR-W-199: a figure that can be drawn is drawn; M1: drive a free ring, verify a
@@ -2025,7 +2025,7 @@ export function unstatedPyramidReading3(c: Construction3, cmd: SolidCommand): Co
  *
  * A right kind's rightness is the placement's (the foot at the ring's circumcentre); what «ישרה» entails about the base
  * — the cyclic fix — rides the parser's own commands after this one, as on a standalone pyramid (and, for a base shape
- * left unstated, the fold's reading's: `unstatedPyramidReading3`, ADR-3D-437).
+ * left unstated, the fold's reading's: `unstatedPyramidReading3`, ADR-3D-468).
  */
 function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], apex: Id): ApplyResult3 {
   const ids = [...base, apex];
@@ -2055,7 +2055,7 @@ function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], ape
     r = applyCommand3(r.next, k);
     if (!r.ok) return r;
   }
-  // #2490 (ADR-3D-437; Q-2490d, judged 2026-11-09): a right pyramid over a ring a circle ALREADY passes through narrows
+  // #2490 (ADR-3D-468; Q-2490d, judged 2026-11-09): a right pyramid over a ring a circle ALREADY passes through narrows
   // nothing, so it shows no build note (`base-constrained`). Decided by what the ring's own statements entail before
   // this line — its family, a circle stated through it, its angles, the faces of the solid it belongs to — through the
   // claim verifier (every claim seed × every branch, docs/17 M3), never from the one drawing. The cyclic fix that
@@ -2087,7 +2087,7 @@ function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], ape
 }
 
 /**
- * #2702 ([ADR-3D-438](../../docs/06b-decisions-3d.md#adr-3d-438)) — AN UNSTATED BASE'S RECTANGLE YIELDS TO A SECOND RING
+ * #2702 ([ADR-3D-469](../../docs/06b-decisions-3d.md#adr-3d-469)) — AN UNSTATED BASE'S RECTANGLE YIELDS TO A SECOND RING
  * OVER ITS LETTERS (M4: a default yields to a statement; ADR-052).
  *
  * «פירמידה SABCD» draws its base as ADR-3D-011's free-aspect rectangle: the default for a base nobody described. «מרובע

@@ -452,7 +452,7 @@ export interface SolidCommand {
    *  («פירמידה ישרה שבסיסה ריבוע» → ABCDS by default). Such a run never binds to existing points as a bound solid
    *  (FR-SP-24's indefinite-noun question is the operator's). Set only by `derive3`'s fold, never typed or saved. */
   lettersUnstated?: true;
-  /** #2702 ([ADR-3D-438](../../docs/06b-decisions-3d.md#adr-3d-438)): the row's own text names NO base shape — the
+  /** #2702 ([ADR-3D-469](../../docs/06b-decisions-3d.md#adr-3d-469)): the row's own text names NO base shape — the
    *  rectangle is ADR-3D-011's default for a base the pyramid makes («פירמידה SABCD»), not a statement. Set only by
    *  `derive3`'s fold (`namesQuadBase3`), never typed or saved; the solid carries it (`SolidObj.baseUnstated`). */
   baseUnstated?: true;
@@ -1411,12 +1411,12 @@ export interface SolidObj {
    */
   bound?: Id[];
   /**
-   * #2490 ([ADR-3D-437](../../docs/06b-decisions-3d.md#adr-3d-437); Q-2490d) — on a bound RIGHT quad pyramid whose kind
+   * #2490 ([ADR-3D-468](../../docs/06b-decisions-3d.md#adr-3d-468); Q-2490d) — on a bound RIGHT quad pyramid whose kind
    * states no base shape: a circle already passed through the ring before this solid (verified from the ring's own
    * statements), so «ישרה» narrowed nothing and the build note `base-constrained` is not shown.
    */
   boundCyclic?: true;
-  /** #2702 (ADR-3D-438): see {@link SolidCommand.baseUnstated} — the base's rectangle is a default, which yields to a
+  /** #2702 (ADR-3D-469): see {@link SolidCommand.baseUnstated} — the base's rectangle is a default, which yields to a
    *  second ring the student declares over the base letters in another order (`yieldUnstatedBase3`). */
   baseUnstated?: true;
 }

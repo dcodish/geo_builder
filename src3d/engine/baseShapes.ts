@@ -502,7 +502,7 @@ export const CYCLIC_MEMBER_NAME: Record<QuadBase, string> = {
  * the ADR-110 macro pattern — so the solver does the work and no new engine construct is needed.
  * A contradiction with a STATED value stays an honest over-constraint refusal (ADR-052 / ADR-114).
  *
- * #2490 ([ADR-3D-437](../../docs/06b-decisions-3d.md#adr-3d-437)): lives in the engine, beside `CYCLIC_MEMBER`, so the
+ * #2490 ([ADR-3D-468](../../docs/06b-decisions-3d.md#adr-3d-468)): lives in the engine, beside `CYCLIC_MEMBER`, so the
  * parser (a base the line states) and the fold's reading of an unstated base over an existing ring
  * (`unstatedPyramidReading3`) lower the one fix.
  */
@@ -723,7 +723,7 @@ export function concaveSeatVertices3(c: StatedConcyclicCtx3 & Pick<Construction3
   if (statedConcyclic3(c, ids)) return null;
   const letters = [...ids].sort().join();
   let allowed = [0, 1, 2, 3];
-  // #2702 (ADR-3D-438): every quad DECLARED over the letters, a pyramid's base among them (`declaredQuads3`) — so a kite
+  // #2702 (ADR-3D-469): every quad DECLARED over the letters, a pyramid's base among them (`declaredQuads3`) — so a kite
   // base is a dart only about its axis, as a flat kite is. A RIGHT pyramid's base is cyclic: the stated-circle reader
   // above answers it (#2810, ADR-3D-467), with every other statement of a circle, so no list of kinds is kept here.
   for (const q of declaredQuads3(c)) {

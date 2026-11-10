@@ -560,7 +560,7 @@ const SEEDED: SeededCorpus = {
   // issue-1986-ring-search.test.ts; these are the build + drift net.
   'kite-dart-second-ring-1986.geo3.json': ['דלתון ABCD', 'מרובע ABDC'],
   'coord-letter-trapezoid-1986.geo3.json': ['A(k,0,0)', 'B(4,0,0)', 'C(1,3,0)', 'D(3,3,0)', 'טרפז ABCD'],
-  // #2702 (ADR-3D-438) — the report and its unstated-base and prism siblings: a second ring over a solid's base letters is
+  // #2702 (ADR-3D-469) — the report and its unstated-base and prism siblings: a second ring over a solid's base letters is
   // drawn on a dart base, where it was refused ring-crossed. The seat is asserted in engine3.test.ts, the class rows in
   // scenarios3.test.ts; these are the build + drift + load net.
   'pyramid-kite-dart-2702.geo3.json': ['פירמידה SABCD שבסיסה דלתון', 'מרובע ABDC'],
@@ -573,7 +573,7 @@ const SEEDED: SeededCorpus = {
   // stability are asserted in engine3.test.ts; these are the build + drift net.
   'pyramid-on-cube-face-2490.geo3.json': ["קובייה ABCDA'B'C'D'", 'פירמידה ABCDS'],
   'pyramid-on-square-2478.geo3.json': ['ריבוע ABCD', 'פירמידה ABCDS שבסיסה ריבוע'],
-  // #2490 (ADR-3D-437; ADR-W-199) — a right pyramid over an existing ring fits the ring to its cyclic member: the
+  // #2490 (ADR-3D-468; ADR-W-199) — a right pyramid over an existing ring fits the ring to its cyclic member: the
   // operator's lines (a general quadrilateral becomes a cyclic one, never the rectangle) and Q-2490c (a stated rhombus
   // becomes a square). The class rows are asserted in pyramid-base.test.ts; these are the build + drift + load net.
   'right-pyramid-existing-quad-2490.geo3.json': ['מרובע ABCD', 'פירמידה ישרה ABCDS'],

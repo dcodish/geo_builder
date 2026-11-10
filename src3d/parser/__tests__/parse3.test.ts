@@ -151,7 +151,7 @@ describe('#2703 — a stated dot product and a letter value carry their spelling
 });
 
 /**
- * #2490 (ADR-3D-437) — the right pyramid's cyclic fix moved to the engine (`cyclicFixCommands`, `baseShapes.ts`), so the
+ * #2490 (ADR-3D-468) — the right pyramid's cyclic fix moved to the engine (`cyclicFixCommands`, `baseShapes.ts`), so the
  * fold's reading of an unstated base lowers the same fix the parser does. A pure move: the parser's output is unchanged.
  */
 describe('#2490 — the right pyramid lowers the engine\'s one cyclic fix', () => {

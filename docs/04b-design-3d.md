@@ -974,7 +974,7 @@ declaration (FR-SP-25) names none, and the mint pass's trial reads it the same w
 `resolvedCmds`, so apply lowers no shape and the narrowing, blame and crossing passes read a quadrilateral; the stored
 fact keeps its parsed commands. The twin rule reads a row as applied only when it holds a shape reference, and as typed
 otherwise. A right kind reads as ITS stated twin «פירמידה ישרה ABCDS שבסיסה מרובע»
-([ADR-3D-437](06b-decisions-3d.md#adr-3d-437)): `unstatedPyramidReading3` returns the general right kind `pyramidQuadR`
+([ADR-3D-468](06b-decisions-3d.md#adr-3d-468)): `unstatedPyramidReading3` returns the general right kind `pyramidQuadR`
 plus that twin's cyclic fix, `cyclicFixCommands('quad', ring)` (a shape-internal `concyclic`), which now lives in
 `baseShapes.ts` beside `CYCLIC_MEMBER` so the parser and the fold lower one fix. Both callers (`expandFact`, the mint
 trial) apply the whole list. The ring's own free DOF absorb the fix (M1); a determined ring that is not cyclic is the
@@ -1177,7 +1177,7 @@ that could be a dart (a kite, a general quadrilateral) fails the check open, and
 letters another declared ring orders differently (`ringReordered3`, the yield condition) is seated with one vertex inside
 the triangle of the other three (`polygon4ConcaveDims`; which vertex is drawn from the seed, as a branch is), where every
 cyclic order is simple at once; a single ring keeps the convex seat bit-identically. **A solid's base takes the seat too**
-([ADR-3D-438](06b-decisions-3d.md#adr-3d-438), #2702): `solidDimsAll3` asks `concaveSeatVertices3` of the base ring of a
+([ADR-3D-469](06b-decisions-3d.md#adr-3d-469), #2702): `solidDimsAll3` asks `concaveSeatVertices3` of the base ring of a
 `pyramidQuad`, `prism4g` or `pyramidKite` (`CONCAVE_SEAT_KINDS3`), and the seat reads every declared quad over the letters
 (`declaredQuads3`, a pyramid's base included), so a kite base may be reflex only on its axis and a cyclic base never. The general bases lead with the same `[cx, cy, dx, dy]` gauge as `polygon4`, so `polygon4ConcaveDims` replaces
 those four; a kite keeps its symmetry structurally and takes a dart window of its own `[half, axis]` (`concaveSolidDims3`).

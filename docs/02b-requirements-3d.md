@@ -751,7 +751,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   make simple is drawn simple** (#1986, ADR-3D-418; the operator's "search first, refuse last", 2026-10-09):
   «דלתון ABCD · מרובע ABDC» is drawn as a dart, «מרובע ABCD · מרובע ABDC» as a concave quadrilateral, and
   «A(k,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» as a genuine trapezoid (k > 4) — never crossed and green, and
-  «הציגו תצורה אחרת» keeps every declared ring simple. **A solid's base is one of the rings** (#2702, ADR-3D-438):
+  «הציגו תצורה אחרת» keeps every declared ring simple. **A solid's base is one of the rings** (#2702, ADR-3D-469):
   «פירמידה SABCD שבסיסה דלתון · מרובע ABDC» draws the pyramid on a dart base (a kite still, the reflex corner on its
   axis), and so do a pyramid whose base is general or unstated («פירמידה SABCD», «… שבסיסה מרובע») and a prism's
   general base («מנסרה ABCDA'B'C'D'»); an unstated base's rectangle is a default and yields to the second ring. A
@@ -934,7 +934,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   the build note naming the change. A ring a circle already passes through (a square, a rectangle, an isosceles
   trapezoid, a box or cube face, a ring with a stated circle or with supplementary stated opposite angles) is drawn as it
   was, with no build note (Q-2490d). A ring whose own givens forbid a circle («מקבילית ABCD» · «∠DAB = 60») is refused,
-  naming those givens ([ADR-3D-437](06b-decisions-3d.md#adr-3d-437)). Height, volume, an
+  naming those givens ([ADR-3D-468](06b-decisions-3d.md#adr-3d-468)). Height, volume, an
   edge length and an angle to the base («גובה הפירמידה», «נפח הפירמידה ABCDS = 5», «|SA| = 5», «הזווית בין SC למישור
   ABCD היא 40») are accepted as on a standalone pyramid; «גובה הפירמידה» names the figure's one pyramid when other
   solids stand beside it. A base whose letters are not in one plane («פירמידה ABCA'S» on the cube) is refused for

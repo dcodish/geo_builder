@@ -274,7 +274,7 @@ describe('#2490 — a pyramid over an existing base', () => {
  * 2026-11-08: *"Keep its shape"*; ADR-052). Through the store, every host and spelling of the class: the ring is drawn
  * exactly as it was before the pyramid line, its DOFs stay (host + 3), no rectangle is imposed, so no narrowing note
  * says one was. The default rectangle stays where the pyramid makes its own base, and a stated shape stays a given. The
- * right pyramid is ADR-3D-437's (the describe below). The unit is engine3.test.ts's `unstatedPyramidReading3`.
+ * right pyramid is ADR-3D-468's (the describe below). The unit is engine3.test.ts's `unstatedPyramidReading3`.
  */
 describe('#2490 — an unstated pyramid base keeps the shape of the ring it stands on', () => {
   beforeEach(reset);
@@ -388,7 +388,7 @@ describe('#2490 — an unstated pyramid base keeps the shape of the ring it stan
 });
 
 /**
- * #2490 (ADR-3D-437; ADR-W-199, operator 2026-11-09: *"we would not refuse something that can be built"*) — a RIGHT
+ * #2490 (ADR-3D-468; ADR-W-199, operator 2026-11-09: *"we would not refuse something that can be built"*) — a RIGHT
  * pyramid whose base shape is unstated, over a ring that already exists, reads as its stated twin «פירמידה ישרה ABCDS
  * שבסיסה מרובע»: the ring is fitted to the cyclic member of its own family with its own free DOF, and refused only when
  * its own givens forbid a circle, naming them. A ring a circle already passes through is drawn as it was, with no build

@@ -869,7 +869,7 @@ function deriveCore3(
    *  never binds to existing points (`SolidCommand.lettersUnstated`). The stored fact keeps its commands unchanged.
    *  #2490 (ADR-3D-436): and a pyramid whose base SHAPE goes unnamed, over a ring the figure `at` already holds, is read
    *  as the quadrilateral its letters name (`unstatedPyramidReading3`): the ring keeps its shape; a RIGHT one as its
-   *  stated twin, with the cyclic fix that twin lowers (ADR-3D-437). The row's own text says
+   *  stated twin, with the cyclic fix that twin lowers (ADR-3D-468). The row's own text says
    *  whether a shape was named (`namesQuadBase3`); a solid the mint pass declared for the row is its bare declaration
    *  («פירמידה ABCDS», listed first), which names none. Every reader after the fold reads this, as `resolvedCmds`. */
   const expandFact = (at: Construction3, f: Fact3): ReturnType<typeof expandFactRaw> => {
@@ -884,7 +884,7 @@ function deriveCore3(
       let read: Command3[] = [out];
       if (i < minted || !(named ??= namesQuadBase3(f.utterance))) {
         read = unstatedPyramidReading3(at, out);
-        // #2702 (ADR-3D-438): a base the pyramid makes, with no shape named — its rectangle is a default that yields
+        // #2702 (ADR-3D-469): a base the pyramid makes, with no shape named — its rectangle is a default that yields
         if (read.length === 1 && read[0] === out && QUAD_PYRAMIDS[out.kind]?.base === 'rectangle' && !QUAD_PYRAMIDS[out.kind]?.right) read = [{ ...out, baseUnstated: true as const }];
       }
       if (read.length !== 1 || read[0] !== k) changed = true;
@@ -1327,7 +1327,7 @@ function deriveCore3(
           for (const cmd of declCmds) {
             // #2490 (ADR-3D-436): a minted solid is its bare declaration, whose base shape is unstated — tried as the
             // fold will apply it, so the trial's verdict is the line's (a trapezoid keeps its shape, never `shape-disjoint`);
-            // a right one with its twin's cyclic fix (ADR-3D-437), every command the fold will apply
+            // a right one with its twin's cyclic fix (ADR-3D-468), every command the fold will apply
             for (const k of m.kind === 'solid' && cmd.type === 'solid' ? unstatedPyramidReading3(made, cmd) : [cmd]) {
               const r = applyCommand3(made, seated(k));
               if (!r.ok) {

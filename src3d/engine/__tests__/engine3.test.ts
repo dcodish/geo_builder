@@ -447,7 +447,7 @@ describe('#2490 — an unstated pyramid base over an existing ring keeps the rin
 });
 
 /**
- * #2490 (ADR-3D-437, ADR-W-199) — `unstatedPyramidReading3` on a RIGHT kind: over a ring that already exists it reads
+ * #2490 (ADR-3D-468, ADR-W-199) — `unstatedPyramidReading3` on a RIGHT kind: over a ring that already exists it reads
  * as its stated twin «פירמידה ישרה ABCDS שבסיסה מרובע» — the general right kind PLUS the twin's cyclic fix — so the
  * ring's own free DOF absorb «ישרה» (a free quadrilateral becomes a cyclic one, never the rectangle), and a ring a
  * circle already passes through is drawn as it was, with no build note (Q-2490d).
@@ -749,7 +749,7 @@ describe('stability (first-class regression)', () => {
 });
 
 /**
- * #2702 (ADR-3D-438) — a solid's quad base takes the concave seat when a second ring orders its letters differently
+ * #2702 (ADR-3D-469) — a solid's quad base takes the concave seat when a second ring orders its letters differently
  * (ADR-3D-418's yield, a solid edition): a kite base as a dart about its axis, a general base (and an unstated one,
  * whose rectangle yields) anywhere, a prism's general base the same. A base convex whenever simple, or a right
  * pyramid's (cyclic) base, keeps the convex seat; a single ring is untouched.

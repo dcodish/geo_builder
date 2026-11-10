@@ -242,14 +242,14 @@ function polygon4ConcaveDims(key: string, seed: number, allowed: readonly number
 export const wholeSolidIndex3 = (c: Construction3, i: number): number => c.partOf?.solidIndex[i] ?? i;
 
 /**
- * #2702 ([ADR-3D-438](../../docs/06b-decisions-3d.md#adr-3d-438)) — the kinds whose quad base may take the concave seat:
+ * #2702 ([ADR-3D-469](../../docs/06b-decisions-3d.md#adr-3d-469)) — the kinds whose quad base may take the concave seat:
  * the flat quadrilateral (ADR-3D-418), and a solid's base a dart can draw — a general quadrilateral (`pyramidQuad`,
  * `prism4g`) or a kite (`pyramidKite`). A right pyramid's base is cyclic (convex whenever simple) and is not here.
  */
 const CONCAVE_SEAT_KINDS3: ReadonlySet<SolidKind> = new Set<SolidKind>(['polygon4', 'pyramidQuad', 'prism4g', 'pyramidKite']);
 
 /**
- * #2702 (ADR-3D-438) — a solid's dims with its quad base on the concave seat. The general bases (`polygon4`,
+ * #2702 (ADR-3D-469) — a solid's dims with its quad base on the concave seat. The general bases (`polygon4`,
  * `pyramidQuad`, `prism4g`) lead with C, D in the A, B gauge — exactly what `polygon4ConcaveDims` returns — so the
  * seat replaces those four and the apex's or the lateral dims follow unchanged. A kite keeps its symmetry (|AB| = |AD|,
  * |CB| = |CD|, structural) and takes a DART window of its own two dims: reflex at C, C rides the axis inside triangle
@@ -286,7 +286,7 @@ export function solidDimsAll3(c: Construction3, seed: number): readonly (readonl
   let bySeed = solidDimsMemo3.get(c.solids);
   if (!bySeed) solidDimsMemo3.set(c.solids, (bySeed = new Map()));
   // #1986 (ADR-3D-418): which flat quadrilaterals take the concave seat is part of the configuration's identity
-  // #2702 (ADR-3D-438): ...and so do a solid's own quad base — a general or kite pyramid base, a general prism base
+  // #2702 (ADR-3D-469): ...and so do a solid's own quad base — a general or kite pyramid base, a general prism base
   const concave = c.solids.map((solid) => (CONCAVE_SEAT_KINDS3.has(solid.kind) && !solid.bound ? concaveSeatVertices3(c, baseRingOf(solid)!) : null));
   const memoKey = concave.some(Boolean) ? `${seed}|${concave.map((v) => (v ? v.join('') : '-')).join('|')}` : seed;
   let all = bySeed.get(memoKey);

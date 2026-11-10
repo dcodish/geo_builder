@@ -78,7 +78,7 @@ const VALUE_CLAIMS = new Set<string>([
  * equal pairs, the isosceles trapezoid's diagonals, the one-line inscription's cyclic fix — and a `soft` default) is
  * the noun, never a given.
  *
- * #2490 ([ADR-3D-437](../../docs/06b-decisions-3d.md#adr-3d-437); Q-2490d): a right pyramid over a ring a circle already
+ * #2490 ([ADR-3D-468](../../docs/06b-decisions-3d.md#adr-3d-468); Q-2490d): a right pyramid over a ring a circle already
  * passed through (`SolidObj.boundCyclic`, read off the folded figure `c`) narrowed nothing: it is that ring's definition,
  * never a cause — «קובייה …» · «פירמידה ישרה ABCDS» says nothing, exactly as the plain «פירמידה ABCDS» there.
  */
@@ -115,7 +115,7 @@ export function rowClass3(cmds: readonly Command3[], c?: Pick<Construction3, 'so
   return 'definition';
 }
 
-/** #2490 (ADR-3D-437): is this right pyramid, in the folded figure, bound over a ring a circle already passed through? */
+/** #2490 (ADR-3D-468): is this right pyramid, in the folded figure, bound over a ring a circle already passed through? */
 function boundOnCyclicRing3(cmd: SolidCommand, c?: Pick<Construction3, 'solids'>): boolean {
   return !!c?.solids.some((s) => s.boundCyclic && s.ids.length === cmd.ids.length && s.ids.every((id, i) => id === cmd.ids[i]));
 }

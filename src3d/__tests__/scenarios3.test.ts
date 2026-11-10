@@ -894,6 +894,8 @@ describe('SCENARIO — crossed-ring-concyclic-2810: a second order over a cyclic
     [['דלתון ABCD', 'מרובע ABDC'], false], // C2: a dart
     [['מרובע ABCD', 'מעגל חוסם את ABCD'], true], // C4: one ring and its circle
     [['דלתון ABCD', 'מעגל חוסם את ABCD'], true],
+    [['פירמידה SABCD שבסיסה דלתון', 'מרובע ABDC'], false], // C3: the kite base drawn as a dart (#2702, ADR-3D-469)
+    [['מרובע ABCD', 'פירמידה ישרה ABCDS'], true], // the right pyramid fits ABCD to a cyclic quadrilateral (#2490, ADR-3D-468)
   ])('%j builds, every ring simple at seeds 0–5', (lines, circle) => {
     lines.forEach(submit);
     for (let seed = 0; seed < 6; seed++) {
@@ -906,7 +908,7 @@ describe('SCENARIO — crossed-ring-concyclic-2810: a second order over a cyclic
   });
 });
 
-// right-pyramid-existing-quad-2490 (#2490, ADR-3D-437) — the operator's lines and the ruling of 2026-11-09 (ADR-W-199:
+// right-pyramid-existing-quad-2490 (#2490, ADR-3D-468) — the operator's lines and the ruling of 2026-11-09 (ADR-W-199:
 // "we would not refuse something that can be built"): «פירמידה ישרה ABCDS» over a quadrilateral that already exists fits
 // it to a quadrilateral a circle passes through, with its own free DOF. The figure built green before the fix too, as a
 // rectangle, so the lock is bespoke: ABCD is cyclic, not a rectangle at some configuration, and varies across presses
@@ -950,7 +952,7 @@ describe('right-pyramid-existing-quad-2490 — «מרובע ABCD» · «פירמ
   });
 });
 
-// pyramid-dart-base-2702 (#2702, ADR-3D-438) — the operator's two lines and the plan's class rows (q-1986-pyramid; #1927
+// pyramid-dart-base-2702 (#2702, ADR-3D-469) — the operator's two lines and the plan's class rows (q-1986-pyramid; #1927
 // 2026-10-09: "Refuse only when nothing the student wrote can save it"): a second ring over a solid's base letters draws
 // the base as a dart, both rings simple at every configuration. A base convex whenever simple — a stated rectangle,
 // parallelogram, square, a box, or a right pyramid's cyclic base — still refuses the second ring.

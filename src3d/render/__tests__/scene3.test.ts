@@ -270,7 +270,7 @@ describe('buildScene3', () => {
 });
 
 /**
- * #2702 (ADR-3D-438) — a solid over a DART base is not convex: beside the reflex corner the solid's centroid lies
+ * #2702 (ADR-3D-469) — a solid over a DART base is not convex: beside the reflex corner the solid's centroid lies
  * outside a lateral face's half-space, so the centroid test read that face backwards. The normals come from the
  * consistently wound closed surface and its signed volume: every face points away from the body.
  */
