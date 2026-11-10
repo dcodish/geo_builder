@@ -56,15 +56,25 @@ describe('#443 — a macro-declared ring is a declared polygon', () => {
   });
 
   /**
-   * The end-to-end half. These four seeds were MEASURED to draw the bare kite as a dart, and to pass
-   * every requirement while doing it. They must now fail the requirement — which is what keeps the
-   * resampler and the config search from offering them.
+   * The end-to-end half. Seeds 68, 71, 104 and 169 were MEASURED (#443) to draw the bare kite as a dart and
+   * to pass every requirement while doing it; the fix made them fail the requirement, which kept the
+   * resampler and the config search from offering them. Since #2797 (ADR-816) the driven solver's convex
+   * pass no longer falls through to the relaxed pass at those seeds — its LM rescue rung finds the convex
+   * kite there — so they now draw CONVEX and meet the requirements (measured: with the rung off they are
+   * still the four darts, rejected). The invariant is locked over the whole range instead: no seed in
+   * 0..199 is a dart that meets the requirements, and the four former darts are convex kites.
    */
-  it.each([68, 71, 104, 169])('seed %i drew a dart and no longer meets the requirements', (seed) => {
+  it('no seed draws a dart that meets the requirements; the measured darts now draw convex (ADR-816)', () => {
     const facts = factsOf(['דלתון ABCD']);
-    expect(isConvex(['A', 'B', 'C', 'D'], replay(facts, seed).positions), 'this seed is one of the measured darts').toBe(false);
-    expect(meetsRequirements(facts, seed)).toBe(false);
-  });
+    for (let seed = 0; seed < 200; seed++) {
+      if (!meetsRequirements(facts, seed)) continue;
+      expect(isConvex(['A', 'B', 'C', 'D'], replay(facts, seed).positions), `seed ${seed} meets the requirements, so it is convex`).toBe(true);
+    }
+    for (const seed of [68, 71, 104, 169]) {
+      expect(isConvex(['A', 'B', 'C', 'D'], replay(facts, seed).positions), `seed ${seed}, a measured dart before ADR-816`).toBe(true);
+      expect(meetsRequirements(facts, seed)).toBe(true);
+    }
+  }, 300_000);
 
   it('a seed that draws convex still meets them', () => {
     const facts = factsOf(['דלתון ABCD']);

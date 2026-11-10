@@ -9,7 +9,7 @@
  * `autoResolve` (whose first tier IS `firstSatisfyingSeed`, sweeping from the CURRENT seed) applies the
  * valid view under a paused history, so one undo still removes the whole action.
  *
- * The measured case is #938's: `SEQ` refuses at seed 4 (one of three in 0..199). The plan's other named
+ * The measured case is #938's broken-seed figure: `SEQ` refuses at seed 4 (by construction since round #2822). The plan's other named
  * figure (#157's trapezoid-midsegment) builds clean at seed 0 on every step — measured; no resolve fires
  * and nothing freezes — so it is not a lock here.
  */
@@ -20,8 +20,10 @@ import { geoWork, isCancelled } from '@/store/geoWork';
 import { parse } from '@/parser';
 import { ctxOf } from '../../__tests__/scenario-pipeline';
 
-const SEQ = ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC'];
-/** Measured to refuse this fact list (#938): one of exactly three seeds in 0..199. */
+/** #938's mechanism figure since round #2822 (its operator sequence lost its broken seeds to ADR-816): #360's square
+ *  with E on AB and |CE| = 5.2, broken at some sampled sides BY CONSTRUCTION (see issue-938-structural-edit-seed). */
+const SEQ = ['ריבוע ABCD', 'נקודה E על AB', 'CE=5.2'];
+/** Measured to refuse SEQ (seed 0 builds). */
 const BROKEN_SEED = 4;
 
 function submit(u: string) {

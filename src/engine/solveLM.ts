@@ -8,7 +8,7 @@
  * solvers ride Nelder–Mead, which stalls past ~6–8 DOF (ADR-281); LM's damped
  * Gauss–Newton steps converge quadratically near a root and handle the 8–12+ DOF joint
  * component solves the design calls for. This module is the standalone numerics slice —
- * integration into `evaluate.ts` is a separate step; nothing here imports engine state.
+ * integration into `evaluate.ts` is the rescue rung (#2797, below); nothing here imports engine state.
  *
  * Deliberate adaptations over the solve3 pattern (each keeps its philosophy):
  *  - **Per-dimension `scale`** — the solve runs in normalised u-space (`x = u∘scale`),
@@ -37,6 +37,9 @@
  *
  * PURE and deterministic: no Math.random, no Date.now, fixed iteration budgets, zero
  * imports. Same inputs ⇒ bit-identical outputs.
+ *
+ * #2797 ([ADR-816](../../docs/06-decisions.md#adr-816)): integrated as `multiStartSolve`'s LM RESCUE RUNG
+ * (`evaluate.ts`) — retry-only, reached when Nelder–Mead accepted nothing; capped by `maxEvals`.
  */
 
 export interface SolveLMOptions {
@@ -64,6 +67,13 @@ export interface SolveLMOptions {
    * primary residuals exactly — it never degrades convergence judgement.
    */
   regularize?: { weight: number; toward: number[] };
+  /**
+   * #2797 ([ADR-816](../../docs/06-decisions.md#adr-816)): a cap on residual EVALUATIONS for the whole solve, both
+   * phases (default none). Checked before each iteration: the solve stops at the last accepted point, so a caller
+   * whose every evaluation is a figure evaluate bounds its cost on the failure path, where LM would otherwise run
+   * its full budget against an inconsistent system.
+   */
+  maxEvals?: number;
 }
 
 export interface SolveLMResult {
@@ -97,6 +107,7 @@ function lmCore(
   u0: number[],
   maxIter: number,
   lambda0: number,
+  spent: () => boolean = () => false,
 ): { u: number[]; r: number[]; err: number; iters: number } {
   const n = u0.length;
   let u = u0.slice();
@@ -106,6 +117,7 @@ function lmCore(
   if (!isFinite(err)) return { u, r, err, iters }; // nothing to descend from
   let lambda = lambda0;
   for (let iter = 0; iter < maxIter; iter++) {
+    if (spent()) break; // the caller's evaluation cap (maxEvals): keep the last accepted point
     iters = iter + 1;
     // numeric Jacobian (central differences) in u-space: J[j][k] = ∂r_k/∂u_j
     const m = r.length;
@@ -202,7 +214,13 @@ export function solveLM(
   const towardU = reg ? reg.toward.map((v, i) => v / scale[i]) : null;
 
   const toX = (u: number[]): number[] => u.map((v, i) => v * scale[i]);
-  const rPrimary = (u: number[]): number[] => residuals(toX(u));
+  let evals = 0;
+  const cap = opts.maxEvals ?? Infinity;
+  const spent = (): boolean => evals >= cap;
+  const rPrimary = (u: number[]): number[] => {
+    evals++;
+    return residuals(toX(u));
+  };
   /** Primary residuals followed by the regulariser rows (identical to rPrimary when none). */
   const rAug = (u: number[]): number[] => {
     const r = rPrimary(u);
@@ -220,7 +238,7 @@ export function solveLM(
   }
 
   // Phase 1: the (possibly regularised) search — picks the basin / manifold point.
-  const search = lmCore(rAug, u0, maxIter, lambda0);
+  const search = lmCore(rAug, u0, maxIter, lambda0, spent);
   let final = search;
   let iterations = search.iters;
   if (towardU) {
@@ -228,7 +246,7 @@ export function solveLM(
     // discipline). From a near-manifold point the accepted steps are ~residual-sized,
     // so the polish zeroes the residuals without wandering back along the manifold;
     // it only ever accepts primary improvements, so it cannot degrade the search.
-    const polish = lmCore(rPrimary, search.u, Math.min(50, maxIter), lambda0);
+    const polish = lmCore(rPrimary, search.u, Math.min(50, maxIter), lambda0, spent);
     final = polish;
     iterations += polish.iters;
   }

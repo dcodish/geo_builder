@@ -1,0 +1,283 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-11-10T12:00:00.000Z",
+  "name": "hexagon-regular-by-angles-2797",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משושה ABCDEF",
+      "group": "g0",
+      "cmd": {
+        "type": "polygon",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "F"
+        ],
+        "place": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "AB = 4",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "AB = 4",
+      "group": "g1",
+      "cmd": {
+        "type": "set-distance",
+        "a": "A",
+        "b": "B",
+        "value": 4
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.3",
+      "utterance": "BC = 4",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.4",
+      "utterance": "BC = 4",
+      "group": "g2",
+      "cmd": {
+        "type": "set-distance",
+        "a": "B",
+        "b": "C",
+        "value": 4
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.5",
+      "utterance": "CD = 4",
+      "group": "g3",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.6",
+      "utterance": "CD = 4",
+      "group": "g3",
+      "cmd": {
+        "type": "set-distance",
+        "a": "C",
+        "b": "D",
+        "value": 4
+      },
+      "enabled": true
+    },
+    {
+      "id": "g4.7",
+      "utterance": "DE = 4",
+      "group": "g4",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g4.8",
+      "utterance": "DE = 4",
+      "group": "g4",
+      "cmd": {
+        "type": "set-distance",
+        "a": "D",
+        "b": "E",
+        "value": 4
+      },
+      "enabled": true
+    },
+    {
+      "id": "g5.9",
+      "utterance": "זווית ABC = 120",
+      "group": "g5",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g5.10",
+      "utterance": "זווית ABC = 120",
+      "group": "g5",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g5.11",
+      "utterance": "זווית ABC = 120",
+      "group": "g5",
+      "cmd": {
+        "type": "set-angle",
+        "vertex": "B",
+        "ray1": "A",
+        "ray2": "C",
+        "value": 120
+      },
+      "enabled": true
+    },
+    {
+      "id": "g6.12",
+      "utterance": "זווית BCD = 120",
+      "group": "g6",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g6.13",
+      "utterance": "זווית BCD = 120",
+      "group": "g6",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g6.14",
+      "utterance": "זווית BCD = 120",
+      "group": "g6",
+      "cmd": {
+        "type": "set-angle",
+        "vertex": "C",
+        "ray1": "B",
+        "ray2": "D",
+        "value": 120
+      },
+      "enabled": true
+    },
+    {
+      "id": "g7.15",
+      "utterance": "זווית CDE = 120",
+      "group": "g7",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g7.16",
+      "utterance": "זווית CDE = 120",
+      "group": "g7",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g7.17",
+      "utterance": "זווית CDE = 120",
+      "group": "g7",
+      "cmd": {
+        "type": "set-angle",
+        "vertex": "D",
+        "ray1": "C",
+        "ray2": "E",
+        "value": 120
+      },
+      "enabled": true
+    },
+    {
+      "id": "g8.18",
+      "utterance": "זווית DEF = 120",
+      "group": "g8",
+      "cmd": {
+        "type": "segment",
+        "a": "E",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g8.19",
+      "utterance": "זווית DEF = 120",
+      "group": "g8",
+      "cmd": {
+        "type": "segment",
+        "a": "E",
+        "b": "F"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g8.20",
+      "utterance": "זווית DEF = 120",
+      "group": "g8",
+      "cmd": {
+        "type": "set-angle",
+        "vertex": "E",
+        "ray1": "D",
+        "ray2": "F",
+        "value": 120
+      },
+      "enabled": true
+    },
+    {
+      "id": "g9.21",
+      "utterance": "FA = 4",
+      "group": "g9",
+      "cmd": {
+        "type": "segment",
+        "a": "F",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g9.22",
+      "utterance": "FA = 4",
+      "group": "g9",
+      "cmd": {
+        "type": "set-distance",
+        "a": "F",
+        "b": "A",
+        "value": 4
+      },
+      "enabled": true
+    }
+  ]
+}

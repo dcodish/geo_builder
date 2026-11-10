@@ -7448,6 +7448,14 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 
 **Why.** Students type on phones, where capitals cost an extra tap each time.
 
+**ADR-W-201 Amendment 1 (2026-11-10): what round #2822 measured, and four mechanism changes.** Operator, after the session's mid-round account: *"good changes - do them"*. In its first 3½ hours, #2822's streams built every picked item (8 bug items ready, 8 feature PRs he passed) but nothing landed: the wave was reopened three times and rebuilt twice for regressions only the combined tip showed, ~10 parallel streams waited 20–45 min per gate on the suite lock, and a hand resolution of append conflicts dropped two closing braces. Changes (mechanism, the session's own):
+1. **A wave freezes** once its full-suite gate starts; later items wait for the next wave.
+2. **About 6 parallel streams**, not ~10.
+3. **Every item runs its builders' whole-figure case files by path** before `ready` (ADR-W-191's skipped set is where #2806, #2797, #2799 and #2735 broke the tip).
+4. **`scripts/round-merge-insertions.mjs`** resolves same-point-insertion conflicts from the three stage blobs (locked by `server/__tests__/round-merge-insertions.test.ts`); anything else is merged by hand and `tsc -b` runs first.
+
+**ADR-W-202 Amendment 2 (2026-11-10): the Rulings Inbox is the ONE place a question waits for him.** Operator: *"the builder roadmap has decisions for me to take that are not on the ruling inbox - is that ok?"* It was not: seven open questions from round #2745 sat only on the roadmap page's decisions panel. They moved to the inbox (each marked `moved` on the roadmap with a pointer), and from now on no session posts an open question to the roadmap page; its `decisions` collection is history only (fix-round Step 2 4c and Step 5, roadmap-refresh).
+
 ## ADR-W-204 — ADR-W-200 built in 2-D: the held row, its one notice, and the shared table every builder will assert (#2790, #2795)
 
 **Status:** accepted · 2026-11-10 · round #2822 · **builds** [ADR-W-200](#adr-w-200) in 2-D ([ADR-822](06-decisions.md#adr-822), with [ADR-821](06-decisions.md#adr-821)); 3-D, analytic and complex are its remaining ports · LADDER stage: **none** (the submit decision)
