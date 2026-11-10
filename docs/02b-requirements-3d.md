@@ -645,6 +645,16 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   answers its coordinates when they are knowledge (**«w = (0, 0, 12)»**) and otherwise «לא נקבע על ידי הנתונים»,
   never its own name; a pair keeps its decomposition («AS = w = (0, 0, 12)»).
   - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867, [ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746, [ADR-3D-371](06b-decisions-3d.md#adr-3d-371), #2072, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395), #1769.
+- **FR-EQ-4c (Must)** — **An answer may be stated in the figure's free letters when that is the only way to state
+  it.** After «מלבן ABCD» · «AB→ = u» · «AD→ = v» · «DF→ = t*DC→» · «BE→ = t*BC→», asking «AE» answers
+  **«u + t·v»**, «AF» answers «t·u + v», and a vector that needs two letters answers in both («(1 − s − t)·v»). A
+  vector with a letter-free answer keeps it («AC = u + v»). The form is affine in the letters and is shown only when it
+  holds exactly; a vector or a number that depends on a letter in any other way (a length such as «|AE|», a product of
+  two letters, an angle letter's cosine) answers **«תלוי ב-t»**, naming the letters, never a wrong linear form. The
+  data panel's vector row prints the same form. A letter its relation determines is a number, not a free letter: the
+  params row prints its value («t = 1/2»), as asking «t» does. A letter shared by two statements is one number in
+  every drawing.
+  - Sources: [ADR-3D-471](06b-decisions-3d.md#adr-3d-471), #1829 (operator ruling 2026-10-06).
 - **FR-EQ-5 (Must)** — **A named plane is placed by whatever is stated about it.** A π-plane may be declared free
   («מישור π3»), or it comes into being, free, from any statement that names it. «קובייה ABCDA'B'C'D'» · «הישר AC' מאונך
   למישור π3» builds with no declaration. So do ∥ / ⊂ a segment or a line, ⟂ / ∥ a vector or a plane, an angle to a
