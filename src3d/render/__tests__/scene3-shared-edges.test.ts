@@ -9,8 +9,13 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand3 } from '../../engine/apply';
 import { resolve3 } from '../../engine/evaluate';
 import { emptyConstruction3, type Command3, type Construction3 } from '../../engine/types';
-import { HOME_CAMERA } from '../camera';
+import { cameraFrame, HOME_CAMERA } from '../camera';
 import { buildScene3, hiddenEdgeKeys } from '../scene3';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { deserializeFigure3 } from '../../store/figureFile3';
+import { derive3, type Fact3 } from '../../store/store3';
+import { parse3 } from '../../parser/parse3';
 
 const CUBE: Command3 = { type: 'solid', kind: 'cube', ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] };
 const PYRAMID: Command3 = { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', 'C', 'D', 'S'] };
@@ -83,4 +88,93 @@ describe('#2490 — solids that share a face', () => {
       );
     }
   });
+});
+
+/**
+ * #2819 (ADR-3D-481): a shared face is a property of TWO solids. A flat polygon carries its ring twice (the ring and its
+ * reverse), and the face count read that one shape as two solids sharing a face — every edge dashed from every view.
+ */
+describe('#2819 — a lone flat polygon is never dashed', () => {
+  const BELOW = { yaw: HOME_CAMERA.yaw, pitch: -0.8 };
+  const flat = (kind: 'polygon3' | 'polygon4' | 'polygon5', ids: string[]) => build({ type: 'solid', kind, ids } as Command3);
+
+  for (const [kind, ids] of [
+    ['polygon3', ['A', 'B', 'C']],
+    ['polygon4', ['A', 'B', 'C', 'D']],
+    ['polygon5', ['A', 'B', 'C', 'D', 'E']],
+  ] as const) {
+    it(`${kind}: no hidden edge from the default camera or from below`, () => {
+      const c = flat(kind, [...ids]);
+      for (const seed of [0, 3]) {
+        const p = resolve3(c, seed).positions;
+        expect([...hiddenEdgeKeys(c, p, HOME_CAMERA)]).toEqual([]);
+        expect([...hiddenEdgeKeys(c, p, BELOW)]).toEqual([]);
+      }
+    });
+  }
+
+  it('the operator\'s figure «מלבן ABCD» · «מעוין ABCD» (fixture) draws every edge solid, through the real load path', () => {
+    const r = deserializeFigure3(readFileSync(join(__dirname, '..', '..', '..', 'fixtures3', 'rectangle-rhombus-merged-2171.geo3.json'), 'utf8'));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const d = derive3(r.facts, r.seed);
+    expect(d.construction.solids.map((s) => s.kind)).toEqual(['polygon4']);
+    expect([...hiddenEdgeKeys(d.construction, d.positions, HOME_CAMERA)]).toEqual([]);
+    expect([...hiddenEdgeKeys(d.construction, d.positions, BELOW)]).toEqual([]);
+  });
+
+  it('a pyramid on a cube\'s face still shares that face: two solids carry it, so it is no surface (#2490 unchanged)', () => {
+    // Were ABCD a surface, each of its edges would be visible whenever the cube's face ABCD faces the camera. Two
+    // different solids carry it, so from some such view an ABCD edge is still hidden (behind the pyramid's body).
+    const c = build(CUBE, PYRAMID);
+    let witnessed = false;
+    for (let seed = 0; seed < 24 && !witnessed; seed++) {
+      if (apexInside(c, seed)) continue;
+      const p = resolve3(c, seed).positions;
+      const [A, A1] = [p.get('A')!, p.get("A'")!];
+      const out = { x: A.x - A1.x, y: A.y - A1.y, z: A.z - A1.z }; // the cube's outward normal on ABCD points away from A'
+      for (let yaw = 0; yaw < 360 && !witnessed; yaw += 30) {
+        for (const pitch of [-60, -30, 0, 30, 60]) {
+          const cam = { yaw: (yaw * Math.PI) / 180, pitch: (pitch * Math.PI) / 180 };
+          const { eye } = cameraFrame(cam);
+          if (out.x * eye.x + out.y * eye.y + out.z * eye.z <= 1e-6) continue;
+          const hidden = hiddenEdgeKeys(c, p, cam);
+          if (['A|B', 'B|C', 'C|D', 'A|D'].some((k) => hidden.has(k))) witnessed = true;
+        }
+      }
+    }
+    expect(witnessed).toBe(true);
+  });
+});
+
+/**
+ * #2819 (ADR-3D-481, found in round #2822): a flat polygon has no body, so a face it shares with a solid is that solid's
+ * surface, never an interior face. «ריבוע ABCD» · «פירמידה ABCDS»: from below the pyramid's base faces the camera and
+ * its edges are drawn solid; from above they border only back-facing faces and stay dashed (ADR-3D-007 §5).
+ */
+describe('#2819 — a pyramid on a stated flat polygon: the base is the pyramid\'s surface', () => {
+  const BELOW = { yaw: HOME_CAMERA.yaw, pitch: -0.8 };
+  const figure = (lines: string[]) =>
+    lines.map((u, i) => {
+      const p = parse3(u);
+      if (!p.ok) throw new Error(u);
+      return { id: `f${i}`, utterance: u, cmds: p.commands, enabled: true } as unknown as Fact3;
+    });
+
+  for (const [lines, base] of [
+    [['ריבוע ABCD', 'פירמידה ABCDS'], ['A|B', 'B|C', 'C|D', 'A|D']],
+    [['משולש ABC', 'פירמידה ABCS'], ['A|B', 'B|C', 'A|C']],
+  ] as const) {
+    it(`${lines.join(' · ')}: no base edge hidden from below; a back base edge still hidden from above`, () => {
+      const facts = figure([...lines]);
+      for (const seed of [0, 1, 2]) {
+        const d = derive3(facts, seed);
+        expect(d.construction.solids.some((s) => s.kind.startsWith('polygon'))).toBe(true);
+        const below = hiddenEdgeKeys(d.construction, d.positions, BELOW);
+        expect(base.filter((k) => below.has(k)), `seed ${seed}, below`).toEqual([]);
+        const home = hiddenEdgeKeys(d.construction, d.positions, HOME_CAMERA);
+        expect(base.some((k) => home.has(k)), `seed ${seed}, home`).toBe(true);
+      }
+    });
+  }
 });
