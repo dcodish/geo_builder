@@ -16221,7 +16221,7 @@ Each of those points moves along a curve.
 
 **Scope (rule 1).** The class is "a centre-only feature asked of the parabola". Measured at pickup: «מרכז הפרבולה», "the centre of the parabola" and «O מרכז הפרבולה» are `not-handled` and escalate. They are not in the plan's *What the student will see*, so they are reported to the operator, not built here (rule 7).
 
-**Ports.** 2-D and 3-D have no parabola: a parity row under the conic family X2 (`parabola-diameter-2625`, `expect: 'refused'`).
+**Ports (ADR-W-170).** 2-D and 3-D have no parabola. The parity row `parabola-diameter-2625` (`expect: 'refused'`) carries two unscheduled gap cells, both found in this round: 2-D BUILDS the sentence (its parabola noun is not read), and 3-D hands it to the model. The conic family X2 could not hold the row, because it makes 2-D a must-refuse builder and a gap cell may not sit there.
 
 **Locks.** `src-analytic/__tests__/parser.test.ts` (#2625 block): five spellings → `parabola-no-diameter`, the controls (the ellipse's and the circle's diameter, «AB מיתר בפרבולה») still read, both locale texts, and the taught chord parsing. `message-floor-2028.test.ts` gains the key's row. The parity row runs the real submit decision.
 
