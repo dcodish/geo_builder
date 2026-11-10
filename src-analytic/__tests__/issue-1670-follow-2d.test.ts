@@ -103,7 +103,7 @@ describe('#1670 row 1 — «OB רדיוס» names a centre that has no letter', 
   });
 
   it('the named centre is then the centre: «O מרכז המעגל» is already known, and «BO = 5» builds', () => {
-    expect(typed(['AB קוטר', 'OB רדיוס', 'O מרכז המעגל']).kinds.at(-1)).toBe('already-known');
+    expect(typed(['AB קוטר', 'OB רדיוס', 'O מרכז המעגל']).kinds.at(-1)).toBe('record');
     expect(typed(['AB קוטר', 'OB רדיוס', 'BO = 5']).kinds.at(-1)).toBe('record');
     const d = derive(['AB קוטר', 'OB רדיוס', 'BO = 5'], 0);
     expect(close(theCircle(d).r, 5)).toBe(true);

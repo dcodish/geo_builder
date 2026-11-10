@@ -4405,6 +4405,8 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 
 ## ADR-CX-084 — A restatement the exact solve already entails adds no row, and says so (#2268)
 
+> **⚠ Superseded in part by [ADR-CX-089](#adr-cx-089)** (2026-11-10, #2790, ADR-W-200): the entailed line is now recorded as its own row, with the suite's `suite.notice.alreadyHeld`. The detector (`entailedBy`, stage 0e′) stands.
+
 **Status:** accepted, 2026-10-17 · **Issue:** [#2268](https://github.com/dcodish/geo_builder/issues/2268) (bug, `P3`, `complex`) · fix round #2304, stream P · branch `fix/2268-complex-entailed-noop` from `main` @ `de7c221f` · plan armed `auto-ok` 2026-10-16
 **Requirements:** [02d](02d-requirements-complex.md) FR-CN-5 (a restatement that adds nothing is answered, not recorded) ·
 **Design:** [04d](04d-design-complex.md), "A restatement the exact solve already entails adds no row" ·
@@ -4511,3 +4513,19 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Locks.** `src-complex/__tests__/canvas-spelling-1497.test.ts`; `issue-1435-sqrt-input.test.ts` re-based («z1 = 1.5 + 2.5i» read «3/2+(5/2)i»).
 
 **Behaviour change for a student:** in the complex panel a number typed as a decimal reads as a decimal in at most two places, never as a fraction.
+
+## ADR-CX-089 — A statement the exact solve already entails is its own row, with the suite notice: complex builds ADR-W-200 (#2790)
+
+**Status:** accepted · 2026-11-10 · feature (P2), fix round #2822 stream H4, branch `fix/2790-analytic-complex`, stacked on 2-D's half ([ADR-W-204](06w-decisions-workspace.md#adr-w-204)) · **builds** [ADR-W-200](06w-decisions-workspace.md#adr-w-200) (operator 2026-11-09: *"it should be accepted but with a notice that it already exists. this should be on all tools"*) · **supersedes in part** [ADR-CX-084](#adr-cx-084) · **LADDER stage:** 0e′ ([LADDER-CX](LADDER-CX.md))
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-5; [02w](02w-requirements-workspace.md) FR-SU-36 and the parity row "Already-there note" · **Design:** [04d](04d-design-complex.md) "A restatement the exact solve already entails"; [04w](04w-design-shell.md) "The already-there note"
+
+**Measured at pickup** (`13f710fe`): «z1 = 3+4i» ×2, «z1 = 3+4i» · «|z1| = 5», «z1 = 3+4i» · «z2 = 1-i» · «z1 = 3+4i», «|z| = 2» ×2 answered `known` (2-D's old sentence, no row). Forced through `acceptLine` each is `ok` with an identical fold; with the first line dropped the relation holds.
+
+**Decision.** The `known` verdict is deleted. `decideSubmitCx` runs the gate first and, for a typed line `lineEntailed` finds entailed, returns `record` with `note: { key: 'already-held' }`; `submitLine` calls `recordLine(line, seed, note)`, which sets `lastNote` in the same commit, and the App words it `suite.notice.alreadyHeld`. A load replays the rows as saved and asks nothing (`replaying`). `setNote` is removed (no caller). The triage replay counts a held line `built` (`held`).
+
+**Known gap (the note's reach).** A held Re/Im or distance value («z1 = 3+4i» · «Re(z1) = 3») records with no note: the exact core does not carry those relations (02d), so the detector cannot see them. Nothing is dropped; the line records either way.
+
+**Locks.** `src-complex/__tests__/already-drawn-1990.test.ts` drives the shared table (`HELD_CASES_COMPLEX`) through the real `submitLine`: one row, the note, no point moving at 4 seeds, and, with the earlier row muted and then deleted, the row carrying the relation alone; controls. Re-based on ADR-W-200's authority: `entailed-noop-2268`, `triage-replay-cx-2241`, `sibling-phrasings`, `app/__tests__/acceptance-gate`.
+
+**Behaviour change for a student:** in complex, «|z1| = 5» after «z1 = 3+4i» (and every exact restatement) is listed as its own row, and the tool says «זה כבר קיים באיור — נוסף כנתון נפרד.» instead of adding nothing.

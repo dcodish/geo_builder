@@ -132,7 +132,7 @@ describe('#1619 B2 — the 471 corpus questions build the exam`s own figure', ()
     // It DRAWS the diameter BD (#1639, ADR-AG-198), so on the exam's figure — BD a diagonal, not drawn — it
     // records; once BD is drawn the statement adds nothing, and says so.
     expect(decideSubmit('BD קוטר במעגל', EXAM_1554, 0)).toMatchObject({ kind: 'record' });
-    expect(decideSubmit('BD קוטר במעגל', [...EXAM_1554, 'BD'], 0)).toMatchObject({ kind: 'already-follows' });
+    expect(decideSubmit('BD קוטר במעגל', [...EXAM_1554, 'BD'], 0)).toMatchObject({ kind: 'record' });
   });
 });
 

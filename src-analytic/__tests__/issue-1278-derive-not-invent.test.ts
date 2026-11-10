@@ -104,7 +104,7 @@ describe('#1278 — the oracle: what the model should have answered builds, and 
   /** The same LINE as the issue's measured `y=4x-5` — the tool itself says so, no equation compared by hand. */
   it('is the line y=4x-5: restating it is already known', () => {
     const { verdicts } = walk(['הישר y-3=4(x-2)', 'הישר y=4x-5']);
-    expect(verdicts).toEqual(['record', 'already-known']);
+    expect(verdicts).toEqual(['record', 'record']);
   });
 
   it('with the point named, the free-direction line plus its slope builds and passes through it', () => {

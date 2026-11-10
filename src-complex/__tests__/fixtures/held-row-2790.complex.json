@@ -1,0 +1,12 @@
+{
+  "app": "complex-builder",
+  "version": 1,
+  "lines": [
+    "z1 = 3+4i",
+    "|z1| = 5"
+  ],
+  "disabled": [0],
+  "freePos": {},
+  "seed": 0,
+  "view": "cart"
+}

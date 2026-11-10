@@ -9,7 +9,7 @@
  * the line as `created`. Fix: `selectorIdentity` compares a `distinct` selector as the set it is.
  */
 import { describe, expect, it } from 'vitest';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 
 describe('#1953 — a restated ring answers «כבר ידוע» in analytic, in any reading', () => {
   it.each([
@@ -20,11 +20,11 @@ describe('#1953 — a restated ring answers «כבר ידוע» in analytic, in 
     ['מלבן ABCD', 'מלבן ADCB'],
     ['טרפז ABCD', 'טרפז CDAB'],
   ])('«%s» · «%s»', (a, b) => {
-    expect(decideSubmit(b, [a], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit(b, [a], 0))).toBe(true);
   });
 
   it('a set of distinct points restated in another order is the same selector', () => {
-    expect(decideSubmit('מרובע DCBA', ['מרובע ABCD'], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('מרובע DCBA', ['מרובע ABCD'], 0))).toBe(true);
   });
 
   it('a crossing order is a different ring and is still refused (#1927)', () => {

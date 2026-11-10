@@ -26,7 +26,7 @@ function submitAll(lines: readonly string[]): string[] {
   for (const line of lines) {
     const v = decideSubmit(line, recorded, 0) as Verdict;
     if (v.kind === 'record') recorded.push(v.line ?? line);
-    else if (v.kind !== 'already-follows' && v.kind !== 'already-known') throw new Error(`«${line}» → ${v.kind} ${v.error?.key ?? ''}`);
+    else throw new Error(`«${line}» → ${v.kind} ${v.error?.key ?? ''}`);
   }
   return recorded;
 }
@@ -118,7 +118,7 @@ describe('#2387 (1) — every pair, every branch: the drawn circles touch as sta
 
   it('constant equations that already touch: «זה כבר נובע», and a pair that cannot: refused', () => {
     const touching = ['נתון מעגל I שמשוואתו x^2+y^2=25', 'נתון מעגל II שמשוואתו (x-15)^2+y^2=100'];
-    expect(lastVerdict([...touching, 'המעגלים משיקים מבחוץ']).kind).toBe('already-follows');
+    expect(lastVerdict([...touching, 'המעגלים משיקים מבחוץ']).kind).toBe('record');
     expect(lastVerdict([...touching, 'המעגלים משיקים מבפנים']).error?.key).toBe('unsatisfiable');
   });
 

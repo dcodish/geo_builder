@@ -73,7 +73,7 @@ describe('#1423 — neighbours unchanged', () => {
   it('#1046: a reused-letter statement that HOLDS is still absorbed, never refused', () => {
     const lines = build();
     const v = decideSubmit('P על המעגל x^2+y^2=16', lines, 0);
-    expect(v.kind === 'already-known' || v.kind === 'already-follows' || v.kind === 'record', JSON.stringify(v)).toBe(true);
+    expect(v.kind, JSON.stringify(v)).toBe('record');
   });
 
   it('ADR-AG-157: a new letter for a crossing that is already named is recorded on it (#1595)', () => {

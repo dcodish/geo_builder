@@ -83,7 +83,7 @@ describe('#2621 B — a line given by its direction alone', () => {
     const two = ['ישר מאונך לציר ה-x', 'ישר המאונך לציר ה-x'];
     expect(kinds(two)).toEqual(['record', 'record']);
     expect(derive(two, 0).figure.curves.filter((q) => q.curve.kind === 'line')).toHaveLength(2);
-    expect(kinds(['ישר מאונך לציר ה-x', 'ישר מאונך לציר ה-x'])).toEqual(['record', 'already-follows']);
+    expect(kinds(['ישר מאונך לציר ה-x', 'ישר מאונך לציר ה-x'])).toEqual(['record', 'record']);
   });
 
   it('the side is its own row, and holds at every seed; a given that contradicts it is refused naming that given', () => {
@@ -106,7 +106,7 @@ describe('#2621 B — a line given by its direction alone', () => {
   });
 
   it('a named line the figure has keeps its reading: the relation about it, as before', () => {
-    expect(last(['נתון ישר l: y=3', 'ישר l מקביל לציר ה-x']).kind).toBe('already-follows');
+    expect(last(['נתון ישר l: y=3', 'ישר l מקביל לציר ה-x']).kind).toBe('record');
     expect(last(['נתון ישר l: y=2x+1', 'ישר l מקביל לציר ה-x']).error?.key).toBe('unsatisfiable');
     expect(derive(['נתון ישר l: y=2x+1', 'ישר l מאונך לציר ה-y'], 0).figure.curves.filter((q) => q.curve.kind === 'line')).toHaveLength(1);
   });

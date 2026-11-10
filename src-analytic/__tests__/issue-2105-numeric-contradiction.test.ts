@@ -71,13 +71,13 @@ describe('#2105 — the same letter with another coefficient or constant: 2-D\'s
 
 describe('#2105 — controls: agreeing values and solvable equations are unchanged', () => {
   it.each([
-    [['משולש ABC', 'AB=4', 'AB=4'], 'already-known'],
-    [['משולש ABC', 'AB=4', 'AB=4.0'], 'already-known'],
-    [['משולש ABC', '∠ABC=40', '∠ABC=40'], 'already-known'],
-    [['משולש ABC', 'AB=2a', 'AB=2a'], 'already-known'],
+    [['משולש ABC', 'AB=4', 'AB=4'], 'record'],
+    [['משולש ABC', 'AB=4', 'AB=4.0'], 'record'],
+    [['משולש ABC', '∠ABC=40', '∠ABC=40'], 'record'],
+    [['משולש ABC', 'AB=2a', 'AB=2a'], 'record'],
     [['משולש ABC', 'AB=2a', 'AB=6'], 'record'], // a number after a letter pins it (a = 3)
     [['משולש ABC', 'AB=2a', 'AB=a+3'], 'record'], // coefficient AND constant changed: an equation that fixes a
-    [['משולש ABC', 'AB=a+3', 'AB=3+a'], 'already-follows'], // the same affine value in another spelling
+    [['משולש ABC', 'AB=a+3', 'AB=3+a'], 'record'], // the same affine value in another spelling
   ])('%j → %s', (lines, kind) => {
     expect(last(lines as string[]).kind).toBe(kind);
   });
