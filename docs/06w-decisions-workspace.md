@@ -7443,6 +7443,23 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 
 **Not changed.** Eligibility (`auto-ok`, no `[proposed]`, no open question), the never-patch escalation exit, item gates, the full suite per landing, the round issue as the live ledger, the published report.
 
+## ADR-W-202 — The Rulings Inbox: one live page holds every test and decision waiting on the operator, with everything needed to answer from a phone, and his answers feed the running round (#2817)
+
+**Status:** accepted · 2026-11-10 · operator request · process (workspace) · builds [ADR-W-201](#adr-w-201)'s "waiting on you" list · beside [ADR-W-116](#adr-w-116) (the round dashboard stays tracking only) and [ADR-W-159](#adr-w-159) (the roadmap page keeps the plan)
+**Operator:** 2026-11-10, in chat:
+> "I will need a live artifact with items that i need ruling on. that would include testing and decisions. this list will be updated when new issues come in or when i provide feedback for a specific test passing or a decision. the computer doing the work is my home pc and i will mostly be monitoring and providing the feedback through claude desktop on remote control so i need this artifact to include as much information as possible for me to decide on."
+
+**Requirements:** none (internal) · **Design:** the fix-round skill Step 2b; `scripts/ruling-inbox/` (the page's source and the item builder)
+
+**Decision.**
+1. **One page, three lists:** Decide, Test, Answered — https://claude.ai/artifact/JZnrjaW56UbrWqgEWbAtxR. Its database has three collections: `items/<id>` and `meta/status`, written only by the session; `answers/<id>`, written only by the page. Writes are owner/editor-only.
+2. **A decision carries** what a student sees today, the context (what the tool does, measured; his earlier rulings, quoted), a Hebrew example, why it is his call, 2–4 options each with what the student would see, its cost and what it rules out, the recommendation and why, and what the answer unblocks. He picks an option, adds a note, or answers in his own words.
+3. **A test carries** the Server URL — the live site when the change is deployed, because he works remotely and the home PC's local server is out of his reach — the Hebrew lines (copyable), Look for, Before, and the pre-played screenshots stored as the page's assets. Pass, or fail with what was wrong.
+4. **The session reads `answers/*` at every wake** and transcribes each answer to its durable home (the issue's `## Operator ruling` comment, `playsheet:close --audit`, a held PR released), then marks the item done with a one-line resolution. An answer can be changed until then. The page never holds a ruling the repo does not.
+5. **Items are written when they arise**, not at the end of a round: escalations, judge escalations, 🎮 cases and pending spot audits. `scripts/ruling-inbox/build-items.mjs` builds them from the repo's own records.
+
+**Why a page and not the issue list.** He answers from a phone, between other work, through remote control: the evidence (screenshots, options, the student's view) must be one tap away, and the answer must reach the running session without a chat round-trip.
+
 ## ADR-W-203 — A lowercase letter that can only be a point label is accepted and written in uppercase; an ambiguous one asks for uppercase, in every builder (#2823)
 
 **Status:** accepted · 2026-11-10 · operator ruling, all four builders · not yet built (#2823) · changes what 2-D's lowercase-names message and analytic's AI fallback do today · LADDER stage: **none** (the reading of a label)

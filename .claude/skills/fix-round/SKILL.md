@@ -264,16 +264,26 @@ Each item, inside its stream:
 Operator, 2026-11-10: *"you work, i answer, you continue working, i continue answering and you deploy in
 between based on what you said so this can go on forever."*
 
-- **His queue grows alongside the work.** Every escalation (Step 4), judge escalation and 🎮 case goes on
-  ONE "waiting on you" list: the round issue's `## Waiting on you` section and the dashboard
-  (`round-event.mjs emit <R> item <key> escalated|ready`). Each line is the question itself, or the case
-  with its Server URL and Hebrew lines, so he can answer from his phone. Post the list in chat whenever it
-  grows, as plain text — never a blocking prompt.
+- **His queue is the Rulings Inbox** (https://claude.ai/artifact/JZnrjaW56UbrWqgEWbAtxR, #2817, ADR-W-202):
+  every escalation (Step 4), judge escalation, 🎮 case and pending spot audit is an item there, written
+  the moment it arises with everything he needs to answer from his phone: a decision's symptom, context,
+  Hebrew example, options with what each shows, costs and rules out, and the recommendation; a test's
+  Server URL (prod when the change is deployed, since he works remotely), Hebrew lines, Look for, Before
+  and the pre-played screenshots. Build them with `node scripts/ruling-inbox/build-items.mjs` (decisions
+  from a `decision-dossier`-shaped file, 🎮 cases from the sheet, `--audits` for spot audits), upload the
+  screenshots as the artifact's assets (Artifact publish `asset: true`), and write `items/*` plus
+  `meta/status` in ONE `ArtifactData` batch. Keep `meta/status` current (round, state, startedAt, wave,
+  lastDeploy, note) on every sync. The round issue's `## Waiting on you` section mirrors it, one line per item.
 - **An item waiting on him is parked; the round goes on** with the next eligible item.
-- **Read his answers at every wake**: his chat messages, the report page's verdicts (`read_db`), and new
-  `## Operator ruling` comments on parked issues. A ruling is transcribed (docs/22 §2e), the plan is
-  re-armed, and the item re-enters the queue at its plan position. A 🎮 pass releases its held PR to the
-  next wave (Step 3); a fail is a report, handled as one.
+- **Read his answers at every wake**: `ArtifactData list` on the inbox's `answers` collection (the page
+  writes `answers/<item id>` as `{choice | verdict, note, at}`), his chat messages, and new
+  `## Operator ruling` comments. Transcribe each answer where it belongs: a decision as the issue's canonical
+  `## Operator ruling — YYYY-MM-DD` comment quoting his choice and note (docs/22 §2e), the plan re-armed and
+  the item back in the queue at its plan position; a spot audit through
+  `npm run playsheet:close -- --audit <sheet>:<id> pass|fail --note "<his note>"`; a 🎮 pass releases its
+  held PR to the next wave (Step 3), a fail is a report, handled as one. Then set the item's
+  `status: "done"` with a one-line `resolution` (what was done, with the commit or comment link); the page
+  moves it to Answered.
 - **Re-arm the Monitor and re-sync the dashboard every wake** (Step 1b): a run of many hours leans on them.
 - **Stops**, whichever comes first:
   1. **24 hours** since the round issue opened;

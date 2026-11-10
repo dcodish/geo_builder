@@ -1,0 +1,404 @@
+<title>Rulings Inbox</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!--
+  #2817 — the operator's RULING INBOX (ADR-W-201's "waiting on you" list). One live page: every decision and
+  every test case waiting on the operator, with everything needed to answer from a phone.
+  Database (capabilities {db, assets}):
+    items/<id>    written by the SESSION only: the question or the case, its evidence, status open|done
+    answers/<id>  written by the PAGE only: the operator's choice/verdict + note
+    meta/status   written by the SESSION: the round's clock, the 🎮 count, the last sync
+  The session reads answers/* at every wake, transcribes them (GitHub, playsheet:close --audit) and sets the
+  item's status to done with a `resolution` line. Source of truth for this file: scripts/ruling-inbox/inbox.html.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one phone-first column — status band, three tabs, expandable cards that carry the whole case. */
+:root{
+  --bg:#f6f7f9;--card:#ffffff;--sunk:#eef1f5;--ink:#1d2330;--muted:#5f6878;--line:#dde2ea;
+  --accent:#2f5aa8;--accent-ink:#ffffff;--accent-soft:#e6edf9;
+  --ok:#17784a;--ok-soft:#e3f3ea;--bad:#b4362b;--bad-soft:#f8e6e3;--warn:#a85f06;--warn-soft:#fbefdc;
+  --font-ui:'IBM Plex Sans',system-ui,'Segoe UI',Arial,sans-serif;
+  --font-he:'IBM Plex Sans Hebrew','IBM Plex Sans','Segoe UI',Arial,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14171d;--card:#1c2029;--sunk:#232835;--ink:#e6e9ef;--muted:#9aa3b2;--line:#303747;
+  --accent:#8db0ec;--accent-ink:#0f1522;--accent-soft:#25324a;
+  --ok:#5ccf91;--ok-soft:#1d3329;--bad:#ee8274;--bad-soft:#3a2321;--warn:#e9ad5a;--warn-soft:#3a2d1b;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14171d;--card:#1c2029;--sunk:#232835;--ink:#e6e9ef;--muted:#9aa3b2;--line:#303747;
+  --accent:#8db0ec;--accent-ink:#0f1522;--accent-soft:#25324a;
+  --ok:#5ccf91;--ok-soft:#1d3329;--bad:#ee8274;--bad-soft:#3a2321;--warn:#e9ad5a;--warn-soft:#3a2d1b;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--font-ui)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--card)}
+.wrap{max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--line)}
+header.top .wrap{padding-block:12px 0}
+.hrow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:19px;font-weight:600;margin:0;letter-spacing:-.01em}
+.sync{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sync.stale{color:var(--warn);font-weight:500}
+.status{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 10px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.status b{color:var(--ink);font-weight:600}
+.meter{display:inline-flex;align-items:center;gap:6px}
+.bar{width:64px;height:6px;border-radius:3px;background:var(--sunk);overflow:hidden;display:inline-block}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar.hot i{background:var(--warn)}
+.statenote{font-size:13px;margin:-4px 0 10px;color:var(--ink)}
+nav.tabs{display:flex;gap:4px}
+nav.tabs a{flex:1;text-align:center;padding:9px 6px 10px;text-decoration:none;color:var(--muted);font-weight:500;font-size:14px;border-bottom:2px solid transparent}
+nav.tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs .n{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:10px;background:var(--sunk);font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums}
+nav.tabs a[aria-current="page"] .n{background:var(--accent);color:var(--accent-ink)}
+main{display:grid;gap:10px;margin-top:14px}
+.empty{padding:28px 18px;text-align:center;color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:var(--r)}
+.empty b{display:block;color:var(--ink);font-weight:600;margin-bottom:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.card.answered{border-color:var(--accent)}
+.card > summary{list-style:none;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 10px}
+.card > summary::-webkit-details-marker{display:none}
+.card > summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.rank{grid-row:span 2;align-self:start;min-width:26px;height:26px;border-radius:13px;background:var(--sunk);display:grid;place-items:center;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.ttl{font-weight:600;line-height:1.35;min-width:0;text-wrap:balance}
+.sub{min-width:0;font-size:13.5px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.chip{font-size:11.5px;letter-spacing:.03em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--sunk);color:var(--muted);font-weight:500}
+.chip.play{background:var(--warn-soft);color:var(--warn)}
+.chip.sent{background:var(--accent-soft);color:var(--accent)}
+.chip.pass{background:var(--ok-soft);color:var(--ok)}
+.chip.fail{background:var(--bad-soft);color:var(--bad)}
+.body{padding:2px 14px 16px;display:grid;gap:14px;border-top:1px solid var(--line)}
+.sec{min-width:0}
+.sec h3{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:12px 0 5px;font-weight:600}
+.sec p{margin:0 0 8px;max-width:65ch}
+.sec p:last-child{margin-bottom:0}
+.he{font-family:var(--font-he)}
+.lines{position:relative;background:var(--sunk);border-radius:8px;padding:10px 12px 10px 12px;font-family:var(--font-he);font-size:15.5px;line-height:1.7;white-space:pre-wrap;direction:rtl;text-align:right;overflow-x:auto}
+.copy{font:500 12.5px var(--font-ui);border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;padding:4px 9px;cursor:pointer;margin-top:6px}
+.server{font-family:var(--font-mono);font-size:13px;word-break:break-all}
+.server a{color:var(--accent)}
+.opts{display:grid;gap:8px}
+.opt{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:var(--card)}
+.opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.opt input{margin:4px 0 0;accent-color:var(--accent);width:17px;height:17px}
+.opt .ol{font-weight:600;min-width:0}
+.opt .rec{display:inline-block;margin-left:6px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ok);font-weight:600}
+.opt dl{grid-column:2;margin:0;display:grid;gap:3px;font-size:13.5px;min-width:0}
+.opt dt{display:inline;color:var(--muted);font-weight:500}
+.opt dd{display:inline;margin:0}
+.recwhy{font-size:13.5px;padding:8px 10px;border-left:3px solid var(--ok);background:var(--ok-soft);border-radius:0 6px 6px 0}
+.verdicts{display:flex;gap:8px;flex-wrap:wrap}
+.vbtn{flex:1;min-width:120px;padding:11px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:600 15px var(--font-ui);cursor:pointer}
+.vbtn[aria-pressed="true"].pass{background:var(--ok);border-color:var(--ok);color:var(--card)}
+.vbtn[aria-pressed="true"].fail{background:var(--bad);border-color:var(--bad);color:var(--card)}
+textarea{width:100%;min-height:64px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:14.5px/1.45 var(--font-ui);resize:vertical}
+textarea:focus-visible,.vbtn:focus-visible,.copy:focus-visible,.send:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sendrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.send{padding:10px 18px;border-radius:8px;border:0;background:var(--accent);color:var(--accent-ink);font:600 15px var(--font-ui);cursor:pointer}
+.send:disabled{opacity:.45;cursor:default}
+.sendmsg{font-size:13px;color:var(--muted)}
+.sendmsg.err{color:var(--bad)}
+.shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.shots figure{margin:0;min-width:0}
+.shots button{display:block;width:100%;padding:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--sunk);cursor:zoom-in}
+.shots img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top}
+.shots figcaption{font-size:12px;color:var(--muted);margin-top:3px}
+.links{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px}
+.links a{color:var(--accent)}
+.resolution{font-size:13.5px;padding:8px 10px;background:var(--sunk);border-radius:6px}
+.mine{font-size:13.5px}
+dialog.lb{padding:0;border:0;background:transparent;max-width:min(96vw,1400px);max-height:94vh}
+dialog.lb::backdrop{background:rgba(8,10,14,.82)}
+dialog.lb img{display:block;max-width:100%;max-height:88vh;border-radius:6px}
+dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
+.note{font-size:12.5px;color:var(--muted);margin-top:18px;max-width:65ch}
+@media (prefers-reduced-motion:no-preference){.card[open] .body{animation:in .16s ease-out}@keyframes in{from{opacity:.4;transform:translateY(-3px)}to{opacity:1;transform:none}}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="hrow"><h1>Rulings Inbox</h1><span class="sync" id="sync">Connecting…</span></div>
+    <div class="status" id="status"></div>
+    <div class="statenote" id="statenote" hidden></div>
+    <nav class="tabs" aria-label="Lists">
+      <a href="#decide" id="tab-decide">Decide <span class="n" id="n-decide">0</span></a>
+      <a href="#test" id="tab-test">Test <span class="n" id="n-test">0</span></a>
+      <a href="#answered" id="tab-answered">Answered <span class="n" id="n-answered">0</span></a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <main id="list" aria-live="polite">
+    <div class="empty"><b>Loading what is waiting on you</b>Decisions and test cases appear here as the fix round finds them.</div>
+  </main>
+  <p class="note">Your answer is saved the moment you send it. Claude reads answers each time it wakes (at least every 30 minutes while a round runs) and moves the item to Answered with what it did. You can change an answer until then. If the round has stopped and is waiting, send any message in the chat to wake it.</p>
+</div>
+
+<dialog class="lb" id="lb"><img id="lbimg" alt=""><p id="lbcap"></p></dialog>
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const state = { items: new Map(), answers: new Map(), meta: null, tab: 'decide', loaded: { items:false, answers:false }, db: null, drafts: {} };
+  const TABS = ['decide','test','answered'];
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const PRODUCT = { '2d':'2-D', '3d':'3-D', analytic:'Analytic', complex:'Complex', workspace:'Workspace', server:'Server' };
+
+  function readTab(){ const h = (location.hash||'').slice(1); state.tab = TABS.includes(h) ? h : 'decide'; }
+  window.addEventListener('hashchange', () => { readTab(); render(); });
+  readTab();
+
+  function ago(ts){
+    if(!ts) return '';
+    const m = Math.round((Date.now() - new Date(ts).getTime())/60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + ' min ago';
+    const h = Math.floor(m/60); return h + ' h ' + (m%60) + ' min ago';
+  }
+  function hoursSince(ts){ return ts ? (Date.now() - new Date(ts).getTime())/3600000 : 0; }
+
+  function bucket(it){
+    if (it.status === 'done') return 'answered';
+    return it.kind === 'decision' ? 'decide' : 'test';
+  }
+
+  function renderStatus(){
+    const m = state.meta || {};
+    const box = $('#status'); const parts = [];
+    if (m.round) {
+      const st = m.state || 'idle';
+      parts.push('<span>Round <b>#' + esc(m.round) + '</b> · <b>' + esc(st) + '</b></span>');
+      if (m.startedAt && st === 'running') {
+        const h = hoursSince(m.startedAt), lim = m.hoursLimit || 24, pct = Math.min(100, h/lim*100);
+        parts.push('<span class="meter">' + h.toFixed(1) + ' of ' + lim + ' h <span class="bar' + (pct>85?' hot':'') + '"><i style="width:' + pct.toFixed(0) + '%"></i></span></span>');
+      }
+      if (m.wave) parts.push('<span>wave <b>' + esc(m.wave) + '</b></span>');
+    } else {
+      parts.push('<span>No round running</span>');
+    }
+    const open = [...state.items.values()].filter(i => i.status !== 'done');
+    const play = open.filter(i => i.kind === 'test' && i.testClass === 'play').length;
+    const lim = (state.meta && state.meta.playLimit) || 10;
+    parts.push('<span class="meter">🎮 waiting <b>' + play + '</b> / ' + lim + ' <span class="bar' + (play>lim*0.8?' hot':'') + '"><i style="width:' + Math.min(100, play/lim*100).toFixed(0) + '%"></i></span></span>');
+    if (m.lastDeploy && m.lastDeploy.tag) parts.push('<span>last deploy <b>' + esc(m.lastDeploy.tag) + '</b>' + (m.lastDeploy.at ? ' · ' + esc(ago(m.lastDeploy.at)) : '') + '</span>');
+    box.innerHTML = parts.join('');
+    const note = $('#statenote');
+    if (m.note) { note.hidden = false; note.textContent = m.note; } else note.hidden = true;
+    const sync = $('#sync');
+    if (m.lastSync) {
+      const mins = (Date.now() - new Date(m.lastSync).getTime())/60000;
+      sync.textContent = 'Updated by Claude ' + ago(m.lastSync);
+      sync.classList.toggle('stale', m.state === 'running' && mins > 45);
+      if (m.state === 'running' && mins > 45) sync.textContent += ' — the round may be stuck';
+    }
+  }
+
+  function linesBlock(lines, builder){
+    if (!lines || !lines.length) return '';
+    const txt = lines.join('\n');
+    return '<div class="lines" dir="rtl" lang="he">' + esc(txt) + '</div><button type="button" class="copy" data-copy="' + esc(txt) + '">Copy lines</button>';
+  }
+
+  function decisionBody(it, ans){
+    const draft = state.drafts[it.id] || {};
+    const chosen = draft.choice != null ? draft.choice : (ans && ans.choice);
+    const note = draft.note != null ? draft.note : (ans && ans.note) || '';
+    let h = '';
+    if (it.symptom) h += '<div class="sec"><h3>What a student sees</h3><p>' + esc(it.symptom) + '</p></div>';
+    if (it.context && it.context.length) h += '<div class="sec"><h3>Context</h3>' + it.context.map(p => '<p>' + esc(p) + '</p>').join('') + '</div>';
+    if (it.example && it.example.lines && it.example.lines.length) h += '<div class="sec"><h3>Example' + (it.example.builder ? ' · ' + esc(PRODUCT[it.example.builder]||it.example.builder) : '') + '</h3>' + linesBlock(it.example.lines) + '</div>';
+    if (it.whyYou) h += '<div class="sec"><h3>Why this is yours</h3><p>' + esc(it.whyYou) + '</p></div>';
+    if (it.options && it.options.length) {
+      h += '<div class="sec"><h3>Options</h3><div class="opts" role="radiogroup">';
+      for (const o of it.options) {
+        const id = 'o-' + it.id + '-' + o.key;
+        h += '<label class="opt" for="' + esc(id) + '"><input type="radio" name="c-' + esc(it.id) + '" id="' + esc(id) + '" value="' + esc(o.key) + '"' + (chosen === o.key ? ' checked' : '') + ' data-act="choose" data-id="' + esc(it.id) + '">'
+          + '<span class="ol">(' + esc(o.key) + ') ' + esc(o.label) + (it.recommended === o.key ? '<span class="rec">Recommended</span>' : '') + '</span><dl>'
+          + (o.detail ? '<div><dt>Student sees: </dt><dd>' + esc(o.detail) + '</dd></div>' : '')
+          + (o.cost ? '<div><dt>Cost: </dt><dd>' + esc(o.cost) + '</dd></div>' : '')
+          + (o.forecloses ? '<div><dt>Rules out: </dt><dd>' + esc(o.forecloses) + '</dd></div>' : '')
+          + '</dl></label>';
+      }
+      h += '</div></div>';
+    }
+    if (it.recommendationWhy) h += '<div class="sec"><div class="recwhy"><b>Recommended (' + esc(it.recommended||'') + '):</b> ' + esc(it.recommendationWhy) + '</div></div>';
+    if (it.unblocks && it.unblocks.length) h += '<div class="sec"><h3>Your answer unblocks</h3><p>' + it.unblocks.map(n => '#' + esc(n)).join(', ') + '</p></div>';
+    h += '<div class="sec"><h3>Your ruling</h3><textarea id="note-' + esc(it.id) + '" data-act="note" data-id="' + esc(it.id) + '" placeholder="Optional: a note, a condition, or a different answer in your words">' + esc(note) + '</textarea></div>';
+    h += sendRow(it, ans, chosen != null || note.trim() !== '');
+    h += linksBlock(it);
+    return h;
+  }
+
+  function testBody(it, ans){
+    const draft = state.drafts[it.id] || {};
+    const verdict = draft.verdict != null ? draft.verdict : (ans && ans.verdict);
+    const note = draft.note != null ? draft.note : (ans && ans.note) || '';
+    let h = '';
+    if (it.why) h += '<div class="sec"><h3>Why this is yours</h3><p>' + esc(it.why) + '</p></div>';
+    if (it.server) h += '<div class="sec"><h3>Where</h3><div class="server"><a href="' + esc(it.server) + '" target="_blank" rel="noopener">' + esc(it.server) + '</a></div>' + (it.serverNote ? '<p class="sub" style="margin-top:4px">' + esc(it.serverNote) + '</p>' : '') + '</div>';
+    if (it.start) h += '<div class="sec"><h3>Start from</h3><p>' + esc(it.start) + '</p></div>';
+    if (it.lines && it.lines.length) h += '<div class="sec"><h3>Type these lines</h3>' + linesBlock(it.lines) + '</div>';
+    if (it.after && it.after.length) h += '<div class="sec"><h3>Then</h3>' + it.after.map(a => '<p>' + esc(a) + '</p>').join('') + '</div>';
+    if (it.lookFor) h += '<div class="sec"><h3>Look for</h3><p>' + esc(it.lookFor) + '</p></div>';
+    if (it.before) h += '<div class="sec"><h3>Before this change</h3><p>' + esc(it.before) + '</p></div>';
+    if (it.shots && it.shots.length) {
+      h += '<div class="sec"><h3>Pre-played screenshots (' + it.shots.length + ')</h3><div class="shots">';
+      it.shots.forEach((s, i) => { h += '<figure><button type="button" data-act="zoom" data-src="' + esc(s.url) + '" data-cap="' + esc(s.caption||'') + '"><img loading="lazy" src="' + esc(s.url) + '" alt="' + esc(s.caption || ('Screenshot ' + (i+1))) + '"></button><figcaption>' + esc(s.caption||'') + '</figcaption></figure>'; });
+      h += '</div></div>';
+    }
+    h += '<div class="sec"><h3>Your verdict</h3><div class="verdicts">'
+      + '<button type="button" class="vbtn pass" data-act="verdict" data-v="pass" data-id="' + esc(it.id) + '" aria-pressed="' + (verdict==='pass') + '">Pass</button>'
+      + '<button type="button" class="vbtn fail" data-act="verdict" data-v="fail" data-id="' + esc(it.id) + '" aria-pressed="' + (verdict==='fail') + '">Fail</button></div>'
+      + '<textarea style="margin-top:8px" id="note-' + esc(it.id) + '" data-act="note" data-id="' + esc(it.id) + '" placeholder="What you saw. Required for a fail: what was wrong">' + esc(note) + '</textarea></div>';
+    h += sendRow(it, ans, verdict === 'pass' || (verdict === 'fail' && note.trim() !== ''));
+    h += linksBlock(it);
+    return h;
+  }
+
+  function sendRow(it, ans, ready){
+    const dirty = !!state.drafts[it.id];
+    let msg = '';
+    if (state.drafts[it.id] && state.drafts[it.id].err) msg = '<span class="sendmsg err">' + esc(state.drafts[it.id].err) + '</span>';
+    else if (ans && !dirty) msg = '<span class="sendmsg">Sent ' + esc(ago(ans.at)) + '. Waiting for Claude to pick it up.</span>';
+    const label = ans ? 'Update answer' : (it.kind === 'decision' ? 'Send ruling' : 'Send verdict');
+    return '<div class="sec sendrow"><button type="button" class="send" data-act="send" data-id="' + esc(it.id) + '"' + ((ready && (dirty || !ans)) ? '' : ' disabled') + '>' + label + '</button>' + msg + '</div>';
+  }
+
+  function linksBlock(it){
+    const L = (it.links || []).slice();
+    if (it.issue && !L.some(l => /issues\/\d+/.test(l.url) && l.url.endsWith('/' + it.issue))) L.unshift({ label: 'Issue #' + it.issue, url: 'https://github.com/dcodish/geo_builder/issues/' + it.issue });
+    if (!L.length) return '';
+    return '<div class="sec links">' + L.map(l => '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>').join('') + '</div>';
+  }
+
+  function answeredBody(it, ans){
+    let h = '';
+    if (ans) {
+      let what = '';
+      if (it.kind === 'decision') { const o = (it.options||[]).find(o => o.key === ans.choice); what = ans.choice ? '(' + ans.choice + ') ' + (o ? o.label : '') : 'note only'; }
+      else what = ans.verdict === 'pass' ? 'Pass' : ans.verdict === 'fail' ? 'Fail' : '';
+      h += '<div class="sec"><h3>You answered</h3><p class="mine"><b>' + esc(what) + '</b>' + (ans.note ? ' — ' + esc(ans.note) : '') + '</p></div>';
+    } else if (it.answeredElsewhere) {
+      h += '<div class="sec"><h3>You answered</h3><p class="mine">' + esc(it.answeredElsewhere) + '</p></div>';
+    }
+    if (it.resolution) h += '<div class="sec"><h3>What Claude did</h3><div class="resolution">' + esc(it.resolution) + '</div></div>';
+    h += '<details class="sec"><summary class="sub" style="cursor:pointer">The original ' + (it.kind === 'decision' ? 'question' : 'case') + '</summary>' + (it.kind === 'decision' ? (it.symptom ? '<p>' + esc(it.symptom) + '</p>' : '') : (it.lookFor ? '<p>Look for: ' + esc(it.lookFor) + '</p>' : '')) + '</details>';
+    h += linksBlock(it);
+    return h;
+  }
+
+  function chipsFor(it, ans){
+    const c = [];
+    if (it.product) c.push('<span class="chip">' + esc(PRODUCT[it.product] || it.product) + '</span>');
+    if (it.kind === 'test') c.push('<span class="chip' + (it.testClass === 'play' ? ' play' : '') + '">' + (it.testClass === 'play' ? '🎮 play' : 'spot check') + '</span>');
+    if (it.round) c.push('<span class="chip">round #' + esc(it.round) + '</span>');
+    if (it.status === 'done') {
+      if (ans && ans.verdict) c.push('<span class="chip ' + esc(ans.verdict) + '">' + esc(ans.verdict) + '</span>');
+      else c.push('<span class="chip pass">done</span>');
+    } else if (ans) c.push('<span class="chip sent">sent</span>');
+    return '<div class="chips">' + c.join('') + '</div>';
+  }
+
+  const openSet = new Set();
+  function render(){
+    TABS.forEach(t => { const a = $('#tab-' + t); if (t === state.tab) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+    const all = [...state.items.values()];
+    const counts = { decide:0, test:0, answered:0 };
+    all.forEach(it => counts[bucket(it)]++);
+    TABS.forEach(t => $('#n-' + t).textContent = counts[t]);
+    renderStatus();
+    const list = $('#list');
+    if (!state.loaded.items) return;
+    let rows = all.filter(it => bucket(it) === state.tab);
+    if (state.tab === 'answered') rows.sort((a,b) => String(b.updated||'').localeCompare(String(a.updated||'')));
+    else rows.sort((a,b) => (a.rank||999) - (b.rank||999) || String(a.created||'').localeCompare(String(b.created||'')));
+    if (!rows.length) {
+      const msg = { decide:['No decisions waiting','When a fix plan needs your call, it appears here with its options and a recommendation.'],
+        test:['Nothing to test','Cases that need your eyes or hands appear here with their screenshots.'],
+        answered:['Nothing answered yet','Your answers move here once Claude has acted on them.'] }[state.tab];
+      list.innerHTML = '<div class="empty"><b>' + msg[0] + '</b>' + msg[1] + '</div>';
+      return;
+    }
+    // keep focus/scroll on re-render: only rebuild when content changed
+    const html = rows.map((it, i) => {
+      const ans = state.answers.get(it.id);
+      const body = it.status === 'done' ? answeredBody(it, ans) : (it.kind === 'decision' ? decisionBody(it, ans) : testBody(it, ans));
+      const sub = it.kind === 'decision' ? (it.symptom || '') : (it.lookFor ? 'Look for: ' + it.lookFor : '');
+      return '<details class="card' + (ans && it.status !== 'done' ? ' answered' : '') + '" data-id="' + esc(it.id) + '"' + (openSet.has(it.id) ? ' open' : '') + '>'
+        + '<summary><span class="rank">' + (state.tab === 'answered' ? '✓' : (i+1)) + '</span><span class="ttl">' + esc(it.title) + '</span><span class="sub">' + esc(sub.length > 160 ? sub.slice(0,157) + '…' : sub) + chipsFor(it, ans) + '</span></summary>'
+        + '<div class="body">' + body + '</div></details>';
+    }).join('');
+    const active = document.activeElement && document.activeElement.id;
+    const caret = active && document.activeElement.selectionStart;
+    list.innerHTML = html;
+    if (active) { const el = document.getElementById(active); if (el) { el.focus(); try { if (caret != null) el.setSelectionRange(caret, caret); } catch(e){} } }
+  }
+
+  document.addEventListener('toggle', e => {
+    const d = e.target; if (!d.classList || !d.classList.contains('card')) return;
+    if (d.open) openSet.add(d.dataset.id); else openSet.delete(d.dataset.id);
+  }, true);
+
+  document.addEventListener('click', async e => {
+    const t = e.target.closest('[data-act],[data-copy]'); if (!t) return;
+    if (t.dataset.copy != null) {
+      try { await navigator.clipboard.writeText(t.dataset.copy); t.textContent = 'Copied'; setTimeout(() => t.textContent = 'Copy lines', 1500); }
+      catch(err) { const pre = t.previousElementSibling; const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); t.textContent = 'Selected — copy it'; }
+      return;
+    }
+    const id = t.dataset.id, act = t.dataset.act;
+    if (act === 'zoom') { $('#lbimg').src = t.dataset.src; $('#lbimg').alt = t.dataset.cap || ''; $('#lbcap').textContent = t.dataset.cap || ''; const d = $('#lb'); if (d.showModal) d.showModal(); return; }
+    if (act === 'verdict') { const d = state.drafts[id] = Object.assign({}, state.drafts[id], { verdict: t.dataset.v, err: null }); keepNote(id); render(); return; }
+    if (act === 'send') { await send(id); return; }
+  });
+  $('#lb').addEventListener('click', () => $('#lb').close());
+
+  document.addEventListener('change', e => {
+    const t = e.target; if (t.dataset.act === 'choose') { state.drafts[t.dataset.id] = Object.assign({}, state.drafts[t.dataset.id], { choice: t.value, err: null }); keepNote(t.dataset.id); render(); }
+  });
+  let noteTimer = null;
+  document.addEventListener('input', e => {
+    const t = e.target; if (t.dataset.act !== 'note') return;
+    state.drafts[t.dataset.id] = Object.assign({}, state.drafts[t.dataset.id], { note: t.value, err: null });
+    clearTimeout(noteTimer); noteTimer = setTimeout(() => { const b = document.querySelector('.send[data-id="' + CSS.escape(t.dataset.id) + '"]'); if (b) { const it = state.items.get(t.dataset.id); const d = state.drafts[t.dataset.id]; const ans = state.answers.get(t.dataset.id); const v = d.verdict != null ? d.verdict : ans && ans.verdict; const c = d.choice != null ? d.choice : ans && ans.choice; b.disabled = it.kind === 'decision' ? !(c != null || t.value.trim()) : !(v === 'pass' || (v === 'fail' && t.value.trim())); } }, 120);
+  });
+  function keepNote(id){ const ta = document.getElementById('note-' + id); if (ta) state.drafts[id].note = ta.value; }
+
+  async function send(id){
+    const it = state.items.get(id); const d = state.drafts[id] || {}; const prev = state.answers.get(id) || {};
+    if (!state.db) { state.drafts[id] = Object.assign({}, d, { err: 'Not connected to the database yet. Try again in a moment.' }); render(); return; }
+    const ta = document.getElementById('note-' + id); const note = (ta ? ta.value : (d.note != null ? d.note : prev.note || '')).trim();
+    const doc = { item: id, kind: it.kind, note, at: new Date().toISOString() };
+    if (it.kind === 'decision') { const c = d.choice != null ? d.choice : prev.choice; if (c != null) doc.choice = c; }
+    else { doc.verdict = d.verdict != null ? d.verdict : prev.verdict; if (doc.verdict === 'fail' && !note) { state.drafts[id] = Object.assign({}, d, { err: 'Say what was wrong, so the fix can start from it.' }); render(); return; } }
+    const btn = document.querySelector('.send[data-id="' + CSS.escape(id) + '"]'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    try { await state.db.doc('answers/' + id).set(doc); delete state.drafts[id]; state.answers.set(id, doc); render(); }
+    catch(err) { state.drafts[id] = Object.assign({}, d, { err: 'Not saved: ' + (err && err.message ? err.message : 'the database refused it') + '. Your text is kept; try again.' }); render(); }
+  }
+
+  // Data
+  const timer = setTimeout(() => { if (!state.loaded.items) { $('#list').innerHTML = '<div class="empty"><b>Can’t reach the inbox yet</b>The page will fill in as soon as the database answers. Check your connection.</div>'; $('#sync').textContent = 'Not connected'; } }, 10000);
+  setInterval(renderStatus, 60000);
+  (async () => {
+    const db = window.claude && window.claude.use ? await window.claude.use('db') : null;
+    if (!db) { clearTimeout(timer); $('#list').innerHTML = '<div class="empty"><b>Sign in to see your inbox</b>This page reads its items from its own database, which needs a signed-in viewer.</div>'; $('#sync').textContent = 'Not connected'; return; }
+    state.db = db;
+    db.collection('items').onSnapshot(snap => {
+      state.items.clear(); snap.docs.forEach(d => { const v = d.data(); if (v) state.items.set(d.id, Object.assign({ id: d.id }, v)); });
+      state.loaded.items = true; if (!snap.metadata.fromCache) clearTimeout(timer); render();
+    }, err => { clearTimeout(timer); $('#list').innerHTML = '<div class="empty"><b>The inbox stopped updating</b>' + esc(err && err.message || '') + ' Reload the page to reconnect.</div>'; });
+    db.collection('answers').onSnapshot(snap => {
+      state.answers.clear(); snap.docs.forEach(d => { const v = d.data(); if (v) state.answers.set(d.id, v); });
+      state.loaded.answers = true; render();
+    }, () => {});
+    db.doc('meta/status').onSnapshot(snap => { state.meta = snap.exists ? snap.data() : null; renderStatus(); }, () => {});
+  })();
+})();
+</script>
