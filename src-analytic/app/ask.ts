@@ -23,14 +23,14 @@ import { foldIndexedName } from '../../shell/indexedName';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
-import { isKnowledge, knownCurve, knownOptions, knownValue, settled, type Figure } from '../engine/evaluate';
+import { isKnowledge, knownCurve, knownOptions, knownValue, settled, vectorInLetters, withLetters, type Figure } from '../engine/evaluate';
 import { locusOf, type LocusResult } from '../engine/locus';
 import { fmtCoefficient } from '../format';
 
-import { curveByName, objectById, tangentLineId, type Id } from '../engine/types';
+import { curveByName, objectById, tangentLineId, type Id, type NumCurve } from '../engine/types';
 import { centreIdOf, curveKindOf } from '../engine/apply';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
-import { valueText } from './panelRows';
+import { pointKnowledge, valueText } from './panelRows';
 import { numeralCurveId, numeralTwin, statedName, type NumeralKind } from '../engine/names';
 
 /**
@@ -55,7 +55,7 @@ import { pointText, scalarText } from './pointText';
 import { readAngleAsk, readRoleRef, readTangentNoun, touchTangentNoun, type RoleRef } from '../parser/parseAnalytic';
 import { angleAt } from '../engine/solve';
 import { angleText, lineAngleOf } from './lineAngle';
-import { curveEquationOf, curveParts, directrixText, locusEquation } from './curveText';
+import { curveEquationOf, curveParts, directrixText, lettersText, locusEquation, symbolicLocusEquation } from './curveText';
 import { parabolaFocus } from '../engine/curves';
 import { ellipseRolePoint, type EllipseRole, type EllipseSide } from '../engine/derived';
 import { ringsNamed } from '../engine/shapes';
@@ -299,8 +299,8 @@ const LOCUS_OF =
  *
  * - «הביעו באמצעות a את <the locus question>»: the same question. The answer is the locus row: the equation when the
  *   configurations agree on it, and with a parameter that moves its coefficients the kind with the existing reason
- *   (ADR-AG-072 §4–5) — the symbolic half is #1186. Read only before a LOCUS question; other questions keep their own
- *   grammar.
+ *   (ADR-AG-072 §4–5) — the symbolic half is #1186. Since #2735 (ADR-AG-458) it is read before EVERY question: the
+ *   answer is in the figure's letters wherever the panel's is («הביעו באמצעות k את שיעורי הנקודה D» asks D's row).
  * - «הראו כי <the locus phrase> הוא / נמצא על <kind> (ומצאו את משוואתו)»: the same row. The kind the sentence states is
  *   not checked: the tool answers, it does not verify (ADR-AG-072 §6).
  *
@@ -318,7 +318,8 @@ const LOCUS_PHRASE = /^(?:ה?מקום\s+ה?גי?אומטרי|(?:[Tt]he\s+)?locus
 
 /** «שיעורי (הנקודה) M», «הקואורדינטות של M», "the coordinates of (point) M" (#2393 R1). */
 const COORDS_OF =
-  withPointName(/^(?:ה?שיעורי|ה?קואורדינטות(?:\s+של)?|(?:[Tt]he\s+)?coordinates\s+of)\s+(?:ה?נקודה\s+|(?:the\s+)?point\s+)?(ℕ)$/);
+  // #2735: «שיעורי הנקודות F1 ו-F2» splits into «שיעורי הנקודות F₁» and «F₂» (`splitAsk`) — the plural noun names one point here.
+  withPointName(/^(?:ה?שיעורי|ה?קואורדינטות(?:\s+של)?|(?:[Tt]he\s+)?coordinates\s+of)\s+(?:ה?נקוד(?:ה|ות)\s+|(?:the\s+)?points?\s+)?(ℕ)$/);
 
 /** «(הערך של) a», "the value of a" — a parameter by its symbol (#2393 R2); taken only for a symbol the register holds. */
 const PARAM_ASK = /^(?:ה?ערך\s+(?:של\s+)?|(?:the\s+)?value\s+of\s+)?([a-zα-ω](?:_\w+)?)$/;
@@ -451,6 +452,9 @@ function askOne(
   // The wrapper a student puts round a question («מהו …», «מצא את …», «…?») is not the question (#1432 am. 1).
   let text = normaliseAsk(question);
   if (!text) return { question, value: null, unreadable: true };
+  // #2735 (ADR-AG-458): «הביעו באמצעות k את …» asks the question it wraps; the answer is in the letters where the panel's is.
+  const expressIn = EXPRESS_IN.exec(text);
+  if (expressIn) text = expressIn[1].trim();
 
   // #2393 R1 (ADR-AG-316) — «(מצאו את) שיעורי (הנקודה) M», "the coordinates of (point) M": the point's own question.
   const coords = COORDS_OF.exec(text);
@@ -489,8 +493,6 @@ function askOne(
    */
   const shown = SHOW_THAT_LOCUS.exec(text);
   if (shown && LOCUS_OF.test(shown[1])) text = shown[1];
-  const expressed = EXPRESS_IN.exec(text);
-  if (expressed && LOCUS_OF.test(expressed[1])) text = expressed[1];
   const loc = LOCUS_OF.exec(text);
   if (loc) {
     /*
@@ -607,8 +609,8 @@ function askOne(
     const o = objectById(d.construction, text);
     // Understood perfectly; the figure simply has no such point (#1111).
     if (!o) return { question, value: null, missing: { name: text, kind: 'point' } };
-    const kx = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === text)?.x ?? null);
-    const ky = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === text)?.y ?? null);
+    // #2735: the panel row's own reading, letters included («(2k, 0)»).
+    const { x: kx, y: ky } = pointKnowledge(d.construction, text);
     /**
      * #1433 — THE PANEL'S OWN DECISION, one seam (`app/pointText.ts`). Asking «C» with two valid
      * positions answered «לא ניתן לחשב מהנתונים» while the panel row beside it listed both options —
@@ -942,8 +944,12 @@ function askOne(
   }
   return {
     question,
-    // #1433 — a measure with a finite option set answers it («3.16 או 5.83»), the panel's own rule.
-    value: k.known ? fmt(k.value) : scalarText(d.construction, readMeasure, fmt),
+    // #1433 — a measure with a finite option set answers it («3.16 או 5.83»), the panel's own rule. #2735 (ADR-AG-458): a
+    // bare length the figure fixes in its letters answers as the segment row does, «10k» — through the same `withLetters`.
+    value: k.known
+      ? fmt(k.value)
+      : (scalarText(d.construction, readMeasure, fmt) ??
+        (plain && BARE_LENGTH.test(text) ? valueText(withLetters(d.construction, { known: false }, readMeasure), fmt) : null)),
     ...(trace ? { trace } : {}),
     ...(mark ? { mark } : {}),
   };
@@ -1003,9 +1009,11 @@ function curveAnswer(d: Derivation, id: Id, name: string | null, question: strin
     if (a0 && b0) trace = traceLine2pt(a0, b0, fmt);
   }
   const options = eqn && 'options' in eqn ? [...new Set(eqn.options.map((o) => curveParts(o).equation))] : null;
+  // #2735 (ADR-AG-458): else the equation in the figure's letters, as the panel row prints it.
+  const letters = eqn && 'letters' in eqn ? symbolicLocusEquation(eqn.letters, fmtCoefficient) : null;
   return {
     question,
-    value: known ? curveParts(known).equation : options && options.length > 1 ? options.join(' או ') : null,
+    value: known ? curveParts(known).equation : options && options.length > 1 ? options.join(' או ') : letters,
     ...(trace && known ? { trace } : {}),
   };
 }
@@ -1048,11 +1056,13 @@ function roleAnswer(
       if (circles.length !== 1) return { question, value: null, host: { kind: 'circle', found: circles.length } };
       cid = circles[0].id;
     }
-    const k = isKnowledge(d.construction, (f) => {
+    const readR = (f: Figure) => {
       const host = f.curves.find((q) => q.id === cid);
       return host && host.curve.kind === 'circle' ? host.curve.r : null;
-    });
-    return { question, value: k.known ? fmt(k.value) : null };
+    };
+    const k = isKnowledge(d.construction, readR);
+    // #2735 (ADR-AG-459): a radius the figure fixes in its letters answers in them, «2k».
+    return { question, value: k.known ? fmt(k.value) : valueText(withLetters(d.construction, k, readR), fmt) };
   }
   // Focus, foci, directrix: THE parabola / THE ellipse. A parameterised conic has no invariant focus,
   // and that is `value: null` in the lane's own honest wording — a different answer from "there is none".
@@ -1063,7 +1073,8 @@ function roleAnswer(
   const hosts = role.role === 'focus' && !role.host ? [...hostsOf(d, 'parabola'), ...hostsOf(d, 'ellipse')] : hostsOf(d, wantKind);
   if (hosts.length !== 1) return { question, value: null, host: { kind: wantKind, found: hosts.length } };
   const cv = knownCurve(d.construction, hosts[0].id);
-  if (!cv) return { question, value: null };
+  // #2735 (ADR-AG-459): a conic the givens fix only in the student's letters answers its role in them, «(2k, 0)», «x = -2k».
+  if (!cv) return { question, value: roleInLetters(d, hosts[0].id, (cur, f) => conicRoleText(cur, role, question, f), fmt) };
   if (cv.kind === 'ellipse') return ellipseRoleAnswer(cv, role, question, fmt);
   if (cv.kind === 'parabola') {
     // The directrix in the one role-line wording the panel prints (am. 1) — derived from the line
@@ -1073,6 +1084,45 @@ function roleAnswer(
     return { question, value: `(${fmt(fp.x)}, ${fmt(fp.y)})` };
   }
   return { question, value: null };
+}
+
+/** A conic's role, printed by the numeric arms above from one configuration's curve — what {@link roleInLetters} runs. */
+function conicRoleText(cur: NumCurve, role: RoleRef, question: string, fmt: (v: number) => string): string | null {
+  if (cur.kind === 'ellipse') return ellipseRoleAnswer(cur, role, question, fmt).value;
+  if (cur.kind !== 'parabola') return null;
+  // y² = 2px: the directrix is x = −p/2 (`parabolaDirectrix`), written as the role line `directrixText` writes a vertical one.
+  if (role.role === 'directrix') return `x = ${fmt(-cur.p / 2)}`;
+  const fp = parabolaFocus(cur);
+  return `(${fmt(fp.x)}, ${fmt(fp.y)})`;
+}
+
+/**
+ * A ROLE IN THE STUDENT'S LETTERS (#2735, ADR-AG-459) — the numeric arm's own printer, run at every configuration of the
+ * pool with a formatter that records each number it prints; each recorded number is then read by the one letter reader
+ * (`vectorInLetters`) and printed in the letters. The words are the numeric answer's; one configuration that prints a
+ * different shape (another axis major, a side the ellipse lacks there) and nothing is answered.
+ */
+function roleInLetters(
+  d: Derivation,
+  hostId: Id,
+  print: (cur: NumCurve, fmt: (v: number) => string) => string | null,
+  fmt: (v: number) => string,
+): string | null {
+  let template: string | null = null;
+  const monos = vectorInLetters(d.construction, (f) => {
+    const cur = f.curves.find((q) => q.id === hostId)?.curve;
+    if (!cur) return null;
+    const nums: number[] = [];
+    const text = print(cur, (v) => {
+      nums.push(v);
+      return `\u0000${nums.length - 1}\u0000`;
+    });
+    if (text === null || (template !== null && text !== template)) return null;
+    template = text;
+    return nums;
+  });
+  if (!monos || monos === 'pending' || template === null) return null;
+  return (template as string).replace(/\u0000(\d+)\u0000/g, (_, i: string) => lettersText(monos[Number(i)], fmt));
 }
 
 /**

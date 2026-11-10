@@ -2003,7 +2003,7 @@ export function App() {
                  * would have to be set correctly at every mint site, and the name already answers
                  * truthfully at all of them.
                  */
-                rows: knows.curves.map(({ id, known, pending, options, letters }) => {
+                rows: knows.curves.map(({ id, known, pending, options, letters, symbolic }) => {
                   const c = d.figure.curves.find((cu) => cu.id === id)!;
                   // The SAME honesty gate the point rows use: an equation prints only when every
                   // coefficient is invariant across the free DOFs. A parabola whose `a` is still
@@ -2049,7 +2049,7 @@ export function App() {
                   const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }) : null;
                   return (
                     <span key={c.id}>
-                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : options ? options.map((o) => curveParts(o, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }).equation).join(` ${isolateRtlName('או')} `) : openCurveText(d.construction, c.id))} />
+                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : options ? options.map((o) => curveParts(o, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }).equation).join(` ${isolateRtlName('או')} `) : openCurveText(d.construction, c.id, symbolic))} />
                       {parts?.details && (
                         <details style={askTraceBox} open>
                           <summary style={askTraceToggle} title={t('curveDetailsToggle')}>

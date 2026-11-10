@@ -10,6 +10,8 @@ conventions otherwise: every significant decision gets an entry. The contract is
 
 ## ADR-AG-001 — Product accepted; the doc-19 §6 deadlock resolved (2026-09-03)
 
+**⚠ Partly superseded by [ADR-AG-458](#adr-ag-458) (2026-11-10):** D1's "a value that moves with a parameter is never written as an expression in it". A coordinate, a length or a curve's equation that is one monomial in the student's letters is now shown in them (#2735); NO CAS stands.
+
 **Context.** The analytic tool was registered in the workspace ([docs/22 §9](22-workflow.md)) and
 deliberately queued **last** ([ADR-CX-001](06d-decisions-complex.md#adr-cx-001) D5, "we will leave
 analytic to the end"). Its plan, [docs/19](archive/19-analytic-geometry-tool.md), was drafted 2026-07-06 off
@@ -16244,3 +16246,49 @@ Each of those points moves along a curve.
 **Locks.** Unit: `src-analytic/__tests__/block-roots-2731.test.ts` (`enumerateBlockRoots` alone: the parabola's two roots, the four circles, a rejected root deflated past, the domain filter, the direction period, the cap, the bounded work, determinism). Fixtures: `exam-2021-special-q1-parabola-2731.analytic.json`, `exam-2023b-q1-four-circles-2731.analytic.json`. `issue-2731-determined-roots.test.ts` (`pipeline-lock:`, 18 cases; 11 fail before the fix): every line above, the refusal «x_K < 1» as its own case, the swapped order, the English twin, the controls, the p2-15 open answer with its three ellipses reached by the button, and the parabola's two equations. `issue-2621b-direction-line.test.ts`'s p2-15 case now asserts the open answer instead of the book's single equation. No parity row: a coordinate parameter is analytic-only.
 
 **Behaviour change for a student:** a figure the givens determine up to a choice of solution now shows every solution: «p» answers «2 או 18» and «הציגו תצורה אחרת» reaches p = 18; with three or more solutions (four circles; the book's p2-15, three ellipses) the value shows no single answer and the button reaches each. A comparison only another solution satisfies («x_K < 10») is recorded and draws that solution, instead of being refused; «x_K = 18» is recorded instead of «זה כבר נובע». A crossing pair through a point already on the curve now lists both letters' positions.
+
+## ADR-AG-458 — A value the figure fixes as a monomial in the student's letters is shown in them: coordinates, lengths, curve equations (#2735)
+
+**Date:** 2026-11-10 · **Status:** accepted · feature (P2, analytic) · fix round #2822 stream G2, branch `feat/2735-parameter-answers` · plan: the #2735 "Fix plan (feature, PR route)" · operator 2026-11-07: *"yes - we should support (2k,0) in the data panel"*; 2026-11-09: *"re the question about k - we go with option C"* (coordinates, curve equations and lengths, in the data panel and the question box). LADDER stage: none (the knowledge gate, a read of the configuration pool). **Supersedes in part** [ADR-AG-001](#adr-ag-001) D1 ("a value that moves with a parameter is never written as an expression in it"); NO CAS stands.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R173 (amended) · **Design:** [04c](04c-design-analytic.md) § "The third verdict" (one letter reader, its callers).
+
+**Measured before** (`86768862`, `panelKnowledge` → `pointText` / `segmentLengthText` / `openCurveText`, and `ask`): exam 9's ellipse x²/144 + y²/(144 − 4k²) = 1 with 0 < k < 6, «F1 הוא המוקד הימני של האליפסה»: F₁ «(x_F₁, 0)»; the midpoint of «A(2k,0)» «B(0,4k)»: «—»; exam 16's circle about the right focus F through the vertex E: «O(F), r = r_F», and «משוואת המעגל» no value; exam 9's A on the parabola with focus F₁ and AF₁ = 10k: «—», and AF₁ nothing. The printed lines of exam 9's first given and of exam 16's circle do not parse today (a domain clause on the equation line; the circle's one-sentence spelling); the figures were built in the grammar's own spellings.
+
+**Class (docs/17 §1).** *A value that the figure fixes as a simple function of a free parameter is shown as an unknown or as nothing, because every value gate accepts only a value identical across configurations. The one reader that recognises a dependence on a letter existed only for loci (ADR-AG-351).*
+
+**Decision.**
+1. **One letter reader.** `fitMonomial` (`engine/locusFit.ts`) is exported as `readInLetters(values, envs, letters)`: the lowest-degree monomial `c·∏ letterᵉ` (total degree ≤ 2) whose ratio snaps to one exact form, checked at EVERY sample. The locus fit calls it unchanged; `curveInLetters` reads a drawn curve's canonical parameters with it (a line made monic as `normalized` makes a locus line).
+2. **A third verdict for a value** (`engine/evaluate.ts`): `valueInLetters` and `curveEquationInLetters` read over the SAME admitted configuration pool every gate judges (no new sweep), each configuration's `env` holding the letters' values. Only the student's letters (never a direction or radius tool symbol), only those that move across the pool, at most two. No letter: the pool is never touched, so a numeric figure is unchanged. A deferred pool not yet complete answers pending («בודק…»), as every gate does (#1473).
+3. **Opted in by the rows the ruling names, never by the one value gate.** `withLetters` adds the verdict to an OPEN verdict (not known, no option set, not pending) for a point's coordinates (`pointKnowledge`, `panelRows.ts`, which the panel and the ask lane's point arm both call) and a segment's length (`segmentKnowledge`, and the ask lane's bare length). `curveEquationOf` (the one decision the curve row and every ask arm print) gains `{ letters }` after the known equation and the option set. A slope, an angle and a parameter's own row do not read it.
+4. **Printed as the locus equations print.** `lettersText` (`curveText.ts`) is the locus monomial spelling with its sign: `2k`, `-2k`, `k/2`, `2√5k`. A point prints each coordinate as a number or its monomial, «(2k, 0)», «(k, 2k)»; one coordinate in letters and the other open keeps the half form «(2k, y_P)». A curve prints through `symbolicLocusEquation`, so exam 16's circle reads «(x − 3k)² + y² = (2k)²», its r² written as a square as every locus circle is (#1187; the plan's text wrote «4k²»). A stated curve keeps the student's own equation on its row; the question box answers its form in the letters.
+5. **Domain.** The pool samples only admissible letter values, so with «k > 0» |AB| = 2√5k reads; with no sign on k the ratio changes sign and nothing is read.
+6. **A letter to answer in is a free parameter** (found at the round #2822 wave tip with [ADR-AG-451](#adr-ag-451)). A DETERMINED figure (every admitted configuration has `carrierDof` 0) has none: its letters are unknowns the givens pin to finitely many roots. The book's p2-15 ellipse (`a`, `b` from «נתונה אליפסה שציריה הם צירי השיעורים», three roots) read «x²/a² + y²/b² = 1», a² = a², where the answer is its three solutions. `letterPool` returns nothing for such a figure. Limit: a letter pinned to three or more roots in a figure free ELSEWHERE is not told apart from a free one (the pool repeats configurations, so a repeat count is no test); no case is known.
+
+**A lock re-based.** `issue-1432-measure-roles.test.ts`'s «a PARAMETERISED parabola has no invariant focus — the honest null» asserted null for «מוקד הפרבולה» on y² = 2ax, the student's own free letter. The operator's ruling (2026-11-07, option C 2026-11-09) overturns that premise: it now answers «(a/2, 0)», still never a sampled point.
+
+**Not CAS.** Nothing is simplified, expanded or solved: measure, snap a ratio, substitute back at every configuration. A dependence that is not a monomial (`k + 1`, `√(144 − 4k²)`) is not found and the row stays as before. "Pinning a parameter is a numeric root-find" is unchanged.
+
+**Ports (ADR-W-157).** 3-D's twin is #1829 (vector answers in t), its own copy of the idea. 2-D and complex have no free parameters of this kind.
+
+**Locks.** `src-analytic/__tests__/locusFit.test.ts`: the reader (2k, k/2, 3k²; k + 1 and √(144 − 4k²) not read; one sample off refuses; 2|k| over both signs refuses) and `curveInLetters` (a circle, a scaled line made monic; a constant curve, a non-monomial and a changing family read nothing). `panel.test.ts`: exam 9's F₁ (2k, 0), A (8k, 8k), AF₁ 10k; exam 16's F (3k, 0), E (5k, 0), B (0, 4k) and the circle row; the midpoint (k, 2k); a non-monomial row unchanged; a numeric figure unchanged. Regression lock: the fixture `answer-in-parameter-q16-2735.analytic.json` (the fixtures net); exam 9 is locked by its `panel.test.ts` rows, because as a fixture it trips the #2691 letter sweep (A and F₁ letters on the directrix ink, a label-placement defect the canvas has without this change; reported on #2691).
+
+**Behaviour change for a student:** in analytic, a point, a segment length or a curve equation that depends on a parameter now shows in that letter, «(2k, 0)», «10k», «(x − 3k)² + y² = (2k)²», where the panel showed «(x_F₁, 0)», «—» or the circle's definition. On a figure with a parameter an open row may show «בודק…» for a moment before it settles.
+
+## ADR-AG-459 — The question box answers in the letters: «הביעו באמצעות k את …» asks the question it wraps (#2735)
+
+**Date:** 2026-11-10 · **Status:** accepted · feature (P2, analytic) · same branch and rulings as [ADR-AG-458](#adr-ag-458) (option C: *the question box alike*). LADDER stage: none (the ask lane).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R173 (amended) · **Design:** [04c](04c-design-analytic.md) § "The third verdict".
+
+**Measured before** (`86768862`): «הביעו באמצעות k את שיעורי F» and «הביעו באמצעות k את משוואת המעגל» were `unreadable`; the imperative was read only in front of a locus question.
+
+**Decision.**
+1. `askOne` strips `EXPRESS_IN` («הביעו / הבע / בטאו … באמצעות / בעזרת <letter> את …») before every rule, not only before a locus question; a locus question reads exactly as before. The answer is whatever the lane answers for the question it wraps: in the letters where the panel's row is (ADR-AG-458), a number where the figure fixes one.
+2. `COORDS_OF` reads the plural noun, «שיעורי הנקודות F₁», because `splitAsk` hands the first part of «שיעורי הנקודות F1 ו-F2» over with it.
+3. The point arm reads `pointKnowledge` (the panel's own), a bare length reads `withLetters`, and `curveAnswer` prints `{ letters }`: each answer is the panel row's text.
+4. **A role of a conic the givens fix only in the letters** (`roleAnswer`: a parabola's focus and directrix, an ellipse's foci, vertices, axes, a circle's radius) answers in them: `roleInLetters` runs the numeric arm's own printer at every configuration of the pool with a formatter that records each number, and `vectorInLetters` reads each recorded number with the one reader. The words are the numeric answer's; a configuration that prints another shape (another major axis) answers nothing. Exam 9 asks «הביעו באמצעות k את משוואת מדריך הפרבולה»: «x = -2k».
+
+**Locks.** `src-analytic/__tests__/ask.test.ts`: exam 16's «מהם שיעורי F?» and «הביעו באמצעות k את שיעורי הנקודה F» → «(3k, 0)», «הביעו באמצעות k את משוואת המעגל» → «(x − 3k)² + y² = (2k)²», «FE» → «2k»; exam 9's «הביעו באמצעות k את שיעורי הנקודות F1 ו-F2» → «(2k, 0)», «(-2k, 0)»; |AB| with no sign on k unanswered, with k > 0 answered; y² = 8kx's focus «(2k, 0)» and directrix «x = -2k»; an ellipse's foci «(3k, 0), (-3k, 0)», a radius «2k», a major axis «10k».
+
+**Behaviour change for a student:** in analytic, «הביעו באמצעות k את …» typed in the question box is answered (it was «לא הבנתי»), in the letter when the figure fixes the value in it.
