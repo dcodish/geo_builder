@@ -4034,6 +4034,16 @@
       ],
       "at": "2026-11-10T13:50:21.025Z",
       "status": "escalated"
+    },
+    {
+      "id": "text-2625-parabola-no-diameter",
+      "kind": "text",
+      "issue": "#2625",
+      "what": "The refusal for «AB קוטר בפרבולה» (a parabola has no centre, so no diameter); the refusal-style lock asks for one next step",
+      "choice": "«לפרבולה אין מרכז, ולכן אין לה קוטר. אם התכוונתם למיתר, כתבו «AB מיתר בפרבולה».» — the reason, then the chord sentence in the student's own letters, which the next line reads",
+      "chosen": true,
+      "at": "2026-11-10T15:30:56.751Z",
+      "status": "pending"
     }
   ],
   "demoted": {
