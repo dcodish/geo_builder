@@ -4253,6 +4253,108 @@
       "chosen": true,
       "at": "2026-11-11T09:59:17.479Z",
       "status": "pending"
+    },
+    {
+      "id": "decisions-2026-11-11-2790-3d-definitional",
+      "question": "In 3-D, a restatement that DEFINES something already defined (a plane equation in another spelling; a repeated 'D on the circle') is refused on fix/2790-3d. (a) its own held row, inert while its twin is enabled, live when the twin is unticked or deleted, configuration kept; (b) keep the old «כבר קיים» with no row.",
+      "class": "restatement-row-behaviour",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "Under ADR-W-200 any input already in the figure, a restated definition included, is accepted in every builder as its own row with the already-exists notice; in 3-D a definitional restatement is inert while its twin is enabled and takes over when the twin is unticked or deleted; never refused, never row-less.",
+      "precedents": [
+        {
+          "quote": "ruling - if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists. this should be on all tools. logic is that basically this should not happen but if it does, we accept it for cases where the user might want to delete/disable a previous input and still wants a specific relation to exist. so this needs to be done in all cases. this ruling is for all tools.",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-200"
+        },
+        {
+          "quote": "we had a ruling already that if an input already exists we still accept it and tell user this is already know.",
+          "date": "2026-11-10",
+          "link": "https://github.com/dcodish/geo_builder/issues/2790"
+        }
+      ],
+      "at": "2026-11-11T10:04:02.670Z",
+      "status": "pending"
+    },
+    {
+      "id": "d1111-2221-flat-ratio",
+      "question": "A ratio whose numerator is a flat triangle («היחס בין שטח Oz1z2 לשטח Oz1z3», z1=1, z2=2, z3=3i): (A) show 0; (B) the no-triangle refusal.",
+      "class": "flat-triple-measure",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "The area or perimeter of three collinear numbers is refused with the no-triangle sentence wherever it appears, a ratio's numerator included; the ratio is never answered 0 from it.",
+      "precedents": [
+        {
+          "quote": "Refuse it: these three numbers make no triangle.",
+          "date": "2026-10-16",
+          "link": "https://github.com/dcodish/geo_builder/issues/2221#issuecomment-6222704983"
+        }
+      ],
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "pending"
+    },
+    {
+      "id": "d1111-2164-capital-z",
+      "question": "«Z1 = 3+4i» in capitals: teach / accept and write lowercase with a notice / keep as typed.",
+      "class": "complex-number-name-case",
+      "verdict": "escalate",
+      "reason": "Reverses a shipped promise either way (02d P2 promises capitals read); ADR-W-203 covers point labels only.",
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-2813-reflex-angle",
+      "question": "Accept a reflex interior angle («∠BCD = 250°») now in three builders, or keep refusing and file a feature.",
+      "class": "reflex-interior-angle-input",
+      "verdict": "escalate",
+      "reason": "A feature's scope and timing (reserved).",
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-2831-mirror-same",
+      "question": "Does a mirror image count as the same solution when ordering «הציגו תצורה אחרת»?",
+      "class": "alternative-configuration-solution-identity",
+      "verdict": "escalate",
+      "reason": "No precedent; his 2026-11-10 'two answers, give both' rulings point the other way from ADR-3D-461's grouping.",
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-2823-axis-letter",
+      "question": "«נקודה x»: ask for uppercase, or accept as «נקודה X» with the notice.",
+      "class": "lowercase-point-label-certainty",
+      "verdict": "escalate",
+      "reason": "ADR-W-203 never says whether an axis letter after the point noun is 'for sure' a point.",
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-analytic-both-zoom",
+      "question": "Analytic, conic chip on «both»: fit the view to the figure and clip far directrices, or keep fitting everything.",
+      "class": "analytic-view-fit-annotations",
+      "verdict": "escalate",
+      "reason": "Reverses ADR-AG-376 §5 (chip marks inside the frame); R127 never says whether a directrix is part of the shape.",
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-2838-all-solids",
+      "question": "Does the 2026-11-10 unlettered-pyramid ruling cover other unlettered solids («משולש ABC» · «קובייה» draws a new cube on the first free letters)?",
+      "class": "unlettered-solid-over-existing-letters",
+      "verdict": "escalate",
+      "reason": "One option pick about a pyramid; no stated rule for solid nouns; ADR-3D-351 says no solid's default lettering changes.",
+      "at": "2026-11-11T10:12:57.683Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-2838-second-solid",
+      "question": "«קובייה» · «קובייה»: keep «כבר קיים», or draw a second cube on the first free letters?",
+      "class": "unlettered-solid-redeclare",
+      "verdict": "escalate",
+      "reason": "Reverses ADR-3D-047's idempotent re-declare; no precedent.",
+      "at": "2026-11-11T10:12:57.683Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
