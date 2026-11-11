@@ -4178,6 +4178,81 @@
       "chosen": true,
       "at": "2026-11-10T16:16:52.922Z",
       "status": "pending"
+    },
+    {
+      "id": "decisions-2026-11-11-pr2818",
+      "question": "Should PR #2818 (#2817, workspace) — the Rulings Inbox — be merged to main?",
+      "class": "feature-play-and-approve",
+      "verdict": "escalate",
+      "reason": "Reserved: merging a feature PR is the operator's own play-and-approve gate (ADR-W-007) and a feature-scope decision; no recorded approval found — use of the page is not approval.",
+      "nearest": [
+        {
+          "quote": "I think need a judgment agent that can make decisions on my behalf based on historic decisions and guidelines I gave",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-173"
+        }
+      ],
+      "at": "2026-11-11T09:42:59.344Z",
+      "status": "escalated"
+    },
+    {
+      "id": "2742-typed-decimal-locus",
+      "question": "Once the equation is recognised, how should the number the student typed appear in it? A student types «A(1.4142,0) · נקודה M · MA = 3»; M's locus chip is a circle centred at A with radius 3. Today it answers «מעגל» with no equation because 1.4142 is neither a small rational nor a surd.",
+      "class": "number-display",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "The locus is determined, so its equation prints (R87). A decimal the student typed is shown like every other number: computed in full and displayed to two decimals where needed (sr-22, #723), so the chip reads «מעגל · (x − 1.41)² + y² = 3²».",
+      "precedents": [
+        {
+          "quote": "I think we need to show the equation if we can determine it",
+          "date": "2026-09-16",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06c-decisions-analytic.md#adr-ag-072"
+        },
+        {
+          "quote": "only if we are positive about the equation we show it. otherwise, we stick to showing the shape.",
+          "date": "2026-09-16",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06c-decisions-analytic.md#adr-ag-072"
+        },
+        {
+          "quote": "the tool should display to decimals after the point whenever needed. But it should calculate the full number. Now, if a number is 7.999, we would round it to 8.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/issues/2361#issuecomment-6580876555"
+        },
+        {
+          "quote": "2 decimal points is always right for this tool - if this is the question",
+          "date": "2026-08-19",
+          "link": "https://github.com/dcodish/geo_builder/issues/723#issuecomment-5342347995"
+        },
+        {
+          "quote": "2394 - option a.",
+          "date": "2026-10-20",
+          "link": "https://github.com/dcodish/geo_builder/issues/2394#issuecomment-6289650832"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Option (c) is ruled out by R87: the circle is the same at every seed. Option (b) is ruled out by sr-22 (a typed value with more than two decimals shows rounded; ADR-W-179 decision 2). Not decided here: a typed surd or fraction printed exactly (#2741); recognising 1.4142 as √2 (must not, ADR-AG-429 §3); the snap/self-check mechanism (ADR-AG-072 §7 must survive); near-integer display (sr-22, e.g. 2.9999 → 3).",
+      "at": "2026-11-11T09:58:13.990Z",
+      "status": "pending"
+    },
+    {
+      "id": "text-2835-parabola-no-centre-retired",
+      "kind": "text",
+      "issue": "#2835",
+      "what": "The parabola-has-no-centre refusal (#2625) gets its next step once the vertex is read: the old «הכלי עדיין לא קורא אותו» clause retires",
+      "choice": "«לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «{{name}} קודקוד הפרבולה».» (no letter in the sentence: «…, כתבו «שיעורי קודקוד הפרבולה».» in the ask box, «…, כתבו «V קודקוד הפרבולה».» in the submit lane) / \"A parabola has no centre. If you meant its vertex, write \"{{name}} is the vertex of the parabola\".\"",
+      "chosen": true,
+      "at": "2026-11-11T09:59:17.479Z",
+      "status": "pending"
+    },
+    {
+      "id": "text-2743-third-crossing-equation-line",
+      "kind": "text",
+      "issue": "#2743",
+      "what": "The ruled third-crossing sentence (#1834) when the line is an equation or a named line, not two letters: the line slot reads «הישר <as typed>»",
+      "choice": "«הישר x=-4 כבר חותך את המעגל ב-K וב-L — לישר אין נקודת חיתוך שלישית עם המעגל.» / \"The line x=-4 already crosses the circle at K and L — a line has no third crossing with a circle.\" (a two-letter line keeps «AC כבר חותך …» unchanged)",
+      "chosen": true,
+      "at": "2026-11-11T09:59:17.479Z",
+      "status": "pending"
     }
   ],
   "demoted": {
