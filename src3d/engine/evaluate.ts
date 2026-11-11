@@ -4271,8 +4271,10 @@ function evaluateSolidsAndPoints(
       for (const sym of vd.symbols ?? []) {
         const given = symbolValueOf(c, sym);
         const keyPt = c.vecDefs.find((d) => d.symbols?.includes(sym) || d.symbol === sym)?.unknown ?? vd.unknown;
-        const neg = c.paramSigns.some((g) => g.sym === sym && !g.positive);
-        const v = given ?? (neg ? sample(seed, `sym-${sym}-${keyPt}`, -0.8, -0.2) : sample(seed, `sym-${sym}-${keyPt}`, 0.2, 0.8));
+        // #1524 (ADR-3D-477): a letter's stated range chooses its window, as for the one-letter ratio above (a sign
+        // gives the same (0.2, 0.8) / (−0.8, −0.2) as before).
+        const [k0, k1] = boundWindow3(symBound3(c, sym), 0.2, 0.8, 0.2);
+        const v = given ?? sample(seed, `sym-${sym}-${keyPt}`, k0, k1);
         letterVals.set(sym, v);
         ratioSymbols?.set(sym, v);
       }
