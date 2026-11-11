@@ -37,7 +37,7 @@ describe('#1394 — asking the 3-D decision changes nothing', () => {
     const f = useGeo3.getState().facts[0];
     useGeo3.setState({ facts: [{ ...f, enabled: false }] });
     const v = askPurely("תיבה ABCDA'B'C'D'");
-    expect(v.kind).toBe('already-stated');
+    expect(v.kind).toBe('retick'); // #2790 (ADR-3D-484): a muted twin is re-ticked (the verdict describes it)
     expect(useGeo3.getState().facts[0].enabled, 'still disabled — asking did not re-enable it').toBe(false);
   });
 

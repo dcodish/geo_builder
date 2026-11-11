@@ -39,7 +39,7 @@ function play(lines: readonly string[]) {
   let error: Parameters<typeof errorText3>[1] | null = null;
   for (const line of lines) {
     const v = decideSubmit3(st, line, () => `f${++n}`);
-    kinds.push(v.kind);
+    kinds.push((v.kind === 'record' && v.held ? 'held' : v.kind));
     if (v.kind === 'refused') error = v.error as never;
     if (v.kind === 'record') st = { facts: v.facts, seed: v.seed };
   }
@@ -90,7 +90,7 @@ describe('#1991 — search first, refuse last: what is NOT refused', () => {
   });
 
   it('the simple order of the same letters still builds', () => {
-    expect(play(['ריבוע ABCD', 'מרובע ADCB']).kinds).toEqual(['record', 'already-stated']);
+    expect(play(['ריבוע ABCD', 'מרובע ADCB']).kinds).toEqual(['record', 'held']);
   });
 
   it('a ring declared ONCE is never its own crossed partner', () => {

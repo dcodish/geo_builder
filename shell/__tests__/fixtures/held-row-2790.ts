@@ -46,6 +46,26 @@ export const HELD_CASES_2D: readonly HeldCase[] = [
   { lines: ['משולש ABC', 'D על AB', 'D על BA'], earlier: 1, why: 'a reversed rider — moved D up to 3.3 (#2795 H2)' },
 ];
 
+/** 3-D's cases ([ADR-3D-484](../../../docs/06b-decisions-3d.md#adr-3d-484)): the #1990 / ADR-3D-449 lines that answered
+ *  «כבר קיים» with no row, and #2795's mover. 2-D's plane lines ride the same 3-D grammar where 3-D reads them. */
+export const HELD_CASES_3D: readonly HeldCase[] = [
+  { lines: ['ריבוע ABCD', 'ריבוע ABCD'], why: 'an exact repeat of a shape (the ruling’s own line)' },
+  { lines: ['פירמידה SABC', 'משולש ABC', 'משולש ABC'], why: 'an exact repeat of a face' },
+  { lines: ['פירמידה SABC', 'זווית ABC = 90', 'זווית ABC = 90'], earlier: 1, why: 'an exact repeat of a right angle' },
+  { lines: ['ריבוע ABCD', 'מרובע ADCB'], why: 'a ring restated in another reading (#1953)' },
+  { lines: ['משולש ABC', 'AB = AC', 'AB = AC'], earlier: 1, why: 'an exact repeat of a relation' },
+  { lines: ['משולש ABC', 'זווית ABC = 90', 'AB ⟂ BC'], earlier: 1, why: 'another spelling' },
+  { lines: ['משולש ABC', 'AB = AC', 'זווית ABC = זווית ACB'], earlier: 1, why: 'the base angles — moved 1e-3 before #2795 (ADR-3D-483)' },
+  { lines: ['ריבוע ABCD', 'זווית DAB = 90'], why: 'a held VALUE' },
+  { lines: ["קוביה ABCDA'B'C'D'", 'AB = 3', 'AC = 3√2'], why: 'a held VALUE with its operand ink (operator 2026-11-10: drawn and marked)' },
+  { lines: ['טרפז שווה שוקיים ABCD', 'AC = BD'], why: 'held operand ink' },
+  { lines: ['משולש ABC', 'D על AB', 'D על BA'], earlier: 1, why: 'a reversed rider' },
+  { lines: ['A(0,0,0)', 'B(√2,0,0)', 'B=(√2,0,0)'], earlier: 1, why: 'stated numbers restated (#2341)' },
+  { lines: ["קובייה ABCDA'B'C'D'", 'AB ∥ CD'], why: 'a relation the solid holds (#2341)' },
+  { lines: ['מעוין ABCD', 'AC ⟂ BD'], why: 'a relation the shape holds by construction' },
+  { lines: ['מרובע ABCD', 'פירמידה ABCDS', 'פירמידה ABCDS'], earlier: 1, why: 'an exact repeat that creates a point (the fold steps it aside while its twin stands)' },
+  { lines: ['A(0,0,0)', 'B(2,0,0)', 'M אמצע AB', 'M אמצע AB'], earlier: 2, why: 'an exact repeat of a construction' },
+];
 /**
  * Analytic's cases (#2790's §1 measurement, [ADR-AG-462](../../../docs/06c-decisions-analytic.md#adr-ag-462) /
  * [ADR-AG-463](../../../docs/06c-decisions-analytic.md#adr-ag-463)): the two old no-row verdicts (`already-known`,

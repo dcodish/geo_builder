@@ -840,7 +840,7 @@ dry run and the mint pass's dry runs all apply the row as read, and `applyComman
 before its own kind (ADR-3D-460). The outermost
 `applyCommand3` then applies it: `'vector'` as the vector command plus an ink arrow (`arrows`) for each pair of the
 sentence; `'length'` as exactly «|XY| = k|ZW|»'s commands (`segment3` + `length-rel`); `'ask'` or no reading as
-`ambiguous-vector-length`, which carries the pairs except at `k = 1`. `decideCommands3` answers `already-stated` for
+`ambiguous-vector-length`, which carries the pairs except at `k = 1`. `decideCommands3` answers a held `record` (ADR-3D-484) for
 a two-reading line whose reading `verifyClaim` finds true in every sample of the figure before it (T45).
 The fact row reads the same record (Am. 2): `App3` hands `Derived3.readings[f.id]` to `factRowText3` / `FactRowText3`
 (`render/FactRow3.tsx`), and a `'length'` row bypasses the command-kind vector gate — `factDisplay3` returns
@@ -849,9 +849,9 @@ wrapped in bars («AA'=3BC» → «|AA'|=3|BC|»), composed from the command whe
 
 **Stated numbers restated** (ADR-3D-423, #2341). `numbersRestatementTwin3` is the third test of the twin rule, after `sameStatement` and `ringRestatementTwin3`. `statedNumbers3` reads what a command states as numbers, of what: a point's coordinates (`point3`, the `coords-eq` claim) or a segment's length in either letter order (the `length-eq` claim). It compares them at `CLAIM_REL_TOL`, and the twin must already draw the line's `segment3` ink. A line with no stated numbers to match has no twin, so a coordinate answer or a first length stays a row. A plane's equation is read as the plane it names ([ADR-3D-429](06b-decisions-3d.md#adr-3d-429), #1542): the `plane-eq` claim under its letters in any order, a `plane3` with no parameter under its name, each as a unit normal with its first nonzero coefficient positive, so a multiple of the equation is the same numbers.
 
-**A statement the figure already holds** (ADR-3D-449, #2341). `impliedByPrior3` is the last test of the twin step in `decideCommands3`, after `knownSegmentEquationTwin3`, on the grammar lane only. It reads the candidate fold the decision already paid against the figure before the row: (1) no construction part outside `STATEMENT_PARTS3` (claims, pins, mutual requirements, memberships, the statement's own segments and point-run planes) changes size, the line states something, declares no shape (`solid`), and touches no default (`touchesDefault3`, which reads the fold's own defaults-yield registry through `yieldEntry3`: a soft right angle, a soft equal pair, a trapezoid's pair); (2) every `knowledgeSamples3` sample at every claim seed places every point, plane and line where the prior one did, and every earlier row keeps its status; (3) a mutual requirement holds at every claim seed (`meetsRequirements3`). Signs and angle bounds are outside `STATEMENT_PARTS3`, so they always commit. The verdict is `already-stated`, its twin the latest enabled row naming every point of the line (`knownTwin3`). It costs the prior samples, memoised per construction, and only after (1).
+**A statement the figure already holds** (ADR-3D-449, #2341; outcome [ADR-3D-484](06b-decisions-3d.md#adr-3d-484), #2790). `impliedByPrior3` is the last test of the twin step in `decideCommands3`, after `knownSegmentEquationTwin3`, on the grammar lane only. It reads the candidate fold the decision already paid against the figure before the row: (1) no construction part outside `STATEMENT_PARTS3` (claims, pins, mutual requirements, memberships, the statement's own segments and point-run planes) changes size, the line states something, declares no shape (`solid`), and touches no default (`touchesDefault3`, which reads the fold's own defaults-yield registry through `yieldEntry3`: a soft right angle, a soft equal pair, a trapezoid's pair); (2) every `knowledgeSamples3` sample at every claim seed places every point, plane and line where the prior one did, and every earlier row keeps its status; (3) a mutual requirement holds at every claim seed (`meetsRequirements3`). Signs and angle bounds are outside `STATEMENT_PARTS3`, so they always commit. Statement parts include the statement's own marks (`angleMarks`, `lengthMarks`) and the apply-time `redundantShapes` flag. Since ADR-3D-484 every twin test leads to a `record` verdict with `held: true` (the store's `already-held` notice, `suite.notice.alreadyHeld`); a muted twin is `retick`. In the fold, a row stating word for word what an earlier enabled ok row states is `ok` without being applied (`exactTwinApplied`), so a repeated declaration never reads `already-defined`; untick or delete the twin and it applies. It costs the prior samples, memoised per construction, and only after (1).
 
-**A row's lead** (ADR-3D-429, ADR-3D-431, #1542). Since ADR-3D-449 no submit records a claim the figure already held, so the ✓ is reached only by a row saved before it. `factLead3` is the row's whole rule: ✓ for an `ok` row holding a claim, except a row `claimGivens3` names, which keeps the status dot. That read asks `verifyClaim` of the construction before the row: a claim that did not hold on every sample of it is the row that made it true. Each row's answer is memoised on a trie keyed on the fact objects, and asked at seed 0, so a commit pays for its own row and a press pays nothing. It is a view read, memoised in `App3` on `(facts, seed)`, and never part of `derive3`, so a seed search pays nothing and a row with no plane equation costs nothing.
+**A row's lead** (ADR-3D-429, ADR-3D-431, #1542; [ADR-3D-484](06b-decisions-3d.md#adr-3d-484), #2790). Every row leads with its status dot: every claim row is a given (ADR-W-200, sr-19), so the ✓ lead, `factLead3` and `claimGivens3` are gone.
 
 **One plane head** (ADR-3D-429). `planeByEquation` and `planeEqClaim` read `PLANE_DEF_NOUN` through `matchDefHead`; the "equation of" lead (`EQ_OF_HE`, `EQ_OF_EN`) is shared with `parametricLine`, and `defBody` is the one separator reader. The space of «π 1» belongs to the index in `PLANE_NAME`.
 
@@ -1007,6 +1007,17 @@ existing `givens-contradict`. `applyBoundPyramid3` asks the claim verifier wheth
 the line (`verifyClaim` concyclic, every claim seed × branch, M3) and stamps `SolidObj.boundCyclic`; then neither the
 `base-constrained` note nor a narrowing cause is read off the pyramid (`rowClass3` takes the folded figure), since it
 narrowed nothing (Q-2490d).
+
+### A held pin is left out of the solve (#2795, [ADR-3D-483](06b-decisions-3d.md#adr-3d-483))
+
+A restatement («זווית ABC = זווית ACB» after «AB = AC») is a scalar pin whose rows lie in the span of the
+others'. It removes no freedom but changes the least-squares path, so it used to move the figure about 1e-3. Each
+driving pin carries its provenance (`scalarPinOrigin3`: the claim it drives, set by `recordClaim3`; the fact that
+stated it, set by the fold). Each pivot solution measures lazily (`heldPins`) which facts' pins are held: newest fact
+first, a fact's pins are held when leaving their rows out keeps the rank of the Jacobian of the pin rows over every
+unknown. `resolveHeld3` (inside `resolve3`'s memo, around the joint rung) then solves the figure without them, which
+is the figure as it was before that fact, and keeps that solution only when every left-out claim holds there
+(`claimHoldsAt3`). A left-out pin stays a checked claim; once its earlier twin is gone it is no longer held and drives.
 
 ### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
 
@@ -1337,7 +1348,7 @@ change to LM start noise cannot move which configuration a seed draws.
 ### The submit decision (#1394, [ADR-3D-258](06b-decisions-3d.md#adr-3d-258))
 
 `store3.submit` decides nothing: `decideSubmit3(state, utterance)` returns a `Verdict3` (rename ·
-not-understood · refused · already-stated · record) and `submit` dispatches it. The decision is pure, so
+not-understood · refused · retick · record, a record carrying `held` for a line the figure already holds) and `submit` dispatches it. The decision is pure, so
 #1358's register can ask "would you accept this line?". The statement seams share `readStatement3` (the
 grammar plus the #866 repair and the #516 typed refusals), `lostGivens3` (the honesty gates) and
 `decideCommands3` (gates → twin → derive → search), where the LLM lane's `submitSteps` also ends. The twin is

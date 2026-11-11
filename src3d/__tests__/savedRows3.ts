@@ -1,31 +1,19 @@
 /**
- * #2341 ([ADR-3D-449](../../docs/06b-decisions-3d.md#adr-3d-449)) — TYPE A LINE, OR KEEP IT AS A SAVED ROW.
+ * #2341 (ADR-3D-449) → #2790 ([ADR-3D-484](../../docs/06b-decisions-3d.md#adr-3d-484)) — TYPE A LINE.
  *
- * Since ADR-3D-449 a statement the figure already holds is answered «כבר קיים» and adds no row. A row saved before the
- * rule still replays as saved: a load never reads the submit decision, so the fold, its notices and the plane chips still
- * see it. The locks of those read-outs (#396, #842, #847, #850, #853, #1475, #1476, #1486, #1491) build their figure
- * here: each line is typed through the store's own `submit`, and a line answered «כבר קיים» is appended as the row a
- * saved file would hold. `typedKnown` lists those lines, so a lock can also assert what typing them does today.
+ * Under ADR-3D-449 a held line answered «כבר קיים» and added no row, so the locks of the fold's read-outs (#396, #842,
+ * #847, #850, #853, #1475, #1476, #1486, #1491) appended it here as the row a saved file would hold. Since ADR-W-200 a held
+ * line is typed again: it is its own row, with the held notice. The helpers stay as the locks' one entry point; a line
+ * the figure held is reported `'held'`.
  */
-import { parse3 } from '../parser/parse3';
-import { useGeo3, type Fact3 } from '../store/store3';
+import { useGeo3 } from '../store/store3';
 
-let saved = 0;
-
-export function submitOrSave3(u: string): 'typed' | 'saved' {
-  const st = useGeo3.getState();
-  const rows = st.facts.length;
-  st.submit(u);
-  const now = useGeo3.getState();
-  if (now.lastError !== null || now.facts.length !== rows || now.lastNotice?.code !== 'already-stated') return 'typed';
-  const p = parse3(u);
-  if (!p.ok) throw new Error(`«${u}» answered already-stated but does not parse`);
-  const row: Fact3 = { id: `saved-${++saved}`, utterance: u, cmds: p.commands, enabled: true };
-  useGeo3.setState({ facts: [...now.facts, row], lastNotice: null });
-  return 'saved';
+export function submitOrSave3(u: string): 'typed' | 'held' {
+  useGeo3.getState().submit(u);
+  return useGeo3.getState().lastNotice?.code === 'already-held' ? 'held' : 'typed';
 }
 
-/** Build `lines` with {@link submitOrSave3}; the lines answered «כבר קיים» when typed. */
+/** Build `lines` with {@link submitOrSave3}; the lines the figure already held when typed. */
 export function buildSaved3(lines: readonly string[]): string[] {
-  return lines.filter((u) => submitOrSave3(u) === 'saved');
+  return lines.filter((u) => submitOrSave3(u) === 'held');
 }

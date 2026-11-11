@@ -23,12 +23,13 @@ function play(lines: string[]) {
     before = st.facts.length;
     last = decideDeterministic3(st, line);
     if (last.kind === 'record') st = { facts: last.facts, seed: last.seed };
-    else if (last.kind === 'already-stated') st = { facts: last.facts, seed: st.seed };
+    else if (last.kind === 'retick') st = { facts: last.facts, seed: st.seed };
   }
   return { last, before, after: st.facts.length, facts: st.facts };
 }
 
-describe('#1953 — a restated ring adds no row in 3-D', () => {
+// #2790 (ADR-3D-484, ADR-W-200): a restated ring is held — its own row, with the notice (was: no row, ADR-W-031)
+describe('#1953 — a restated ring is held in 3-D', () => {
   it.each([
     ['ריבוע ABCD', 'מרובע ABCD'], // the supertype word, declared spelling — recorded a second row before
     ['ריבוע ABCD', 'מרובע ADCB'], // the operator's T11 line
@@ -41,9 +42,8 @@ describe('#1953 — a restated ring adds no row in 3-D', () => {
     ['מחומש ABCDE', 'מחומש EDCBA'],
   ])('«%s» · «%s»', (a, b) => {
     const r = play([a, b]);
-    expect(r.last.kind).toBe('already-stated');
-    expect(r.after, 'no new row').toBe(r.before);
-    if (r.last.kind === 'already-stated') expect(r.last.twin.utterance, 'the note quotes the line that declared the ring').toBe(a);
+    expect(r.last.kind === 'record' && r.last.held).toBe(true);
+    expect(r.after, 'its own row').toBe(r.before + 1);
   });
 
   it('a trapezoid read so the OTHER pair is named is a different statement and still records', () => {
@@ -51,14 +51,15 @@ describe('#1953 — a restated ring adds no row in 3-D', () => {
   });
 
   it('a crossing order is a different ring — never a twin (#1927 owns that line)', () => {
-    expect(play(['ריבוע ABCD', 'מרובע ACBD']).last.kind).not.toBe('already-stated');
+    const crossed = play(['ריבוע ABCD', 'מרובע ACBD']).last;
+    expect(crossed.kind === 'record' && crossed.held).toBe(false);
   });
 
   // #1988 (ADR-3D-326, operator ruling 2026-10-10): a noun the declared one IMPLIES is a restatement in every
   // reading too — a square IS a rectangle. It used to be refused `shape-less-specific`.
   it('a less specific SHAPE word restates the ring in every reading', () => {
     for (const b of ['מלבן ABCD', 'מלבן BCDA', 'מקבילית ADCB', 'דלתון CDAB'])
-      expect(play(['ריבוע ABCD', b]).last.kind, b).toBe('already-stated');
+      expect(play(['ריבוע ABCD', b]).last, b).toMatchObject({ kind: 'record', held: true });
   });
 
   it('a noun no quadrilateral carries alongside the declared one is still refused (#1918)', () => {

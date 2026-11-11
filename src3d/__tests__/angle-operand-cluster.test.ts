@@ -158,8 +158,8 @@ describe('#512 — «מישור [xy]» is an operand, not one grammatical positi
     build(["תיבה ABCDA'B'C'D'", 'המישור ABC מונח על המישור [xy]', 'AB מקביל למישור [xy]']);
     expect(state().lastError).toBeNull();
     // #2341 (ADR-3D-449): judged normally, it holds on the placed box, so it is already known and adds no row
-    expect(state().facts).toHaveLength(2);
-    expect(state().lastNotice).toEqual({ code: 'already-stated' });
+    expect(state().facts).toHaveLength(3);
+    expect(state().lastNotice).toEqual({ code: 'already-held' });
   });
 });
 
