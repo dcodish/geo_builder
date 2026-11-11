@@ -2837,6 +2837,13 @@ const coordPoint: Rule = (s) => {
   const signTail = rest.match(
     /^,?\s*([a-w])\s+(?:הוא\s+)?(?:פרמטר\s+)?(חיובי|שלילי)$|^,?\s*(?:where\s+)?([a-w])\s+is\s+(?:a\s+)?(positive|negative)(?:\s+parameter)?$|^,?\s*([a-w])\s*([<>])\s*0$/,
   );
+  // #1524 (ADR-3D-477): `M(k,1,3), k ≥ 0` — a RANGE clause in the same appositive slot
+  const boundTail = signTail ? null : rest.match(/^,\s*(?:where\s+)?(.+)$/);
+  const boundCmds = boundTail ? paramBound(boundTail[1].trim()) : null;
+  if (boundCmds) {
+    cmds.push(...boundCmds);
+    rest = '';
+  }
   if (signTail) {
     const sym = signTail[1] ?? signTail[3] ?? signTail[5];
     const word = signTail[2] ?? signTail[4] ?? signTail[6];
@@ -3687,7 +3694,7 @@ const injectionList: Rule = (s) => {
   // text defers the whole utterance (never a silent drop of a stated given).
   const tail = m[1].slice(lastEnd).replace(/^[\s.,;:]+|[\s.,;:]+$/g, '');
   if (tail) {
-    const signCmds = paramSign(tail);
+    const signCmds = paramSign(tail) ?? paramBound(tail); // #1524: a range clause rides the same tail
     if (!signCmds) return null;
     cmds.push(...signCmds);
   }
@@ -3772,6 +3779,83 @@ const paramSign: Rule = (s) => {
     s.match(/^([a-w])\s+is\s+(?:a\s+)?parameter$/i);
   if (d) return [{ type: 'param-decl', sym: d[1] }];
   return null;
+};
+
+/**
+ * #1524 ([ADR-3D-477](../../docs/06b-decisions-3d.md#adr-3d-477)) — a RANGE stated on a letter, the sign's sibling:
+ * `t ≥ 0`, `k ≤ 3`, `k > 2`, `2 ≤ k ≤ 5`, `2 < k < 5` (and the typed `>=` / `<=`), «k גדול מ-2», «k קטן או שווה
+ * ל-3», «k לפחות 2», «k לכל היותר 3», "k is greater than 2", "k is at least 2", "k is at most 3". One comparison
+ * vocabulary ({@link readCmp3}) for the symbol and the words. A strict end at 0 alone IS the sign and lowers to
+ * `param-sign` (`t > 0`, «t גדול מ-0»), so a sign has one command whichever way it is spelled.
+ */
+type Cmp3 = { dir: '<' | '>'; strict: boolean };
+const CMP_SYM3: Record<string, Cmp3> = {
+  '<': { dir: '<', strict: true }, '>': { dir: '>', strict: true },
+  '≤': { dir: '<', strict: false }, '<=': { dir: '<', strict: false }, '⩽': { dir: '<', strict: false },
+  '≥': { dir: '>', strict: false }, '>=': { dir: '>', strict: false }, '⩾': { dir: '>', strict: false },
+};
+const CMP_SYM_RE3 = String.raw`<=|>=|[<>≤≥⩽⩾]`;
+/** The words of a one-sided comparison: «גדול מ-», «קטן או שווה ל-», «לפחות», «לכל היותר», "greater than", "at least". */
+const CMP_WORDS3: { re: RegExp; cmp: Cmp3 }[] = [
+  { re: /^(?:גדול|גדולה)\s+או\s+שו?וה\s+ל\s*-?\s*/, cmp: { dir: '>', strict: false } },
+  { re: /^(?:קטן|קטנה)\s+או\s+שו?וה\s+ל\s*-?\s*/, cmp: { dir: '<', strict: false } },
+  { re: /^(?:גדול|גדולה)\s+מ\s*-?\s*/, cmp: { dir: '>', strict: true } },
+  { re: /^(?:קטן|קטנה)\s+מ\s*-?\s*/, cmp: { dir: '<', strict: true } },
+  { re: /^לפחות\s+/, cmp: { dir: '>', strict: false } },
+  { re: /^לכל\s+היותר\s+/, cmp: { dir: '<', strict: false } },
+  { re: /^(?:is\s+)?(?:greater|bigger|larger)\s+than\s+or\s+equal\s+to\s+/i, cmp: { dir: '>', strict: false } },
+  { re: /^(?:is\s+)?(?:less|smaller)\s+than\s+or\s+equal\s+to\s+/i, cmp: { dir: '<', strict: false } },
+  { re: /^(?:is\s+)?(?:greater|bigger|larger)\s+than\s+/i, cmp: { dir: '>', strict: true } },
+  { re: /^(?:is\s+)?(?:less|smaller)\s+than\s+/i, cmp: { dir: '<', strict: true } },
+  { re: /^(?:is\s+)?at\s+least\s+/i, cmp: { dir: '>', strict: false } },
+  { re: /^(?:is\s+)?at\s+most\s+/i, cmp: { dir: '<', strict: false } },
+];
+/** The comparison at the head of `s` (a symbol or the words) and the text after it. */
+function readCmp3(s: string): { cmp: Cmp3; rest: string } | null {
+  const sym = s.match(new RegExp(String.raw`^\s*(${CMP_SYM_RE3})\s*`));
+  if (sym) return { cmp: CMP_SYM3[sym[1]], rest: s.slice(sym[0].length) };
+  for (const w of CMP_WORDS3) {
+    const m = s.match(w.re);
+    if (m) return { cmp: w.cmp, rest: s.slice(m[0].length) };
+  }
+  return null;
+}
+/** The bound `sym <cmp> value` states, as one end of an interval. */
+const endOf3 = (cmp: Cmp3, value: number) =>
+  cmp.dir === '>' ? { lo: value, loStrict: cmp.strict } : { hi: value, hiStrict: cmp.strict };
+const paramBound: Rule = (s) => {
+  const num = (t: string): number | null => (new RegExp(`^${NUM}$`).test(t.trim()) ? Number(t.trim()) : null);
+  const lower = (sym: string, ends: { lo?: number; hi?: number; loStrict?: boolean; hiStrict?: boolean }): Command3[] => {
+    const lo = ends.lo ?? null, hi = ends.hi ?? null;
+    // a strict end at 0, alone, is the sign — one command whichever way the sign is spelled
+    if (lo === 0 && hi === null && ends.loStrict) return [{ type: 'param-sign', sym, positive: true }];
+    if (hi === 0 && lo === null && ends.hiStrict) return [{ type: 'param-sign', sym, positive: false }];
+    return [{ type: 'param-bound', sym, lo, hi, loStrict: lo !== null && !!ends.loStrict, hiStrict: hi !== null && !!ends.hiStrict }];
+  };
+  // the chain `2 ≤ k ≤ 5` / `5 > k > 2` — both comparisons point the same way. Its letter is one of the RESERVED
+  // parameter/vector letters (t k m u v w): a two-sided bound around any other lowercase letter («60 < a < 90») is the
+  // #394 angle-label register's (ADR-3D-063 guidance: «∠ABC» or a Greek label), which partitions the shape exactly so.
+  const chain = s.match(new RegExp(String.raw`^(${NUM})\s*(${CMP_SYM_RE3})\s*([tkmuvw])\s*(${CMP_SYM_RE3})\s*(${NUM})$`));
+  if (chain) {
+    const [, a, c1, sym, c2, b] = chain;
+    const p = CMP_SYM3[c1], q = CMP_SYM3[c2];
+    if (p.dir !== q.dir) return null;
+    const [lo, loStrict, hi, hiStrict] = p.dir === '<' ? [Number(a), p.strict, Number(b), q.strict] : [Number(b), q.strict, Number(a), p.strict];
+    return lower(sym, { lo, loStrict, hi, hiStrict });
+  }
+  // the reversed one-sided form `2 < k` — the value first
+  const rev = s.match(new RegExp(String.raw`^(${NUM})\s*(${CMP_SYM_RE3})\s*([a-w])$`));
+  if (rev) {
+    const c = CMP_SYM3[rev[2]];
+    return lower(rev[3], endOf3({ dir: c.dir === '<' ? '>' : '<', strict: c.strict }, Number(rev[1])));
+  }
+  // the letter first: `k ≥ 2`, «הפרמטר k גדול מ-2», «k הוא מספר לפחות 2», "the parameter k is at least 2"
+  const head = s.match(/^(?:ה?פרמטר\s+|the\s+parameter\s+)?([a-w])(?=[\s<>≤≥⩽⩾])\s*(?:הוא\s+)?(?:פרמטר\s+|מספר\s+)?/);
+  if (!head) return null;
+  const c = readCmp3(s.slice(head[0].length));
+  if (!c) return null;
+  const v = num(c.rest);
+  return v === null ? null : lower(head[1], endOf3(c.cmp, v));
 };
 
 /** Standalone `v = (10,-5,0)` — a single vector injection.
@@ -5433,6 +5517,7 @@ export const RULES: Rule[] = [
   intersectionLine,
   coordPoint,
   paramSign, // ADR-3D-032: `k הוא פרמטר חיובי` — before generic rules can misread the letter
+  paramBound, // #1524 (ADR-3D-477): `k ≥ 2`, `2 ≤ k ≤ 5`, «k גדול מ-2» — the sign's sibling, at the sign's slot
   vectorInjection,
   onAxes, // `על ציר ה-x` before the generic membership/on-segment rules
   membership, // before onSegment: `על אחד המישורים` must never read as a point-on-segment

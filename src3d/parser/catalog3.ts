@@ -142,6 +142,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   },
   { category: 'points', he: 't פרמטר חיובי', en: 't is a positive parameter', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
   { category: 'points', he: 't > 0', en: 't > 0', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
+  // #1524 (ADR-3D-477): a RANGE on a letter — the sign that allows zero, and two-sided
+  { category: 'points', he: 't ≥ 0', en: 't ≥ 0', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
+  { category: 'points', he: '2 ≤ t ≤ 5', en: '2 ≤ t ≤ 5', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
+  { category: 'points', he: 't גדול מ-2', en: 't is greater than 2', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
   // #324 (ADR-3D-079): a ring's relation to a COORDINATE plane (lowercase x/y/z) or axis
   { category: 'planesLines', he: 'הבסיס ABCD מונח על מישור שמקביל למישור [xy]', en: 'base ABCD lies on a plane parallel to the xy-plane' },
   { category: 'planesLines', he: 'המישור ABC מונח על המישור [xy]', en: 'plane ABC lies on the xy-plane' },

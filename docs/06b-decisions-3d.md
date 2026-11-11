@@ -15472,6 +15472,43 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 
 **Behaviour change for a student:** none beyond ADR-3D-454's.
 
+## ADR-3D-477 — A letter's stated range is the sign's sibling: one interval every sign reader reads (#1524)
+
+**Status:** accepted · 2026-11-10 · feature (P2, 3d) · fix round #2822, stream G5 · PR from `feat/1524-nonstrict-ranges` (base `15a8f5af`) · arm 1 of the operator's option (C) ruling, the plan's first PR (arms 1 + 4); extends [ADR-3D-032](#adr-3d-032) (the sign), [ADR-3D-079](#adr-3d-079) (pin symbols), [ADR-3D-175](#adr-3d-175) (named components), [ADR-3D-236](#adr-3d-236) (vec-def ratios), [ADR-3D-390](#adr-3d-390) (free vectors)
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2g (new) · **Design:** [04b](04b-design-3d.md) § *A letter's range is one interval* · **Ladder:** none: a selection among roots and a narrowing of the sampled window, the stages the sign already used
+
+**Rulings.** Operator 2026-09-29 on #1524: *"we need all. so option C"* (parameter, magnitude and angle bounds; each refused when the givens make it false, naming the statement, and restricting what «הציגו תצורה אחרת» samples) and *"1524 is approved"* (one PR per arm: parameters + palette first). Every *What the student will see* line on the issue is `[asked]` or `[ruled]`.
+
+**Measured at pickup** (`15a8f5af`, `parse3`): `t < 0` / `t > 0` read as `param-sign`; `t ≥ 0`, `t >= 0`, `k ≤ 3`, `2 ≤ k ≤ 5`, `k > 2`, «M(k,1,3), k ≥ 0» were all `not-handled`. The two-sided chain and the Hebrew words had no grammar at all.
+
+**Class.** *A statement about where a letter lies was a boolean.* `ParamSignCommand.positive` fed ten readers (the coordinate parameter's root filter in two lanes, its sampled half-window, the vec-def root pick and its window, the pivot's pin-symbol filter and soft anchor, the free-vector sampler and its check, the named-component check and the store's verifier), each with its own `v > 1e-9` and its own half-window. A range is the same statement with a different end, so adding it at the parser alone would have needed ten more branches.
+
+**Decision.**
+1. **One interval** (`engine/bound3.ts`, `Bound3 = {lo, hi, loStrict, hiStrict}`). `boundHolds3` (the sign's tolerance: a strict end must be cleared by 1e-9, a closed end may be missed by it), `foldBounds3` (every statement on one letter intersected in the order stated; a statement that would empty the range is left out, so the figure is drawn under the earlier ones and the verifier refuses the newer one), `boundWindow3` (a reader's default window narrowed to the range and kept clear of its ends; beside the stated end when the range leaves the default window), `boundAnchor3` (the pivot's soft anchor) and `boundReflect3` (the sign walk's target). A sign is the interval (0, ∞) / (−∞, 0) and gives each reader's old half-window; the free-vector draw keeps its mirrored negative draw.
+2. **`Construction3.paramSigns` and `componentSigns` carry a `Bound3`**, never a boolean. `param-sign` lowers to its interval at apply; the new `param-bound` command (`{sym, lo, hi, loStrict, hiStrict}`) to its own. Both share the sign's owner gate (`symbolOwnersOf`): a letter no mechanism owns is `unknown-symbol`; a rider's parameter is `param-bound-not-selectable` (the sign's `sign-not-selectable`, worded for a range).
+3. **The root filters read the letter's OWN range.** The coordinate parameter's two root filters applied every stated sign to its roots, whatever letter the sign named (sound while a figure has one letter, as the vec-def reader's comment already warned). They now read `symBound3(c, c.param)`; a range on another letter never filters these roots.
+4. **The verifier** (`store3`) checks a `param-bound` fact against its own interval: `param-bound-unsatisfiable` («הנתונים אינם משאירים ל-k ערך בתחום שנקבע…»), the sign's `sign-unsatisfiable` in a range's words.
+5. **The grammar** (`parse3` `paramBound`, at the sign's slot; also the point-list tail and the appositive clause of `coordPoint`): `k ≥ 2`, `k >= 2`, `2 < k`, `2 ≤ k ≤ 5`, `5 > k > 2`, «k גדול מ-2», «k גדול או שווה ל-2», «k קטן (או שווה ל)-3», «k לפחות 2», «k לכל היותר 3», «הפרמטר k הוא מספר …», "k is greater than / less than (or equal to) / at least / at most", over one comparison vocabulary (`readCmp3`). A strict end at 0 alone lowers to `param-sign`, so «k גדול מ-0» and `k > 0` are one command. The letter is `[a-w]`, so `AB > 3` and `x > 0` are not taken (arms 2/3 and the component sign).
+
+**Not in this PR (the ruling's arms 2 and 3, own PRs under #1524).** Magnitude bounds («|AB| ≤ 5», «המרחק … גדול מ-4») and angle bounds stated in words or between lines and planes. A component compared with a number other than zero («x_B ≥ 1») is also unread, as it was.
+
+**Measured after.** On the ADR-3D-032 exam base with `M(k,1,3)`: «k ≥ 2» draws M.x in [2.33, 2.65] over seeds 0–4, «k ≥ 5» in [5.57, 8.29], «k ≤ −4» in [−10.03, −7.31]; «k > 0» is unchanged (0.42–1.65, the old window). With the 60° angle, «k ≥ 0» takes +2√15 and «k ≤ 0» −2√15 at every seed; «k ≥ 8» is refused `param-bound-unsatisfiable`; «k ≥ 2 · k ≤ 1» refuses the second. «B(2t,t,1) · t ≥ 3» anchors t in [3.49, 4.53].
+
+**Locks.** Unit: `src3d/engine/__tests__/bound3.test.ts` (the sign windows bit for bit, the fold, the windows inside their range, the anchor and the walk). Parse + figure: `src3d/__tests__/adr-3d-032.test.ts` § #1524 (21 spellings, the sign normalisation, no theft, sampling at four ranges, root selection both ways, three refusals, the pin-symbol anchor). Message floor: `message-floor-2028.test.ts` (the two codes). Regression: `fixtures3/param-range-1524.geo3.json`.
+
+**Behaviour change for a student:** a range on a letter now reads, draws inside itself and is refused when the givens leave it no room; «t ≥ 0» is the sign that allows zero.
+
+## ADR-3D-478 — The 3-D palette offers `>`, `≤`, `≥` beside `<` (#1524)
+
+**Status:** accepted · 2026-11-10 · feature (P2, 3d) · fix round #2822, stream G5 · with [ADR-3D-477](#adr-3d-477) · arm 4 of the #1524 ruling; amends [ADR-W-095](06w-decisions-workspace.md#adr-w-095)'s "3-D gains none"
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-12 (unchanged: the face is the payload) · **Design:** none (internal): `ui/symbols3.ts` and the bidi core · **Ladder:** none
+
+**Decision.** ADR-W-095 gave 3-D no `≥`/`≤` because its grammar had no comparison for them to type (#511: a button never offers a glyph its grammar refuses). ADR-3D-477 is that grammar, so `SYMBOL_PALETTE_3` gains `>`, `≤`, `≥` beside `<`, each inserting its own glyph (the shared `palette-faces` check). They join `<` in 3-D's bidi `CORE` (the #482 lock requires every palette character there). A typed `>=` / `<=` is already folded to the glyph at the store boundary (ADR-W-095) and the grammar reads both.
+
+**Locks.** `bidi3.test.ts` § #1524 (each of the four comparison buttons is offered and its insert builds a range), the #482 drift lock, `palette-faces-1348.test.ts`.
+
+**Behaviour change for a student:** three new symbol buttons in 3-D.
+
 ## ADR-3D-471 — An answer may be stated in the figure's free letters: one list of open letters, an affine read-off with a held-out check (#1829)
 
 **Status:** accepted · 2026-11-10 · feature (P2, 3d) · fix round #2822, stream G3 · branch `feat/1829-answers-keep-t` from `main` @ `86768862` · amends [ADR-3D-065](#adr-3d-065) («depends on α»: name the dependency, never state the relation) and [ADR-3D-067](#adr-3d-067) (the single-parameter `parametricDecomp`)

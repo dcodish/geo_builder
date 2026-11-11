@@ -20,6 +20,7 @@
  *    by object identity, so adding a fact never moves existing points.
  */
 
+import { boundHolds3, signBound3, type Bound3 } from '../engine/bound3';
 import { create } from 'zustand';
 import type { PlaneDisplayMode3Map } from './figureFile3';
 import { buildNotices3, shapeWarnings3, type BuildNotice3, type ShapeWarning3 } from '../engine/notices';
@@ -2158,7 +2159,7 @@ function deriveCore3(
             break;
           }
         }
-      } else if (cmd.type === 'param-sign') {
+      } else if (cmd.type === 'param-sign' || cmd.type === 'param-bound') {
         // ADR-3D-032: the chosen parameter value must honour the stated sign.
         // #325 (ADR-3D-079): the sign may name a PIN symbol (`B(2t,t,k)` → t) — read the
         // pivot's solved value for it instead of the coord-sym parameter.
@@ -2179,8 +2180,10 @@ function deriveCore3(
                resolved.ratioSymbols?.[cmd.sym] ??
                resolved.freeSyms.get(cmd.sym) ?? // #2684 (ADR-3D-421): a free-vector system's letter
                (bound ? componentValue(c, bound.target, bound.axis, (id) => positions.get(id), resolved.freeVectors) : undefined)); // #1188: a free vector's component
-        if (v === undefined || !Number.isFinite(v) || (cmd.positive ? v <= 1e-9 : v >= -1e-9)) {
-          status[f.id] = { code: 'sign-unsatisfiable', id: cmd.sym };
+        // #1524 (ADR-3D-477): a RANGE is checked the same way, against its own interval, and refused in its own words.
+        const stated: Bound3 = cmd.type === 'param-sign' ? signBound3(cmd.positive) : { lo: cmd.lo, hi: cmd.hi, loStrict: cmd.loStrict, hiStrict: cmd.hiStrict };
+        if (v === undefined || !boundHolds3(stated, v)) {
+          status[f.id] = { code: cmd.type === 'param-sign' ? 'sign-unsatisfiable' : 'param-bound-unsatisfiable', id: cmd.sym };
           break;
         }
       } else if (cmd.type === 'vec-rel' || cmd.type === 'seg-plane-rel' || cmd.type === 'length-rel') {
