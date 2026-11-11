@@ -1,6 +1,10 @@
 {
  "catalog:1:he": "bcd4c4e5ef82eb85",
  "suite:[\"תיבה ABCDA'B'C'D'\"]": "bcd4c4e5ef82eb85",
+ "fixture:bagrut-03572-q2-wording-2062.geo3.json": "17438ba85665bf3e",
+ "suite:[\"תיבה ABCDA'B'C'D'\",\"נסמן: AA' = w, AB = v, AD = u\",\"הנקודה E היא אמצע המקצוע BB'\",\"הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w\",\"מישור AEC\"]": "17438ba85665bf3e",
+ "fixture:negative-divisor-terms-2062.geo3.json": "dd19bd587e68f5d4",
+ "suite:[\"תיבה ABCDA'B'C'D'\",\"נסמן: AA' = w, AB = v, AD = u\",\"BN=u/2-v/2\",\"BK=-v/2+w/4\"]": "dd19bd587e68f5d4",
  "fixture:box-seg-angle-909.geo3.json": "7a0e2a54364cbfb1",
  "suite:[\"תיבה ABCDA'B'C'D'\",\"הזווית בין A'C לבין BC' היא 70\"]": "7a0e2a54364cbfb1",
  "fixture:box-seg-angle-cross-917.geo3.json": "cc4dc99c6ff4393b",
@@ -401,6 +405,7 @@
  "suite:[\"A\",\"B\",\"C\",\"S\",\"Q\"]": "de8aacaa74f2b2f1",
  "suite:[\"A\",\"B\",\"C\",\"S\",\"O\"]": "b4dad067ae9f424e",
  "suite:[\"A\",\"B\",\"C\",\"S\",\"E\"]": "9625c516c36d01b0",
+ "suite:[\"A\",\"B\",\"C\",\"M\"]": "a3995eeb8baf679f",
  "suite:[\"A\",\"B\",\"C\",\"E\"]": "29886d6a24cc1a50",
  "suite:[\"A\",\"B\",\"D\"]": "9da2a4545854b948",
  "suite:[\"A\",\"B\",\"D\",\"C\"]": "73420b0641b388c9",
