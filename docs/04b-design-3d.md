@@ -1281,6 +1281,19 @@ ring with exactly ONE placeholder corner first yields it to ARM 2 (the family's 
 parallelogram family and the kite, a plane rider otherwise), keeping the point's original slot in the order
 (`keepPointSlot3`) so its dependents still follow it.
 
+### Letters in a vector equation over placed points (#1551, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472))
+
+A `vec-eq` given may carry lettered coefficients (`VecTerm.letter`: coefficient = `coeff + p·sym`). Its letters are
+never pivot unknowns. At any drawing the equation is `R = Σₛ s·Dₛ` with numbers R and Dₛ, so `vecEqLetters3`
+(`vecExpr.ts`) solves the letters by linear least squares and returns the residual no letter can absorb. That residual
+is the pin's three rows in the pivot (the free shape moves until the relation can hold; scale-covariant like the
+numeric `vec-eq`, so the `invariantOnly` lane and the rank probe need no change, and the probe charges the box only
+for the residual's rank), the verifier's measure, and `vecEqLetterAt3` (the panel's `vec-letter` owner, the claims'
+number reader) reads the letters off the same call. A value given to a letter («a = 1/2») substitutes; dependent letter
+directions leave the letters undetermined (`a = ?`). A definition with several letters (`vecDefs[].symbols`, each term
+naming its letter in `SymTerm.sym`) samples each letter as a one-letter ratio is sampled, and `vecDefLetterAt3` reads
+the letters back through the same least squares.
+
 ### Claims
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape inside a

@@ -22,12 +22,14 @@ import { givenText } from '../../shell/literal';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 import { freeDofCount3, hasAbsoluteFrameObject, knowledgeSamples3, letterIsGaugeLength3, paramIsKnowledge, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3, type Axis3, type Resolved3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, v3, type Vec3 } from './vec3';
-import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf } from './types';
+import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf, termLetter3 } from './types';
 import { COMBINING_ARROW } from '../lexicon/marks3';
 import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { spellingOf } from './types';
 import type { Construction3, FreeVec3, FreeVecMetric3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';
 import { applyCommand3 } from './apply';
+import { vecEqLetters3 } from './vecExpr';
+import { vecEqLetterAt3 } from './claims';
 
 export interface VecEntry {
   /** Display label, e.g. `EN` or a declared name like `w`. */
@@ -932,32 +934,31 @@ export const panelSeeds3 = (at: Seed3): number[] => {
 /** #1829 (ADR-3D-471): the number a vec-def ratio letter takes in one drawing, read off the positions — the ask's
  *  reading of «t» and the params row's, one reader (the #481 rule). Null when the letter defines no point here. */
 export function vecDefLetterAt3(c: Construction3, sym: string, pos: Positions3): number | null {
-  const vd = c.vecDefs.find((d) => d.symbol === sym);
+  // #1551 (ADR-3D-472): the definition read as the equation it is (from→unknown = Σ terms), its letters by the one
+  // least-squares reader the vector equations use — a one-letter ratio is its projection, as before; several letters
+  // are read together
+  const vd = c.vecDefs.find((d) => d.symbol === sym || d.symbols?.includes(sym));
   if (!vd) return null;
-  const from = pos.get(vd.from);
-  const unknown = pos.get(vd.unknown);
-  if (!from || !unknown) return null;
-  const termVec = (atom: (typeof vd.terms)[number]['atom']): Vec3 | null => {
-    if (atom.kind === 'pair') {
-      const a = pos.get(atom.from);
-      const b = pos.get(atom.to);
-      return a && b ? sub3(b, a) : null;
-    }
-    const d = c.vectors.get(atom.name);
-    const a = d && pos.get(d.from);
-    const b = d && pos.get(d.to);
-    return a && b ? sub3(b, a) : null;
-  };
-  let lhs = sub3(unknown, from); // (unknown − from) − Σ k·atom
-  let dir = { x: 0, y: 0, z: 0 }; // Σ p·atom  (the direction the symbol scales)
-  for (const t of vd.terms) {
-    const v = termVec(t.atom);
-    if (!v) return null;
-    lhs = sub3(lhs, { x: v.x * t.coeff.k, y: v.y * t.coeff.k, z: v.z * t.coeff.k });
-    dir = { x: dir.x + v.x * t.coeff.p, y: dir.y + v.y * t.coeff.p, z: dir.z + v.z * t.coeff.p };
-  }
-  const d2 = dot3(dir, dir);
-  return d2 < 1e-12 ? null : dot3(lhs, dir) / d2;
+  const sol = vecEqLetters3(
+    [{ coeff: 1, atom: { kind: 'pair', from: vd.from, to: vd.unknown } }],
+    vd.terms.map((t) => {
+      const l = termLetter3(t, vd.symbol);
+      return { coeff: t.coeff.k, atom: t.atom, ...(t.coeff.p !== 0 && l ? { letter: { sym: l, p: t.coeff.p } } : {}) };
+    }),
+    (atom) => {
+      if (atom.kind === 'pair') {
+        const p = pos.get(atom.from);
+        const q = pos.get(atom.to);
+        return p && q ? sub3(q, p) : null;
+      }
+      const d = c.vectors.get(atom.name);
+      const p = d && pos.get(d.from);
+      const q = d && pos.get(d.to);
+      return p && q ? sub3(q, p) : null;
+    },
+    () => undefined,
+  );
+  return sol?.letters?.get(sym) ?? null;
 }
 
 /** #1829 (ADR-3D-471): an OPEN letter of the params rows — its sampled values (one per configuration the rows read;
@@ -1048,6 +1049,11 @@ export function paramRows3(c: Construction3, resolved: readonly Resolved3[]): { 
               if (!(len2 > 1e-12)) continue;
               const t = dot3(sub3(e, a), ab) / len2;
               return o.fromB ? 1 - t : t;
+            }
+            if (o.kind === 'vec-letter') {
+              // #1551 (ADR-3D-472): a vector equation's letter, read off this drawing by least squares
+              const v = vecEqLetterAt3(c, sym, r.positions);
+              if (v !== null) return v;
             }
             if (o.kind === 'free-sym') {
               // #1188 step 2 (ADR-3D-390): a free vector's letter — the free-vector system's value at this drawing
@@ -1969,7 +1975,7 @@ function statedCoordText(c: Construction3, id: Id, i: number, value: number): st
 }
 
 /** One side of a vector equation: `3u`, `DC⃗`, `2AB⃗ + v`. */
-type VecTermLike = { coeff: number; src?: string; atom: { kind: string; name?: string; from?: string; to?: string } };
+type VecTermLike = { coeff: number; src?: string; atom: { kind: string; name?: string; from?: string; to?: string }; letter?: { sym: string; p: number } };
 
 /** #1188 step 4 (ADR-3D-406): a metric given over free vectors as a stated row — «|u| = 5», «u ⟂ v», «∠(u, v) = 60°». */
 function freeMetricRow(m: FreeVecMetric3): string {
@@ -2006,6 +2012,15 @@ function vecSide(terms: readonly VecTermLike[]): string {
     .map((t, i) => {
       const body =
         t.atom.kind === 'named' ? (t.atom.name ?? '?') : pairArrow(t.atom.from ?? '?', t.atom.to ?? '?');
+      // #1551 (ADR-3D-472): a lettered coefficient prints its letter as the student wrote it — «aEA⃗», «−2bEC⃗», «(1 + a)EA⃗»
+      if (t.letter) {
+        const lp = Math.abs(t.letter.p);
+        const lt = `${lp === 1 ? '' : cleanNum(lp)}${t.letter.sym}`;
+        const lettered = t.coeff === 0 ? `${lt}${body}` : `(${cleanNum(t.coeff)} ${t.letter.p < 0 ? '−' : '+'} ${lt})${body}`;
+        const neg = t.coeff === 0 && t.letter.p < 0;
+        if (i === 0) return neg ? `−${lettered}` : lettered;
+        return neg ? ` − ${lettered}` : ` + ${lettered}`;
+      }
       const mag = Math.abs(t.coeff);
       // A coefficient of 1 is written by being absent, as every textbook writes it.
       // #1497: a coefficient is a given, so it prints as typed; one the tool computed reads the tiers

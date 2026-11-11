@@ -137,8 +137,16 @@ describe('#932 — a rider ratio means the same thing however it is spelled', ()
       const r = applyCommand3(c, cmd);
       if (r.ok) c = r.next;
     }
+    // #1551 (ADR-3D-472): a letter over placed points is an unknown of a GIVEN now — the line lowers to the lettered
+    // `vec-eq` given (pin + claim), and a relation no shape satisfies is refused by the store naming the SENTENCE
+    // («הנתונים סותרים זה את זה — אין גוף שמקיים את «SB = t·SA» …», operator ruling 2026-10-13), which blames neither
+    // endpoint. #932's rule stands: the refusal never names the apex S.
     const r = applyCommand3(c, cmds('SB = t·SA')![0]);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toEqual({ code: 'no-solution', id: 'B' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const claim = r.next.claims.at(-1);
+      expect(claim?.type).toBe('vec-eq');
+      expect(claim?.type === 'vec-eq' && claim.rhs.some((t) => t.letter?.sym === 't')).toBe(true);
+    }
   });
 });

@@ -54,7 +54,7 @@ import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
 import { coincidences3, namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
-import { claimPointIds, defaultPlaneDisplay3, scalarPinOrigin3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3, type SolidCommand } from '../engine/types';
+import { claimPointIds, defaultPlaneDisplay3, scalarPinOrigin3, emptyConstruction3, figureSymbolsOf, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3, type SolidCommand } from '../engine/types';
 import { partsOf3, sameSeed3, seedKey3, seedNumber3, type Seed3 } from '../engine/components3';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
@@ -1827,7 +1827,7 @@ function deriveCore3(
           status[newest?.factId ?? owner.factId] =
             claim.type === 'polygon-open'
               ? boundPolygonCollapsed(owner.factId, claim.ids)
-              : (sampledCarrierVerdict(claim, c, resolved) ?? membershipCollapse(owner.factId, claim) ?? { code: 'claim-refuted' });
+              : (sampledCarrierVerdict(claim, c, resolved) ?? membershipCollapse(owner.factId, claim) ?? lettersCannotHold3(claim, facts.find((g) => g.id === owner.factId)?.utterance ?? '') ?? { code: 'claim-refuted' });
           break;
         }
       }
@@ -3094,6 +3094,10 @@ function impliedByPrior3(facts: readonly Fact3[], seed: Seed3, fact: Fact3, deri
   const prior = derive3(facts as Fact3[], seed);
   const was = prior.construction;
   const now = derived.construction;
+  // #1551 (ADR-3D-472): a line that NAMES a new letter («EM = a·EA + b·EC» over placed points) states something the
+  // figure did not hold — what a and b are — even where the relation itself held already
+  const had = new Set(figureSymbolsOf(was));
+  if (figureSymbolsOf(now).some((l) => !had.has(l))) return null;
   const size = (v: unknown): number | null => (v instanceof Map || v instanceof Set ? v.size : Array.isArray(v) ? v.length : null);
   let stated = false;
   for (const key of Object.keys(now) as (keyof Construction3)[]) {
@@ -3426,3 +3430,13 @@ export const useGeo3 = create<Geo3State>()(
 
 export const undo3 = () => useGeo3.temporal.getState().undo();
 export const redo3 = () => useGeo3.temporal.getState().redo();
+
+/**
+ * #1551 ([ADR-3D-472](../../docs/06b-decisions-3d.md#adr-3d-472)) — a vector equation with LETTERS («EB' = a·EA + b·EC»)
+ * states that some numbers make it hold. Its pin drove the figure's free shape toward it, so a verification that still
+ * fails means no shape and no letters satisfy it with the other givens: the contradiction register naming the
+ * sentence (operator ruling 2026-10-13), never «בדקו את החישוב» — there is no student calculation to check.
+ */
+function lettersCannotHold3(claim: Claim3, utterance: string): FactStatus3 | null {
+  return claim.type === 'vec-eq' && [...claim.lhs, ...claim.rhs].some((t) => t.letter) ? { code: 'givens-contradict', stated: utterance, others: [] } : null;
+}

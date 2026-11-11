@@ -76,8 +76,11 @@ describe('a parenthesised symbolic coefficient is one term', () => {
     expect(coeffs('(1-0.25)u')).toEqual([{ k: 0.75, p: 0 }]);
   });
 
-  it('still refuses two different symbols in one expression (the V7 boundary)', () => {
-    expect(parseSymExpr('(1-t)u + kv')).toBeNull();
+  // #1551 (ADR-3D-472) supersedes the V7 one-letter boundary (FR-VC-2): two letters, one per term, are read; two
+  // letters in ONE term stay refused (degree 2)
+  it('reads two different letters in one expression, one per term (#1551; was the V7 boundary)', () => {
+    expect(parseSymExpr('(1-t)u + kv')).toMatchObject({ symbols: ['t', 'k'] });
+    expect(parseSymExpr('(1-t)u + kv')!.terms.map((t) => t.sym)).toEqual(['t', 'k']);
   });
 
   it('reads a DIVIDED symbol as one term of a sum (ADR-3D-069 / #300)', () => {
@@ -220,5 +223,28 @@ describe('end-to-end — the affine interpolation form builds', () => {
       const cz = bc.x * bs.y - bc.y * bs.x;
       expect(Math.hypot(cx, cy, cz), `seed ${i}`).toBeLessThan(1e-9);
     }
+  });
+});
+
+/** #1551 (ADR-3D-472): several letters, one per term — any alphabet; degree stays 1. */
+describe('#1551 — parseSymExpr reads several letters', () => {
+  it.each(['a*EA+b*EC', 'a·EA + b·EC', 'aEA+bEC'])('«%s» → two lettered terms', (src) => {
+    expect(parseSymExpr(src)).toEqual({
+      terms: [
+        { coeff: { k: 0, p: 1 }, atom: { kind: 'pair', from: 'E', to: 'A' }, sym: 'a' },
+        { coeff: { k: 0, p: 1 }, atom: { kind: 'pair', from: 'E', to: 'C' }, sym: 'b' },
+      ],
+      symbols: ['a', 'b'],
+    });
+  });
+  it('Greek letters read the same way', () => {
+    expect(parseSymExpr('αEA + βEC')?.symbols).toEqual(['α', 'β']);
+  });
+  it('one letter keeps the one-letter shape exactly (no per-term letter: saved files are unchanged)', () => {
+    expect(parseSymExpr('aEA + 1/6EC')).toMatchObject({ symbol: 'a' });
+    expect(parseSymExpr('aEA + 1/6EC')!.terms.every((t) => !('sym' in t))).toBe(true);
+  });
+  it.each(['ab·EA', 'a²EA'])('degree 2 «%s» stays refused', (src) => {
+    expect(parseSymExpr(src)).toBeNull();
   });
 });

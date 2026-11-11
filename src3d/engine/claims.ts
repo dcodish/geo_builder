@@ -10,10 +10,10 @@
 import { knowledgeSamples3, lineAtParam, planeAtParam, type Resolved3 } from './evaluate';
 import { seedNumber3, type Seed3 } from './components3';
 import { CLAIM_REL_TOL, containmentDeviation, coordPlaneRelHolds, DIRECTION_REL_TOL, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
-import { atomVec, evalExpr } from './vecExpr';
+import { atomVec, evalExpr, hasLetters3, vecEqLetters3 } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { bisectorDir3, cross3, dist3, dot3, ringCollapsed3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
-import { symbolOwnersOf, type Claim3, type Construction3, type RevolutionObj } from './types';
+import { symbolOwnersOf, symbolValueOf, type Claim3, type Construction3, type Positions3, type RevolutionObj } from './types';
 import { freeRelationHolds3 } from './freeVecSystem';
 import { pivotLetterValue3 } from './solve3';
 
@@ -101,6 +101,7 @@ export function letterNumbersAt3(c: Construction3, sym: string, r: Resolved3): (
     else if (o.kind === 'vec-def') out.push(r.ratioSymbols[sym]);
     else if (o.kind === 'component') out.push(pivotLetterValue3(c, { kind: 'component', target: o.target, axis: o.axis }, at, () => undefined));
     else if (o.kind === 'rider') out.push(pivotLetterValue3(c, { kind: 'rider', id: o.id, fromB: o.fromB }, at, () => undefined));
+    else if (o.kind === 'vec-letter') out.push(vecEqLetterAt3(c, sym, r.positions) ?? undefined); // #1551
   }
   return out;
 }
@@ -415,6 +416,12 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
     case 'free-rel': // #2684 (ADR-3D-421): the relation at this drawing and this configuration's free-vector solution
       return freeRelationHolds3(c, claim.m, pos, resolved.freeX);
     case 'vec-eq': {
+      // #1551 (ADR-3D-472): with letters it holds when SOME letters satisfy it at this drawing — the least-squares
+      // residual the pivot drove, judged by the same relative tolerance
+      if (hasLetters3(claim.lhs) || hasLetters3(claim.rhs)) {
+        const sol = vecEqLetters3(claim.lhs, claim.rhs, (a) => atomVec(a, c, pos), (sym) => symbolValueOf(c, sym));
+        return !!sol && norm3(sol.residual) <= REL_TOL * Math.max(sol.scale, 1);
+      }
       const l = evalExpr(claim.lhs, c, pos);
       const r = evalExpr(claim.rhs, c, pos);
       if (!l || !r) return false;
@@ -612,4 +619,18 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
 export function verifyClaim(claim: Claim3, c: Construction3, seed: Seed3): boolean {
   // one base seed at a time, so a refuted claim still stops at the first failing seed (docs/17 §7)
   return claimSeeds(seed).every((s) => knowledgeSamples3(c, [s]).every((r) => holdsAt(claim, c, r)));
+}
+
+/**
+ * #1551 ([ADR-3D-472](../../docs/06b-decisions-3d.md#adr-3d-472)) — the number a vector equation's letter takes in one
+ * drawing: its least-squares value in the FIRST equation that carries it (`vecEqLetters3`), null when that drawing does
+ * not determine it. The panel's params row, the ask «a» and the claims' number reader all read this one function.
+ */
+export function vecEqLetterAt3(c: Construction3, sym: string, pos: ReadonlyMap<string, Vec3>): number | null {
+  for (const k of c.claims) {
+    if (k.type !== 'vec-eq' || ![...k.lhs, ...k.rhs].some((t) => t.letter?.sym === sym)) continue;
+    const sol = vecEqLetters3(k.lhs, k.rhs, (a) => atomVec(a, c, pos as Positions3), (s) => symbolValueOf(c, s));
+    return sol?.letters?.get(sym) ?? null;
+  }
+  return null;
 }
