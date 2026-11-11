@@ -47,7 +47,10 @@ async function play(steps: readonly string[]): Promise<{ last: 'restates' | 'ref
     }
     if (v.kind !== 'store-op') commitVerdict(v, line);
     const added = new Set(st().facts.map(groupKey)).size > rowsBefore;
-    out = { last: added ? 'refines' : 'restates' };
+    // #2790 (ADR-822, ADR-W-200): a restatement is its own row since the ruling, so "a row was added" no longer tells
+    // a restatement from a refinement — the verdict's own `restates` (the held row, with the notice) does, as the 3-D
+    // and analytic twins of this lock read `held`.
+    out = { last: (v.kind === 'commit' && v.restates) || !added ? 'restates' : 'refines' };
   }
   return { ...out, earlierAccepted };
 }
