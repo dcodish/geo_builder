@@ -32,8 +32,6 @@ function submit(line: string, lng: Lng = 'he'): string | null {
 function setUp(lines: readonly string[]) {
   for (const l of lines) expect(submit(l), `setup «${l}»`).toBeNull();
 }
-/** The example the sentence quotes after «למשל» / "for example" — the spelling it teaches. */
-const taught = (sentence: string) => /(?:למשל|for example) «([^»]+)»/.exec(sentence)?.[1] ?? null;
 
 const CUBE = "קובייה ABCDA'B'C'D'";
 const PYRAMID = 'פירמידה SABCD';
