@@ -18,6 +18,8 @@ import { knownCurve } from '../engine/evaluate';
 import { conicMarksOf } from '../app/conicMarks';
 import { withConic, type AnnotationMap } from '../app/annotations';
 import { loadAnalyticSession } from '../app/loadSession';
+// #2709: the chip's cycle per kind
+import { conicChips } from '../app/conicMarks';
 import { buildScene } from '../render/scene';
 import { Figure } from '../render/Figure';
 import { ALL_SHOWN, type CanvasDisplay } from '../render/canvasDisplay';
@@ -58,14 +60,14 @@ describe('round #2678 — a conic chip on, with the values switched off', () => 
     expect(off.roles.directrices[0].label).toBeUndefined();
   });
 
-  it('the ellipse: both foci keep their letters, both directrices lose their equations', () => {
+  it('the ellipse: both foci keep their letters, without their coordinates; an ellipse draws no directrix (#2709)', () => {
     const on = sceneOf('issue-1863-ellipse', ELLIPSE_BOX);
     const off = sceneOf('issue-1863-ellipse', ELLIPSE_BOX, NO_VALUES);
     expect(off.roles.foci).toHaveLength(2);
-    expect(off.roles.directrices).toHaveLength(2);
+    expect(on.roles.directrices).toHaveLength(0);
+    expect(off.roles.directrices).toHaveLength(0);
     expect(on.roles.foci.every((f) => /\(/.test(strip(f.label?.text) ?? ''))).toBe(true);
     expect(off.roles.foci.map((f) => strip(f.label?.text))).toEqual(on.roles.foci.map((f) => strip(f.label?.text)?.replace(/\(.*$/, '')));
-    expect(off.roles.directrices.every((l) => l.label === undefined)).toBe(true);
   });
 
   it('a focus on the student\'s own point F writes nothing either way', () => {
@@ -83,6 +85,55 @@ describe('round #2678 — a conic chip on, with the values switched off', () => 
     const off = html(NO_VALUES);
     expect(off).not.toContain('27/2');
     expect(off).toContain('data-testid="analytic-roles"');
+  });
+});
+
+describe('#2709 (ADR-AG-466) — an ellipse shows its foci only (operator 2026-11-04: "foci only for ellipse.")', () => {
+  const ELLIPSE = ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'];
+  const PARABOLA = ['נתונה פרבולה שמשוואתה y^2=54x'];
+  const chipOf = (lines: string[], map: AnnotationMap) => {
+    const d = derive(lines, 0);
+    return { d, chip: conicChips(d, map)[0] };
+  };
+
+  it('the ellipse chip cycles nothing → foci → nothing; the parabola keeps its four states', () => {
+    const { d, chip } = chipOf(ELLIPSE, {});
+    expect([chip.state, chip.next]).toEqual(['none', 'focus']);
+    const on = conicChips(d, withConic({}, chip.id, chip.next))[0];
+    expect([on.state, on.next]).toEqual(['focus', 'none']);
+    const p = chipOf(PARABOLA, {});
+    const seen: string[] = [];
+    let map: AnnotationMap = {};
+    for (let i = 0; i < 4; i++) {
+      const c = conicChips(p.d, map)[0];
+      seen.push(c.next);
+      map = withConic(map, c.id, c.next);
+    }
+    expect(seen).toEqual(['directrix', 'focus', 'both', 'none']);
+  });
+
+  it('a saved «both» on an ellipse loads as foci (two dots, no directrix), and the file is not rewritten', () => {
+    store().clearAll();
+    for (const l of ELLIPSE) store().recordLine(l);
+    const { chip } = chipOf(ELLIPSE, {});
+    const saved = { ...JSON.parse(JSON.stringify(store().serialize())), annotations: { [chip.id]: { conic: 'both' } } };
+    store().clearAll();
+    loadAnalyticSession(saved, 'file');
+    expect(store().annotations).toEqual({ [chip.id]: { conic: 'both' } });
+    const d = derive(store().lines, 0);
+    const read = conicChips(d, store().annotations)[0];
+    expect([read.state, read.next]).toEqual(['focus', 'none']);
+    expect(conicMarksOf(d, store().annotations).map((m) => m.kind)).toEqual(['focus', 'focus']);
+  });
+
+  it('a saved «directrix» on an ellipse reads as nothing shown; on a parabola it still draws the directrix', () => {
+    const { d, chip } = chipOf(ELLIPSE, {});
+    const map: AnnotationMap = { [chip.id]: { conic: 'directrix' } };
+    const read = conicChips(d, map)[0];
+    expect([read.state, read.next]).toEqual(['none', 'focus']);
+    expect(conicMarksOf(d, map)).toEqual([]);
+    const p = chipOf(PARABOLA, {});
+    expect(conicMarksOf(p.d, { [p.chip.id]: { conic: 'directrix' } }).map((m) => m.kind)).toEqual(['directrix']);
   });
 });
 

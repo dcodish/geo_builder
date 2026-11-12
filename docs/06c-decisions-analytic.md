@@ -14860,6 +14860,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 
 **Requirements:** [02c](02c-requirements-analytic.md) R221, R222 (new), R20. · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip".
 
+> **⚠ Superseded in part by [ADR-AG-466](#adr-ag-466)** (2026-11-12; operator 2026-11-04, #2709: *"foci only for ellipse."*): the ellipse's four-state cycle and its directrices. An ellipse's chip is nothing → foci → nothing and it draws no directrix; `ellipseDirectrices` is removed. The parabola is unchanged.
+
 **Operator rulings, verbatim.**
 - 2026-09-19 (#1218): *"yes. there is an off state. label shows what is next. elippse has fewer states."* Its "fewer states" (two, foci only) was **replaced** on 2026-10-09: *"The ellipse → the SAME four-state cycle as the parabola. (He chose this over the two-state foci-only option the session recommended.)"*, confirmed 2026-10-14 (card `d14-1218-focus`): *"the 9 October four-state control wins"*. So both conics cycle «כלום → רק מדריך → רק מוקד → מוקד ומדריך», and an ellipse draws both foci and both directrices. No conflict remains.
 - 2026-10-09, answer 2: *"the NEXT ACTION, always"* («הצג מדריך · הצג מוקד · הצג מוקד ומדריך · הסתר»). Answer 5: *"`F` for a parabola's focus, `F₁` / `F₂` for an ellipse's, with the directrix labelled by its equation."*
@@ -16386,6 +16388,32 @@ Each of those points moves along a curve.
 **Locks.** `engine.test.ts` (#2664 rows): the classifier on ten equations (offsets and axis exact, the canonical ones with no frame fields), the roles at known values (foci (7,−1) and (−1,−1); focus (3,1) and directrix x = 1; focus (0,2) and directrix y = −2), the polyline on the curve, «קנונית» refused, membership at the vertex and a chord; #896's rows rewritten (the translated parabola and ellipse read; «פרבולה קנונית» with a translated equation refused `not-canonical`; the hyperbola still refused). `parser.test.ts`: the bracket unwrap and the claim carried, and both locale texts. `issue-2628-translated-locus.test.ts`: the six loci now named with their equation, the hyperbola still unnamed, the input gate widened. Fixtures (the net): `issue-2664-translated-ellipse`, `issue-2664-translated-parabola`, `issue-2664-y-parabola`, `exam-2021s-q1-two-parabolas-2664` (A(0,0), B(2,2)), and `issue-2664-canonical-word-refused` in `REFUSES_LAST_LINE`. `message-floor-2028.test.ts` gains the key. Catalog: a translated-ellipse row and two parabola rows in F6.
 
 **Behaviour change for a student:** in analytic, a typed translated ellipse, translated parabola or y-axis parabola is read and drawn, its focus, foci, vertices, directrix and centre answer from where it is drawn, and a locus that is such a curve is named with its equation. «פרבולה קנונית» / «אליפסה קנונית» with an equation off the origin is refused naming the word. A hyperbola and a rotated conic are still refused.
+## ADR-AG-466 — An ellipse shows its foci only: its chip is nothing → foci → nothing (#2709)
+
+**Date:** 2026-11-12 · **Status:** accepted · bug (P2, analytic), fix round #2855 stream B, branch `fix/2709-ellipse-chip-foci-only`. **Supersedes in part** [ADR-AG-376](#adr-ag-376) (the ellipse's four states and its directrices). LADDER stage: none (display state).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R221 (rewritten for the ellipse), R20's canvas line · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip" (the chip, the marks).
+
+**Operator ruling, 2026-11-04** (playing round #2697): *"does an ellipse have a מדריך? i know about the מוקד only. a parabola has both."* Offered A (keep the directrices) or B (foci only): *"foci only for ellipse."* This replaces the 2026-10-09 ruling (confirmed 2026-10-14, card `d14-1218-focus`) that gave the ellipse the parabola's cycle, and returns to #1218's 2026-09-19 *"elippse has fewer states."* Re-reported 2026-11-12: *"ellipses still have the chip to show מדריכים but ellipses dont have that"*.
+
+**Measured at pickup** (`31d99a36`, the #2851 branch tip on `caf619a5`; `derive` → `conicChips` / `conicMarksOf`): «נתונה אליפסה שמשוואתה x^2/25+y^2/9=1» has a chip whose next state from nothing is `directrix`; `both` draws two foci and two directrices.
+
+**Class.** The chip's cycle and the marks' directrix branch were kind-blind: one `CONIC_CYCLE` for every conic. Every ellipse (canonical, translated, y-major, parameterised) and every reader of the state (the chip and the marks) is the class; a parabola is unchanged.
+
+**Decision.**
+1. **A cycle per kind** (`app/annotations.ts` `ELLIPSE_CYCLE` = none → focus; `nextConic(s, cycle)`, the parabola's `CONIC_CYCLE` by default). `app/conicMarks.ts` maps each kind to its cycle.
+2. **One read** (`stateOn` in `conicMarks.ts`): the map's record folded onto the kind's cycle, used by `conicChips` and `conicMarksOf` alike. A saved `both` on an ellipse reads as `focus` (it showed the foci), a saved `directrix` as `none`. The saved map is never rewritten: `cleanAnnotations` still keeps every state (a parabola needs them), and the next press writes the state the chip names.
+3. **No directrix on an ellipse**: the directrix branch draws a parabola's only, and `ellipseDirectrices` (`engine/curves.ts`), which nothing else used, is deleted.
+4. **Words**: `conicChip.ellipse` keeps `focus` («הצג מוקדים») and `none` («הסתר»); `directrix` and `both` are dropped in both locales.
+
+This also settles the open card about the «both» state zooming out to keep an ellipse's far directrices in frame: an ellipse has none.
+
+**Ports.** None: 2-D and 3-D have no conics (exception family X2).
+
+**Locks.** `round-2678-conic-display.test.tsx`: the ellipse cycle (nothing → foci → nothing) and the parabola's four states; a saved `both` on an ellipse loads through `loadAnalyticSession` as foci (two dots, no directrix) with the map unchanged; a saved `directrix` reads as nothing while a parabola's still draws; the ellipse scene has no directrix. Fixture `issue-1863-ellipse` now carries `focus` (its name drops the directrices).
+
+**Behaviour change for a student:** in analytic, an ellipse's button reads «הצג מוקדים» / «הסתר» and only shows and hides the two foci; no directrix is drawn on an ellipse, including in a figure saved with them shown. A parabola's button is unchanged.
+
 ## ADR-AG-460 — The subject frame takes the exam's colon and the masculine «מקיים» (#2062)
 
 **Status:** accepted, 2026-11-10 · **Issue:** [#2062](https://github.com/dcodish/geo_builder/issues/2062) (feature, `P2`, `analytic`) · round [#2822](https://github.com/dcodish/geo_builder/issues/2822)

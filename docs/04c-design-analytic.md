@@ -1973,13 +1973,15 @@ by a line id, drawn BESIDE the name (2026-10-09 answer 4) through the same place
 Each is a facet, a reader in `cleanAnnotations`, and a projection into `SceneKnowledge`; no store or envelope field.
 
 **The chip.** `app/conicMarks.ts` `conicChips(d, annotations)`: one per STATED parabola or ellipse, on its
-`objectLine` row, in the givens row's `trail` seat after the locus chips; `state` and `next` from
-`CONIC_CYCLE` (none → directrix → focus → both). The label key is `conicChip.<kind>.<next>`. A press is
+`objectLine` row, in the givens row's `trail` seat after the locus chips; `state` and `next` from the kind's cycle
+(#2709, [ADR-AG-466](06c-decisions-analytic.md#adr-ag-466)): a parabola's `CONIC_CYCLE` (none → directrix → focus → both),
+an ellipse's `ELLIPSE_CYCLE` (none → focus). `stateOn` is the ONE read of the map for the chip and the marks: a state
+the kind lacks (a saved `both` / `directrix` on an ellipse) folds to `focus` / `none`; the map is never rewritten. The label key is `conicChip.<kind>.<next>`. A press is
 `setAnnotations(withConic(map, id, next))`: one undo entry, nothing submitted.
 
 **The marks.** `conicMarksOf(d, annotations, hidden)` returns world-space marks from the closed forms
-(`parabolaFocus`, `parabolaDirectrix`, `ellipseFoci`, `ellipseDirectrices` — new, `x = ±a²/c` or `y = ±b²/c`, null
-when a = b). Labels: the book's letter unless a student's point holds it (`F₁` ≡ `F1`), plus `(x, y)` through
+(`parabolaFocus`, `parabolaDirectrix`, `ellipseFoci`; an ellipse draws no directrix, #2709, and `ellipseDirectrices`
+is gone). Labels: the book's letter unless a student's point holds it (`F₁` ≡ `F1`), plus `(x, y)` through
 `fmtAnalytic` only when `knownCurve` holds; a directrix's `roleLineOf` (the panel's `roleLineText`) only when known;
 nothing at all where a student's point stands at the focus. A hidden curve (#2238) draws none. `buildScene` takes them
 as `SceneKnowledge.roleMarks` and returns `scene.roles`: foci as dots, directrices clipped to the view box by

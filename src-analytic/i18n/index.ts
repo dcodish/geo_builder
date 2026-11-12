@@ -659,10 +659,10 @@ const he = {
   locusChipShow: 'הצג מקום גאומטרי',
   locusChipHide: 'הסתר מקום גאומטרי',
   // #1863 (ADR-AG-376) — the conic chip names its NEXT action (operator, 2026-10-09): directrix → focus → both → hide.
-  // The words are the session's (ADR-W-174); the ellipse's are plural, two foci and two directrices.
+  // The words are the session's (ADR-W-174). An ellipse shows its two foci only (#2709, ADR-AG-466): foci → hide.
   conicChip: {
     parabola: { directrix: 'הצג מדריך', focus: 'הצג מוקד', both: 'הצג מוקד ומדריך', none: 'הסתר' },
-    ellipse: { directrix: 'הצג מדריכים', focus: 'הצג מוקדים', both: 'הצג מוקדים ומדריכים', none: 'הסתר' },
+    ellipse: { focus: 'הצג מוקדים', none: 'הסתר' },
   },
   // #1863 (ADR-AG-377) — an ellipse the givens make a circle, said in the narrowing note's voice (cause first, ADR-W-129)
   conicCircle: '{{cause}}, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה.',
@@ -1232,7 +1232,7 @@ const en: typeof he = {
   locusChipHide: 'Hide locus',
   conicChip: {
     parabola: { directrix: 'Show directrix', focus: 'Show focus', both: 'Show focus and directrix', none: 'Hide' },
-    ellipse: { directrix: 'Show directrices', focus: 'Show foci', both: 'Show foci and directrices', none: 'Hide' },
+    ellipse: { focus: 'Show foci', none: 'Hide' },
   },
   conicCircle: '{{cause}}, the ellipse is now a circle — a circle is a kind of ellipse.',
   conicCircleNamed: '{{cause}}, the ellipse {{name}} is now a circle — a circle is a kind of ellipse.',

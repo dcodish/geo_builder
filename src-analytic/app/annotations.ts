@@ -11,7 +11,9 @@
  * `AnnotationMap` is keyed by the OBJECT id (a curve's id, later a point's), one `Annotation` per object, each kind of
  * annotation a FACET of that one record:
  *
- * - `conic` — the conic chip's state (this PR): `directrix` · `focus` · `both`; absent is «nothing shown».
+ * - `conic` — the conic chip's state (this PR): `directrix` · `focus` · `both`; absent is «nothing shown». An ellipse's
+ *   chip reaches only `focus` (#2709, ADR-AG-466); a saved `directrix` / `both` on one is kept here and read as nothing /
+ *   focus by `app/conicMarks.ts`.
  * - `coords` — #1211, a point's coordinates shown on the canvas (later PR; the click menu writes it).
  * - `line` — #1121, a line's equation / slope shown beside its name (later PR; the click menu writes it).
  *
@@ -37,9 +39,12 @@ export interface Annotation {
 
 export type AnnotationMap = Record<string, Annotation>;
 
-/** The state after one press — the cycle returns to nothing after «both». */
-export function nextConic(s: ConicState): ConicState {
-  return CONIC_CYCLE[(CONIC_CYCLE.indexOf(s) + 1) % CONIC_CYCLE.length];
+/** An ellipse's cycle (#2709, ADR-AG-466; operator 2026-11-04: *"foci only for ellipse."*): nothing → foci → nothing. */
+export const ELLIPSE_CYCLE: readonly ConicState[] = ['none', 'focus'];
+
+/** The state after one press on `cycle` (a parabola's by default) — it returns to nothing after its last state. */
+export function nextConic(s: ConicState, cycle: readonly ConicState[] = CONIC_CYCLE): ConicState {
+  return cycle[(cycle.indexOf(s) + 1) % cycle.length];
 }
 
 /** The conic state recorded for an object (nothing when unrecorded). */
