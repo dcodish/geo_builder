@@ -1,4 +1,7 @@
 /**
+ * pipeline-lock: the class is a store verdict across sequences and seeds (one letter value at seeds 0–5, the refusal of a
+ * restatement and of a value line, the order permutation, the unchanged DOF cue) that the fixture's build + drift net cannot assert.
+ *
  * #2785 (ADR-3D-488) — A LETTER WRITTEN IN COORDINATES IS ONE UNKNOWN WHEREVER IT IS WRITTEN.
  *
  * A bare letter («B(k,1,2)») used to lower to a free component NAMED k (#814, first binding wins), so a second
