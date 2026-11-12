@@ -62,6 +62,11 @@ export interface VecTerm {
   /** #1497 (ADR-3D-426): the coefficient as typed, for DISPLAY only. Nothing solves from it. */
   src?: string;
   atom: VecAtom;
+  /**
+   * #1551 (ADR-3D-472): a LETTER in the coefficient — the coefficient is `coeff + letter.p · letter.sym`, the letter an
+   * unknown of the equation («EM = a·EA + b·EC»). Absent on every numeric term, so a saved file is unchanged.
+   */
+  letter?: { sym: string; p: number };
 }
 
 /**
@@ -81,7 +86,18 @@ export interface SymTerm {
   /** #1497 (ADR-3D-426): a numeric coefficient as typed, for DISPLAY only. */
   src?: string;
   atom: VecAtom;
+  /**
+   * #1551 (ADR-3D-472): the letter `coeff.p` multiplies, when the expression carries SEVERAL letters
+   * («a·EA + b·EC»). Absent: the expression's one `symbol` — every one-letter command and saved file is unchanged.
+   */
+  sym?: string;
 }
+
+/** #1551 (ADR-3D-472): the letter a term's `coeff.p` multiplies — its own, else the expression's one letter. */
+export const termLetter3 = (t: SymTerm, symbol: string | undefined): string | undefined => t.sym ?? symbol;
+
+/** #1551: every letter an expression carries, in first-written order — the one letter, or the several. */
+export const exprLetters3 = (x: { symbol?: string; symbols?: string[] }): string[] => x.symbols ?? (x.symbol !== undefined ? [x.symbol] : []);
 
 export type Claim3 =
   | { type: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number; given?: true } // |a1b1| = c·|a2b2|
@@ -932,6 +948,8 @@ export interface VecRelCommand {
   to: Id;
   terms: SymTerm[];
   symbol?: string;
+  /** #1551 (ADR-3D-472): two or more letters («EM = a·EA + b·EC»); then `symbol` is absent and each term names its own. */
+  symbols?: string[];
   /**
    * #1183 — the student wrote the VECTOR marking explicitly (`⃗`/`→`/`⟶`, or the «וקטור»/`vector`
    * word), so this relation is not the two-reading sentence {@link segmentEquationReading} asks about.
@@ -1639,7 +1657,7 @@ export interface Construction3 {
   /** #253 (ADR-3D-419): the PLACED points stated on a free circle. Each pins it; a rider is defined by it instead. */
   circleMembers3: { point: Id; circle: string }[];
   /** V7 — vector definitions: `X⃗Y = Σ terms`, solving `unknown` (affine; `symbol` = the free coefficient). */
-  vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string }[];
+  vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string; /** #1551 (ADR-3D-472): two or more letters (then no `symbol`) */ symbols?: string[] }[];
   /**
    * V7 — conditions that PIN a figure SYMBOL. #902 (ADR-3D-219): keyed by the symbol's NAME, never by
    * the vec-def that introduced it. A letter is owned by whichever mechanism carries it — a vec-def's
@@ -1887,8 +1905,9 @@ export const emptyConstruction3 = (): Construction3 => ({
  */
 export function figureSymbolsOf(c: Construction3): string[] {
   const out = new Set<string>();
-  for (const vd of c.vecDefs) if (vd.symbol) out.add(vd.symbol);
+  for (const vd of c.vecDefs) for (const s of exprLetters3(vd)) out.add(s); // #1551: every letter of a definition
   for (const s of pinSymsOf(c)) out.add(s);
+  for (const s of vecEqLettersOf3(c)) out.add(s); // #1551: a vector equation's letters
   if (c.param) out.add(c.param);
   // The three kinds the address registry knew and the panel did not price (#939).
   for (const b of c.partialNames) out.add(b.sym);
@@ -2098,7 +2117,20 @@ export type SymbolOwner =
   | { kind: 'rider'; id: Id; fromB: boolean }
   /** #1188 step 2 (ADR-3D-390): a letter in an AFFINE component of a free vector («u = (k-1, 2, k)») — an unknown of
    *  the free-vector system, solved there and never by the pivot */
-  | { kind: 'free-sym' };
+  | { kind: 'free-sym' }
+  /** #1551 (ADR-3D-472): a letter of a vector equation over placed points («EM = a·EA + b·EC») — read off the drawing by
+   *  least squares (`vecEqLetters3`), never a pivot unknown */
+  | { kind: 'vec-letter' };
+
+/** #1551 (ADR-3D-472): the letters the vector equations over placed points carry, in first-written order. */
+export function vecEqLettersOf3(c: Pick<Construction3, 'claims'>): string[] {
+  const out: string[] = [];
+  for (const k of c.claims) {
+    if (k.type !== 'vec-eq') continue;
+    for (const t of [...k.lhs, ...k.rhs]) if (t.letter && !out.includes(t.letter.sym)) out.push(t.letter.sym);
+  }
+  return out;
+}
 
 /** #1188 step 2 (ADR-3D-390): the letters the free vectors' affine components name, in first-written order. */
 export function freeVecSymsOf(c: Pick<Construction3, 'freeVectors'> & Partial<Pick<Construction3, 'freeVecMetrics'>>): string[] {
@@ -2111,8 +2143,9 @@ export function freeVecSymsOf(c: Pick<Construction3, 'freeVectors'> & Partial<Pi
 export function symbolOwnersOf(c: Construction3, sym: string): SymbolOwner[] {
   const out: SymbolOwner[] = [];
   c.vecDefs.forEach((vd, def) => {
-    if (vd.symbol === sym) out.push({ kind: 'vec-def', def });
+    if (vd.symbol === sym || vd.symbols?.includes(sym)) out.push({ kind: 'vec-def', def });
   });
+  if (vecEqLettersOf3(c).includes(sym)) out.push({ kind: 'vec-letter' }); // #1551
   if (pinSymsOf(c).includes(sym)) out.push({ kind: 'pin-sym' });
   if (c.param === sym) out.push({ kind: 'param' });
   const marks = c.angleMarks.filter((m) => m.label === sym);

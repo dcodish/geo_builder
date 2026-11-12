@@ -44,6 +44,8 @@ export const PROMPT_EXAMPLES_3D: PromptExample3[] = [
   { freeform: 'a cone with apex S over center O, radius 5 and height 12', steps: ['cone with apex S base center O radius 5 height 12'] },
   // #1547 (ADR-3D-299): ONE coordinate is its own given — never invent the other two as letters («B(3, y, z)»)
   { freeform: 'שיעור ה x של הנקודה B שווה ל-3', steps: ['x_B = 3'] },
+  // #1551 (ADR-3D-472): a vector relation may carry SEVERAL letters (the exam's parameters) — keep each in its term
+  { freeform: 'נתון EM = a·EA + b·EC כאשר a ו-b הם פרמטרים', steps: ['EM = a·EA + b·EC'] },
 ];
 
 /**

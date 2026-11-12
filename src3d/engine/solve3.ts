@@ -21,6 +21,7 @@ import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { congruentShapes3 } from './configs3';
 import { evalAffine, openPinSymsOf, pinSymsOf, scalarPinOrigin3, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
+import { hasLetters3, vecEqLetters3 } from './vecExpr';
 import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -845,6 +846,19 @@ export function scalarPinRows3(
       // #1183: a VECTOR equation drives — three SIGNED component residuals, so the descent crosses
       // zero instead of touching it (the ADR-3D-006 lesson `concyclic` records below). `exprAt`
       // already evaluates a `VecExpr`, so a named vector and a point pair reach this by one path.
+      // #1551 (ADR-3D-472): a LETTER in a coefficient is solved at this drawing by least squares, so the residual is
+      // the part no letter can absorb — the shape moves until the relation can hold, and no new pivot unknown exists.
+      // Over the atoms' size like the numeric row (#2806): scale-free, so a shrinking figure cannot zero it.
+      if (hasLetters3(pin.lhs) || hasLetters3(pin.rhs)) {
+        const sol = vecEqLetters3(pin.lhs, pin.rhs, dirOf, (sym) => symbolValueOf(c, sym));
+        if (!sol) {
+          out.push(10, 10, 10);
+          continue;
+        }
+        const den = env.gaugeFrozen ? 1 : Math.max(sol.scale, REL_DIFF_FLOOR);
+        out.push(sol.residual.x / den, sol.residual.y / den, sol.residual.z / den);
+        continue;
+      }
       const l = exprAt(pin.lhs);
       const r = exprAt(pin.rhs);
       if (!l || !r) {

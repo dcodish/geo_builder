@@ -527,9 +527,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   them until |AB| = 5 holds, and keeps holding on «הציגו תצורה אחרת». What was not stated keeps varying; a
   conflicting magnitude is refused, naming the statement it conflicts with.
   - Sources: ADR-3D-260, #1311.
-- **FR-VC-2 (Must)** — Support **at most one symbolic parameter** in a vector expression, pinned by a
-  given through root-finding. Two unknowns in one expression is a known boundary.
-  - Sources: #301, superseded by #1551.
+- **FR-VC-2 (Must)** — **A vector expression may carry several letters, one per term (degree 1), in any
+  alphabet.** Over points already placed («EM = a·EA + b·EC» after the exam's «BM = u/6 − 2v/3 + w/12») the letters are
+  solved with the figure's free shape: a relation that holds for every shape gives seed-stable letters and the data panel
+  prints them (**a = 2/3, b = 1/6**); one that holds only for some shapes reshapes the box (and moves riders) so that it
+  holds, the rest staying free for «הציגו תצורה אחרת»; one that no shape satisfies is refused by name, «הנתונים סותרים זה
+  את זה — אין גוף שמקיים את «EB' = a·EA + b·EC» יחד עם שאר הנתונים». Over a new point («EN = a·EA + b·EC») each letter is
+  a free number: N lies free in the plane EAC, the panel reads «a = ?», «b = ?» and writes EN in a and b. A letter
+  carried by one term only («EM = aEA + 1/6EC») is the same case. «ab·EA», «a²EA» stay refused (FR-VC-3).
+  - Sources: #301, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472), #1551 (operator rulings 2026-08-16, 2026-09-29, 2026-10-05, 2026-10-13).
 - **FR-VC-2a (Must)** — **A POWER in a coordinate component is supported where the solver can pin it,
   and refused BY NAME where it cannot.** On a figure carrying a solid, `C(p², p, 0)` builds and the
   relation `x = y²` holds. With no solid it is refused by name, never accepted with the power discarded.

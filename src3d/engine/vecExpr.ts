@@ -111,3 +111,74 @@ export function vectorValue3(
   const b = at.positions.get(atom.to);
   return a && b ? sub3(b, a) : undefined;
 }
+
+/**
+ * #1551 ([ADR-3D-472](../../docs/06b-decisions-3d.md#adr-3d-472)) — THE LETTERS OF A VECTOR EQUATION, read off ONE drawing.
+ *
+ * «EM = a·EA + b·EC» over placed points: the coefficients are affine in the letters, so at a drawing the equation is
+ * R = Σₛ s·Dₛ with R and every Dₛ numbers — a linear least squares, solved by its normal equations (one small linear
+ * solve, the no-CAS boundary: docs/20 D3). `residual` is the part of R no letter can absorb: zero exactly when the
+ * equation holds for SOME letters at this drawing. It is what the pivot drives (the figure's free shape moves until the
+ * relation can hold) and what the verifier judges; `letters` is what the panel and the ask read. A letter given a value
+ * (`known`) is a number. `letters` is null when the letter directions are dependent (the drawing does not determine
+ * them); the residual is then the part of R outside their span.
+ */
+export function vecEqLetters3(
+  lhs: VecExpr,
+  rhs: VecExpr,
+  vecOf: (atom: VecAtom) => Vec3 | null,
+  known: (sym: string) => number | undefined,
+): { residual: Vec3; letters: Map<string, number> | null; scale: number } | null {
+  let R = v3(0, 0, 0);
+  const D = new Map<string, Vec3>();
+  let scale = 0;
+  for (const [side, sign] of [[lhs, 1], [rhs, -1]] as const) {
+    for (const t of side) {
+      const w = vecOf(t.atom);
+      if (!w) return null;
+      const n = Math.hypot(w.x, w.y, w.z);
+      if (n > scale) scale = n;
+      let c = t.coeff;
+      if (t.letter) {
+        const v = known(t.letter.sym);
+        if (v !== undefined) c += t.letter.p * v;
+        else {
+          // R = Σ s·Dₛ with Dₛ = Σ_rhs p·v − Σ_lhs p·v
+          const d = D.get(t.letter.sym) ?? v3(0, 0, 0);
+          D.set(t.letter.sym, v3(d.x - sign * t.letter.p * w.x, d.y - sign * t.letter.p * w.y, d.z - sign * t.letter.p * w.z));
+        }
+      }
+      R = v3(R.x + sign * c * w.x, R.y + sign * c * w.y, R.z + sign * c * w.z);
+    }
+  }
+  const syms = [...D.keys()];
+  const dirs = syms.map((s) => D.get(s)!);
+  // Gram–Schmidt for the residual (robust when the directions are dependent), normal equations for the letters
+  const basis: Vec3[] = [];
+  for (const d of dirs) {
+    let e = d;
+    for (const b of basis) e = sub3(e, v3(b.x * dot3(e, b), b.y * dot3(e, b), b.z * dot3(e, b)));
+    const n = Math.hypot(e.x, e.y, e.z);
+    if (n > 1e-9 * Math.max(1, scale)) basis.push(v3(e.x / n, e.y / n, e.z / n));
+  }
+  let residual = R;
+  for (const b of basis) residual = sub3(residual, v3(b.x * dot3(residual, b), b.y * dot3(residual, b), b.z * dot3(residual, b)));
+  if (basis.length < dirs.length) return { residual, letters: null, scale: Math.max(scale, 1e-12) };
+  const n = dirs.length;
+  const M = dirs.map((di) => [...dirs.map((dj) => dot3(di, dj)), dot3(di, R)]);
+  for (let col = 0; col < n; col++) {
+    let piv = col;
+    for (let r = col + 1; r < n; r++) if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+    [M[col], M[piv]] = [M[piv], M[col]];
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = M[r][col] / M[col][col];
+      for (let k = col; k <= n; k++) M[r][k] -= f * M[col][k];
+    }
+  }
+  const letters = new Map(syms.map((s, i) => [s, M[i][n] / M[i][i]] as const));
+  return { residual, letters, scale: Math.max(scale, 1e-12) };
+}
+
+/** #1551: does a vector expression carry a letter? */
+export const hasLetters3 = (e: VecExpr): boolean => e.some((t) => t.letter !== undefined);
