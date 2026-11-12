@@ -36,12 +36,12 @@ import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
-import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3, unstatedPyramidReading3 } from '../engine/apply';
+import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, renameIds3, resolveUnletteredSolid3, ringKeyIds3, segmentEquationKind3, unstatedPyramidReading3 } from '../engine/apply';
 import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableCircle3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { definiteCircle3 } from '../engine/definiteCircle';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
-import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
+import { definiteShapeExample3, definiteSolidExample3, solidNounArticle3 } from '../lexicon/shapePhrase3';
 import { anglesProveConvex3, commandStatesCircle3, convexWhenSimple, statedConcyclic3, statedRingCorners3, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
@@ -94,6 +94,9 @@ export interface Derived3 {
    *  ring the fold picked. The fact list keeps the reference; every reader that asks "what did this line state?" of
    *  the figure reads these. */
   resolvedCmds: Readonly<Record<string, readonly Command3[]>>;
+  /** #2838 (ADR-3D-486): each applied row holding an unlettered solid noun the fold read on other letters — its commands
+   *  as typed, renamed onto those letters (no other reading). What the submit decision compares a new line against. */
+  relettered?: Readonly<Record<string, readonly Command3[]>>;
   /** #1467 (ADR-3D-382): by fact id, the points that line CREATED by reference — the fold's mint pass, last resort
    *  after the deferral fixpoint. What the «נוצרה נקודה חדשה …» notice names. Absent for a line that created none. */
   created: Readonly<Record<string, readonly string[]>>;
@@ -732,6 +735,58 @@ function spellsLetters3(utterance: string, ids: readonly string[]): boolean {
 }
 
 /**
+ * #2838 ([ADR-3D-486](../../docs/06b-decisions-3d.md#adr-3d-486)) — did the row's text TYPE this solid's run? It spells
+ * the whole run, or its unprimed letters (the parser completes «קובייה ABCD» / «מנסרה ABC» with their primes).
+ */
+function typesSolidRun3(utterance: string, ids: readonly string[]): boolean {
+  return spellsLetters3(utterance, ids) || spellsLetters3(utterance, ids.filter((id) => !id.endsWith("'")));
+}
+
+/** #2838 (ADR-3D-486): a `solid` command the row's text did not letter — the parser's default run for a solid noun. */
+function unletteredSolid3(k: Command3, utterance: string): k is SolidCommand {
+  return k.type === 'solid' && nounOfKind(k.kind) !== null && !typesSolidRun3(utterance, k.ids);
+}
+
+/**
+ * #2790 (ADR-3D-484 Am. 1) / #2838 (ADR-3D-486) — FR-SP-24's ONE indefinite-noun rule, as the twin pairing reads it: does
+ * this row name a NEW shape each time it is applied? An indefinite or prefixed flat shape noun (`shape-ref3`), or an
+ * unlettered solid noun that is not definite («קובייה», not «הקובייה»).
+ */
+function newShapeEachTime3(f: Pick<Fact3, 'cmds' | 'utterance'>): boolean {
+  return f.cmds.some((k) => k.type === 'shape-ref3' && k.article !== 'definite') ||
+    (f.cmds.some((k) => unletteredSolid3(k, f.utterance)) && solidNounArticle3(f.utterance) !== 'definite');
+}
+
+/**
+ * #2838 ([ADR-3D-486](../../docs/06b-decisions-3d.md#adr-3d-486)) — AN UNLETTERED SOLID NOUN, READ AGAINST THE FIGURE.
+ * The context-free parser letters «קובייה» / «פירמידה ישרה שבסיסה ריבוע» with its default run; the row's text spells
+ * none of it. FR-SP-24 (ADR-3D-351) reads such a noun as it reads an unnamed flat one: definite → the drawn solid,
+ * indefinite → a NEW solid on the first free letters (`resolveUnletteredSolid3`). The whole row is renamed by the one
+ * map, so a relation the noun lowered with (a base's isosceles pair) lands on the new letters. ONE reader for the fold
+ * (`expandFact`, against the figure before the row) and the submit decision (against the figure as it stands).
+ * `skip` leading commands are a mint-pass declaration (#1566), whose letters the row named.
+ */
+function unletteredSolidRow3(
+  at: Construction3,
+  utterance: string,
+  cmds: readonly Command3[],
+  skip = 0,
+): { ok: true; cmds: readonly Command3[] } | { ok: false; error: EngineError3 } {
+  let out = cmds;
+  for (let i = skip; i < out.length; i++) {
+    const k = out[i];
+    if (!unletteredSolid3(k, utterance)) continue;
+    const r = resolveUnletteredSolid3(at, k, solidNounArticle3(utterance));
+    if (!r.ok) return { ok: false, error: withShapeSentence3(r.error, utterance) };
+    if (!r.map) continue;
+    const renamed = renameIds3(out.slice(i), r.map);
+    const solid = renamed[0] as SolidCommand;
+    out = [...out.slice(0, i), r.kind ? { ...solid, kind: r.kind } : solid, ...renamed.slice(1)];
+  }
+  return { ok: true, cmds: out };
+}
+
+/**
  * #116 / #424 / #1918 (M4 defaults-yield) — THE ENTRY ONE COMMAND MAKES IN A DEFAULTS-YIELD REGISTRY of `derive3`: an
  * explicit right angle (its three labels, vertex first), an explicit equal pair spanning three labels (a triangle's side
  * pair), or a stated segment ∥ (`[a, b, c, d]` for ab ∥ cd). A shape's own lowered relation (`soft`, `origin`) makes none.
@@ -849,9 +904,10 @@ function standingTwins3(facts: readonly Fact3[]): Map<string, string> {
   const standing: Fact3[] = [];
   for (const f of facts) {
     if (!f.enabled) continue;
-    // an indefinite or prefixed shape noun («מעוין», «נתון מעוין») is a NEW ring each time it is applied (ADR-3D-351): two
-    // such rows share their commands, never their shape, so they are never twins (the decision compares them resolved)
-    if (f.cmds.some((k) => k.type === 'shape-ref3' && k.article !== 'definite')) {
+    // an indefinite or prefixed shape noun («מעוין», «נתון מעוין», «קובייה») is a NEW shape each time it is applied
+    // (ADR-3D-351, ADR-3D-486): two such rows share their commands, never their shape, so they are never twins (the
+    // decision compares them resolved)
+    if (newShapeEachTime3(f)) {
       standing.push(f);
       continue;
     }
@@ -867,8 +923,9 @@ function standingTwins3(facts: readonly Fact3[]): Map<string, string> {
 /** #2235: an ambiguous definite noun's refusal, worded with the student's sentence and its taught remedy. */
 function withShapeSentence3<E extends { code: string }>(e: E, utterance: string): E {
   if (e.code !== 'ambiguous-definite-shape') return e;
-  const shapes = (e as unknown as { shapes: string[] }).shapes;
-  return { ...e, sentence: utterance.trim(), example: definiteShapeExample3(utterance, shapes[0]) };
+  const { shapes, solid } = e as unknown as { shapes: string[]; solid?: string };
+  // #2838 (ADR-3D-486): a definite solid noun's remedy writes the letters after the SOLID noun
+  return { ...e, sentence: utterance.trim(), example: (solid ? definiteSolidExample3 : definiteShapeExample3)(utterance, shapes[0]) };
 }
 
 /**
@@ -905,6 +962,8 @@ function deriveCore3(
   let facts = factsIn;
   /** #2235 (ADR-3D-351): the commands each fact holding a `shape-ref3` applied as, against the figure before it */
   const resolvedCmds: Record<string, Command3[]> = {};
+  /** #2838 (ADR-3D-486): each row holding an unlettered solid noun, as typed but on the letters the fold read it on */
+  const relettered: Record<string, Command3[]> = {};
   /** #1680 (ADR-3D-391 Am. 1): the reading each line's two-reading segment equation took */
   const readings: Record<string, SegmentEquationReading3> = {};
   /** A fact's commands with its shape references resolved against `at` — or the refusal, worded with its sentence. */
@@ -923,9 +982,15 @@ function deriveCore3(
    *  whether a shape was named (`namesQuadBase3`); a solid the mint pass declared for the row is its bare declaration
    *  («פירמידה ABCDS», listed first), which names none. Every reader after the fold reads this, as `resolvedCmds`. */
   const expandFact = (at: Construction3, f: Fact3): ReturnType<typeof expandFactRaw> => {
-    const r = expandFactRaw(at, f);
-    if (!r.ok || !r.cmds.some((k) => k.type === 'solid' && isPyramidKind3(k.kind))) return r;
     const minted = presolids?.[f.id]?.cmds.length ?? 0;
+    const raw = expandFactRaw(at, f);
+    // #2838 (ADR-3D-486): an unlettered solid noun is the drawn solid (definite) or a new one on free letters
+    const r = raw.ok ? unletteredSolidRow3(at, f.utterance, raw.cmds, minted) : raw;
+    if (r.ok && raw.ok && r.cmds !== raw.cmds) {
+      const typed = unletteredSolidRow3(at, f.utterance, f.cmds);
+      if (typed.ok) relettered[f.id] = [...typed.cmds];
+    }
+    if (!r.ok || !r.cmds.some((k) => k.type === 'solid' && isPyramidKind3(k.kind))) return r;
     let named: boolean | undefined;
     let changed = false;
     const cmds = r.cmds.flatMap((k, i): Command3[] => {
@@ -2457,7 +2522,7 @@ function deriveCore3(
   // #2790 (ADR-3D-484, Q-2790c [judged]): a HELD row's claims say the held notice only — the #396/#842/#850 notes retire there
   const heldIds = new Set(facts.filter((f) => f.held).map((f) => f.id));
   const heldClaims = new Set(claimOwners.filter((o) => heldIds.has(o.factId)).flatMap((o) => c.claims.slice(o.from, o.to)));
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed, heldClaims), shapeWarnings: shapeWarnings3(c, positions), coincidences: coincidences3(c, positions), resolvedCmds, created, createdCircles, readings };
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed, heldClaims), shapeWarnings: shapeWarnings3(c, positions), coincidences: coincidences3(c, positions), resolvedCmds, relettered, created, createdCircles, readings };
 }
 
 export interface Geo3State {
@@ -2998,7 +3063,10 @@ export function decideCommands3(
    * honesty gates and the twin rule judge the ring it names, never the placeholders; an ambiguous definite noun is
    * refused here, naming the shapes. Every earlier fact holding a reference is read as the ring it was applied to.
    */
-  const refs = commands.some((k) => k.type === 'shape-ref3') || facts.some((f) => f.cmds.some((k) => k.type === 'shape-ref3'));
+  // #2838 (ADR-3D-486): an unlettered solid noun is read against the figure the same way (`unletteredSolidRow3`)
+  const unlettered = (cmds: readonly Command3[], text: string) => cmds.some((k) => unletteredSolid3(k, text));
+  const refs = commands.some((k) => k.type === 'shape-ref3') || facts.some((f) => f.cmds.some((k) => k.type === 'shape-ref3')) ||
+    (facts.length > 0 && unlettered(commands, utterance));
   const view = refs ? derive3(facts, seed) : null;
   let stated: readonly Command3[] = commands;
   if (view && commands.some((k) => k.type === 'shape-ref3')) {
@@ -3006,10 +3074,20 @@ export function decideCommands3(
     if (!exp.ok) return { kind: 'refused', error: withShapeSentence3(exp.error, utterance) };
     stated = exp.cmds;
   }
+  if (view && unlettered(stated, utterance)) {
+    const exp = unletteredSolidRow3(view.construction, utterance, stated);
+    if (!exp.ok) return { kind: 'refused', error: exp.error };
+    stated = exp.cmds;
+  }
   // #2490 (ADR-3D-436): only a row HOLDING a reference is read as applied. The fold also reads a pyramid row against the
   // figure (its unstated base over an existing ring, its unspelled letters), and that reading is the first application's:
   // the same sentence typed again over the same letters is the same statement, so every other row is compared as typed.
-  const statedFacts = view ? facts.map((f) => (view.resolvedCmds[f.id] && f.cmds.some((k) => k.type === 'shape-ref3') ? { ...f, cmds: [...view.resolvedCmds[f.id]] } : f)) : facts;
+  // #2838 (ADR-3D-486): a row holding an unlettered solid is compared on the letters the fold read it on
+  const statedFacts = view
+    ? facts.map((f) =>
+        view.resolvedCmds[f.id] && f.cmds.some((k) => k.type === 'shape-ref3') ? { ...f, cmds: [...view.resolvedCmds[f.id]] }
+        : view.relettered?.[f.id] ? { ...f, cmds: [...view.relettered[f.id]] } : f)
+    : facts;
   // #424 / #438 / #440 / #535: the honesty gates guard the DETERMINISTIC path too — bound to the
   // EVENT, not to a commit path. The old reasoning ("the rules parse the utterance itself, so
   // nothing can leak") was falsified by #530: a rule CAN match an utterance and still drop part

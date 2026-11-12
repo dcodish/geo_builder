@@ -12,7 +12,7 @@ import { heldRadius3, radiusLengthCircle3 } from './freeCircle';
 import { definiteCircle3 } from './definiteCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
-import { resolveSolidSubject } from './solidSubject';
+import { nounAdmits, nounOfKind, resolveSolidSubject } from './solidSubject';
 import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, cyclicFixCommands, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_BASES, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
@@ -2196,6 +2196,59 @@ export function expandShapeRefs3(c: Construction3, cmds: readonly Command3[]): {
     out.push(...r.cmds);
   }
   return { ok: true, cmds: out };
+}
+
+/**
+ * #2838 ([ADR-3D-486](../../docs/06b-decisions-3d.md#adr-3d-486)) — the letters a NEW solid gets when its noun carried
+ * none: {@link freeVertexRun3}'s first free letters (FR-SP-24's rule, the one a new flat shape takes), one per letter
+ * ROOT of the parser's default run, each primed vertex following its root («קובייה» beside «משולש ABC» → D…G, D'…G').
+ * A candidate root is taken when the figure holds it in any primed form the solid uses. Returns old id → new id.
+ */
+export function freeSolidRun3(ids: readonly Id[], taken: (id: string) => boolean): Map<Id, Id> {
+  const root = (id: Id): Id => id.replace(/'+$/, '');
+  const roots = [...new Set(ids.map(root))];
+  const primes = [...new Set(ids.map((id) => id.slice(root(id).length)))];
+  const fresh = freeVertexRun3(roots.length, (x) => primes.some((p) => taken(x + p)));
+  const of = new Map(roots.map((r, i) => [r, fresh[i]]));
+  return new Map(ids.map((id) => [id, of.get(root(id))! + id.slice(root(id).length)]));
+}
+
+/**
+ * #2838 ([ADR-3D-486](../../docs/06b-decisions-3d.md#adr-3d-486)) — WHICH SOLID an unlettered solid noun is, read
+ * against the figure: FR-SP-24's reading of an unnamed shape noun ({@link resolveShapeRef3}), solid edition. The parser
+ * is context-free, so it lettered the noun with its default run; `solid` is that command and `article` how the noun
+ * was introduced.
+ *  - **definite** («הקובייה»): the figure's ONE solid the noun admits (`nounAdmits`, the #766 resolver's vocabulary)
+ *    with as many vertices — the row is that solid (its kind and letters); two or more → `ambiguous-definite-shape`,
+ *    naming them; none → as the indefinite noun;
+ *  - **indefinite / prefixed** («קובייה», «פירמידה ישרה שבסיסה ריבוע»): a NEW solid — on the default letters while the
+ *    figure holds none of them, else on the first free letters ({@link freeSolidRun3}).
+ * Returns the letter map to apply to the whole row (null: the row stays as parsed) and, for a definite noun, the kind.
+ */
+export function resolveUnletteredSolid3(
+  c: Construction3,
+  solid: SolidCommand,
+  article: ShapeRef3Command['article'],
+): { ok: true; map: Map<Id, Id> | null; kind?: SolidKind } | { ok: false; error: EngineError3 } {
+  const noun = nounOfKind(solid.kind);
+  if (article === 'definite' && noun) {
+    const drawn = c.solids.filter((s) => nounAdmits(noun, s.kind) && s.ids.length === solid.ids.length);
+    if (drawn.length > 1) return { ok: false, error: { code: 'ambiguous-definite-shape', shapes: drawn.map((s) => s.ids.join('')), sides: 0, solid: noun } };
+    if (drawn.length === 1) return { ok: true, map: new Map(solid.ids.map((id, i) => [id, drawn[0].ids[i]])), kind: drawn[0].kind };
+  }
+  if (!solid.ids.some((id) => c.points.has(id))) return { ok: true, map: null };
+  return { ok: true, map: freeSolidRun3(solid.ids, (id) => c.points.has(id)) };
+}
+
+/** `cmds` with every point id `map` names renamed — a pure rename over the command data (the {@link fillShapeHoles3} walk). */
+export function renameIds3(cmds: readonly Command3[], map: ReadonlyMap<Id, Id>): Command3[] {
+  const fill = (v: unknown): unknown => {
+    if (typeof v === 'string') return map.get(v) ?? v;
+    if (Array.isArray(v)) return v.map(fill);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, fill(x)]));
+    return v;
+  };
+  return cmds.map((k) => fill(k) as Command3);
 }
 
 export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {

@@ -179,7 +179,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     case 'ambiguous-definite-shape':
       return t('err.ambiguousDefiniteShape', {
         sentence: err.sentence ?? '',
-        plural: t(`err.shapePlural.${err.sides === 3 || err.sides === 4 ? err.sides : 'n'}`),
+        // #2838 (ADR-3D-486): a definite solid noun names its family («קוביות»)
+        plural: err.solid ? t(`err.solidPlural.${err.solid}`) : t(`err.shapePlural.${err.sides === 3 || err.sides === 4 ? err.sides : 'n'}`),
         shapes: err.shapes.join(', '),
         example: err.example ?? err.shapes[0],
       });

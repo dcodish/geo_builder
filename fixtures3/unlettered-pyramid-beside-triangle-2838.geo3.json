@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-12T09:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "פירמידה ישרה שבסיסה משולש שווה שוקיים",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid3",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "type": "length-rel",
+          "a1": "A",
+          "b1": "B",
+          "rhs": {
+            "pair": [
+              "A",
+              "C"
+            ]
+          },
+          "c": 1,
+          "soft": true,
+          "origin": "shape"
+        }
+      ]
+    }
+  ]
+}

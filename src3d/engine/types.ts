@@ -2351,7 +2351,7 @@ export type EngineError3 =
   // #2235 (ADR-3D-351): a DEFINITE unnamed shape noun («המשולש ישר זווית») on a figure holding two or more declared
   // flat polygons of its size — which one is the student's to say (operator ruling 2026-10-16, card `g2235-3d`).
   // `shapes` in figure order. `sentence` / `example` are filled by the store, which knows the utterance.
-  | { code: 'ambiguous-definite-shape'; shapes: string[]; sides: number; sentence?: string; example?: string }
+  | { code: 'ambiguous-definite-shape'; shapes: string[]; sides: number; sentence?: string; example?: string; /** #2838 (ADR-3D-486): a definite SOLID noun's family (`sides` 0) */ solid?: SolidNounOf }
   | { code: 'bound-unsatisfiable'; id: Id } // #273: no sampled configuration puts the measure inside the stated bound
   | { code: 'vacuous-relation' } // S4 (#378): a mutual position stated between an object and itself
   | { code: 'plane-not-determined'; id: string } // #487: this construct needs a plane with a stated equation — π is still free
