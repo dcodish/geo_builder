@@ -5401,7 +5401,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       // A parabola has one focus; a side word about it names nothing the figure can check.
       if (f.side) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
-      return applyFact(c, { t: 'derived', id: f.id, rule: { t: 'parabola-focus', curve: host.id }, src: f.src });
+      return applyFact(c, { t: 'derived', id: f.id, rule: { t: 'parabola-point', curve: host.id, role: 'focus' }, src: f.src });
     }
 
     /**
@@ -5433,6 +5433,20 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'vertex-of': {
+      /*
+       * «V קודקוד הפרבולה» (#2835, ADR-AG-470) — THE parabola's vertex, the focus's path with the other role: the derived
+       * point, or on a point that exists M1's `derived-at` (a fixed parabola judges it, a parameterised one is pinned).
+       * A side or an axis word names an ellipse's vertex; about a parabola, which has one, it names nothing — refused.
+       */
+      // «הקודקוד שלה» names no conic: the figure's one parabola or ellipse, as a focus naming none (`focus-of`).
+      const conics = c.objects.filter((o) => ['parabola', 'ellipse'].includes(curveKindOf(o) ?? ''));
+      const onlyParabola = !f.host && !f.side && !f.axis && conics.length === 1 && curveKindOf(conics[0]) === 'parabola';
+      if (f.host === 'parabola' || onlyParabola) {
+        const parabolas = c.objects.filter((o) => curveKindOf(o) === 'parabola');
+        if (parabolas.length !== 1) return { ok: false, error: noHost(f.src, 'parabola', parabolas) };
+        if (f.side || f.axis) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+        return applyFact(c, { t: 'derived', id: f.id, rule: { t: 'parabola-point', curve: parabolas[0].id, role: 'vertex' }, src: f.src });
+      }
       const host = theEllipse(c, f.src);
       if (!host.ok) return host;
       if (f.side) {

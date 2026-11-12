@@ -141,9 +141,10 @@ export type ParseFailure =
   | { code: 'parabola-no-diameter'; detail: string }
   /**
    * #2625 (ADR-AG-454 Am. 1; operator ruling 2026-11-10, Q-2625b (a)) — «מרכז הפרבולה», «O מרכז הפרבולה», "the centre of the
-   * parabola": the same reason as the diameter's, read by the centre role's reader. `detail` is the line.
+   * parabola": the same reason as the diameter's, read by the centre role's reader. `detail` is the line. `name` (#2835,
+   * ADR-AG-470): the student's letter for the point, which the sentence's next step («O קודקוד הפרבולה») reuses.
    */
-  | { code: 'parabola-no-centre'; detail: string }
+  | { code: 'parabola-no-centre'; detail: string; name?: string }
   /**
    * #1919 (ADR-626, the operator's ruling of 2026-10-08: *"we only support english or hebrew … rejected.
    * in all tools"*) — a letter this tool cannot read. Analytic had no member of the class: it handed
@@ -2730,8 +2731,11 @@ export type RoleRef =
   | { role: 'foci' }
   | { role: 'directrix' }
   | { role: 'perimeter'; noun?: string; ids?: Id[] }
-  /** «הקודקוד הימני של האליפסה» · «הקצה הימני של הציר הגדול» · «קודקוד האליפסה» (#2616, ADR-AG-353). */
-  | { role: 'vertex'; side?: EllipseSide; axis?: 'major' | 'minor' }
+  /**
+   * «הקודקוד הימני של האליפסה» · «הקצה הימני של הציר הגדול» · «קודקוד האליפסה» (#2616, ADR-AG-353). `host` (#2835,
+   * ADR-AG-470): the conic the phrase names — «קודקוד הפרבולה» is the parabola's one vertex; «הקודקוד שלה» names none.
+   */
+  | { role: 'vertex'; host?: 'parabola' | 'ellipse'; side?: EllipseSide; axis?: 'major' | 'minor' }
   /** «קודקודי האליפסה» — the ask (#2616). */
   | { role: 'vertices' }
   /**
@@ -2776,9 +2780,16 @@ const ROLE_ONE_FOCUS_EN = new RegExp(`^one\\s+of\\s+(?:the\\s+|its\\s+)?foci${OF
 const ROLE_FOCI_HE = /^(?:ה?שיעורי\s+)?ה?מוקדי(?:ם)?(?:\s+(?:של\s+)?ה?אליפסה|\s+שלה)?$/;
 const ROLE_FOCI_EN = /^(?:the\s+|its\s+)?(?:coordinates\s+of\s+(?:the\s+)?)?foci(?:\s+of\s+(?:the\s+)?ellipse)?$/i;
 const ROLE_VERTEX_SIDE_HE = new RegExp(`^(?:ה?שיעורי\\s+)?ה?קו?דקוד\\s+ה?${SIDE_HE}${OF_ELLIPSE_HE}$`);
+const ROLE_VERTEX_SIDE_PARABOLA_HE = new RegExp(`^(?:ה?שיעורי\\s+)?ה?קו?דקוד\\s+ה?${SIDE_HE}\\s+(?:של\\s+)?ה?פרבולה$`);
+const ROLE_VERTEX_SIDE_PARABOLA_EN = new RegExp(`^(?:the\\s+)?(?:coordinates\\s+of\\s+(?:the\\s+)?)?${SIDE_EN}\\s+vertex\\s+of\\s+(?:the\\s+)?parabola$`, 'i');
 const ROLE_VERTEX_SIDE_EN = new RegExp(`^(?:the\\s+)?(?:coordinates\\s+of\\s+(?:the\\s+)?)?${SIDE_EN}\\s+vertex${OF_ELLIPSE_EN}$`, 'i');
-const ROLE_VERTEX_ANY_HE = /^(?:ה?שיעורי\s+)?ה?קו?דקוד\s+(?:של\s+)?ה?אליפסה$/;
-const ROLE_VERTEX_ANY_EN = /^(?:a\s+|the\s+)?vertex\s+of\s+(?:the\s+)?ellipse$/i;
+/**
+ * «קודקוד האליפסה» · «קודקוד הפרבולה» · «הקודקוד שלה» (#2835, ADR-AG-470: the parabola is a host of the same reader, its
+ * one vertex a role point like its focus). A bare «הקודקוד» names no conic — it is a polygon's vertex — so it is not read.
+ */
+const ROLE_VERTEX_ANY_HE = /^(?:ה?שיעורי\s+)?ה?קו?דקוד(?:\s+(?:של\s+)?ה?(אליפסה|פרבולה)|\s+שלה)$/;
+const ROLE_VERTEX_ANY_EN =
+  /^(?:a\s+|the\s+)?(?:coordinates\s+of\s+(?:the\s+)?)?(?:vertex\s+of\s+(?:the\s+)?(ellipse|parabola)|(ellipse|parabola)['’]s\s+vertex|its\s+vertex)$/i;
 // #1863 (ADR-AG-377): «מרכז האליפסה» — the book's own noun («מיתר העובר דרך מרכז האליפסה נקרא קוטר»)
 // #2625 (ADR-AG-454 Am. 1; operator ruling 2026-11-10, Q-2625b (a)): the parabola is a host of the same reader, refused.
 const ROLE_ELLIPSE_CENTRE_HE = /^(?:ה?שיעורי\s+)?(?:ה?נקודת\s+)?מרכז\s+(?:של\s+)?ה?(אליפסה|פרבולה)$/;
@@ -2818,7 +2829,14 @@ export function readRoleRef(raw: string): RoleRef | null {
   if (ROLE_FOCI_HE.test(text) || ROLE_FOCI_EN.test(text)) return { role: 'foci' };
   const vertexSide = ROLE_VERTEX_SIDE_HE.exec(text) ?? ROLE_VERTEX_SIDE_EN.exec(text);
   if (vertexSide) return { role: 'vertex', side: ellipseSideOf(vertexSide[1]) };
-  if (ROLE_VERTEX_ANY_HE.test(text) || ROLE_VERTEX_ANY_EN.test(text)) return { role: 'vertex' };
+  // «הקודקוד הימני של הפרבולה» (#2835, ADR-AG-470): read, so M1 can say a parabola's one vertex has no side (out-of-scope).
+  const parabolaSide = ROLE_VERTEX_SIDE_PARABOLA_HE.exec(text) ?? ROLE_VERTEX_SIDE_PARABOLA_EN.exec(text);
+  if (parabolaSide) return { role: 'vertex', host: 'parabola', side: ellipseSideOf(parabolaSide[1]) };
+  const vertexAny = ROLE_VERTEX_ANY_HE.exec(text) ?? ROLE_VERTEX_ANY_EN.exec(text);
+  if (vertexAny) {
+    const hostWord = vertexAny[1] ?? vertexAny[2];
+    return { role: 'vertex', ...(hostWord ? { host: /פרבולה|parabola/i.test(hostWord) ? ('parabola' as const) : ('ellipse' as const) } : {}) };
+  }
   const centre = ROLE_ELLIPSE_CENTRE_HE.exec(text) ?? ROLE_ELLIPSE_CENTRE_EN.exec(text);
   if (centre) return /פרבולה|parabola/i.test(centre[1]) ? { role: 'centre', host: 'parabola' } : { role: 'centre' };
   const axisEnd = ROLE_AXIS_END_HE.exec(text) ?? ROLE_AXIS_END_EN.exec(text);
@@ -2948,14 +2966,16 @@ function parseMeasureRoles(line: string): RuleOutcome {
         const slot = pointSlot(value.replace(/^ב(?=ה?נקודה\s)/, ''));
         if (!slot) continue;
         // «O מרכז הפרבולה» (#2625, ADR-AG-454 Am. 1): a parabola has no centre — understood, refused, never escalated.
-        if (ref.host === 'parabola') return refuse('parabola-no-centre', line);
+        if (ref.host === 'parabola') return { ok: false, code: 'parabola-no-centre', detail: line, ...('name' in slot ? { name: slot.name } : {}) } as ParseResult;
         const facts = (id: Id): Fact[] => [{ t: 'ellipse-centre-of', id, src: line }];
         return 'name' in slot ? made(facts(slot.name)) : withMint(line, slot, facts);
       }
       case 'vertex': {
         const slot = pointSlot(value.replace(/^ב(?=ה?נקודה\s)/, ''));
         if (!slot) continue;
-        const facts = (id: Id): Fact[] => [{ t: 'vertex-of', id, ...(ref.side ? { side: ref.side } : {}), ...(ref.axis ? { axis: ref.axis } : {}), src: line }];
+        const facts = (id: Id): Fact[] => [
+          { t: 'vertex-of', id, ...(ref.host ? { host: ref.host } : {}), ...(ref.side ? { side: ref.side } : {}), ...(ref.axis ? { axis: ref.axis } : {}), src: line },
+        ];
         return 'name' in slot ? made(facts(slot.name)) : withMint(line, slot, facts);
       }
       case 'axis': {

@@ -682,8 +682,8 @@ function describeRule(r: DerivedRule): string {
       return `מפגש האלכסונים ${r.v.join('')}`;
     case 'incircle-centre':
       return `מרכז המעגל החסום ב-${r.v.join('')}`;
-    case 'parabola-focus':
-      return `מוקד ${r.curve}`;
+    case 'parabola-point':
+      return `${r.role === 'vertex' ? CONIC_ROLE_WORDS.vertex : CONIC_ROLE_WORDS.focus} ${r.curve}`;
     case 'ellipse-point':
       return `${r.role.k === 'focus' ? CONIC_ROLE_WORDS.focus : CONIC_ROLE_WORDS.vertex} ${r.curve}`;
     case 'circle-centre':

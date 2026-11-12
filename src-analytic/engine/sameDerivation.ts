@@ -71,8 +71,8 @@ export function sameDerivation(a: DerivedRule, b: DerivedRule): boolean {
       return b.t === 'incircle-centre' && sameRing(a.v, b.v);
     case 'circle-centre':
       return b.t === 'circle-centre' && a.curve === b.curve;
-    case 'parabola-focus':
-      return b.t === 'parabola-focus' && a.curve === b.curve;
+    case 'parabola-point':
+      return b.t === 'parabola-point' && a.curve === b.curve && a.role === b.role;
     case 'ellipse-point':
       return b.t === 'ellipse-point' && a.curve === b.curve && JSON.stringify(a.role) === JSON.stringify(b.role);
     // Where two circles touch is one point whichever circle is named first (#1504).
@@ -116,7 +116,7 @@ export function sameDerivation(a: DerivedRule, b: DerivedRule): boolean {
 export function namesCurveFeature(rule: DerivedRule): boolean {
   switch (rule.t) {
     case 'circle-centre':
-    case 'parabola-focus':
+    case 'parabola-point':
     case 'ellipse-point':
     case 'touch-point':
     case 'common-touch':

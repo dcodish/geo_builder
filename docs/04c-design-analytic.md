@@ -282,6 +282,17 @@ unlettered end into `ellipse-dist`, and drops the segment and declaration such a
 joined by «ו» are split on an enumerated joiner. The ask (`ellipseRoleAnswer`, `app/ask.ts`) reads the same closed
 form off `knownCurve`.
 
+**The parabola's role points** ([ADR-AG-470](06c-decisions-analytic.md#adr-ag-470), #2835). One rule, `parabola-point
+{curve, role: 'focus' | 'vertex'}` (`engine/derived.ts`, the `ellipse-point` pattern; it replaced `parabola-focus`), whose
+closed form is `parabolaRolePoint` (`engine/conicFrame.ts`): `toWorld(c, p/2, 0)` and `toWorld(c, 0, 0)`, so the
+translated and the y-axis parabolas need nothing more; `curves.ts`'s `parabolaFocus` and the ask read the same function.
+The vertex role has two hosts: `RoleRef['vertex'].host` and `vertex-of.host` (`'parabola' | 'ellipse'`, the focus's
+shape); «הקודקוד שלה» names none, and M1 (`apply.ts` `vertex-of`) then takes the figure's one parabola or ellipse, as
+`focus-of` does. A parabola host resolves THE parabola (`noHost` for none or several); a side or an axis word on it is
+`out-of-scope`. The ask (`roleAnswer`) answers the parabola's vertex beside its focus; on a parabola it cannot read as
+a known curve it first asks `parabolaRoleKnown` (each printed number through `isKnowledge`: the vertex of «y² = 2px» is
+(0, 0) in every configuration), then the letters (`roleInLetters`).
+
 **The one-letter pin.** `parseParamRelation` reads an equation over one letter; M1's used-symbol gate stays the judge,
 and a relation linear in its letter goes to `bindSymbol` (`onePinValue`), a non-linear one stays a `param-rel`.
 `sizeLetters` (`engine/carriers.ts`) gives an ellipse's semi-axis letters (`semiAxisLetters`: moving the letter

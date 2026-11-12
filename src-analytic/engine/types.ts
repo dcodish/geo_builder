@@ -627,8 +627,9 @@ export type Fact =
   /**
    * «A הקודקוד הימני של האליפסה» · «A הוא הקצה הימני של הציר הגדול» (#2616, ADR-AG-353) — a vertex named. `axis` when the
    * sentence named the axis it ends («הקצה … של הציר הגדול»), which a side word on it then orients; no side is a choice.
+   * `host` (#2835, ADR-AG-470): «V קודקוד הפרבולה» names THE parabola's vertex; absent or `ellipse`, the ellipse's.
    */
-  | (FactBase & { t: 'vertex-of'; id: Id; side?: EllipseSide; axis?: 'major' | 'minor' })
+  | (FactBase & { t: 'vertex-of'; id: Id; host?: 'parabola' | 'ellipse'; side?: EllipseSide; axis?: 'major' | 'minor' })
   /** «P מרכז האליפסה» · "P is the centre of the ellipse" (#1863, ADR-AG-377) — THE ellipse's centre, named. */
   | (FactBase & { t: 'ellipse-centre-of'; id: Id })
   /**

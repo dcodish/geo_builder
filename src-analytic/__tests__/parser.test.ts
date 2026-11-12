@@ -683,16 +683,21 @@ describe('#2625 (ADR-AG-454 Am. 1) — the centre of a parabola is refused with 
     ['O is the centre of the parabola'],
     ['O is the center of the parabola'],
   ])('«%s» → parabola-no-centre', (line) => {
-    expect(parseLine(line)).toEqual({ ok: false, code: 'parabola-no-centre', detail: line });
+    // #2835 (ADR-AG-470): the letter the student gave the point rides along, for the sentence's next step.
+    const name = /^O\b/.test(line) || /הוא O$/.test(line) ? { name: 'O' } : {};
+    expect(parseLine(line)).toEqual({ ok: false, code: 'parabola-no-centre', detail: line, ...name });
   });
-  it.each([['O מרכז האליפסה'], ['O is the centre of the ellipse'], ['O מרכז המעגל'], ['F מוקד הפרבולה']])('control «%s» still reads', (line) => {
+  it.each([['O מרכז האליפסה'], ['O is the centre of the ellipse'], ['O מרכז המעגל'], ['F מוקד הפרבולה'], ['O קודקוד הפרבולה']])('control «%s» still reads', (line) => {
     expect(parseLine(line).ok).toBe(true);
   });
-  it('the sentence: the reason, then the vertex said plainly to be unread (no next step the tool reads)', () => {
+  it('the sentence: the reason, then the vertex as the next step in the student’s own letter (#2835, ADR-AG-470)', () => {
     type T = (k: string, o?: Record<string, unknown>) => string;
-    const err = { key: 'parabola-no-centre', detail: 'O מרכז הפרבולה' } as const;
-    expect(errorText(err, analyticI18n.getFixedT('he') as unknown as T)).toBe('לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, הכלי עדיין לא קורא אותו.');
-    expect(errorText(err, analyticI18n.getFixedT('en') as unknown as T)).toBe('A parabola has no centre. If you meant its vertex, the tool does not read it yet.');
+    const err = { key: 'parabola-no-centre', detail: 'O מרכז הפרבולה', name: 'O' } as const;
+    const plain = (x: string) => x.replace(/[\u2066-\u2069]/g, '');
+    expect(plain(errorText(err, analyticI18n.getFixedT('he') as unknown as T))).toBe('לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «O קודקוד הפרבולה».');
+    expect(plain(errorText(err, analyticI18n.getFixedT('en') as unknown as T))).toBe('A parabola has no centre. If you meant its vertex, write «O is the vertex of the parabola».');
+    // No letter in the line: the sentence's own «V».
+    expect(plain(errorText({ key: 'parabola-no-centre', detail: 'מרכז הפרבולה' }, analyticI18n.getFixedT('he') as unknown as T))).toBe('לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «V קודקוד הפרבולה».');
   });
 });
 
