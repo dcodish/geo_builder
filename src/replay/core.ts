@@ -3285,6 +3285,8 @@ export let lastConfigTier: 'current' | 'sweep' | 'seat' | 'variant' | 'reflect' 
 
 export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_BUDGET_MS): { facts: Fact[]; seed: number } | null {
   lastConfigTier = null;
+  // #2813 (ADR-823 Am. 1): a stored reflex seat a later stated angle rules out is moved structurally, before any sample
+  facts = reflexSeatsYieldToStatedCorners(facts);
   const deadline = Date.now() + budgetMs;
   const timeLeft = () => Math.max(0, deadline - Date.now());
   // First the targeted extension/reflection search (ADR-098/ADR-166): it explores the discrete apex
@@ -3563,21 +3565,29 @@ function reflexAxes(facts: Fact[], c: Construction): ChoiceAxis[] {
   const seatable = new Set(c.objects.filter((o) => o.kind === 'free-point' && !o.pinned).map((o) => o.id));
   const yields = convexityYields(facts);
   const out: ChoiceAxis[] = [];
+  let corners: StatedCorner[] | undefined;
   facts.forEach((f, i) => {
     if (!f.enabled || f.cmd.type !== 'quadrilateral') return;
     const cmd = f.cmd as Extract<AnyCommand, { type: 'quadrilateral' }>;
     if (!yields.has(ringKey(cmd.ids)) && cmd.reflex === undefined) return;
     if (!cmd.ids.some((id) => seatable.has(id))) return; // no vertex is ours to seat — the ring has no reflex choice
-    const k = cmd.ids.length; // 4 reflex choices + the convex default
-    const cur = cmd.reflex === undefined ? 0 : (((cmd.reflex % k) + k) % k) + 1;
+    const k = cmd.ids.length;
+    // #2813 (ADR-823 Am. 1): a vertex a stated interior angle rules out is never offered as the reflex one — its digit
+    // could only be rejected by the floor, after a replay. Digit 0 stays the convex default; digit m+1 seats allowed[m].
+    const ruledOut = statedReflexExclusions(facts, cmd.ids, corners ??= statedRingCorners(facts));
+    const allowed = [...Array(k).keys()].filter((v) => !ruledOut.has(cmd.ids[v]));
+    const stored = cmd.reflex === undefined ? undefined : ((cmd.reflex % k) + k) % k;
+    const at = stored === undefined ? -1 : allowed.indexOf(stored);
+    if (stored !== undefined && at < 0) allowed.push(stored); // a stored seat stays reachable as `cur`, so the axis can leave it
+    const cur = stored === undefined ? 0 : allowed.indexOf(stored) + 1;
     out.push({
       kind: 'reflex',
       i,
-      n: k + 1,
+      n: allowed.length + 1,
       cur,
       set: (target, d) => {
         const { reflex: _prev, ...rest } = target as Extract<AnyCommand, { type: 'quadrilateral' }>;
-        return (d === 0 ? rest : { ...rest, reflex: d - 1 }) as AnyCommand;
+        return (d === 0 ? rest : { ...rest, reflex: allowed[d - 1] }) as AnyCommand;
       },
     });
   });
@@ -5455,6 +5465,57 @@ export function statedRingCorners(facts: Fact[]): StatedCorner[] {
     for (const w of pinnedAngleWedges([con])) if (w.deg > 0 && w.deg < 180 - 1e-6) out.push({ ...w, fact: f });
   }
   return out;
+}
+
+/**
+ * #2813 (ADR-823 Am. 1) — the vertices a STATED interior angle rules out as the reflex corner of a ring over `ids`' letters.
+ * The dent's corner is the point inside the other three — the same point in every simple order of the letters — so a
+ * corner stated in ANY declared ring over the same letters rules its vertex out.
+ */
+function statedReflexExclusions(facts: Fact[], ids: Id[], corners: StatedCorner[]): Set<Id> {
+  const out = new Set<Id>();
+  if (corners.length === 0) return out;
+  const letters = [...ids].sort().join();
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    for (const r of declaredRings(f.cmd)) {
+      if (r.ids.length !== ids.length || [...r.ids].sort().join() !== letters) continue;
+      for (const { corner } of cornersOfRing(r.ids, corners)) out.add(corner.v);
+    }
+  }
+  return out;
+}
+
+/**
+ * #2813 ([ADR-823](docs/06-decisions.md#adr-823) Am. 1) — A STORED REFLEX SEAT YIELDS TO A LATER STATED ANGLE (M4: a
+ * default yields to a statement). ADR-622's `quadrilateral.reflex` is an unstated configuration choice, persisted by the
+ * search that found it. When a later line states the angle at THAT vertex, the ruling (2026-11-10 (b)) says it is the
+ * interior angle, so no seed can make the stored seat valid — and the seed tiers of {@link findValidConfig}, which turn
+ * before the `reflex` axis, would each pay a failing replay first (measured: «מרובע ABCD · מרובע ABDC · ∠DAB = 70°»
+ * re-seated only after the whole seed sweep, long enough in the worker that the next Enter met the busy gate). The
+ * stored digit moves to the next vertex no statement rules out, structurally and before any sample; with none left the
+ * seat is dropped (the convex default). Returns the SAME array when nothing changes.
+ */
+export function reflexSeatsYieldToStatedCorners(facts: Fact[]): Fact[] {
+  if (!facts.some((f) => f.enabled && f.cmd.type === 'quadrilateral' && (f.cmd as { reflex?: number }).reflex !== undefined)) return facts;
+  const corners = statedRingCorners(facts);
+  if (corners.length === 0) return facts;
+  let out: Fact[] | null = null;
+  facts.forEach((f, i) => {
+    if (!f.enabled || f.cmd.type !== 'quadrilateral') return;
+    const cmd = f.cmd as Extract<AnyCommand, { type: 'quadrilateral' }>;
+    if (cmd.reflex === undefined) return;
+    const k = cmd.ids.length;
+    const r = ((cmd.reflex % k) + k) % k;
+    const ruledOut = statedReflexExclusions(facts, cmd.ids, corners);
+    if (!ruledOut.has(cmd.ids[r])) return;
+    let next: number | undefined;
+    for (let j = 1; j < k; j++) if (!ruledOut.has(cmd.ids[(r + j) % k])) { next = (r + j) % k; break; }
+    const { reflex: _prev, ...rest } = cmd;
+    out ??= facts.slice();
+    out[i] = { ...f, cmd: (next === undefined ? rest : { ...rest, reflex: next }) as AnyCommand };
+  });
+  return out ?? facts;
 }
 
 /** The stated corners of ring `ids` — a wedge at a vertex between its two ring neighbours, in either ray order. */

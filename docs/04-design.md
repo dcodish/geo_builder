@@ -1460,7 +1460,7 @@ is sound because the line's own constraints only narrow the configurations. A hi
 helper `gateVerdict` mirrors it (reason `crossed-ring`). The predicate is 2-D's own: `BOUNDARIES.json` keeps engine
 layers `copied-never-shared`.
 
-**A ring proved convex by its stated angles: one more reason for the same reader** ([ADR-823](06-decisions.md#adr-823),
+**A ring proved convex by its stated angles: one more reason for the same reader** (and a STORED reflex seat a later stated angle rules out is moved structurally at the top of `findValidConfig` — `reflexSeatsYieldToStatedCorners`, ADR-823 Am. 1 — so the worker never sweeps seeds that cannot help; `reflexAxes` never offers such a vertex) ([ADR-823](06-decisions.md#adr-823),
 #2813). A stated corner angle is the INTERIOR angle. Two halves, both in `replay/core.ts`: (1) the view floor —
 `polygonsConvex`'s simple-floor branch (a yielding, stated-concave or top-level ring) also requires every STATED corner
 (`statedRingCorners`: a `set-angle` or a corner `set-perpendicular` fact between the vertex's two ring neighbours, below
