@@ -138,6 +138,61 @@
         "AB הוא קוטר המעגל"
       ],
       "lookFor": "A and B on circle O, through its centre."
+    },
+    {
+      "sheet": "round-2855-w4",
+      "id": "T42",
+      "kind": "3d:blind-review",
+      "queued": "2026-11-12",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "פירמידה SABCD",
+        "B(2t, t, k)",
+        "N(k,p,3)"
+      ],
+      "lookFor": "N at height 3, N.x equal to B.z; «הציגו תצורה אחרת» moves p."
+    },
+    {
+      "sheet": "round-2855-w4",
+      "id": "T43",
+      "kind": "3d:blind-review",
+      "queued": "2026-11-12",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "N(k,p,3)"
+      ],
+      "lookFor": "N is drawn at height 3; the freedom count shows 2."
+    },
+    {
+      "sheet": "round-2855-w4",
+      "id": "T44",
+      "kind": "analytic:blind-review",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "נתונה פרבולה שמשוואתה y^2=8x",
+        "V קודקוד הפרבולה"
+      ],
+      "lookFor": "V is drawn at the origin, the parabola's vertex."
+    },
+    {
+      "sheet": "prod-2026-11-12-4",
+      "id": "P5",
+      "kind": "2d:assertion",
+      "queued": "2026-11-12",
+      "product": "2d",
+      "base": "https://themathbible.com",
+      "path": "/geo-builder/",
+      "lines": [
+        "משולש ABC"
+      ],
+      "lookFor": "A triangle."
     }
   ],
   "results": [

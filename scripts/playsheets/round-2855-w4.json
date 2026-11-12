@@ -1,0 +1,81 @@
+{
+ "name": "round-2855-w4",
+ "title": "Fix round #2855, wave 4 (PRs #2862, #2864 — operator-passed)",
+ "cases": [
+  {
+   "id": "T42",
+   "title": "3-D: a new point with letters shares k with B",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה SABCD",
+    "B(2t, t, k)",
+    "N(k,p,3)"
+   ],
+   "cycles": 2,
+   "lookFor": "N at height 3, N.x equal to B.z; «הציגו תצורה אחרת» moves p.",
+   "before": "«N(k,p,3)» was not understood."
+  },
+  {
+   "id": "T43",
+   "title": "3-D: «N(k,p,3)» on a blank page",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "N(k,p,3)"
+   ],
+   "lookFor": "N is drawn at height 3; the freedom count shows 2.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T44",
+   "title": "«V קודקוד הפרבולה» names the vertex",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=8x",
+    "V קודקוד הפרבולה"
+   ],
+   "lookFor": "V is drawn at the origin, the parabola's vertex.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T45",
+   "title": "the vertex of a moved parabola, and asking for it",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "(y-3)^2=8(x-2)",
+    "V קודקוד הפרבולה"
+   ],
+   "asks": [
+    "שיעורי קודקוד הפרבולה"
+   ],
+   "lookFor": "V at (2, 3), and the question answers (2, 3).",
+   "before": "Not understood; the question was unreadable."
+  },
+  {
+   "id": "T46",
+   "title": "PR #2864 (refusal) · a parabola has no centre — the refusal teaches the vertex",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "y^2=8x",
+    "O מרכז הפרבולה"
+   ],
+   "lookFor": "Refused: «לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «O קודקוד הפרבולה».»",
+   "before": "Refused without pointing to the vertex.",
+   "expectRefusal": "לפרבולה אין מרכז"
+  }
+ ]
+}
