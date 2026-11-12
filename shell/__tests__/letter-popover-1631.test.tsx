@@ -73,6 +73,11 @@ describe('#1631 — the popover as first rendered', () => {
     expect(html).toContain('✓');
   });
 
+  it('#2851: an initial letter opens IN the input (the analytic focus offer opens on «F1»); none = empty', () => {
+    expect(render({ initialValue: 'F1' })).toContain('value="F1"');
+    expect(render()).toContain('value=""');
+  });
+
   it('the label length is the caller’s (3-D types C1′ in four characters)', () => {
     expect(render({ maxLength: 4 })).toContain('maxLength="4"');
   });

@@ -638,9 +638,17 @@ export interface Scene {
   roles: SceneRoles;
 }
 
+/** #2851 (ADR-AG-465) — a clickable focus: the offer id, the letter its popover opens on, the hover sentence. */
+export interface FocusOffer {
+  id: string;
+  letter: string;
+  title: string;
+}
+
 /** The conic role marks in screen space (#1863): foci (dots) and directrices (dashed lines), each with its placed label. */
 export interface SceneRoles {
-  foci: Array<{ cx: number; cy: number; label?: { text: string; x: number; y: number } }>;
+  /** `offer`: #2851, the focus is clickable (the renderer draws its hit target). */
+  foci: Array<{ cx: number; cy: number; label?: { text: string; x: number; y: number }; offer?: FocusOffer }>;
   directrices: Array<{ x1: number; y1: number; x2: number; y2: number; label?: { text: string; x: number; y: number } }>;
 }
 
@@ -805,7 +813,7 @@ export interface SceneKnowledge {
    * without its coordinates; absent (a directrix's equation is all value) = nothing.
    */
   roleMarks?: Array<
-    | { kind: 'focus'; x: number; y: number; label?: string; labelNoValues?: string }
+    | { kind: 'focus'; x: number; y: number; label?: string; labelNoValues?: string; offer?: FocusOffer }
     | { kind: 'directrix'; line: { a: number; b: number; c: number }; label?: string; labelNoValues?: string }
   >;
   /**
@@ -1188,7 +1196,7 @@ export function buildScene(
   );
   const roleBase = labelled.length + statedDraft.requests.length;
   const roles: SceneRoles = {
-    foci: roleDraft.foci.map((f) => ({ cx: f.cx, cy: f.cy, ...(f.req !== undefined ? { label: { text: roleDraft.requests[f.req].req.text, ...placed[roleBase + f.req] } } : {}) })),
+    foci: roleDraft.foci.map((f) => ({ cx: f.cx, cy: f.cy, ...(f.offer ? { offer: f.offer } : {}), ...(f.req !== undefined ? { label: { text: roleDraft.requests[f.req].req.text, ...placed[roleBase + f.req] } } : {}) })),
     directrices: roleDraft.directrices.map((l) => ({ x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2, ...(l.req !== undefined ? { label: { text: roleDraft.requests[l.req].req.text, ...placed[roleBase + l.req] } } : {}) })),
   };
   const placedOf = new Map(labelled.map((s, i) => [s, placed[i]] as const));
@@ -1246,18 +1254,18 @@ function roleScene(
   box: Box,
   t: Transform,
 ): {
-  foci: Array<{ cx: number; cy: number; req?: number }>;
+  foci: Array<{ cx: number; cy: number; req?: number; offer?: FocusOffer }>;
   directrices: Array<{ x1: number; y1: number; x2: number; y2: number; req?: number }>;
   requests: Array<{ req: LabelRequest }>;
 } {
-  const out = { foci: [] as Array<{ cx: number; cy: number; req?: number }>, directrices: [] as Array<{ x1: number; y1: number; x2: number; y2: number; req?: number }>, requests: [] as Array<{ req: LabelRequest }> };
+  const out = { foci: [] as Array<{ cx: number; cy: number; req?: number; offer?: FocusOffer }>, directrices: [] as Array<{ x1: number; y1: number; x2: number; y2: number; req?: number }>, requests: [] as Array<{ req: LabelRequest }> };
   const ask = (req: LabelRequest): number => out.requests.push({ req }) - 1;
   for (const m of marks) {
     if (m.kind === 'focus') {
       const cx = t.sx(m.x);
       const cy = t.sy(m.y);
       const n = { x: Math.SQRT1_2, y: -Math.SQRT1_2 };
-      out.foci.push({ cx, cy, ...(m.label ? { req: ask({ mid: { x: cx, y: cy }, n, text: lbl(m.label), both: true, priority: 2 }) } : {}) });
+      out.foci.push({ cx, cy, ...(m.offer ? { offer: m.offer } : {}), ...(m.label ? { req: ask({ mid: { x: cx, y: cy }, n, text: lbl(m.label), both: true, priority: 2 }) } : {}) });
       continue;
     }
     const seg = polylines({ kind: 'line', ...m.line }, box)[0];

@@ -6,7 +6,7 @@
  * plane cannot be mirrored by the RTL page around it (the #118 bidi lesson has no purchase here —
  * and `dir` is not an SVG attribute, so asserting it would only have been decoration).
  */
-import { ANSWER_LABEL_FONT, LENGTH_LABEL_FONT, POINT_LABEL, TICK_LABEL, pointLabelAnchor, type Scene } from './scene';
+import { ANSWER_LABEL_FONT, LENGTH_LABEL_FONT, POINT_LABEL, TICK_LABEL, pointLabelAnchor, type FocusOffer, type Scene } from './scene';
 
 const AXIS = '#64748b';
 const GRID = '#e2e8f0';
@@ -30,6 +30,7 @@ export function Figure({
   onCrossing,
   onPick,
   onCentre,
+  onFocus,
 }: {
   scene: Scene;
   showConstruction?: boolean;
@@ -53,6 +54,11 @@ export function Figure({
    * Absent = the centre offer behaves as any ring (`onCrossing` with its automatic sentence).
    */
   onCentre?: (offerId: string, screen: { x: number; y: number }) => void;
+  /**
+   * #2851 (ADR-AG-465) — a SHOWN FOCUS that carries its letter was clicked: the caller opens the letter popover on it, as
+   * `onCentre` does for a centre. Absent = the focus marks stay decoration.
+   */
+  onFocus?: (offer: FocusOffer, screen: { x: number; y: number }) => void;
 }) {
   const { width, height, axes, curves, segments, arcs, construction, extensions, points, crossings, measures, loci } = scene;
   /** #1598: a centre offer asks for a letter (`onCentre`); every other ring adds its sentence (`onCrossing`). */
@@ -480,6 +486,32 @@ export function Figure({
           </g>
         ))}
       </g>
+
+      {/*
+        #2851 (ADR-AG-465) — A SHOWN FOCUS IS AN OFFER. The mark itself stays decoration (`analytic-roles`); its hit
+        target is here, the centre ring's size, with the sentence a click records as the hover. Before the points, so a
+        real point at the same place covers it. Not exported: an offer is not part of the figure.
+      */}
+      {onFocus && (
+        <g data-noexport="1" data-testid="analytic-focus-offers">
+          {(scene.roles?.foci ?? []).map((p, i) =>
+            p.offer ? (
+              <circle
+                key={`fo${i}`}
+                data-focus-offer={p.offer.id}
+                cx={p.cx}
+                cy={p.cy}
+                r={8}
+                fill="transparent"
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => onFocus(p.offer!, { x: e.clientX, y: e.clientY })}
+              >
+                <title>{p.offer.title}</title>
+              </circle>
+            ) : null,
+          )}
+        </g>
+      )}
 
       {/* points */}
       <g>

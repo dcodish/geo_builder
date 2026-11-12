@@ -15,7 +15,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { knownCurve } from '../engine/evaluate';
-import { conicMarksOf } from '../app/conicMarks';
+import { conicMarksOf, focusSentenceOf } from '../app/conicMarks';
 import { withConic, type AnnotationMap } from '../app/annotations';
 import { loadAnalyticSession } from '../app/loadSession';
 import { buildScene } from '../render/scene';
@@ -128,5 +128,24 @@ describe('round #2678 — the save carries the chip AND the switches', () => {
     store().undo();
     expect(store().annotations).toEqual({});
     expect(store().lines).toEqual(fx.lines);
+  });
+});
+
+describe('#2851 (ADR-AG-465) — focusSentenceOf: the sentence a click on a shown focus records', () => {
+  it('names the side the focus sits on, in plain digits; a parabola its one focus; a stale offer nothing', () => {
+    const fx = fixture('issue-1863-ellipse');
+    const d = derive(fx.lines, 0);
+    const id = Object.keys(fx.annotations!)[0];
+    expect(focusSentenceOf(d, `focus:0:${id}`, 'F₁')).toBe('F1 מוקד ימני של האליפסה');
+    expect(focusSentenceOf(d, `focus:1:${id}`, 'F₂')).toBe('F2 מוקד שמאלי של האליפסה');
+    expect(focusSentenceOf(d, 'focus:0:no-such-curve', 'F')).toBeNull();
+    const p = fixture('issue-1863-parabola');
+    const dp = derive(p.lines, 0);
+    expect(focusSentenceOf(dp, `focus:0:${Object.keys(p.annotations!)[0]}`, 'F')).toBe('F מוקד הפרבולה');
+    // the mark carries the same sentence as its offer
+    expect(conicMarksOf(d, { [id]: { conic: 'focus' } }).map((m) => (m.kind === 'focus' ? m.offer?.title : null))).toEqual([
+      'F1 מוקד ימני של האליפסה',
+      'F2 מוקד שמאלי של האליפסה',
+    ]);
   });
 });
