@@ -1380,6 +1380,16 @@ Related: #778 (the umbrella), #779 (the P1 the case half exposes), #777 (the sam
 rather than guess" spine on an incomplete comparative), [ADR-289](06-decisions.md#adr-289) and
 ADR-3D-040 (the guidance registers), [ADR-W-029](#adr-w-029), [ADR-052](06-decisions.md#adr-052).
 
+**Amendment (2026-11-12, #2164) — complex reads the exam's capital «Z₁» as typed; the table's complex row was wrong.**
+Operator ruling, 2026-11-12, #2164 option C: *"2164 - C"*. That means: keep it as typed, close #2164 as working as
+specified, and correct this ADR's complex row. The row above says complex "accepts `z1` and `Z1` alike, silently" as if
+that were an unwanted register to teach away. It is not. The exam itself writes Z₁ (`docs/02d-requirements-complex.md`
+P2: *"subscripts (`Z₁`) … normalize"*; F1's own example `Z1 ו-Z2 מספרים מרוכבים`), so the capital is complex's
+canonical register as much as the lowercase. Invariant 1 stands as written: *what varies per product is which register
+is canonical*. For complex, both cases of a z/w-family name are canonical and name the same number, so nothing is
+rewritten into a different register and nothing is taught. No code change.
+**Requirements:** none (02d P2 already promises this) · **Design:** none (internal).
+
 ## ADR-W-031 — A restated fact SUCCEEDS, appends no row, and says so — in every product (#613)
 
 > **⚠ Ruled to change — superseded by [ADR-W-200](#adr-w-200)** (operator 2026-11-09, #2790: *"if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists … this ruling is for all tools."*): a restated fact is to be accepted as its own row, with a notice. **⚠ Superseded in 2-D** by [ADR-W-204](#adr-w-204) / [ADR-822](06-decisions.md#adr-822) (2026-11-10), **in analytic** by [ADR-AG-462](06c-decisions-analytic.md#adr-ag-462) and **in complex** by [ADR-CX-089](06d-decisions-complex.md#adr-cx-089) (2026-11-10); this entry holds in 3-D until #2790's port lands.
