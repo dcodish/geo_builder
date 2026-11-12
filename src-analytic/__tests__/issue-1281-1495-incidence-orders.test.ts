@@ -153,3 +153,39 @@ describe('#1281 — the converse word order, a coordinate operand, and «בסי�
     expect(d.faults.map((f) => [f.index, f.code, f.detail])).toEqual([[2, 'not-handled', 'הישר CD עובר דרך הבית']]);
   });
 });
+
+describe('#2848 (ADR-AG-464) — a minted name is decided by the lines before it, so a later line can refer to it', () => {
+  const minted = (lines: string[]) => derive(lines, 0).minted.map((m) => m.id);
+  const ids = (lines: string[]) => derive(lines, 0).figure.points.map((p) => p.id);
+
+  it('a later line typing the minted name («P1», «P₁») refers to that point: one point, named P₁', () => {
+    for (const ref of ['P1 על הישר y=x+1', 'P₁ על הישר y=x+1']) {
+      const lines = ['נתונה הנקודה (k, 2)', ref];
+      const d = derive(lines, 0);
+      expect(d.faults).toEqual([]);
+      expect(minted(lines)).toEqual(['P₁']);
+      expect(ids(lines)).toEqual(['P₁']);
+      expect(d.figure.env.k).toBeCloseTo(1, 6);
+    }
+  });
+
+  it('a later line that refers to it never renames it — the name the row announced is the name it keeps', () => {
+    expect(minted(['נתונה הנקודה (1,2)'])).toEqual(['P₁']);
+    expect(minted(['נתונה הנקודה (1,2)', 'B(4,4)', 'הקטע P1B'])).toEqual(['P₁']);
+  });
+
+  it('a later definition of ANOTHER point under the minted name is a name clash, not a rename', () => {
+    const d = derive(['נתונה הנקודה (1,2)', 'P1(2,3)'], 0);
+    expect(d.minted.map((m) => m.id)).toEqual(['P₁']);
+    expect(d.faults.map((f) => [f.index, f.code])).toEqual([[1, 'conflicting-restatement']]);
+  });
+
+  it('a student letter at the SAME coordinates still takes the mint (#2674, unchanged)', () => {
+    expect(minted(['נתונה הנקודה (1,2)', 'E(1,2)'])).toEqual([]);
+    expect(ids(['נתונה הנקודה (1,2)', 'E(1,2)'])).toEqual(['E']);
+  });
+
+  it('a letter an EARLIER line took is still skipped', () => {
+    expect(minted(['P1(5,5)', 'נתונה הנקודה (1,2)'])).toEqual(['P₂']);
+  });
+});

@@ -7996,7 +7996,7 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 
 ## ADR-AG-164 — Incidence in every order and over every operand: the line first, a side as subject, a point by its coordinates (named by the tool) (#1281, #1495)
 
-**Status:** accepted · 2026-09-27 · operator fix-now in session; the naming mechanism ruled the same day (#1281)
+**Status:** accepted · 2026-09-27 · operator fix-now in session; the naming mechanism ruled the same day (#1281) · **Amended by [ADR-AG-464](#adr-ag-464) (2026-11-12, #2848):** §3's "over the whole list" reads the letters TAKEN from the lines up to the mint's own; a later line that refers to the minted name binds to it, and a later line defining another point under it is a name clash.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R119 · **Design:** [04c](04c-design-analytic.md#a-point-on-an-object-and-the-carrier-that-holds-it-adr-ag-029-adr-ag-032), "Incidence in every order"
 
@@ -16418,3 +16418,27 @@ Each of those points moves along a curve.
 **Locks.** `src-analytic/__tests__/issue-2738-locus-every-mover.test.ts`: re-expected (`TWO_CIRCLES`, `ONE_CIRCLE`, `MID`, the free point beside a mover, the chord-length pair: no chip; the bisector beside a second mover: the bisector's chip only; the bisector beside «מרובע» / «טרפז» / «מעוין» unchanged); `onFixedCarrier` unit rows (a stated circle, an axis, the line through two fixed points: yes; the line through a moving point, the bisector, a stated distance, a derived midpoint: no); the operator's two figures over seeds 0 to 2 (the chord: no chip; with «AB מקביל לישר y=x»: `[M, line 2]` only; the focus triangle: no chip on any row).
 
 **Behaviour change for a student:** a point placed on a given curve (the chord's ends on the ellipse, «M על המעגל I», «D על האליפסה», a point on a stated line or an axis) no longer shows «הצג מקום גאומטרי». A point that moves along something not drawn (the midpoint of a chord kept parallel to a line, «נקודה M» with «MA = MB») keeps it.
+
+## ADR-AG-464 — A minted name is decided by the lines before it: a later line that types it refers to that point (#2848)
+
+**Date:** 2026-11-12 · **Status:** accepted · bug (analytic, P1, wrong-answer) · fix round #2855, branch `fix/2848-minted-name-reference` · **amends [ADR-AG-164](#adr-ag-164)** §3 · **LADDER stage:** none (naming, before the fold)
+**Requirements:** none (unchanged — [02c](02c-requirements-analytic.md) R119 and ADR-AG-164 §3 already promise *"a minted name can be referred to … adding a line never renames an earlier one"*) · **Design:** [04c](04c-design-analytic.md) § "Incidence in every order"
+**Operator:** the #1263 ruling, 2026-09-20: *"mint a reserved letter, and say so"* (ADR-AG-164 §3); the #2731 ruling (ADR-AG-451) for the two values of k. Report 2026-11-12 on #2848: *"k is not calculated but it does have 2 possible values so we should be able to see both options"*.
+
+**Measured at pickup** (`caf619a5`, `decideSubmit` line by line → `derive` → `ask`, model never called). `x^2+4y^2=4` · «נתונה הנקודה (k-1, k-2)» · «P1 על האליפסה»: the coordinate point minted **P₂**, a second free point P₁ on the ellipse, k free at 3.458, «k» → nothing. With «P2 על האליפסה» the names flipped. With a student letter («P(k-1, k-2)» · «P על האליפסה») «k» → «1 או 13/5». «P1 על האליפסה» and «P₁ על האליפסה» both lower to `declare P₁` + `on-kind P₁ ellipse`, the same facts «P על האליפסה» lowers to: an incidence on an existing point, so nothing needed deduping where a point id is created.
+
+**Root cause.** `derive.resolveMints` built its set of TAKEN letters from the whole fact list, later lines included. A later line that typed the name the row had just announced («P1») made that name taken, so the mint skipped to P₂ and the later line's P₁ was a new free point. The name the tool announces could never be referred to, and adding a line renamed an earlier one.
+
+**Class.** Every later line that refers to a minted name in either spelling (`P1`, `P₁`): an incidence on any carrier, a question, a measurement («P1B = 5»), a segment. Only analytic mints reserved `P₁…` names (no `MINT_PREFIX` or minted subscript in `src/`, `src3d/`, `src-complex/`), so nothing to port. The tool's derived-point letters (`resolveToolLetters`) already read the taken letters incrementally.
+
+**Decision.** `resolveMints` reads the letters taken from the facts of the lines up to and including the mint's own line (and the names it minted before), never a later line. Then:
+1. A later line that only REFERS to the minted name binds to the minted point.
+2. A later line that DEFINES a different point under that name («P1(2, 3)» at other coordinates) is the fold's name clash, refused with the existing `conflicting-restatement` message, as «A(1,2)» · «A(2,3)» is. Before, it silently renamed the earlier point to P₂.
+3. A later student's letter at the SAME coordinates still takes the mint (#2674, ADR-AG-404), unchanged.
+4. The origin's default O (#1628) follows the same reading: a later «O(…)» elsewhere no longer moves the origin's name; it is a clash.
+
+**Measured after** (same door). The operator's three lines: one point P₁ = (8/5, 3/5), «k» → «1 או 13/5», «P1» → «(0, -1) או [(8/5, 3/5)]», «הציגו תצורה אחרת» reaches k = 1. «P₁ על האליפסה» the same. «P2 על האליפסה» is a new point, P₁ keeps its name. «P1(2,3)» after «נתונה הנקודה (1,2)» → refused `conflicting-restatement`; «P1(1,2)» → recorded, one point.
+
+**Locks.** Unit: `src-analytic/__tests__/issue-1281-1495-incidence-orders.test.ts` (#2848 block: a later reference keeps the name, a later definition clashes, the same coordinates still yield). Fixture: `minted-name-referred-2848.analytic.json` (the operator's lines). `issue-2848-minted-name-reference.test.ts` (`pipeline-lock:`): ask k, ask P1, the other configuration, the subscript spelling, «P2» a new point, the clash refused as its own case.
+
+**Behaviour change for a student:** after «נתונה הנקודה (k-1, k-2)» says «הכלי קרא לנקודה P₁», «P1 על האליפסה» puts that point on the ellipse and its name stays P₁; k shows «1 או 13/5». A later «P1(2, 3)» at other coordinates is refused as a name clash, where it used to rename the earlier point to P₂.
