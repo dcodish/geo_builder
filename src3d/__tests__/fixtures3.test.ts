@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2785 (ADR-3D-488) — the triage's sequence: a letter written in two points' coordinates is one unknown (C.x = B.z).
+  // The class is asserted in shared-letter-coords-2785.test.ts; this is the build + drift + load net.
+  'shared-letter-coords-2785.geo3.json': ['פירמידה SABCD', 'B(2t, t, k)', 'C(k,1,2)'],
   // #2790 (ADR-3D-484) — the held row: the base angles restated after «AB = AC» are their own row, with the notice, and move
   // nothing (#2795, ADR-3D-483). The file is saved with «AB = AC» UNTICKED (set after generation): the restated row holds
   // the triangle isosceles on its own. The class is asserted in already-drawn-1990.test.ts; this is the build + drift + load net.

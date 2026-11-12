@@ -7,13 +7,13 @@
  * 2-D tool's relation detection uses, applied to answers.
  */
 
-import { knowledgeSamples3, lineAtParam, planeAtParam, type Resolved3 } from './evaluate';
+import { knowledgeSamples3, lineAtParam, planeAtParam, solveSmall, type Resolved3 } from './evaluate';
 import { seedNumber3, type Seed3 } from './components3';
 import { CLAIM_REL_TOL, containmentDeviation, coordPlaneRelHolds, DIRECTION_REL_TOL, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { bisectorDir3, cross3, dist3, dot3, ringCollapsed3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
-import { symbolOwnersOf, type Claim3, type Construction3, type RevolutionObj } from './types';
+import { evalAffine, pinSymsOf, symbolOwnersOf, symbolValueOf, type Claim3, type Construction3, type RevolutionObj, type SymComp } from './types';
 import { freeRelationHolds3 } from './freeVecSystem';
 import { pivotLetterValue3 } from './solve3';
 
@@ -97,13 +97,76 @@ export function letterNumbersAt3(c: Construction3, sym: string, r: Resolved3): (
   const out: (number | undefined)[] = [];
   for (const o of symbolOwnersOf(c, sym)) {
     if (o.kind === 'param') out.push(r.param?.value);
-    else if (o.kind === 'pin-sym') out.push(r.pivot?.pinSymbols?.[sym]);
+    else if (o.kind === 'pin-sym') out.push(pinLettersAt3(c, r)[sym]);
     else if (o.kind === 'vec-def') out.push(r.ratioSymbols[sym]);
     else if (o.kind === 'component') out.push(pivotLetterValue3(c, { kind: 'component', target: o.target, axis: o.axis }, at, () => undefined));
     else if (o.kind === 'rider') out.push(pivotLetterValue3(c, { kind: 'rider', id: o.id, fromB: o.fromB }, at, () => undefined));
   }
   return out;
 }
+
+const pinLettersMemo = new WeakMap<Resolved3, Record<string, number>>();
+
+/**
+ * #2785 (ADR-3D-488) — THE VALUE OF EVERY LETTER WRITTEN IN A COORDINATE, in one resolved configuration. Where the pivot
+ * runs it solved them (`pivot.pinSymbols`). Where it does not (every point fixed by coordinates), nothing moves and
+ * the letters are READ from the placed points: each point pin is Σ kᵢ·letterᵢ + c = the point's coordinate, solved
+ * jointly over every pin (Gauss–Newton, least squares; a value-pinned letter is its number). A letter whose equations
+ * disagree takes the least-squares value, so every claim that writes it fails there: the arbiter, never a second
+ * placement path.
+ */
+export function pinLettersAt3(c: Construction3, r: Resolved3): Record<string, number> {
+  if (r.pivot?.pinSymbols) return r.pivot.pinSymbols;
+  const hit = pinLettersMemo.get(r);
+  if (hit) return hit;
+  const all = pinSymsOf(c);
+  const out: Record<string, number> = {};
+  for (const s of all) {
+    const v = symbolValueOf(c, s);
+    if (v !== undefined) out[s] = v;
+  }
+  const open = all.filter((s) => out[s] === undefined);
+  const eqs: { e: SymComp; target: number }[] = [];
+  for (const pin of c.pins) {
+    const p = r.positions.get(pin.id);
+    if (!p) continue;
+    for (const [comp, v] of [[pin.x, p.x], [pin.y, p.y], [pin.z, p.z]] as const)
+      if (comp !== null && typeof comp === 'object' && pinSymsOfAffineOpen(comp, open)) eqs.push({ e: comp, target: v });
+  }
+  if (open.length > 0 && eqs.length > 0) {
+    const resid = (x: number[]): number[] => {
+      const at = (s: string) => out[s] ?? x[open.indexOf(s)];
+      return eqs.map(({ e, target }) => evalAffine(e, at) - target);
+    };
+    const sq = (v: number[]) => v.reduce((a, b) => a + b * b, 0);
+    let best: { x: number[]; f: number } | null = null;
+    for (const start of [0, 1, -1, 3, -3]) {
+      let x = open.map(() => start);
+      for (let it = 0; it < 30; it++) {
+        const r0 = resid(x);
+        const J = open.map((_, j) => {
+          const h = 1e-6 * Math.max(1, Math.abs(x[j]));
+          const xh = [...x];
+          xh[j] += h;
+          return resid(xh).map((v, i) => (v - r0[i]) / h);
+        });
+        const n = open.length;
+        const M = Array.from({ length: n }, (_, a) => Array.from({ length: n }, (__, b) => J[a].reduce((s, v, i) => s + v * J[b][i], 0) + (a === b ? 1e-12 : 0)));
+        const g = Array.from({ length: n }, (_, a) => -J[a].reduce((s, v, i) => s + v * r0[i], 0));
+        const d = solveSmall(M, g);
+        if (!d) break;
+        x = x.map((v, j) => v + d[j]);
+        if (Math.max(...d.map(Math.abs)) <= 1e-12 * Math.max(1, ...x.map(Math.abs))) break;
+      }
+      const f = sq(resid(x));
+      if (x.every(Number.isFinite) && (!best || f < best.f)) best = { x, f };
+    }
+    if (best) open.forEach((s, j) => { out[s] = best!.x[j]; });
+  }
+  pinLettersMemo.set(r, out);
+  return out;
+}
+const pinSymsOfAffineOpen = (e: SymComp, open: string[]): boolean => e.terms.some((t) => open.includes(t.sym));
 
 /** Seeds checked for every claim: the display seed plus fixed offsets (deterministic). */
 // #2764 (ADR-3D-454): a configuration of several parts is sampled around its base number — a verdict is the facts'
@@ -458,6 +521,18 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       // #1546 (ADR-3D-282): a null component is unstated (or owned by a pivot symbol) and is not checked.
       // A fully stated claim keeps its one-vector tolerance byte-for-byte; a partial one compares each
       // present component, scaled by its own magnitude.
+      // #2785 (ADR-3D-488): a component written with letters is judged at the letters' resolved values
+      if (claim.sym && claim.sym.some((e) => e !== null)) {
+        const at = pinLettersAt3(c, resolved);
+        const val = (e: SymComp | null, v: number | null): number | null => {
+          if (!e) return v;
+          const n = evalAffine(e, (s) => at[s] ?? NaN);
+          return Number.isFinite(n) ? n : null;
+        };
+        const target = { x: val(claim.sym[0], claim.x), y: val(claim.sym[1], claim.y), z: val(claim.sym[2], claim.z) };
+        if (claim.sym.some((e, i) => e !== null && [target.x, target.y, target.z][i] === null)) return false; // a letter no lane resolved
+        return componentsHold(p, target);
+      }
       return componentsHold(p, claim);
     }
     case 'vec-val': {

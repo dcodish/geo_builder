@@ -5,8 +5,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { applyCommand3, freeDims, unstatedPyramidReading3 } from '../apply';
-import { claimResidual3, residualHolds3, verifyClaim } from '../claims';
+import { applyCommand3, coordLetterExprs3, freeDims, unstatedPyramidReading3 } from '../apply';
+import { claimResidual3, pinLettersAt3, residualHolds3, verifyClaim } from '../claims';
 import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, type QuadPreference3 } from '../evaluate';
 import { commandStatesCircle3, concaveSeatVertices3, quadDrawnDegenerate, statedConcyclic3 } from '../baseShapes';
 import { pointParents3 } from '../carriers';
@@ -843,5 +843,43 @@ describe('#2814 — the pivot pick is over DISTINCT configurations, in an order 
     expect(congruentShapes3(rect(1), rect(-1))).toBe(true);
     const par = (dx: number) => new Map([['A', v3(0, 0, 0)], ['B', v3(5, 0, 0)], ['C', v3(5 + dx, 4, 0)], ['D', v3(dx, 4, 0)]]);
     expect(congruentShapes3(par(3), par(-3))).toBe(false);
+  });
+});
+
+describe('#2785 (ADR-3D-488) — a coordinate letter written twice is one pin symbol; the claim judges it', () => {
+  it('coordLetterExprs3 lowers a bare letter to 1·k only where it is shared', () => {
+    const cmd = { x: null, y: 1, z: null, syms: ['k', null, 'p'] as [string | null, string | null, string | null] };
+    expect(coordLetterExprs3(cmd, (s) => s === 'k')).toEqual([{ terms: [{ sym: 'k', k: 1 }], c: 0 }, null, null]);
+  });
+
+  it('the second use promotes the first statement’s named component, and the coords-eq claim carries the letter', () => {
+    const c = build(
+      { type: 'point3', id: 'B', x: 2, y: 1, z: -8 },
+      { type: 'point3', id: 'C', x: 4, y: 5, z: 6 },
+      { type: 'point3', id: 'B', x: null, y: 1, z: -8, syms: ['k', null, null] },
+    );
+    expect(c.partialNames.map((b) => b.sym)).toEqual(['k']); // first use: a named free component (ADR-3D-175)
+    const r = applyCommand3(c, { type: 'point3', id: 'C', x: null, y: 5, z: 6, syms: ['k', null, null] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.next.partialNames).toEqual([]);
+    expect(r.next.pins.map((p) => p.x)).toEqual([{ terms: [{ sym: 'k', k: 1 }], c: 0 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }]);
+    const claims = r.next.claims.filter((cl) => cl.type === 'coords-eq');
+    expect(claims.every((cl) => cl.type === 'coords-eq' && cl.sym?.[0]?.terms[0].sym === 'k')).toBe(true);
+    // k = 2 (off B) and k = 4 (off C) cannot both hold: the least-squares k fails both claims
+    const res = resolve3(r.next, 0);
+    expect(pinLettersAt3(r.next, res).k).toBeCloseTo(3, 9);
+    expect(verifyClaim(claims[claims.length - 1], r.next, 0)).toBe(false);
+  });
+
+  it('a letter that agrees everywhere holds: «B(2,1,-8)» then «B(2t,t,k)» reads t = 1, k = −8', () => {
+    const c = build(
+      { type: 'point3', id: 'B', x: 2, y: 1, z: -8 },
+      { type: 'point3', id: 'B', x: null, y: null, z: null, syms: ['t', 't', 'k'], symExprs: [{ terms: [{ sym: 't', k: 2 }], c: 0 }, { terms: [{ sym: 't', k: 1 }], c: 0 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }] },
+    );
+    const res = resolve3(c, 0);
+    expect(pinLettersAt3(c, res).t).toBeCloseTo(1, 9);
+    expect(pinLettersAt3(c, res).k).toBeCloseTo(-8, 9);
+    expect(c.claims.filter((cl) => cl.type === 'coords-eq').every((cl) => verifyClaim(cl, c, 0))).toBe(true);
   });
 });

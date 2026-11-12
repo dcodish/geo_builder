@@ -3900,7 +3900,7 @@ function solveLengthDetermination(
 }
 
 /** Gaussian elimination with partial pivoting for the ≤ 3×3 normal equations; null when singular. */
-function solveSmall(M: number[][], r: number[]): number[] | null {
+export function solveSmall(M: number[][], r: number[]): number[] | null {
   const n = r.length;
   const a = M.map((row, i) => [...row, r[i]]);
   const norm = Math.max(1e-300, ...M.flat().map(Math.abs));

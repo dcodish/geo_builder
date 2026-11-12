@@ -15861,3 +15861,32 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 **Locks.** `src3d/__tests__/scenarios3.test.ts` `crossed-ring-concyclic-2810`: A1 and A2 refused naming the angle lines; the angle-only quadrilateral builds simple at seeds 0–5. Parity rows `stated-angle-interior-2813-01..03`.
 
 **Behaviour change for a student:** in 3-D, «מרובע ABDC» after «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°» (or «∠BCD = 110°» after the second ring) is refused, naming the angle lines, instead of drawing ABDC crossed or ABCD as a dart.
+
+## ADR-3D-488 — A letter written in coordinates is one unknown wherever it is written, and the coordinate claim judges it (#2785)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2785](https://github.com/dcodish/geo_builder/issues/2785) (bug, `P2`, wrong answer) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02b](02b-requirements-3d.md) — FR-VC-2b (a value reaches every place the letter is written; two coordinates that give a letter two values are refused) · **Design:** [04b](04b-design-3d.md) — "A pin is a driver; the claim beside it is the arbiter" (the claim's symbolic components, the shared-letter promotion) · **LADDER stage:** none (pivot unknown layout and the claim arbiter)
+**Amends** [ADR-3D-079](#adr-3d-079) (a bare letter written a second time is the affine form 1·k), [ADR-3D-175](#adr-3d-175) (a named point component is promoted when its letter is written again) and [ADR-3D-282](#adr-3d-282) (the `coords-eq` claim carries symbolic components).
+
+**Measured at pickup** (`round/2026-11-12-w2` @ `444f14fe`, `useGeo3.submit` → `derive3`, seeds 0–3): «פירמידה SABCD · B(k,1,2) · C(k,3,4)» drew B.x / C.x = 0.260 / 0.264, 2.676 / 2.600; «B(2t, t, k) · C(k,1,2)» drew C.x = −1.263 beside B.z = 1.341; «k = 1» after R1 put B.x at 1 and C.x at 1.039; «A(0,0,0) · B(2,15,-8) · B(2t,t,k)» and «… · B(k,15,k)» were accepted as rows the figure already holds. The repeated letter in one statement (B(k,1,k)), the numeric twin «B(3,15,-8)» (`claim-refuted`) and «B(2t,t,k) · k = 1» were right.
+
+**The class.** *A letter written in coordinate components is one unknown wherever it is written, but the coordinate lowering tied it only when the component was affine and only inside the pivot, and no arbiter checked it; so a letter read from two coordinate places, across two statements or within one statement on a determined point, was drawn with two values or read as already held.*
+
+**Root cause.** Two halves. (1) A BARE letter («B(k,1,2)») is lowered as the NAME of a free component (ADR-3D-175, «first binding wins»), so a second statement written with k («C(k,3,4)») pinned nothing, and a bare k after «B(2t,t,k)» became a second, independent owner of a pivot pin symbol. (2) The `coords-eq` claim recorded only the numeric components, so where the pivot does not run (every point fixed by coordinates) nothing read the letters and a false restatement passed.
+
+**Decision.**
+1. *One pool, decided at the second use.* `coordLetterShared3` asks whether a bare letter is already written elsewhere: a pin symbol, the figure parameter, or a point component an earlier coordinate statement named. If so, `coordLetterExprs3` lowers it to the affine form 1·k (the parser's own `SymComp`), and `promoteNamedComponents3` re-writes the earlier statement's free component as 1·k and releases its name binding, so both pins carry one pin symbol whichever line came first (the M2 re-homing of #801, one owner over). A letter the figure parameter owns re-homes through `adoptParamAsPinSym` or is refused `two-params` (unchanged rule). A letter written for the FIRST time, bare, keeps ADR-3D-175's representation byte for byte: it adds nothing the point does not already have.
+2. *The claim judges the letters.* The existing-id `point3` records `coords-eq` with `sym` (the symbolic components) whenever a component carries a letter. `holdsAt` reads each at the letters' values (`pinLettersAt3`): the pivot's `pinSymbols` where it runs; where it does not, a least-squares read of every letter off the placed points over every point pin (a value-pinned letter is its number). A letter whose equations disagree fails the claim, so the line is refused with its numeric twin's verdict (`claim-refuted`, an existing sentence).
+3. *«k = 1» values the pool*: a shared letter is a pin symbol, so the value pin reaches every place it is written.
+
+**Deviation from the plan, recorded.** The plan lowered every bare letter to 1·k at its first use. Measured: that changes the DOF cue of a single-use letter («B(k,1,2)» alone: 8 → 9, the gauge allowance absorbs the new pin component while the letter adds an unknown), slows «B(4, n, p)» on the book box from a partial pin to 6.1 s (two new pivot unknowns), and re-opens the exam gates ADR-3D-175 measured. Promoting at the second use keeps every single-use figure identical (pickup check (b)) and still ties every shared letter.
+
+**Not changed.** The vector and pair injection lanes keep ADR-3D-175's named components (the plan's scope): a bare letter in «AB = (k,1,2)» shared with a point coordinate is not promoted (see #2785's report).
+
+**Value line.** «k = 3» on a letter the pivot does not move carries the coordinate claims written with k (`symbol-value`), so «A(0,0,0) · B(2,1,-8) · B(2t,t,k) · k = 3» refuses the value line `claim-refuted`, as its numeric twin «B(n,1,-8) · n = 3» does, instead of turning the earlier row red.
+
+**Sibling audit.** *Analytic:* «A(k,1)» · «B(k,3)» through `derive` draws A.x = B.x at seeds 0–2 and «k = 2» puts both at 2: one letter, one value, nothing to file. *2-D, complex:* no letter coordinates. *3-D vector/pair injections:* unchanged by plan (above).
+
+**Locks.** `src3d/__tests__/shared-letter-coords-2785.test.ts` (R1–R5, C1–C3, the t/k control, the order permutation, the single-use cue, a sign on a single-use letter, the value line); fixture `fixtures3/shared-letter-coords-2785.geo3.json` (R2).
+
+**Behaviour change for a student:** a letter written in two points' coordinates has one value at every «הציגו תצורה אחרת»; «k = 1» reaches every coordinate written with k; «B(2t,t,k)» or «B(k,15,k)» after «B(2,15,-8)» is refused «הטענה לא מתקיימת בציור — בדקו את החישוב» instead of being accepted.
