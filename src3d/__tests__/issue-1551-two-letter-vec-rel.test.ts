@@ -70,6 +70,17 @@ describe('#1551 — the exam: letters over placed points are solved', () => {
     expect(params(submitAll([...EXAM, 'EM = aEA + 1/6EC']))).toEqual({ a: '2/3' });
   });
 
+  it('a line naming new letters is its own plain row; the same line again is a held row (#2790, ADR-3D-484)', () => {
+    submitAll([...EXAM, 'EM = a·EA + b·EC']);
+    const first = useGeo3.getState();
+    expect(first.facts.at(-1)?.held).toBeUndefined();
+    expect(first.lastNotice).toBeNull();
+    useGeo3.getState().submit('EM = a·EA + b·EC');
+    const again = useGeo3.getState();
+    expect(again.facts.at(-1)?.held).toBe(true);
+    expect(again.lastNotice).toEqual({ code: 'already-held' });
+  });
+
   it('(i) stability: adding the relation moves no point', () => {
     const before = resolve3(submitAll(EXAM), 0).positions;
     const after = resolve3(submitAll([...EXAM, 'EM = a·EA + b·EC']), 0).positions;
