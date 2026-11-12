@@ -879,6 +879,8 @@ describe('#2838 — an unlettered solid noun, read against the figure (ADR-3D-48
     const two = apply(one, cube(DEFAULT));
     expect(resolveUnletteredSolid3(two, cube(DEFAULT), 'definite')).toMatchObject({ ok: false, error: { code: 'ambiguous-definite-shape', solid: 'cube' } });
     expect(resolveUnletteredSolid3(emptyConstruction3(), cube(DEFAULT), 'definite')).toEqual({ ok: true, map: null });
+  });
+});
 
 describe('#2785 (ADR-3D-488) — a coordinate letter written twice is one pin symbol; the claim judges it', () => {
   it('coordLetterExprs3 lowers a bare letter to 1·k only where it is shared', () => {
