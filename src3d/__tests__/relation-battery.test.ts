@@ -461,10 +461,10 @@ describe('the battery — supported cells exercised end-to-end', () => {
       for (const u of setup) submit(u);
       expect(state().lastError, `${rel}: setup`).toBeNull();
       submit(trueLine);
-      // #2341 (ADR-3D-449): two equation planes decide the relation, so a true one is «כבר קיים» with no row
+      // #2790 (ADR-3D-484): two equation planes decide the relation, so a true one is held — its own row, with the notice
       expect(state().lastError, `${rel}: «${trueLine}» is true and is never refused`).toBeNull();
-      expect(state().facts).toHaveLength(setup.length);
-      expect(state().lastNotice).toEqual({ code: 'already-stated' });
+      expect(state().facts).toHaveLength(setup.length + 1);
+      expect(state().lastNotice).toEqual({ code: 'already-held' });
       state().clear();
       for (const u of falseSetup ?? setup) submit(u);
       submit(falseLine);

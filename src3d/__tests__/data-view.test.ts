@@ -6,7 +6,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { dataView, panelIsEmpty, type DataPanel } from '../engine/dataView';
+import { dataView, mutualRowKey3, panelIsEmpty, pointPlaneRow3, pointPlaneRowKey3, type DataPanel } from '../engine/dataView';
 import { derive3, useGeo3 } from '../store/store3';
 
 function reset() {
@@ -292,5 +292,29 @@ describe('#2820 — a plane named π prints its name once in the parametric row'
       'π: 2x + y - 1 = 0',
       'π = (0, 1, 0) + t·(0, 0, 1) + s·(1, -2, 0)',
     ]);
+  });
+});
+
+// #2062 (ADR-3D-480; the operator's ruling of 2026-10-14, card `d14b-2062-question` A): a point × plane row
+describe('#2062 — the panel says whether a point the student introduced lies in a plane', () => {
+  beforeEach(reset);
+  const EXAM = ["תיבה ABCDA'B'C'D'", "נסמן: AA' = w, AB = v, AD = u", "הנקודה E היא אמצע המקצוע BB'", 'הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w', 'מישור AEC'];
+  const rows = (us: string[]) => {
+    for (const u of us) submit(u);
+    return panel().mutual.filter((m) => m.rel === 'on-plane' || m.rel === 'off-plane');
+  };
+
+  it('the exam figure: M lies in plane AEC — and E, which defines the plane, gets no row; no solid vertex gets one', () => {
+    expect(rows(EXAM)).toEqual([{ a: 'M', b: 'AEC', rel: 'on-plane' }]);
+    expect(pointPlaneRow3(panel(), 'M', 'ACE')).toEqual({ a: 'M', b: 'AEC', rel: 'on-plane' }); // a run is its letters, in any order
+    expect(mutualRowKey3({ a: 'M', b: 'AEC', rel: 'on-plane' })).toBe(pointPlaneRowKey3('M', 'CEA'));
+  });
+
+  it('a midpoint off the plane reads «אינה נמצאת»', () => {
+    expect(rows(["קובייה ABCDA'B'C'D'", 'M אמצע AB', "מישור ACC'"])).toEqual([{ a: 'M', b: "ACC'", rel: 'off-plane' }]);
+  });
+
+  it('no plane, no row', () => {
+    expect(rows(["קובייה ABCDA'B'C'D'", 'M אמצע AB'])).toEqual([]);
   });
 });

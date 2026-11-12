@@ -3588,8 +3588,15 @@ const TANGENT_FROM_EN = new RegExp(
  */
 // The host: the circle with its centre or name — or the ellipse or parabola (#2618, ADR-AG-355), the third capture.
 const CHORD_CIRCLE_HE = `ב(?:ה)?(?:מעגל(?:\\s+(?:ש?מרכזו\\s+(${NAME})|(${CIRCLE_NAME})))?|(${CONIC_NOUN_HE}))`;
+/*
+ * The ONE chord's host, after the chord (#2502, ADR-AG-468; 2-D's reading): «במעגל», «של המעגל» and the construct state
+ * «המעגל» («AB מיתר המעגל», «CD הוא מיתר של המעגל», «מיתר AB של האליפסה»): the same three groups as `CHORD_CIRCLE_HE`,
+ * so every spelling lowers through the one `chordFacts`. «של» takes the article: «של מעגל» (a circle, indefinite) is not
+ * read here.
+ */
+const CHORD_HOST_HE = `(?:ב(?:ה)?|של\\s+ה|ה)(?:מעגל(?:\\s+(?:ש?מרכזו\\s+(${NAME})|(${CIRCLE_NAME})))?|(${CONIC_NOUN_HE}))`;
 const CHORD_ONE_HE = new RegExp(
-  `^${HE_GIVEN}(?:(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?מיתר|(?:ה)?מיתר\\s+(${NAME})(${NAME}))(?:\\s+${CHORD_CIRCLE_HE})?$`,
+  `^${HE_GIVEN}(?:(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?מיתר|(?:ה)?מיתר\\s+(${NAME})(${NAME}))(?:\\s+${CHORD_HOST_HE})?$`,
 );
 const CHORD_ONE_EN = new RegExp(
   `^(?:(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+chord|(?:the\\s+)?chord\\s+(${NAME})(${NAME}))(?:\\s+(?:of|in)\\s+(?:the\\s+)?(?:circle(?:\\s+(?:centred\\s+at\\s+|centered\\s+at\\s+)?(${CIRCLE_NAME}))?|(${CONIC_NOUN_EN})))?$`,
@@ -3656,7 +3663,9 @@ function clauseFacts(clause: string, line: string): Fact[] | null {
   return r.ok ? r.facts.map((x) => ({ ...x, src: line })) : null;
 }
 
-function parseChord(line: string): RuleOutcome {
+function parseChord(raw: string): RuleOutcome {
+  // «מיתר המעגל AB» — the host before the ends is the same sentence as «מיתר AB של המעגל» (#2502).
+  const line = hostBeforeEnds(raw);
   const one = CHORD_ONE_HE.exec(line);
   const oneEn = one ? null : CHORD_ONE_EN.exec(line);
   if (one || oneEn) {
@@ -5011,6 +5020,18 @@ const THRU_BARE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+(${NAME}${NAME}${NAME})
  */
 
 /**
+ * THE HOST BEFORE THE ENDS — «קוטר המעגל AB», «קוטר האליפסה AB», «מיתר האליפסה AB» (#2502, ADR-AG-468; 2-D reads the circle's
+ * spelling): the construct state with the curve between the noun and the ends. It is the same sentence as «קוטר AB של
+ * המעגל», so it is rewritten to that text, which the diameter and chord readers own, and the two cannot lower apart. Only the
+ * definite noun with no name of its own: «קוטר המעגל AC נמצא על …» and «קוטר מעגל O היוצא מ…» are other sentences.
+ */
+const HOST_BEFORE_ENDS_HE = new RegExp(`^(${HE_GIVEN}(?:ה)?(?:קוטר|מיתר))\\s+(ה(?:מעגל|${CONIC_NOUN_HE}))\\s+((?:${NAME}){2})$`);
+function hostBeforeEnds(line: string): string {
+  const m = HOST_BEFORE_ENDS_HE.exec(line);
+  return m ? `${m[1]} ${m[3]} של ${m[2]}` : line;
+}
+
+/**
  * «BD קוטר במעגל» — a DIAMETER (#1324). The sentence names the two ends and, optionally, the circle; WHICH
  * circle it means is decided at M1 (`diameter-of`), because the parser is pure over one line.
  *
@@ -5028,11 +5049,11 @@ const THRU_BARE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+(${NAME}${NAME}${NAME})
  */
 const DIAM_HE = new RegExp(
   `^${HE_GIVEN}(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?קוטר` +
-    `(?:\\s+(ב|של\\s+)(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)|(פרבולה)))?$`,
+    `(?:\\s+(?:(ב|של\\s+)|(?=ה))(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)|(פרבולה)))?$`,
 );
 /** «קוטר BD במעגל» — the noun first, the same statement. */
 const DIAM_NOUN_FIRST_HE = new RegExp(
-  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(ב|של\\s+)(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)|(פרבולה))$`,
+  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(?:(ב|של\\s+)|(?=ה))(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)|(פרבולה))$`,
 );
 /** «נתון מעגל שקוטרו BD» — the circle DEFINED by its diameter, always a new circle. */
 const DIAM_DEFINE_HE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+ש(?:ה)?קוטר(?:ו|\\s+שלו)(?:\\s+(?:הוא|היא))?\\s+(${NAME})(${NAME})$`);
@@ -5042,7 +5063,9 @@ const DIAM_EN = new RegExp(
 );
 const DIAM_DEFINE_EN = new RegExp(`^(?:the\\s+|a\\s+)?circle\\s+(?:with|on)\\s+(?:the\\s+|a\\s+)?diameter\\s+(${NAME})(${NAME})$`, 'i');
 
-function parseCircleThru(line: string): RuleOutcome {
+function parseCircleThru(raw: string): RuleOutcome {
+  // «קוטר האליפסה AB» — the host before the ends is «קוטר AB של האליפסה» (#2502).
+  const line = hostBeforeEnds(raw);
   const thru = THRU_HE.exec(line) ?? THRU_EN.exec(line);
   const bare = thru ? null : THRU_BARE.exec(line);
   if (thru || bare) {

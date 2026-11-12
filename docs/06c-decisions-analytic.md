@@ -7996,7 +7996,7 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 
 ## ADR-AG-164 — Incidence in every order and over every operand: the line first, a side as subject, a point by its coordinates (named by the tool) (#1281, #1495)
 
-**Status:** accepted · 2026-09-27 · operator fix-now in session; the naming mechanism ruled the same day (#1281)
+**Status:** accepted · 2026-09-27 · operator fix-now in session; the naming mechanism ruled the same day (#1281) · **Amended by [ADR-AG-464](#adr-ag-464) (2026-11-12, #2848):** §3's "over the whole list" reads the letters TAKEN from the lines up to the mint's own; a later line that refers to the minted name binds to it, and a later line defining another point under it is a name clash.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R119 · **Design:** [04c](04c-design-analytic.md#a-point-on-an-object-and-the-carrier-that-holds-it-adr-ag-029-adr-ag-032), "Incidence in every order"
 
@@ -14860,6 +14860,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 
 **Requirements:** [02c](02c-requirements-analytic.md) R221, R222 (new), R20. · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip".
 
+> **⚠ Superseded in part by [ADR-AG-466](#adr-ag-466)** (2026-11-12; operator 2026-11-04, #2709: *"foci only for ellipse."*): the ellipse's four-state cycle and its directrices. An ellipse's chip is nothing → foci → nothing and it draws no directrix; `ellipseDirectrices` is removed. The parabola is unchanged.
+
 **Operator rulings, verbatim.**
 - 2026-09-19 (#1218): *"yes. there is an off state. label shows what is next. elippse has fewer states."* Its "fewer states" (two, foci only) was **replaced** on 2026-10-09: *"The ellipse → the SAME four-state cycle as the parabola. (He chose this over the two-state foci-only option the session recommended.)"*, confirmed 2026-10-14 (card `d14-1218-focus`): *"the 9 October four-state control wins"*. So both conics cycle «כלום → רק מדריך → רק מוקד → מוקד ומדריך», and an ellipse draws both foci and both directrices. No conflict remains.
 - 2026-10-09, answer 2: *"the NEXT ACTION, always"* («הצג מדריך · הצג מוקד · הצג מוקד ומדריך · הסתר»). Answer 5: *"`F` for a parabola's focus, `F₁` / `F₂` for an ellipse's, with the directrix labelled by its equation."*
@@ -15911,6 +15913,8 @@ The same coupling broke three things a student sees, each confirmed against the 
 
 ## ADR-AG-426 — Every point that moves along one curve has its locus, however many other points move (#2738)
 
+> **⚠ Superseded in part** 2026-11-12 by [ADR-AG-472](#adr-ag-472) (#2849): a point stated on a carrier that holds still (a given curve, a fixed line) has no chip, so the two-circle, one-circle and midpoint cases below lose the movers' chips. The walk, the point's own freedom and the bisector cases are unchanged.
+
 **Date:** 2026-11-07 · **Status:** accepted · feature (analytic, P2) · operator ruling · branch `feat/2738-locus-every-mover` · **supersedes in part [ADR-AG-352](#adr-ag-352)** (which points get a chip) · **LADDER stage:** none (the locus walk over the solved figure, not a rung)
 **Requirements:** [02c](02c-requirements-analytic.md) R87 (amended: the point's own freedom), R200 (amended: every such point has a chip) · **Design:** [04c](04c-design-analytic.md) § "The locus lane" → "The point's own freedom: its part, and the directions it does not move in pinned"
 **Operator:** 2026-11-07, answering the question ADR-AG-425 left open: *"when there is more than 1 point with a locus, allpoints shoudl get the chip of showing the locus."*
@@ -16281,11 +16285,13 @@ Each of those points moves along a curve.
 
 **Measured at pickup** (`13f710fe`): «l2 אנך אמצעי ל-EK» after «האנך האמצעי לקטע EK» was refused `line-exists` («הישר הזה כבר קיים באיור: «…». כדי לקרוא לו l2, לחצו Enter…»), the box pre-filled with «נסמן את האנך האמצעי ל-EK ב-l2»; the same for the parallel through a point, the line-first and English spellings, and «l הוא המשיק למעגל בנקודה A» after the unnamed tangent.
 
-**Decision.** `restatedLine`'s fourth verdict is `held-name` (was `line-exists`). A constructed line (`line-at`) takes the name through `nameConstructedLine` — extracted from `name-line-object`, which now calls it: the id becomes the name's and every reference follows; the tangent at A keeps its id (ADR-AG-368). An equation line takes it through the existing promotion arm. Either way the outcome is `narrowed` with the `already-held` notice, so the submit path records the row with `suite.notice.alreadyHeld` (ADR-AG-462). `applyAll` (a sentence lowered to several facts, as the tangent at a point is) now carries an `already-held` notice from its parts; it carried none before, and only this code is carried, so no other notice changes its reach. Deleting the earlier, unnamed row leaves the line drawn, named. The error code `line-exists`, its two messages, the `declared`/`offer` plumbing and `parser/lineOffer.ts` are removed — nothing produces them. Unchanged: a second name for a named line is `already-named`; a name over the tool's l-number renames it (#2425 Q3) with no notice — not asked by the ruling, listed as a question on #2790.
+**Decision.** `restatedLine`'s fourth verdict is `held-name` (was `line-exists`). A constructed line (`line-at`) takes the name through `nameConstructedLine` — extracted from `name-line-object`, which now calls it: the id becomes the name's and every reference follows; the tangent at A keeps its id (ADR-AG-368). An equation line takes it through the existing promotion arm. Either way the outcome is `narrowed` with the `already-held` notice, so the submit path records the row with `suite.notice.alreadyHeld` (ADR-AG-462). `applyAll` (a sentence lowered to several facts, as the tangent at a point is) now carries an `already-held` notice from its parts; it carried none before, and only this code is carried, so no other notice changes its reach. Deleting the earlier, unnamed row leaves the line drawn, named. The error code `line-exists`, its two messages, the `declared`/`offer` plumbing and `parser/lineOffer.ts` are removed — nothing produces them. Unchanged: a second name for a named line is `already-named`; a name over the tool's l-number renames it (#2425 Q3) — see Amendment 1.
 
 **Locks.** `issue-2583-2584-restated-lines.test.ts` (T32 re-based: the operator's sequence records, the line is l2, G on l2 gives the same locus, and the earlier row deleted leaves l2 drawn; the parallel, line-first and English spellings); `issue-2621a-tangent-ref.test.ts` (the tangent named by its restatement); `message-floor-2028.test.ts` (the two retired messages); the shared table's T32 row in `already-drawn-1990.test.ts`.
 
 **Behaviour change for a student:** «l2 אנך אמצעי ל-EK» after the same bisector drawn unnamed is accepted: the line is called l2, the row is listed, and the tool says «זה כבר קיים באיור — נוסף כנתון נפרד.» instead of refusing with the rename offer.
+
+**Amendment 1 (2026-11-10, round #2822, judged Q-2790b (a) `[judged]` from ADR-W-200 and the operator's Q-2790a "b"; branch `fix/2790b-analytic-renamed-line`).** A student name over the tool's l-number on a DRAWN line («נתון ישר y=2x+1» · «נתון ישר l2: y=2x+1») is its own row with the already-held notice; the name still replaces the l-number, one line (#2425 Q3, 2026-10-20). The equation arm's `rename` outcome carries `heldName` when the twin is stated; a carrier promoted by a name (#1149) stays silent. Locks: `issue-2583-2584-restated-lines.test.ts` (the equation spelling), the shared table's row in `held-row-2790.ts` (driven by `already-drawn-1990.test.ts`). **Behaviour change for a student:** that renaming row now says «זה כבר קיים באיור — נוסף כנתון נפרד.».
 
 ## ADR-AG-458 — A value the figure fixes as a monomial in the student's letters is shown in them: coordinates, lengths, curve equations (#2735)
 
@@ -16382,3 +16388,133 @@ Each of those points moves along a curve.
 **Locks.** `engine.test.ts` (#2664 rows): the classifier on ten equations (offsets and axis exact, the canonical ones with no frame fields), the roles at known values (foci (7,−1) and (−1,−1); focus (3,1) and directrix x = 1; focus (0,2) and directrix y = −2), the polyline on the curve, «קנונית» refused, membership at the vertex and a chord; #896's rows rewritten (the translated parabola and ellipse read; «פרבולה קנונית» with a translated equation refused `not-canonical`; the hyperbola still refused). `parser.test.ts`: the bracket unwrap and the claim carried, and both locale texts. `issue-2628-translated-locus.test.ts`: the six loci now named with their equation, the hyperbola still unnamed, the input gate widened. Fixtures (the net): `issue-2664-translated-ellipse`, `issue-2664-translated-parabola`, `issue-2664-y-parabola`, `exam-2021s-q1-two-parabolas-2664` (A(0,0), B(2,2)), and `issue-2664-canonical-word-refused` in `REFUSES_LAST_LINE`. `message-floor-2028.test.ts` gains the key. Catalog: a translated-ellipse row and two parabola rows in F6.
 
 **Behaviour change for a student:** in analytic, a typed translated ellipse, translated parabola or y-axis parabola is read and drawn, its focus, foci, vertices, directrix and centre answer from where it is drawn, and a locus that is such a curve is named with its equation. «פרבולה קנונית» / «אליפסה קנונית» with an equation off the origin is refused naming the word. A hyperbola and a rotated conic are still refused.
+## ADR-AG-466 — An ellipse shows its foci only: its chip is nothing → foci → nothing (#2709)
+
+**Date:** 2026-11-12 · **Status:** accepted · bug (P2, analytic), fix round #2855 stream B, branch `fix/2709-ellipse-chip-foci-only`. **Supersedes in part** [ADR-AG-376](#adr-ag-376) (the ellipse's four states and its directrices). LADDER stage: none (display state).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R221 (rewritten for the ellipse), R20's canvas line · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip" (the chip, the marks).
+
+**Operator ruling, 2026-11-04** (playing round #2697): *"does an ellipse have a מדריך? i know about the מוקד only. a parabola has both."* Offered A (keep the directrices) or B (foci only): *"foci only for ellipse."* This replaces the 2026-10-09 ruling (confirmed 2026-10-14, card `d14-1218-focus`) that gave the ellipse the parabola's cycle, and returns to #1218's 2026-09-19 *"elippse has fewer states."* Re-reported 2026-11-12: *"ellipses still have the chip to show מדריכים but ellipses dont have that"*.
+
+**Measured at pickup** (`31d99a36`, the #2851 branch tip on `caf619a5`; `derive` → `conicChips` / `conicMarksOf`): «נתונה אליפסה שמשוואתה x^2/25+y^2/9=1» has a chip whose next state from nothing is `directrix`; `both` draws two foci and two directrices.
+
+**Class.** The chip's cycle and the marks' directrix branch were kind-blind: one `CONIC_CYCLE` for every conic. Every ellipse (canonical, translated, y-major, parameterised) and every reader of the state (the chip and the marks) is the class; a parabola is unchanged.
+
+**Decision.**
+1. **A cycle per kind** (`app/annotations.ts` `ELLIPSE_CYCLE` = none → focus; `nextConic(s, cycle)`, the parabola's `CONIC_CYCLE` by default). `app/conicMarks.ts` maps each kind to its cycle.
+2. **One read** (`stateOn` in `conicMarks.ts`): the map's record folded onto the kind's cycle, used by `conicChips` and `conicMarksOf` alike. A saved `both` on an ellipse reads as `focus` (it showed the foci), a saved `directrix` as `none`. The saved map is never rewritten: `cleanAnnotations` still keeps every state (a parabola needs them), and the next press writes the state the chip names.
+3. **No directrix on an ellipse**: the directrix branch draws a parabola's only, and `ellipseDirectrices` (`engine/curves.ts`), which nothing else used, is deleted.
+4. **Words**: `conicChip.ellipse` keeps `focus` («הצג מוקדים») and `none` («הסתר»); `directrix` and `both` are dropped in both locales.
+
+This also settles the open card about the «both» state zooming out to keep an ellipse's far directrices in frame: an ellipse has none.
+
+**Ports.** None: 2-D and 3-D have no conics (exception family X2).
+
+**Locks.** `round-2678-conic-display.test.tsx`: the ellipse cycle (nothing → foci → nothing) and the parabola's four states; a saved `both` on an ellipse loads through `loadAnalyticSession` as foci (two dots, no directrix) with the map unchanged; a saved `directrix` reads as nothing while a parabola's still draws; the ellipse scene has no directrix. Fixture `issue-1863-ellipse` now carries `focus` (its name drops the directrices).
+
+**Behaviour change for a student:** in analytic, an ellipse's button reads «הצג מוקדים» / «הסתר» and only shows and hides the two foci; no directrix is drawn on an ellipse, including in a figure saved with them shown. A parabola's button is unchanged.
+
+## ADR-AG-460 — The subject frame takes the exam's colon and the masculine «מקיים» (#2062)
+
+**Status:** accepted, 2026-11-10 · **Issue:** [#2062](https://github.com/dcodish/geo_builder/issues/2062) (feature, `P2`, `analytic`) · round [#2822](https://github.com/dcodish/geo_builder/issues/2822)
+**Requirements:** [02c](02c-requirements-analytic.md) — the exam's circle-and-centre sentences («M מקיימת …») · **Design:** [04c](04c-design-analytic.md) § `satisfiesClause` · **LADDER stage:** none (parser)
+**Cites** the [operator ruling 2026-10-14](https://github.com/dcodish/geo_builder/issues/2062#issuecomment-6167336795), card `d14b-2062-frame` A. The 2-D twin: [ADR-819](06-decisions.md#adr-819).
+
+**Measured at pickup** (`d6004946`, `decideSubmit`): analytic already read the frame (`satisfiesClause`, ADR-AG-315): «הנקודה M מקיימת AM = 3», «M מקיימת AM = MB», "the point M satisfies AM = MB" and «הנקודה M מקיימת ∠AMB = 90» record. The exception was «הנקודה M מקיימת: AM = MB» (`not-handled`), the colon after the verb. The masculine «מקיים» (final mem) was missed too: the pattern spelled `מקיימ(ת|ים|ות)?`, which never matches «מקיים». The plan's account («analytic `not-handled`») was older than ADR-AG-315's reach; corrected here, not built twice.
+
+**Decision.** `satisfiesClause` reads `מקיי(ם|מת|מים|מות)` and `satisf(ies|y)`, followed by a colon or a space: the spelling 2-D's `readSubjectFrame` and 3-D's `readSubjectFrame3` share. The mention gate (the statement's facts name the point) is unchanged. «הנקודה D מקיימת AB = 3» keeps its `split-statements` refusal; 2-D and 3-D hand it to the model, recorded as an unscheduled known-gap cell on `subject-frame-unrelated-2062`.
+
+**Locks.** Unit: `src-analytic/__tests__/issue-1618-sentence-frame.test.ts` (#2062 block). Parity rows `subject-frame-*-2062`.
+
+**Behaviour change for a student:** «הנקודה M מקיימת: AM = MB» and «M מקיים AM = MB» build, where they went to the AI.
+
+## ADR-AG-472 — A point stated on a given curve has no locus chip: its locus is that curve, already drawn (#2849)
+
+**Date:** 2026-11-12 · **Status:** accepted · bug (analytic, P2) · fix round #2855 stream F · branch `fix/2849-no-chip-on-given-curve` · **supersedes in part [ADR-AG-426](#adr-ag-426)** (which points get a chip) · **LADDER stage:** none (the chip's choice over the solved figure, not a rung)
+**Requirements:** [02c](02c-requirements-analytic.md) R200 (amended: a point on a given curve has no chip) · **Design:** [04c](04c-design-analytic.md) § "The way in: the chip and the guide row"
+**Operator:** 2026-11-12, on `x^2+2y^2=16` · «AB מיתר באליפסה» · «M אמצע AB»: *"in this case, A and B should not have the chip. they are on the ellipse so their locus is just the ellipse."*; then, confirming the reach: *"whenever a point is on a given curve, there is no point of giving it a chip. it just clutters the screen and is meaningless"*; and a second figure, `7x^2+9y^2=63` · «F1 מוקד ימני של האליפסה» · «F2 מוקד שמאלי» · «משולש F1F2D» · «D על האליפסה», where the chip sat on the triangle row: *"the show locus chip appears on the triangle for some reason"*.
+
+**Measured at pickup** (`origin/main` @ `caf619a5`, `locusChips(derive(…))`): the chord figure `[A, B]` on line 1; with «AB מקביל לישר y=x» added `[A, B, M]`; the focus triangle `[D]` on the triangle row (the row that introduced D); #2738's `ONE_CIRCLE` and `TWO_CIRCLES` `[M, N]`.
+
+**Class.** *A point stated on a fixed carrier was offered its locus*, and that locus is the carrier itself: every chip of that kind can only redraw a curve the student typed. ADR-AG-426 gives the chip to every point whose positions form a curve (`hasLocus`), and a point on a fixed curve trivially qualifies.
+
+**Decision.**
+1. **`onFixedCarrier(raw, env, id, start, seed, choiceSeed)`** (`engine/locus.ts`): true when `id` has an incidence statement (`on-curve`, `on-line`, `on-line-2pt`) whose carrier holds still over every free direction of the point's part: the part is `locusPartAt`'s, the parameters are fixed (as `hasLocus` holds them), and no point the carrier is built from (`inputsOf`; none for `on-line`) moves along any vector of `jacobianRank`'s null basis (central differences at `MOTION_STEP`, the `MOVES` bar).
+2. **`locusChips`** (`app/locusChip.ts`) skips such a point after `hasLocus`. That loop is the one place a chip is chosen; `hasLocus` stays the engine's "does it move along one curve" predicate and the walk is untouched. The ask does not read `hasLocus` (it answers a chip's record, and a typed locus question answers the pointer, ADR-AG-381), so there is no second predicate to keep in agreement.
+3. **Kept:** a point on a carrier that itself moves («P על הישר AB» while B moves: its locus is not the line), every derived point (a midpoint, a foot, a crossing: none of them is stated on a carrier), and the bisector's «נקודה M» · «MA = MB» (a distance, not a given curve).
+
+**Locks.** `src-analytic/__tests__/issue-2738-locus-every-mover.test.ts`: re-expected (`TWO_CIRCLES`, `ONE_CIRCLE`, `MID`, the free point beside a mover, the chord-length pair: no chip; the bisector beside a second mover: the bisector's chip only; the bisector beside «מרובע» / «טרפז» / «מעוין» unchanged); `onFixedCarrier` unit rows (a stated circle, an axis, the line through two fixed points: yes; the line through a moving point, the bisector, a stated distance, a derived midpoint: no); the operator's two figures over seeds 0 to 2 (the chord: no chip; with «AB מקביל לישר y=x»: `[M, line 2]` only; the focus triangle: no chip on any row).
+
+**Behaviour change for a student:** a point placed on a given curve (the chord's ends on the ellipse, «M על המעגל I», «D על האליפסה», a point on a stated line or an axis) no longer shows «הצג מקום גאומטרי». A point that moves along something not drawn (the midpoint of a chord kept parallel to a line, «נקודה M» with «MA = MB») keeps it.
+
+## ADR-AG-464 — A minted name is decided by the lines before it: a later line that types it refers to that point (#2848)
+
+**Date:** 2026-11-12 · **Status:** accepted · bug (analytic, P1, wrong-answer) · fix round #2855, branch `fix/2848-minted-name-reference` · **amends [ADR-AG-164](#adr-ag-164)** §3 · **LADDER stage:** none (naming, before the fold)
+**Requirements:** none (unchanged — [02c](02c-requirements-analytic.md) R119 and ADR-AG-164 §3 already promise *"a minted name can be referred to … adding a line never renames an earlier one"*) · **Design:** [04c](04c-design-analytic.md) § "Incidence in every order"
+**Operator:** the #1263 ruling, 2026-09-20: *"mint a reserved letter, and say so"* (ADR-AG-164 §3); the #2731 ruling (ADR-AG-451) for the two values of k. Report 2026-11-12 on #2848: *"k is not calculated but it does have 2 possible values so we should be able to see both options"*.
+
+**Measured at pickup** (`caf619a5`, `decideSubmit` line by line → `derive` → `ask`, model never called). `x^2+4y^2=4` · «נתונה הנקודה (k-1, k-2)» · «P1 על האליפסה»: the coordinate point minted **P₂**, a second free point P₁ on the ellipse, k free at 3.458, «k» → nothing. With «P2 על האליפסה» the names flipped. With a student letter («P(k-1, k-2)» · «P על האליפסה») «k» → «1 או 13/5». «P1 על האליפסה» and «P₁ על האליפסה» both lower to `declare P₁` + `on-kind P₁ ellipse`, the same facts «P על האליפסה» lowers to: an incidence on an existing point, so nothing needed deduping where a point id is created.
+
+**Root cause.** `derive.resolveMints` built its set of TAKEN letters from the whole fact list, later lines included. A later line that typed the name the row had just announced («P1») made that name taken, so the mint skipped to P₂ and the later line's P₁ was a new free point. The name the tool announces could never be referred to, and adding a line renamed an earlier one.
+
+**Class.** Every later line that refers to a minted name in either spelling (`P1`, `P₁`): an incidence on any carrier, a question, a measurement («P1B = 5»), a segment. Only analytic mints reserved `P₁…` names (no `MINT_PREFIX` or minted subscript in `src/`, `src3d/`, `src-complex/`), so nothing to port. The tool's derived-point letters (`resolveToolLetters`) already read the taken letters incrementally.
+
+**Decision.** `resolveMints` reads the letters taken from the facts of the lines up to and including the mint's own line (and the names it minted before), never a later line. Then:
+1. A later line that only REFERS to the minted name binds to the minted point.
+2. A later line that DEFINES a different point under that name («P1(2, 3)» at other coordinates) is the fold's name clash, refused with the existing `conflicting-restatement` message, as «A(1,2)» · «A(2,3)» is. Before, it silently renamed the earlier point to P₂.
+3. A later student's letter at the SAME coordinates still takes the mint (#2674, ADR-AG-404), unchanged.
+4. The origin's default O (#1628) follows the same reading: a later «O(…)» elsewhere no longer moves the origin's name; it is a clash.
+
+**Measured after** (same door). The operator's three lines: one point P₁ = (8/5, 3/5), «k» → «1 או 13/5», «P1» → «(0, -1) או [(8/5, 3/5)]», «הציגו תצורה אחרת» reaches k = 1. «P₁ על האליפסה» the same. «P2 על האליפסה» is a new point, P₁ keeps its name. «P1(2,3)» after «נתונה הנקודה (1,2)» → refused `conflicting-restatement`; «P1(1,2)» → recorded, one point.
+
+**Locks.** Unit: `src-analytic/__tests__/issue-1281-1495-incidence-orders.test.ts` (#2848 block: a later reference keeps the name, a later definition clashes, the same coordinates still yield). Fixture: `minted-name-referred-2848.analytic.json` (the operator's lines). `issue-2848-minted-name-reference.test.ts` (`pipeline-lock:`): ask k, ask P1, the other configuration, the subscript spelling, «P2» a new point, the clash refused as its own case.
+
+**Behaviour change for a student:** after «נתונה הנקודה (k-1, k-2)» says «הכלי קרא לנקודה P₁», «P1 על האליפסה» puts that point on the ellipse and its name stays P₁; k shows «1 או 13/5». A later «P1(2, 3)» at other coordinates is refused as a name clash, where it used to rename the earlier point to P₂.
+
+## ADR-AG-475 — A circle through a ring's letters proves convex position: ADR-AG-261's proof reads one more reason (#2812)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2812](https://github.com/dcodish/geo_builder/issues/2812) (bug, `P2`, wrong answer) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02c](02c-requirements-analytic.md) — the ring-order bullets (a circle through the letters) · **Design:** [04c](04c-design-analytic.md) — `ringOrderFault`'s structural arm · **LADDER stage:** none (`derive`'s structural fault)
+**Amends** [ADR-AG-261](#adr-ag-261) · 2-D's [ADR-826](06-decisions.md#adr-826), the reference (ADR-W-157) · rests on [ADR-W-199](06w-decisions-workspace.md#adr-w-199) §2.
+
+**Measured at pickup** (`caf619a5`, `decideSubmit` line by line): R1 «מרובע ABCD · מעגל חוסם את ABCD · מרובע ABDC», R3 (the «חסום במעגל» spelling), R5 «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» and the rider order recorded every line. «מעגל חוסם את ABCD» lowers to a `circle-thru` through A, B, C and one `on-curve` rider for D — not an `on-curve` per vertex as the plan read it; the reader takes both.
+
+**Class.** *Analytic's structural ring-order proof read only the NOUN.* A circle through the letters proves convex position just as a square noun does, and was never read.
+
+**Decision.** `ringConvexityProofAg(construction, polygon)` (rings.ts, the copy of 2-D's reader): the noun (`convexWhenSimple`), or one circle object (`circle-thru`, `circle-at`, a circle `curve`) whose through points and `on-curve` riders cover every letter. `ringOrderFault` uses it for every declared ring of four or more letters, and blames the latest of the declarations and the proof lines (the circle's line, each rider's line). The refusal is `ring-contradicts-noun` → `errRingContradictsNoun`, unchanged.
+
+**Locks.** `src-analytic/__tests__/issue-1991-crossed-ring-specific-noun.test.ts` (#2812 block: R1, R3, R5, the rider, R9 refused naming the line; the two controls record; the reader's four cases; ABCD with its circle drawn simple at seeds 0–5). Parity: `crossed-ring-2810-01..03` and `crossed-ring-2811-01..02` lose their analytic cells.
+
+**Behaviour change for a student:** in the analytic builder, a second order of a ring's letters over a circle through them — or the circle line after two orders — is refused with the crossed-shape message instead of drawn crossed.
+
+## ADR-AG-471 — A stated polygon angle is the interior angle: a reflex-corner ring fault, and the angle proof joins ADR-AG-261 (#2813)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2813](https://github.com/dcodish/geo_builder/issues/2813) (bug, `P2`, wrong answer) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02c](02c-requirements-analytic.md) — the ring-order bullets (a stated corner angle is the interior angle) · **Design:** [04c](04c-design-analytic.md) — *A stated corner is the interior corner* · **LADDER stage:** none (ring validity and `derive`'s structural fault)
+**Amends** [ADR-AG-261](#adr-ag-261) · 2-D's [ADR-823](06-decisions.md#adr-823), the reference (ADR-W-157).
+
+**Decision.** `ringFaultsOf` adds the hard `reflex-corner` fault: a simple ring that seats a stated corner (`statedCornersAg`: an `angle` of any measure, or a corner `perpendicular`) against its orientation — `drawableAt` never draws it. `ringConvexityProofAg` (rings.ts, copied from 2-D) proves convex position from stated degrees summing to at least (n − 3)·180°; `ringOrderFault` reads it beside the noun: the angle lines join the blame, and the fault `ring-contradicts-angles` (`polygon`, `pair`, `declared`) reads `errRingContradictsAngles`, 2-D's text verbatim.
+
+**Locks.** `src-analytic/__tests__/issue-2813-stated-angle-interior.test.ts` (A1 and A2 refused with the message; no proof, no refusal; the view floor at seeds 0–5); unit block in `issue-1158-1166-polygon-noun-validity.test.ts`. Parity rows `stated-angle-interior-2813-01..03`.
+
+**Behaviour change for a student:** in the analytic builder the same lines refuse «מרובע ABDC» (or the completing angle line), naming the angle lines, where they were recorded with ABDC crossed.
+
+## ADR-AG-468 — A diameter or a chord is read in the construct state, on every curve: «AB קוטר האליפסה», «AB הוא קוטר המעגל», «קוטר האליפסה AB» (#2502)
+
+**Date:** 2026-11-12 · **Status:** accepted · bug (P2, analytic, reported) · fix round #2855 stream C, branch `fix/2502-construct-state-chord-diameter` · plan: the #2569/#2502 "Fix plan — 2026-11-03" (auto-ok 2026-11-03) widened by the operator's report of 2026-11-12 (*"the term קוטר in ellipse is not defined?"*). LADDER stage: none (parser).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R117 (amended: the copula and the construct state) and R204 (the ellipse's and the parabola's construct state) · **Design:** [04c](04c-design-analytic.md) § "The same relations about the ellipse and the parabola" (the host phrase's three spellings).
+
+**Measured before** (`caf619a5`, `decideSubmit`, no model). After «x^2/25+y^2/9=1», «AB קוטר באליפסה», «AB קוטר של האליפסה», «AB הוא קוטר באליפסה», «הקטע AB הוא קוטר של האליפסה», «קוטר AB באליפסה», «הקוטר AB של האליפסה» and "AB is a diameter of the ellipse" recorded. «AB קוטר האליפסה», «AB הוא קוטר האליפסה», «קוטר האליפסה AB» and «AB מיתר האליפסה» were `not-handled`. After «מעגל O», «AB קוטר המעגל», «AB הוא קוטר המעגל», «קוטר המעגל AB», «AB מיתר המעגל», «CD הוא מיתר של המעגל» and «מיתר AB של המעגל» were `not-handled`. 2-D (`decideDeterministic2D`, the same commit) builds every circle spelling on the drawn circle, asks `input.ambiguousCircleRef` with two circles, and draws a circle with none.
+
+**Root cause.** The host phrase after a diameter or a chord had one spelling per reader, not the language's three. `DIAM_HE` / `DIAM_NOUN_FIRST_HE` required a preposition («ב», «של»), so the construct state «קוטר המעגל» (the definite noun with none) fell off. `CHORD_CIRCLE_HE` took only «ב», so «מיתר של המעגל» fell off too, and so did the construct state. No reader took the host BEFORE the ends («קוטר האליפסה AB»). The copula was never the problem: «AB הוא קוטר באליפסה» read. It failed only with the construct-state host.
+
+**Decision.** One host phrase per reader, in the three spellings 2-D reads. (1) The diameter readers take a `(?=ה)` alternative to the preposition group. The definite noun is then the article, and no group is added, so «של מעגל» (indefinite) still defines a new circle and every lowering is unchanged. (2) The one chord takes `CHORD_HOST_HE`: «ב(ה)», «של ה» or «ה», with the same three groups as `CHORD_CIRCLE_HE`, so all spellings go through `chordFacts`. «של מעגל» with no article is not read for a chord, as before. (3) `hostBeforeEnds` rewrites «קוטר/מיתר ה<curve> XY» to «קוטר/מיתר XY של ה<curve>» at the entry of both rules, so the two orders cannot lower apart. Only the bare definite noun is taken: «קוטר המעגל AC נמצא על …» and «קוטר מעגל O היוצא מ…» keep their own readers. The definite noun binds the drawn curve through the existing binder: with one curve it binds to it, with two of that kind it asks (`ambiguous-shape`, #2477's rule, ADR-W-175 sr-12 A), and with no circle the circle is drawn, as «AB קוטר במעגל» already does. On the parabola, «AB קוטר הפרבולה» reaches the parabola group and gets #2625's `parabola-no-diameter`, while «AB מיתר הפרבולה» is a chord of it, as «AB מיתר בפרבולה» is.
+
+**Scope (rule 1).** The class is the host phrase of the ONE chord and the diameter. The plural chord readers (`CHORD_LIST_HE`, `CHORD_PAIR_HE`) keep «ב» only: the report did not name them, and their leading «במעגל, …» form is a scene, not a host. #2569's name-first segment («AB קטע») is bundled in the 2026-11-03 plan but is its own item.
+
+**Locks.** Unit: `src-analytic/__tests__/parser.test.ts` (#2502 block): each construct spelling parses to the facts of its «ב» twin, the parabola's three refuse, and «של מעגל» keeps its readings. Bespoke: `src-analytic/__tests__/issue-2502-construct-state.test.ts` (`pipeline-lock:`), every row of the issue table drawn as a diameter of the ellipse (A, B on it, opposite through the centre, at six seeds), the circle's spellings through O, the which-one question with two curves, and the parabola's refusal. Fixtures: `issue-2502-copula-diameter.analytic.json`, `issue-2502-ellipse-construct.analytic.json`. Parity rows `copula-diameter-2502`, `copula-chord-2502`, `copula-diameter-two-circles-2502`, `construct-*-2502` and `chord-of-the-circle-2502` (2-D and analytic agree). Catalog: «AB קוטר האליפסה», «AB קוטר המעגל» (not featured).
+
+**Ports (ADR-W-157).** 2-D is the reference and is unchanged. 3-D's circles are a different construct, so no port.
+
+**Behaviour change for a student:** in analytic, «AB קוטר האליפסה», «AB הוא קוטר האליפסה», «קוטר האליפסה AB» and «AB מיתר האליפסה» draw the diameter or chord of the drawn ellipse. «AB הוא קוטר המעגל», «קוטר המעגל AB», «CD הוא מיתר של המעגל» and «מיתר המעגל AB» draw on the drawn circle. With two curves of that kind the tool asks which. «AB קוטר הפרבולה» gets the parabola's «לפרבולה אין מרכז…» sentence. Before, each went to the AI.

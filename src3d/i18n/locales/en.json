@@ -63,7 +63,6 @@
     "delete": "Delete",
     "edit": "Edit in place",
     "toggleTitle": "Include in the figure",
-    "claimVerified": "The claim was verified against the figure",
     "planeFace": "Face only",
     "planeFull": "Full plane",
     "dihedralShow": "Show construction",
@@ -183,6 +182,7 @@
     "componentSymbolic": "A single coordinate with a letter value («{{component}}») is not supported yet — give it a number, e.g. {{component}} = 3",
     "inscribedContradictsNoun": "A {{shape}} cannot be inscribed in a circle: «{{sentence}}». A circle through every vertex would make it a {{forced}}, and a {{forced}} is not a {{shape}}. If the shape is a {{forced}}, write «{{forced}}» instead of «{{shape}}».",
     "inscribedContradictsNounVs": "Can't do that: «{{sentence}}» contradicts «{{other}}» — they can't both hold. The reason: a circle through the four vertices would make a {{shape}} a {{forced}}, and a {{forced}} is not a {{shape}}.",
+    "ringContradictsAngles": "«{{detail}}» can't be added: by {{forcing}}, the shape {{ring}} is convex, and points in convex position have only one order in which the sides don't cross — so {{other}} would fold over itself. Change one of the angles or the order of the letters.",
     "ringContradictsNoun": "The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.",
     "radianAngle": "In solid geometry, angles are written in degrees — for example ∠ABC = 90",
     "unreadName": "«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.",
@@ -194,6 +194,7 @@
     "noPrismToMakeRight": "there is no prism in the figure to make right — build a prism or a parallelepiped first",
     "ambiguousPrism": "there is more than one prism in the figure — it's unclear which one you mean",
     "shapePlural": { "3": "triangles", "4": "quadrilaterals", "n": "polygons" },
+    "solidPlural": { "cube": "cubes", "box": "boxes", "pyramid": "pyramids", "prism": "prisms" },
     "ambiguousDefiniteShape": "«{{sentence}}» — the figure has several {{plural}} ({{shapes}}), so it isn't clear which one you mean. Name it, e.g. «{{example}}».",
     "planeNotDetermined": "Plane {{id}} has no stated equation or orientation yet — this statement needs a determined plane. Pin it with an equation, three points on it, or a ∥/⊥ relation",
     "pointNotDetermined": "Point {{id}} has no determined position yet, so this statement cannot be checked — pin the point first: its coordinates, or a length or angle that fixes it",
@@ -247,7 +248,9 @@
       "perpendicular": "{{a}} is perpendicular to {{b}}",
       "contained": "{{a}} lies in plane {{b}}",
       "parallelPlane": "{{a}} is parallel to plane {{b}}",
-      "perpendicularPlane": "{{a}} is perpendicular to plane {{b}}"
+      "perpendicularPlane": "{{a}} is perpendicular to plane {{b}}",
+      "on-plane": "{{a}} lies in plane {{b}}",
+      "off-plane": "{{a}} does not lie in plane {{b}}"
     }
   },
   "scope": {
@@ -273,6 +276,7 @@
       "unavailable": "those points aren't in the figure",
       "noObject": "that object isn't in the figure",
       "undetermined": "not determined by the givens",
+      "inPanel": "The answer is in the data panel — the row for the mutual position of {{point}} and plane {{plane}}",
       "noFrame": "no coordinate system, so no equation — what IS known about the plane is shown. For an equation, state one point's coordinates (e.g. A(0,0,0)) or a plane/line equation",
       "noFrameLine": "no coordinate system, so no line equation. For an equation, state one point's coordinates (e.g. A(0,0,0)) or a plane/line equation",
       "scale": "depends on the figure's scale (pin a size)",

@@ -165,8 +165,19 @@ function upliftLowercaseLabels(s: string): string {
 const SCRIPT_BOUNDARY_LATIN_HE = /([A-Za-z][A-Za-z0-9']*)(?=[א-ת])/g;
 const SCRIPT_BOUNDARY_HE_LATIN = /([א-ת]{2,})(?=[A-Za-z])/g;
 export function normalize3(s: string): string {
+  // #2062 (ADR-3D-479): the subject frame «הנקודה M מקיימת …» comes off LAST, at the one boundary every rule and every
+  // honesty gate reads (2-D's `readFrame` seat), so the frame's words are never an unread part of the line.
+  return subjectFrame3(normalizeText3(s));
+}
+
+/** The line's subject frame, read off the normalised text BEFORE it comes off (the read-extent gate's exemption). */
+export function subjectFrameOf3(raw: string): { subject: string; rest: string } | null {
+  return readSubjectFrame3(normalizeText3(raw));
+}
+
+function normalizeText3(s: string): string {
   // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
-  return upliftLowercaseLabels(
+  return (upliftLowercaseLabels(
     // #1545 (ADR-3D-300): every prime glyph → `'` through the ONE fold (lexicon/marks3), which the ask
     // lane and the LLM sequence gate also call — it used to be spelled here and twice more, narrower.
     // #1691 (ADR-AG-239): «AB ו- CD», «ו -CD», «ו - CD» are «ו-CD» — the shared fold every builder's boundary calls.
@@ -275,7 +286,7 @@ export function normalize3(s: string): string {
       // ADR-3D-079 Am. 2: a trailing sentence period is decoration (book lines end with «.» —
       // «t פרמטר חיובי.» used to dead-end); a decimal never ends in a bare dot, so this is safe
       .replace(/\s*\.+$/, ''),
-  );
+  ));
 }
 
 const TOKEN = /[A-Z]\d*'?/g;
@@ -1448,6 +1459,46 @@ const stripStatementPrefix = (s: string): string =>
     '',
   );
 
+/**
+ * #2062 ([ADR-3D-479](../../docs/06b-decisions-3d.md#adr-3d-479)) — THE SUBJECT FRAME: «הנקודה M מקיימת BM = …»,
+ * «נקודה M מקיימת: AM = MB», «M מקיים …», "the point M satisfies AM = MB". The exam names the point a statement is
+ * about, then states it; the statement alone is what is asserted, so a line every rule reads bare is read framed
+ * (the operator's ruling of 2026-10-14, card `d14b-2062-frame` A: in front of any statement, in every builder).
+ * The frame comes off only when the statement MENTIONS the named point as an operand: «הנקודה D מקיימת AB = 3» is not
+ * this sentence (D would vanish without a word), so it is left as typed. A given-prefix in front («נתון כי הנקודה M
+ * מקיימת …») comes off with it. The 2-D (`src/parser/frame.ts`) and analytic (`satisfiesClause`) readers are copies,
+ * never imports (BOUNDARIES.json).
+ */
+const SUBJECT_FRAME_HE = new RegExp(String.raw`^${HE_SUBJ}(${LBL})\s+מקיי(?:ם|מת|מים|מות)(?:\s*:\s*|\s+)(.+)$`);
+const SUBJECT_FRAME_EN = new RegExp(String.raw`^(?:[Tt]he\s+)?(?:[Pp]oint\s+)?(${LBL})\s+satisf(?:ies|y)(?:\s*:\s*|\s+)(.+)$`);
+export function readSubjectFrame3(s: string): { subject: string; rest: string } | null {
+  const bare = stripStatementPrefix(s).trim();
+  const m = SUBJECT_FRAME_HE.exec(bare) ?? SUBJECT_FRAME_EN.exec(bare);
+  if (!m) return null;
+  const [, subject, rest] = m;
+  const mentioned = (rest.match(new RegExp(LBL, 'g')) ?? ([] as string[])).includes(subject);
+  return mentioned ? { subject, rest: rest.trim() } : null;
+}
+/** The line with its subject frame read off — or the line unchanged when it has none ({@link readSubjectFrame3}). */
+export function subjectFrame3(s: string): string {
+  return readSubjectFrame3(s)?.rest ?? s;
+}
+
+/**
+ * #2062 ([ADR-3D-480](../../docs/06b-decisions-3d.md#adr-3d-480)) — THE MEMBERSHIP QUESTION: «האם הנקודה M נמצאת
+ * במישור AEC?», «האם M נמצא על המישור π1», "is M in plane AEC?". The exam's ג(2) asks it; a question is never a given,
+ * so it is read BEFORE the grammar by both surfaces (the main input's `answer-in-panel` refusal and the ask lane) and
+ * answered from the panel's point × plane row. One reader, two surfaces.
+ */
+const MEMBER_PLANE = String.raw`((?:${LBL}){3,}|π\d*|[α-ωΑ-Ω]\d*)`;
+const MEMBER_HE = new RegExp(String.raw`^האם\s+${HE_SUBJ}(${LBL})\s+(?:נמצא(?:ת)?|מונח(?:ת)?|שייכ(?:ת)?|שייך|מוכל(?:ת)?)\s+(?:ב|על\s*)?ה?מישור\s*${MEMBER_PLANE}\s*\??$`);
+const MEMBER_EN = new RegExp(String.raw`^[Ii]s\s+(?:the\s+)?(?:point\s+)?(${LBL})\s+(?:(?:lying|contained)\s+)?(?:in|on)\s+(?:the\s+)?plane\s+${MEMBER_PLANE}\s*\??$`);
+export function membershipQuestion3(raw: string): { point: string; plane: string } | null {
+  const s = normalizeText3(raw).replace(/\s*[?？]\s*$/, '').trim();
+  const m = MEMBER_HE.exec(s) ?? MEMBER_EN.exec(s);
+  return m ? { point: m[1], plane: m[2] } : null;
+}
+
 /** `5/3`, `0.5`, `2`, `√2`, `2√3`, `√6/4`… — absent ⇒ 1. Null on malformed. A fraction GLYPH never reaches
  *  here: {@link normalize3} spells it as digits (#2255, ADR-3D-374), so no reader keeps a glyph table. */
 function parseCoeff(s: string | undefined): number | null {
@@ -1835,22 +1886,32 @@ export const RADICAND = String.raw`(?:\(\s*${UNUM}(?:\s*\/\s*${UNUM})?\s*\)|${UN
  * `2k·u`, `t·BE`, plus every numeric form. Null on anything else.
  */
 const SYM_TERM = new RegExp(
-  String.raw`^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:${UNUM})?\s*(?:√\s*${RADICAND})?(?:\s*\/\s*${UNUM})?)?\s*[·×*]?\s*([a-w])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(${UNUM}))?$`,
+  String.raw`^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:${UNUM})?\s*(?:√\s*${RADICAND})?(?:\s*\/\s*${UNUM})?)?\s*[·×*]?\s*([a-wα-ω])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(${UNUM}))?$`,
 );
 
-export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string } | null {
+/**
+ * #1551 ([ADR-3D-472](../../docs/06b-decisions-3d.md#adr-3d-472)): an expression may carry SEVERAL letters, one per term
+ * («EM = a·EA + b·EC», «αEA + βEC»: the alphabet does not choose the path). One letter keeps today's shape exactly
+ * (`symbol`, no per-term letter), so every one-letter command and saved file is unchanged; with two or more, each
+ * lettered term names its own (`sym`) and the expression lists them (`symbols`). Degree stays 1: a term carries at
+ * most one letter, so «ab·EA», «a²EA» and «a/b» have nowhere to live and stay refused (FR-VC-3).
+ */
+export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string; symbols?: string[] } | null {
   const parts = splitTopLevelTerms(src);
   if (!parts || parts.length === 0) return null;
   const terms: SymTerm[] = [];
-  let symbol: string | undefined;
+  const letters: string[] = [];
+  let termLetter: string | undefined;
   const bindSymbol = (letter: string): boolean => {
-    if (symbol && symbol !== letter) return false;
-    symbol = letter;
+    if (termLetter && termLetter !== letter) return false; // two letters in ONE term: degree 2
+    termLetter = letter;
+    if (!letters.includes(letter)) letters.push(letter);
     return true;
   };
   for (const part of parts) {
     const m = part.match(SYM_TERM);
     if (!m) return null;
+    termLetter = undefined;
     const [, sign, paren, numRaw, symLetter, pairA, pairB, named, divisor] = m;
     let coeff: LinExpr = { k: 1, p: 0 };
     if (paren) {
@@ -1878,10 +1939,12 @@ export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string }
     const signed: LinExpr = sign === '-' ? { k: neg(coeff.k), p: neg(coeff.p) } : coeff;
     // #1497: a purely numeric coefficient keeps its spelling, «(2/3)u» as «2/3»; a letter's never does
     const spelled = !symLetter && coeff.p === 0 ? statedSrc(paren ?? `${numRaw ?? ''}${divisor ? `/${divisor}` : ''}`) : {};
-    if (pairA) terms.push({ coeff: signed, ...spelled, atom: { kind: 'pair', from: pairA, to: pairB } });
-    else terms.push({ coeff: signed, ...spelled, atom: { kind: 'named', name: named } });
+    const own = termLetter !== undefined ? { sym: termLetter } : {};
+    if (pairA) terms.push({ coeff: signed, ...spelled, atom: { kind: 'pair', from: pairA, to: pairB }, ...own });
+    else terms.push({ coeff: signed, ...spelled, atom: { kind: 'named', name: named }, ...own });
   }
-  return { terms, symbol };
+  if (letters.length <= 1) return { terms: terms.map(({ sym: _sym, ...t }) => t), symbol: letters[0] };
+  return { terms, symbols: letters };
 }
 
 /**
@@ -2152,7 +2215,6 @@ const volumeEqPoly: Rule = (s) => {
 
 const vecEqClaim: Rule = (s0) => {
   const s = stripStatementPrefix(s0);
-  if (GREEK.test(s)) return null; // unknown scalars belong to spanPoint, never a claim
   const parts = s.split('=');
   if (parts.length !== 2) return null;
   const lhsPair = parts[0].trim().match(/^([A-Z]\d*'?)([A-Z]\d*'?)$/);
@@ -2163,7 +2225,7 @@ const vecEqClaim: Rule = (s0) => {
     // lane; dropping it here is what made every spelling indistinguishable at apply, so the ambiguity
     // guard refused the arrow form its own clarification teaches. Recorded only when true, so an
     // unmarked command is byte-identical to before (and a saved figure's JSON is unchanged).
-    return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol, ...(VEC_MARKED ? { marked: true as const } : {}) }];
+    return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol, ...(rhs.symbols ? { symbols: rhs.symbols } : {}), ...(VEC_MARKED ? { marked: true as const } : {}) }];
   }
   // #1783 (ADR-3D-391): «3BD = AD» is «AD = 3·BD» — the same sentence with its sides swapped (Am. 1: it was lowered
   // with the reciprocal, «AD = ⅓·BD», a different sentence). It lowers to the same
@@ -2173,7 +2235,7 @@ const vecEqClaim: Rule = (s0) => {
   if (rhsPair) {
     const l = parseSymExpr(parts[0]);
     const [term] = l?.terms ?? [];
-    if (l && !l.symbol && l.terms.length === 1 && term.atom.kind === 'pair' && term.coeff.p === 0 && term.coeff.k !== 0)
+    if (l && !l.symbol && !l.symbols && l.terms.length === 1 && term.atom.kind === 'pair' && term.coeff.p === 0 && term.coeff.k !== 0)
       return [{
         type: 'vec-rel', from: rhsPair[1], to: rhsPair[2],
         terms: [{ coeff: { k: term.coeff.k, p: 0 }, atom: term.atom }],

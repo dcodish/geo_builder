@@ -5,8 +5,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { applyCommand3, freeDims, unstatedPyramidReading3 } from '../apply';
-import { claimResidual3, residualHolds3, verifyClaim } from '../claims';
+import { applyCommand3, coordLetterExprs3, freeDims, freeSolidRun3, renameIds3, resolveUnletteredSolid3, unstatedPyramidReading3 } from '../apply';
+import { claimResidual3, lettersAt3, residualHolds3, verifyClaim } from '../claims';
 import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, type QuadPreference3 } from '../evaluate';
 import { commandStatesCircle3, concaveSeatVertices3, quadDrawnDegenerate, statedConcyclic3 } from '../baseShapes';
 import { pointParents3 } from '../carriers';
@@ -843,5 +843,79 @@ describe('#2814 — the pivot pick is over DISTINCT configurations, in an order 
     expect(congruentShapes3(rect(1), rect(-1))).toBe(true);
     const par = (dx: number) => new Map([['A', v3(0, 0, 0)], ['B', v3(5, 0, 0)], ['C', v3(5 + dx, 4, 0)], ['D', v3(dx, 4, 0)]]);
     expect(congruentShapes3(par(3), par(-3))).toBe(false);
+  });
+});
+
+describe('#2838 — an unlettered solid noun, read against the figure (ADR-3D-486)', () => {
+  const apply = (c: Construction3, k: Command3): Construction3 => {
+    const r = applyCommand3(c, k);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    return r.next;
+  };
+  const cube = (ids: string[]): SolidCommand => ({ type: 'solid', kind: 'cube', ids });
+  const DEFAULT = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
+
+  it('freeSolidRun3: the first free letters per root, primes following, a root taken in any primed form', () => {
+    const map = freeSolidRun3(DEFAULT, (id) => ['A', 'B', 'C'].includes(id));
+    expect(DEFAULT.map((id) => map.get(id))).toEqual(['D', 'E', 'F', 'G', "D'", "E'", "F'", "G'"]);
+    const primed = freeSolidRun3(DEFAULT, (id) => id === "E'");
+    expect(DEFAULT.map((id) => primed.get(id))).toEqual(['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"]);
+    const skip = freeSolidRun3(['A', 'B', 'C', 'D', 'S'], (id) => id === "B'" || id === 'A');
+    expect(['A', 'B', 'C', 'D', 'S'].map((id) => skip.get(id))).toEqual(['B', 'C', 'D', 'E', 'F']);
+  });
+
+  it('resolveUnletteredSolid3: indefinite keeps free default letters, moves off taken ones', () => {
+    expect(resolveUnletteredSolid3(emptyConstruction3(), cube(DEFAULT), 'indefinite')).toEqual({ ok: true, map: null });
+    const tri = apply(emptyConstruction3(), { type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] });
+    const r = resolveUnletteredSolid3(tri, cube(DEFAULT), 'indefinite');
+    expect(r.ok && r.map && r.map.get("A'")).toBe("D'");
+  });
+
+  it('resolveUnletteredSolid3: definite is the one drawn solid, ambiguous with two, a new one with none', () => {
+    const one = apply(emptyConstruction3(), cube(['E', 'F', 'G', 'H', "E'", "F'", "G'", "H'"]));
+    const r = resolveUnletteredSolid3(one, { type: 'solid', kind: 'box', ids: DEFAULT }, 'definite');
+    expect(r.ok && r.kind).toBe('cube');
+    expect(r.ok && r.map && renameIds3([{ type: 'solid', kind: 'box', ids: DEFAULT }], r.map)).toEqual([{ type: 'solid', kind: 'box', ids: ['E', 'F', 'G', 'H', "E'", "F'", "G'", "H'"] }]);
+    const two = apply(one, cube(DEFAULT));
+    expect(resolveUnletteredSolid3(two, cube(DEFAULT), 'definite')).toMatchObject({ ok: false, error: { code: 'ambiguous-definite-shape', solid: 'cube' } });
+    expect(resolveUnletteredSolid3(emptyConstruction3(), cube(DEFAULT), 'definite')).toEqual({ ok: true, map: null });
+  });
+});
+
+describe('#2785 (ADR-3D-488) — a coordinate letter written twice is one pin symbol; the claim judges it', () => {
+  it('coordLetterExprs3 lowers a bare letter to 1·k only where it is shared', () => {
+    const cmd = { x: null, y: 1, z: null, syms: ['k', null, 'p'] as [string | null, string | null, string | null] };
+    expect(coordLetterExprs3(cmd, (s) => s === 'k')).toEqual([{ terms: [{ sym: 'k', k: 1 }], c: 0 }, null, null]);
+  });
+
+  it('the second use promotes the first statement’s named component, and the coords-eq claim carries the letter', () => {
+    const c = build(
+      { type: 'point3', id: 'B', x: 2, y: 1, z: -8 },
+      { type: 'point3', id: 'C', x: 4, y: 5, z: 6 },
+      { type: 'point3', id: 'B', x: null, y: 1, z: -8, syms: ['k', null, null] },
+    );
+    expect(c.partialNames.map((b) => b.sym)).toEqual(['k']); // first use: a named free component (ADR-3D-175)
+    const r = applyCommand3(c, { type: 'point3', id: 'C', x: null, y: 5, z: 6, syms: ['k', null, null] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.next.partialNames).toEqual([]);
+    expect(r.next.pins.map((p) => p.x)).toEqual([{ terms: [{ sym: 'k', k: 1 }], c: 0 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }]);
+    const claims = r.next.claims.filter((cl) => cl.type === 'coords-eq');
+    expect(claims.every((cl) => cl.type === 'coords-eq' && cl.sym?.[0]?.terms[0].sym === 'k')).toBe(true);
+    // k = 2 (off B) and k = 4 (off C) cannot both hold: the least-squares k fails both claims
+    const res = resolve3(r.next, 0);
+    expect(lettersAt3(r.next, res).k).toBeCloseTo(3, 9);
+    expect(verifyClaim(claims[claims.length - 1], r.next, 0)).toBe(false);
+  });
+
+  it('a letter that agrees everywhere holds: «B(2,1,-8)» then «B(2t,t,k)» reads t = 1, k = −8', () => {
+    const c = build(
+      { type: 'point3', id: 'B', x: 2, y: 1, z: -8 },
+      { type: 'point3', id: 'B', x: null, y: null, z: null, syms: ['t', 't', 'k'], symExprs: [{ terms: [{ sym: 't', k: 2 }], c: 0 }, { terms: [{ sym: 't', k: 1 }], c: 0 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }] },
+    );
+    const res = resolve3(c, 0);
+    expect(lettersAt3(c, res).t).toBeCloseTo(1, 9);
+    expect(lettersAt3(c, res).k).toBeCloseTo(-8, 9);
+    expect(c.claims.filter((cl) => cl.type === 'coords-eq').every((cl) => verifyClaim(cl, c, 0))).toBe(true);
   });
 });

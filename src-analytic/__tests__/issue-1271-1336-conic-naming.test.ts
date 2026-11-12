@@ -313,8 +313,11 @@ describe('Am. 2 · an ellipse whose equation is a circle is ACCEPTED as the stud
     expect(ellipseFoci(c).map((f) => [Math.abs(f.x), Math.abs(f.y)])).toEqual([[0, 0], [0, 0]]);
   });
 
-  it('only that pair changed: an off-centre circle under the ellipse noun is still out of scope, and the circle noun over an ellipse is still refused', () => {
-    expect(refusal(['נתונה אליפסה שמשוואתה (x-1)^2+y^2=4']).key).toBe('out-of-scope');
+  // Round #2822 (#2664, ADR-AG-455): the off-centre circle under the ellipse noun was refused 'out-of-scope' only because
+  // analytic read no translated conic. #2664 reads translated conics, so it is now the 2026-09-29 ruling's case (an ellipse
+  // whose equation is a circle is ACCEPTED as the student's ellipse), centre (1, 0). The circle noun over an ellipse stays refused.
+  it('the off-centre circle under the ellipse noun is accepted since #2664 (the ruling, translated); the circle noun over an ellipse is still refused', () => {
+    recordsAll(['נתונה אליפסה שמשוואתה (x-1)^2+y^2=4']);
     expect(refusal(['נתון מעגל I שמשוואתו x^2/9+y^2/4=1']).key).toBe('kind-mismatch');
     expect(refusal(['נתונה פרבולה I שמשוואתה x^2+y^2=16']).key).toBe('kind-mismatch');
   });

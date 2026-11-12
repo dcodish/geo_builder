@@ -4095,6 +4095,81 @@
       "status": "pending"
     },
     {
+      "id": "Q-2790b",
+      "issue": 2790,
+      "question": "«נתון ישר y=2x+1» then «נתון ישר l2: y=2x+1» (a student name over the tool's l-number): (a) own row with the held notice; (b) rename silently.",
+      "class": "restated-fact-held-row",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A line restating a line already in the figure is its own row with the held notice in every case; a new name does not take it out of that rule (Q-2790a 'b'); the student's name still replaces the tool's l-number (2026-10-20).",
+      "precedents": [
+        {
+          "quote": "ruling - if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists. this should be on all tools.",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-200"
+        },
+        {
+          "quote": "b",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2790#issuecomment-6750486021"
+        }
+      ],
+      "confidence": "high",
+      "at": "2026-11-10T18:58:37.525Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2790c",
+      "issue": 2790,
+      "question": "3-D held relation rows show the held notice AND an older relation note (#396/#842/#850): (a) one held notice; (b) both.",
+      "class": "restated-fact-held-row",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "In 3-D a held statement says one thing — that it already exists: the held notice replaces the older relation notes, as ADR-3D-449 replaced them under the 2026-11-06 ruling.",
+      "precedents": [
+        {
+          "quote": "In all cases it should say כבר קיים",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/2341#issuecomment-6683983248"
+        }
+      ],
+      "confidence": "high",
+      "at": "2026-11-10T18:58:37.525Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2793c",
+      "issue": 2793,
+      "question": "«תיבה» · «X_B=3» (one off-origin component, no sign): should «הציגו תצורה אחרת» slide the figure along its unanchored axes? (a) keep ADR-3D-373, it stays put; (b) slide at every configuration.",
+      "class": "stated-component-unanchored-axis-slide",
+      "verdict": "escalate",
+      "reason": "(b) would reverse ADR-3D-373 §4 with no ruling ordering it; his words conflict (ADR-052 no fixed position vs FR-SP-4 keep it flat on the floor); ADR-3D-373's figure decision is a session's scoping, not his words.",
+      "nearest": [
+        {
+          "quote": "4 - b",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2746#issuecomment-6745659180"
+        },
+        {
+          "quote": "Keep it flat on the floor",
+          "date": "2026-10-31",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/02b-requirements-3d.md"
+        }
+      ],
+      "at": "2026-11-10T15:52:09.298Z",
+      "status": "escalated"
+    },
+    {
+      "id": "text-2625-parabola-no-centre",
+      "kind": "text",
+      "issue": "#2625",
+      "what": "The refusal for «O מרכז הפרבולה» and its spellings (a parabola has no centre; ruled Q-2625b (a))",
+      "choice": "«לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, הכלי עדיין לא קורא אותו.» — the reason, then an honest next step: the vertex is what the student may mean, and the tool does not read it yet",
+      "chosen": true,
+      "at": "2026-11-10T17:24:27.784Z",
+      "status": "pending"
+    },
+    {
       "id": "text-2790-held-notice",
       "kind": "text",
       "issue": "#2790",
@@ -4103,6 +4178,183 @@
       "chosen": true,
       "at": "2026-11-10T16:16:52.922Z",
       "status": "pending"
+    },
+    {
+      "id": "decisions-2026-11-11-pr2818",
+      "question": "Should PR #2818 (#2817, workspace) — the Rulings Inbox — be merged to main?",
+      "class": "feature-play-and-approve",
+      "verdict": "escalate",
+      "reason": "Reserved: merging a feature PR is the operator's own play-and-approve gate (ADR-W-007) and a feature-scope decision; no recorded approval found — use of the page is not approval.",
+      "nearest": [
+        {
+          "quote": "I think need a judgment agent that can make decisions on my behalf based on historic decisions and guidelines I gave",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-173"
+        }
+      ],
+      "at": "2026-11-11T09:42:59.344Z",
+      "status": "escalated"
+    },
+    {
+      "id": "2742-typed-decimal-locus",
+      "question": "Once the equation is recognised, how should the number the student typed appear in it? A student types «A(1.4142,0) · נקודה M · MA = 3»; M's locus chip is a circle centred at A with radius 3. Today it answers «מעגל» with no equation because 1.4142 is neither a small rational nor a surd.",
+      "class": "number-display",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "The locus is determined, so its equation prints (R87). A decimal the student typed is shown like every other number: computed in full and displayed to two decimals where needed (sr-22, #723), so the chip reads «מעגל · (x − 1.41)² + y² = 3²».",
+      "precedents": [
+        {
+          "quote": "I think we need to show the equation if we can determine it",
+          "date": "2026-09-16",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06c-decisions-analytic.md#adr-ag-072"
+        },
+        {
+          "quote": "only if we are positive about the equation we show it. otherwise, we stick to showing the shape.",
+          "date": "2026-09-16",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06c-decisions-analytic.md#adr-ag-072"
+        },
+        {
+          "quote": "the tool should display to decimals after the point whenever needed. But it should calculate the full number. Now, if a number is 7.999, we would round it to 8.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/issues/2361#issuecomment-6580876555"
+        },
+        {
+          "quote": "2 decimal points is always right for this tool - if this is the question",
+          "date": "2026-08-19",
+          "link": "https://github.com/dcodish/geo_builder/issues/723#issuecomment-5342347995"
+        },
+        {
+          "quote": "2394 - option a.",
+          "date": "2026-10-20",
+          "link": "https://github.com/dcodish/geo_builder/issues/2394#issuecomment-6289650832"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Option (c) is ruled out by R87: the circle is the same at every seed. Option (b) is ruled out by sr-22 (a typed value with more than two decimals shows rounded; ADR-W-179 decision 2). Not decided here: a typed surd or fraction printed exactly (#2741); recognising 1.4142 as √2 (must not, ADR-AG-429 §3); the snap/self-check mechanism (ADR-AG-072 §7 must survive); near-integer display (sr-22, e.g. 2.9999 → 3).",
+      "at": "2026-11-11T09:58:13.990Z",
+      "status": "pending"
+    },
+    {
+      "id": "text-2835-parabola-no-centre-retired",
+      "kind": "text",
+      "issue": "#2835",
+      "what": "The parabola-has-no-centre refusal (#2625) gets its next step once the vertex is read: the old «הכלי עדיין לא קורא אותו» clause retires",
+      "choice": "«לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «{{name}} קודקוד הפרבולה».» (no letter in the sentence: «…, כתבו «שיעורי קודקוד הפרבולה».» in the ask box, «…, כתבו «V קודקוד הפרבולה».» in the submit lane) / \"A parabola has no centre. If you meant its vertex, write \"{{name}} is the vertex of the parabola\".\"",
+      "chosen": true,
+      "at": "2026-11-11T09:59:17.479Z",
+      "status": "pending"
+    },
+    {
+      "id": "text-2743-third-crossing-equation-line",
+      "kind": "text",
+      "issue": "#2743",
+      "what": "The ruled third-crossing sentence (#1834) when the line is an equation or a named line, not two letters: the line slot reads «הישר <as typed>»",
+      "choice": "«הישר x=-4 כבר חותך את המעגל ב-K וב-L — לישר אין נקודת חיתוך שלישית עם המעגל.» / \"The line x=-4 already crosses the circle at K and L — a line has no third crossing with a circle.\" (a two-letter line keeps «AC כבר חותך …» unchanged)",
+      "chosen": true,
+      "at": "2026-11-11T09:59:17.479Z",
+      "status": "pending"
+    },
+    {
+      "id": "decisions-2026-11-11-2790-3d-definitional",
+      "question": "In 3-D, a restatement that DEFINES something already defined (a plane equation in another spelling; a repeated 'D on the circle') is refused on fix/2790-3d. (a) its own held row, inert while its twin is enabled, live when the twin is unticked or deleted, configuration kept; (b) keep the old «כבר קיים» with no row.",
+      "class": "restatement-row-behaviour",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "Under ADR-W-200 any input already in the figure, a restated definition included, is accepted in every builder as its own row with the already-exists notice; in 3-D a definitional restatement is inert while its twin is enabled and takes over when the twin is unticked or deleted; never refused, never row-less.",
+      "precedents": [
+        {
+          "quote": "ruling - if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists. this should be on all tools. logic is that basically this should not happen but if it does, we accept it for cases where the user might want to delete/disable a previous input and still wants a specific relation to exist. so this needs to be done in all cases. this ruling is for all tools.",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-200"
+        },
+        {
+          "quote": "we had a ruling already that if an input already exists we still accept it and tell user this is already know.",
+          "date": "2026-11-10",
+          "link": "https://github.com/dcodish/geo_builder/issues/2790"
+        }
+      ],
+      "at": "2026-11-11T10:04:02.670Z",
+      "status": "pending"
+    },
+    {
+      "id": "d1111-2221-flat-ratio",
+      "question": "A ratio whose numerator is a flat triangle («היחס בין שטח Oz1z2 לשטח Oz1z3», z1=1, z2=2, z3=3i): (A) show 0; (B) the no-triangle refusal.",
+      "class": "flat-triple-measure",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "The area or perimeter of three collinear numbers is refused with the no-triangle sentence wherever it appears, a ratio's numerator included; the ratio is never answered 0 from it.",
+      "precedents": [
+        {
+          "quote": "Refuse it: these three numbers make no triangle.",
+          "date": "2026-10-16",
+          "link": "https://github.com/dcodish/geo_builder/issues/2221#issuecomment-6222704983"
+        }
+      ],
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "pending"
+    },
+    {
+      "id": "d1111-2164-capital-z",
+      "question": "«Z1 = 3+4i» in capitals: teach / accept and write lowercase with a notice / keep as typed.",
+      "class": "complex-number-name-case",
+      "verdict": "escalate",
+      "reason": "Reverses a shipped promise either way (02d P2 promises capitals read); ADR-W-203 covers point labels only.",
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-2813-reflex-angle",
+      "question": "Accept a reflex interior angle («∠BCD = 250°») now in three builders, or keep refusing and file a feature.",
+      "class": "reflex-interior-angle-input",
+      "verdict": "escalate",
+      "reason": "A feature's scope and timing (reserved).",
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-2831-mirror-same",
+      "question": "Does a mirror image count as the same solution when ordering «הציגו תצורה אחרת»?",
+      "class": "alternative-configuration-solution-identity",
+      "verdict": "escalate",
+      "reason": "No precedent; his 2026-11-10 'two answers, give both' rulings point the other way from ADR-3D-461's grouping.",
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-2823-axis-letter",
+      "question": "«נקודה x»: ask for uppercase, or accept as «נקודה X» with the notice.",
+      "class": "lowercase-point-label-certainty",
+      "verdict": "escalate",
+      "reason": "ADR-W-203 never says whether an axis letter after the point noun is 'for sure' a point.",
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-analytic-both-zoom",
+      "question": "Analytic, conic chip on «both»: fit the view to the figure and clip far directrices, or keep fitting everything.",
+      "class": "analytic-view-fit-annotations",
+      "verdict": "escalate",
+      "reason": "Reverses ADR-AG-376 §5 (chip marks inside the frame); R127 never says whether a directrix is part of the shape.",
+      "at": "2026-11-11T10:08:42.928Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-2838-all-solids",
+      "question": "Does the 2026-11-10 unlettered-pyramid ruling cover other unlettered solids («משולש ABC» · «קובייה» draws a new cube on the first free letters)?",
+      "class": "unlettered-solid-over-existing-letters",
+      "verdict": "escalate",
+      "reason": "One option pick about a pyramid; no stated rule for solid nouns; ADR-3D-351 says no solid's default lettering changes.",
+      "at": "2026-11-11T10:12:57.683Z",
+      "status": "escalated"
+    },
+    {
+      "id": "d1111-2838-second-solid",
+      "question": "«קובייה» · «קובייה»: keep «כבר קיים», or draw a second cube on the first free letters?",
+      "class": "unlettered-solid-redeclare",
+      "verdict": "escalate",
+      "reason": "Reverses ADR-3D-047's idempotent re-declare; no precedent.",
+      "at": "2026-11-11T10:12:57.683Z",
+      "status": "escalated"
     }
   ],
   "demoted": {

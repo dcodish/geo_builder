@@ -12,7 +12,7 @@ import { drivenSolveStats, evaluate } from '../evaluate';
 import { applySeed } from '../sample';
 import { withExecutedCap, work } from '../solveBudget';
 import { factsOf } from '../../__tests__/scenario-pipeline';
-import { replay } from '@/replay/core';
+import { findValidConfig, replay } from '@/replay/core';
 import { dist, footOnLine } from '../geometry';
 import type { Command } from '../types';
 
@@ -140,6 +140,30 @@ describe('the LM rescue rung (#2797, ADR-816)', () => {
     const p = (id: string) => fig.positions.get(id)!;
     expect(convex(['A', 'B', 'C', 'D', 'E', 'F'].map(p))).toBe(true);
     expect(dist(p('B'), p('E'))).toBeCloseTo(8, 1);
+  });
+
+  /**
+   * #2813 (ADR-823, operator ruling 2026-11-10 (b)): a stated angle is the INTERIOR angle. The fixture
+   * `hexagon-regular-by-angles-2797` (and its sides-and-angles prefix) drew a DENTED hexagon at seeds 2–3 — B and C, or E,
+   * reflex: a "120°" corner that is 240° inside. No view the config search offers seats a stated corner reflex.
+   */
+  it('no view of the hexagon seats a stated 120° corner as a reflex corner (#2813, seeds 0–7)', () => {
+    const lines = ['משושה ABCDEF', 'AB = 4', 'BC = 4', 'CD = 4', 'DE = 4', 'זווית ABC = 120', 'זווית BCD = 120', 'זווית CDE = 120', 'זווית DEF = 120'];
+    const ring = ['A', 'B', 'C', 'D', 'E', 'F'];
+    for (const facts of [factsOf(lines), factsOf([...lines, 'FA = 4'])]) {
+      for (let seed = 0; seed < 8; seed++) {
+        const found = findValidConfig(facts, seed);
+        if (!found) continue;
+        const pts = ring.map((id) => replay(found.facts, found.seed).positions.get(id)!);
+        let area = 0;
+        for (let i = 0; i < 6; i++) area += pts[i].x * pts[(i + 1) % 6].y - pts[(i + 1) % 6].x * pts[i].y;
+        for (const v of [1, 2, 3, 4]) {
+          const [o, a, b] = [pts[v - 1], pts[v], pts[v + 1]];
+          const turn = (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+          expect(Math.sign(turn), `seed ${seed}: the stated corner ${ring[v]} turns with the ring`).toBe(Math.sign(area));
+        }
+      }
+    }
   });
 
   it('a solve Nelder–Mead already accepts makes ZERO LM starts (retry-only: byte-identical where it worked)', () => {

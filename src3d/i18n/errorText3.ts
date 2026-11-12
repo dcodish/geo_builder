@@ -90,6 +90,11 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // equal-lengths claim has nothing to compare there; that arm waits for the operator (#2492).
     case 'proof-target':
       return t(PROOF_TARGET_KEY, { sentence: err.sentence });
+    // #2062 (ADR-3D-480; the operator's ruling of 2026-10-14, card `d14b-2062-question` A): the exam's membership question
+    // is answered by pointing at the panel row that holds it; where the panel has none, the ask lane's undetermined note.
+    case 'answer-in-panel':
+      // one sentence, both surfaces: the ask lane's note keys
+      return err.known ? t('query.note.inPanel', { point: err.point, plane: err.plane }) : t('query.note.undetermined');
     // #1837 (ADR-W-142): an angle in radians — 2-D's ruled degrees sentence, verbatim (ADR-W-118 B1).
     case 'radian-angle':
       return t('err.radianAngle');
@@ -147,6 +152,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // student's own statement and what the figure actually holds, never internal state.
     // #1923 (ADR-3D-314): analytic's `errRingContradictsNoun`, word for word — the line that completed the crossing.
     case 'ring-crossed':
+      // #2813 (ADR-3D-490): proved by stated angles — 2-D's input.ringContradictsAngles, word for word
+      if (err.angles) return t('err.ringContradictsAngles', { detail: err.stated, ...err.angles });
       return t('err.ringContradictsNoun', { detail: err.stated });
     // #1918 (ADR-3D-313): a noun no quadrilateral can carry together with the one already known — what the ring
     // is known to be, and the name it does not take. The key keeps the `shapeLessSpecific` name it was written
@@ -172,7 +179,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     case 'ambiguous-definite-shape':
       return t('err.ambiguousDefiniteShape', {
         sentence: err.sentence ?? '',
-        plural: t(`err.shapePlural.${err.sides === 3 || err.sides === 4 ? err.sides : 'n'}`),
+        // #2838 (ADR-3D-486): a definite solid noun names its family («קוביות»)
+        plural: err.solid ? t(`err.solidPlural.${err.solid}`) : t(`err.shapePlural.${err.sides === 3 || err.sides === 4 ? err.sides : 'n'}`),
         shapes: err.shapes.join(', '),
         example: err.example ?? err.shapes[0],
       });

@@ -1655,6 +1655,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "EM = a·EA + b·EC",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "EM = a·EA + b·EC",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "en",
     "text": "EF is parallel to plane ABC",
     "winner": "segPlaneRel",
   },

@@ -37,10 +37,10 @@ const STILL_FAILS: Record<string, string> = {
 };
 
 /**
- * #2341 (ADR-3D-449, operator 2026-11-06: *"In all cases it should say כבר קיים"*): a guide example that can only CHECK —
- * a claim no figure can be driven to (a cone's volume or area, a never-parallel probe) — is a correct answer on the
- * figure its `needs` build, so the click answers «זה כבר קיים באיור — אין מה להוסיף.» and adds no row. Asserted as that,
- * never as a failure: the example still reads and verifies. Keyed by the Hebrew spelling.
+ * #2341 (ADR-3D-449) → #2790 ([ADR-3D-484](../../docs/06b-decisions-3d.md#adr-3d-484), ADR-W-200): a guide example that can
+ * only CHECK — a claim no figure can be driven to (a cone's volume or area, a never-parallel probe) — is a correct answer on
+ * the figure its `needs` build. Since ADR-3D-449 the click answered «כבר קיים» with no row; now it builds again, as its own
+ * row with the notice «זה כבר קיים באיור — נוסף כנתון נפרד.». Keyed by the Hebrew spelling.
  */
 const KNOWN_ON_CLICK = new Set(['ℓ אינו מקביל ל-π1 לכל m', 'נפח החרוט = 100π', 'שטח המעטפת של החרוט = 65π', 'שטח הפנים של החרוט = 90π']);
 
@@ -58,7 +58,7 @@ function clickOnBlank(entry: (typeof ENTRIES)[number], lang: 'he' | 'en'): strin
     const err = st().lastError;
     if (err) return `«${line}» refused ${err.code}`;
     if (known && i === lines.length - 1) {
-      if (st().facts.length !== i || st().lastNotice?.code !== 'already-stated') return `«${line}» was not answered already known`;
+      if (st().facts.length !== i + 1 || st().lastNotice?.code !== 'already-held') return `«${line}» was not recorded as held`;
       continue;
     }
     if (st().facts.length !== i + 1) return `«${line}» recorded ${st().facts.length - i} rows`;

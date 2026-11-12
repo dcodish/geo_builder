@@ -213,3 +213,19 @@ describe('false-positive net — no catalog utterance trips either gate (both lo
     }
   }
 });
+
+// #2062 (ADR-3D-479): a divided symbol with a MINUS sign pays its denominator, as with a plus sign
+describe('#2062 — a −x/n vector term accounts its denominator', () => {
+  const lost = (s: string) => {
+    const r = parse3(s);
+    expect(r.ok, s).toBe(true);
+    return r.ok ? droppedGivenNumbers3(s, r.commands) : ['(unparsed)'];
+  };
+  it('every −x/n spelling is accounted, as its (1/n)x twin is', () => {
+    for (const s of ['BN=u/2-v/2', 'BN=-v/2', 'BN=u-v/2', 'BK=-v/2+w/4', 'BL=u/6-v/2+w/12', 'BN=v/2-u/2', 'BN=1/2u-1/2v', 'BN=u/2+v/2'])
+      expect(lost(s), s).toEqual([]);
+  });
+  it('a stated number no command carries is still caught', () => {
+    expect(droppedGivenNumbers3('BN=u/2-v/2 ו-AB = 7', parse3('BN=u/2-v/2').ok ? (parse3('BN=u/2-v/2') as { commands: Command3[] }).commands : [])).toEqual(['7']);
+  });
+});

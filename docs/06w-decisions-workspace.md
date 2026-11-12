@@ -1380,6 +1380,16 @@ Related: #778 (the umbrella), #779 (the P1 the case half exposes), #777 (the sam
 rather than guess" spine on an incomplete comparative), [ADR-289](06-decisions.md#adr-289) and
 ADR-3D-040 (the guidance registers), [ADR-W-029](#adr-w-029), [ADR-052](06-decisions.md#adr-052).
 
+**Amendment (2026-11-12, #2164) — complex reads the exam's capital «Z₁» as typed; the table's complex row was wrong.**
+Operator ruling, 2026-11-12, #2164 option C: *"2164 - C"*. That means: keep it as typed, close #2164 as working as
+specified, and correct this ADR's complex row. The row above says complex "accepts `z1` and `Z1` alike, silently" as if
+that were an unwanted register to teach away. It is not. The exam itself writes Z₁ (`docs/02d-requirements-complex.md`
+P2: *"subscripts (`Z₁`) … normalize"*; F1's own example `Z1 ו-Z2 מספרים מרוכבים`), so the capital is complex's
+canonical register as much as the lowercase. Invariant 1 stands as written: *what varies per product is which register
+is canonical*. For complex, both cases of a z/w-family name are canonical and name the same number, so nothing is
+rewritten into a different register and nothing is taught. No code change.
+**Requirements:** none (02d P2 already promises this) · **Design:** none (internal).
+
 ## ADR-W-031 — A restated fact SUCCEEDS, appends no row, and says so — in every product (#613)
 
 > **⚠ Ruled to change — superseded by [ADR-W-200](#adr-w-200)** (operator 2026-11-09, #2790: *"if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists … this ruling is for all tools."*): a restated fact is to be accepted as its own row, with a notice. **⚠ Superseded in 2-D** by [ADR-W-204](#adr-w-204) / [ADR-822](06-decisions.md#adr-822) (2026-11-10), **in analytic** by [ADR-AG-462](06c-decisions-analytic.md#adr-ag-462) and **in complex** by [ADR-CX-089](06d-decisions-complex.md#adr-cx-089) (2026-11-10); this entry holds in 3-D until #2790's port lands.
@@ -7432,6 +7442,25 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 5. **🎮 only for his judgment.** A case whose pass a screenshot or an assertion can show is ✅ or 👁 and is closed by the session (assertion, blind review, spot audits). 🎮 is kept for: a feature PR's acceptance (one headline case per PR; its other cases close as ✅/👁); anything shipped beyond what he asked; and a feel no screenshot carries (a drag, a delay, an animation).
 
 **Not changed.** Eligibility (`auto-ok`, no `[proposed]`, no open question), the never-patch escalation exit, item gates, the full suite per landing, the round issue as the live ledger, the published report.
+
+## ADR-W-202 — The Rulings Inbox: one live page holds every test and decision waiting on the operator, with everything needed to answer from a phone, and his answers feed the running round (#2817)
+
+**Status:** accepted · 2026-11-10 · operator request · process (workspace) · builds [ADR-W-201](#adr-w-201)'s "waiting on you" list · beside [ADR-W-116](#adr-w-116) (the round dashboard stays tracking only) and [ADR-W-159](#adr-w-159) (the roadmap page keeps the plan)
+**Operator:** 2026-11-10, in chat:
+> "I will need a live artifact with items that i need ruling on. that would include testing and decisions. this list will be updated when new issues come in or when i provide feedback for a specific test passing or a decision. the computer doing the work is my home pc and i will mostly be monitoring and providing the feedback through claude desktop on remote control so i need this artifact to include as much information as possible for me to decide on."
+
+**Requirements:** none (internal) · **Design:** the fix-round skill Step 2b; `scripts/ruling-inbox/` (the page's source and the item builder)
+
+**Decision.**
+1. **One page, three lists:** Decide, Test, Answered — https://claude.ai/artifact/JZnrjaW56UbrWqgEWbAtxR. Its database has three collections: `items/<id>` and `meta/status`, written only by the session; `answers/<id>`, written only by the page. Writes are owner/editor-only.
+2. **A decision carries** what a student sees today, the context (what the tool does, measured; his earlier rulings, quoted), a Hebrew example, why it is his call, 2–4 options each with what the student would see, its cost and what it rules out, the recommendation and why, and what the answer unblocks. He picks an option, adds a note, or answers in his own words.
+3. **A test carries** the Server URL — the live site when the change is deployed, because he works remotely and the home PC's local server is out of his reach — the Hebrew lines (copyable), Look for, Before, and the pre-played screenshots stored as the page's assets. Pass, or fail with what was wrong.
+4. **The session reads `answers/*` at every wake** and transcribes each answer to its durable home (the issue's `## Operator ruling` comment, `playsheet:close --audit`, a held PR released), then marks the item done with a one-line resolution. An answer can be changed until then. The page never holds a ruling the repo does not.
+5. **Items are written when they arise**, not at the end of a round: escalations, judge escalations, 🎮 cases and pending spot audits. `scripts/ruling-inbox/build-items.mjs` builds them from the repo's own records.
+
+**Why a page and not the issue list.** He answers from a phone, between other work, through remote control: the evidence (screenshots, options, the student's view) must be one tap away, and the answer must reach the running session without a chat round-trip.
+
+**ADR-W-202 Amendment 1 (2026-11-10): an item leaves the inbox as soon as the session has acted on it; what still needs him is colour-coded apart from what he has sent.** Operator: *"when you finish with a test i already answered, it should be removed from the ruling inbox. It now appears in answered - question is how long does it stay there"*, then *"they should disappear as soon as you acted on them or have them color coded so i know what is already addressed vs needs my attention. same for decisions"*. Decisions and tests alike: an unanswered item carries the accent stripe and is counted on its tab; an answered one not yet acted on is dimmed, grey-striped, marked «sent · waiting for Claude» and sorted last; once the session has acted, it deletes the item and its answer, and says what it did in chat. The Answered tab is gone. The record stays where it was transcribed (the issue's ruling comment, `scripts/playsheets/spot-audits.json`).
 
 ## ADR-W-203 — A lowercase letter that can only be a point label is accepted and written in uppercase; an ambiguous one asks for uppercase, in every builder (#2823)
 

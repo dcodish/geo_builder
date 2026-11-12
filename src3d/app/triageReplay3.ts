@@ -121,10 +121,10 @@ export function replay3dSession(events: readonly LoggedEvent3[], budgetMs = 60_0
           res = 'built';
           detail = v.fact.cmds.map((c) => c.type).join(',');
           break;
-        case 'already-stated':
+        case 'retick': // #2790 (ADR-3D-484): a muted row retyped is re-ticked, nothing appended
           advance({ facts: v.facts, seed: st.seed });
           res = 'built-nothing';
-          detail = 'already-stated';
+          detail = 'retick';
           break;
         case 'rename': {
           const r = renameFacts3(st.facts, v.from, v.to);

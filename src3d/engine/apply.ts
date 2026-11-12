@@ -12,7 +12,7 @@ import { heldRadius3, radiusLengthCircle3 } from './freeCircle';
 import { definiteCircle3 } from './definiteCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
-import { resolveSolidSubject } from './solidSubject';
+import { nounAdmits, nounOfKind, resolveSolidSubject } from './solidSubject';
 import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, cyclicFixCommands, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_BASES, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
@@ -20,7 +20,7 @@ import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3,
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { builtFrom3, carrierParams3, determinationReach3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, FreeVecMetric3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecExpr, VecRelCommand } from './types';
-import { freeMetricOperands3, spellingOf, symbolValueOf } from './types';
+import { freeMetricOperands3, scalarPinOrigin3, spellingOf, symbolValueOf, exprLetters3, termLetter3 } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
 import { hasClaimResidual3, verifyClaim } from './claims';
 
@@ -286,7 +286,13 @@ function recordClaim3(next: Construction3, c: Construction3, claim: Claim3, driv
     return 'param';
   }
   if (drive) {
+    const pinsBefore = next.scalarPins.length;
     drive.pin();
+    // #2795 (ADR-3D-483): the pin drives this claim — what the held-pin release checks when it leaves the pin out
+    for (let i = pinsBefore; i < next.scalarPins.length; i++) {
+      const pin = next.scalarPins[i];
+      scalarPinOrigin3.set(pin, { ...scalarPinOrigin3.get(pin), claim });
+    }
     if (drive.record === 'arbiter') recordPinGiven(next, claim as PinGivenClaim);
     else if (drive.record === 'claim') next.claims.push(claim);
     return 'pin';
@@ -1237,6 +1243,73 @@ function statedComps(
   // #1188: a free vector's tuple shares the order (no free vector exists before #1188, so the old ords are unchanged)
   const ord = c.pins.length + c.vectorPins.length + c.pairPins.length + [...c.freeVectors.values()].filter((v) => v.stated).length;
   return { stated: { texts: cmd.srcs, letters: [lettersAt(0), lettersAt(1), lettersAt(2)], ord } };
+}
+
+/**
+ * #2785 (ADR-3D-488) — IS A LETTER WRITTEN IN A COORDINATE ALREADY WRITTEN ELSEWHERE? A letter is one unknown wherever
+ * it is written: a pin symbol (`pinSymsOf`, «B(2t,t,k)»), the figure parameter, or a point component an earlier
+ * coordinate statement named (#814, «B(k,1,2)»). A letter written for the FIRST time, bare, is still only the name of
+ * a free component (ADR-3D-175): it adds nothing the point does not already have, and it keeps that representation
+ * (the exam gates ADR-3D-175 measured). The second place it is written makes it one unknown in every place.
+ */
+export function coordLetterShared3(c: Construction3, sym: string): boolean {
+  return (
+    pinSymsOf(c).includes(sym) || c.param === sym || c.partialNames.some((b) => b.sym === sym && b.target.kind === 'point') ||
+    // #1551 (ADR-3D-472 Am. 1): a letter a vector equation's coefficient already carries is the same unknown
+    symbolOwnersOf(c, sym).some((o) => o.kind === 'vec-letter')
+  );
+}
+
+/**
+ * #2785 (ADR-3D-488) — THE LETTERS OF A COORDINATE TUPLE, AS UNKNOWNS. The parser attaches `symExprs` only when the tuple
+ * carries structure (`2t`, a repeated letter); a bare distinct letter comes through as a NAME (`syms`) beside a null
+ * component. A bare letter that is shared ({@link coordLetterShared3}) is the affine form 1·k, the same `SymComp` the
+ * parser emits for `2t`, so it joins the pin-symbol pool under its name.
+ */
+export function coordLetterExprs3(
+  cmd: {
+    x: number | null; y: number | null; z: number | null;
+    syms?: [string | null, string | null, string | null];
+    symExprs?: [SymComp | null, SymComp | null, SymComp | null];
+  },
+  shared: (sym: string) => boolean,
+): [SymComp | null, SymComp | null, SymComp | null] {
+  const nums = [cmd.x, cmd.y, cmd.z];
+  return [0, 1, 2].map((i) => {
+    const e = cmd.symExprs?.[i];
+    if (e) return e;
+    const s = cmd.syms?.[i];
+    return nums[i] === null && s && shared(s) ? { terms: [{ sym: s, k: 1 }], c: 0 } : null;
+  }) as [SymComp | null, SymComp | null, SymComp | null];
+}
+
+/**
+ * #2785 (ADR-3D-488) — A NAMED POINT COMPONENT BECOMES THE POOL'S UNKNOWN when its letter is written a second time: the
+ * earlier pin's free component is re-written as 1·k (and its claim judges it), and the name binding is released. The
+ * M2 re-homing of #801, one owner over: whichever statement came first, the letter ends in one place, the pivot's
+ * pin-symbol pool, so the figure does not depend on the order the lines were typed in.
+ */
+function promoteNamedComponents3(next: Construction3, syms: readonly string[]): void {
+  const AX = ['x', 'y', 'z'] as const;
+  for (const sym of syms) {
+    const bound = next.partialNames.filter((b) => b.sym === sym && b.target.kind === 'point');
+    if (bound.length === 0) continue;
+    const one = (): SymComp => ({ terms: [{ sym, k: 1 }], c: 0 });
+    for (const b of bound) {
+      if (b.target.kind !== 'point') continue;
+      const id = b.target.id;
+      const i = AX.indexOf(b.axis);
+      const named = (st: StatedComps | undefined) => !st || st.letters[i].includes(sym);
+      next.pins = next.pins.map((p) => (p.id === id && p[b.axis] === null && named(p.stated) ? { ...p, [b.axis]: one() } : p));
+      next.claims = next.claims.map((cl) => {
+        if (cl.type !== 'coords-eq' || cl.id !== id || !cl.given || cl[b.axis] !== null || cl.sym?.[i]) return cl;
+        const sym3 = [...(cl.sym ?? [null, null, null])] as [SymComp | null, SymComp | null, SymComp | null];
+        sym3[i] = one();
+        return { ...cl, sym: sym3 };
+      });
+    }
+    next.partialNames = next.partialNames.filter((b) => !(b.sym === sym && b.target.kind === 'point'));
+  }
 }
 
 /** #902 (ADR-3D-219) — a stated number for ONE component of an injection target, as the injection
@@ -2190,6 +2263,59 @@ export function expandShapeRefs3(c: Construction3, cmds: readonly Command3[]): {
     out.push(...r.cmds);
   }
   return { ok: true, cmds: out };
+}
+
+/**
+ * #2838 ([ADR-3D-486](../../docs/06b-decisions-3d.md#adr-3d-486)) — the letters a NEW solid gets when its noun carried
+ * none: {@link freeVertexRun3}'s first free letters (FR-SP-24's rule, the one a new flat shape takes), one per letter
+ * ROOT of the parser's default run, each primed vertex following its root («קובייה» beside «משולש ABC» → D…G, D'…G').
+ * A candidate root is taken when the figure holds it in any primed form the solid uses. Returns old id → new id.
+ */
+export function freeSolidRun3(ids: readonly Id[], taken: (id: string) => boolean): Map<Id, Id> {
+  const root = (id: Id): Id => id.replace(/'+$/, '');
+  const roots = [...new Set(ids.map(root))];
+  const primes = [...new Set(ids.map((id) => id.slice(root(id).length)))];
+  const fresh = freeVertexRun3(roots.length, (x) => primes.some((p) => taken(x + p)));
+  const of = new Map(roots.map((r, i) => [r, fresh[i]]));
+  return new Map(ids.map((id) => [id, of.get(root(id))! + id.slice(root(id).length)]));
+}
+
+/**
+ * #2838 ([ADR-3D-486](../../docs/06b-decisions-3d.md#adr-3d-486)) — WHICH SOLID an unlettered solid noun is, read
+ * against the figure: FR-SP-24's reading of an unnamed shape noun ({@link resolveShapeRef3}), solid edition. The parser
+ * is context-free, so it lettered the noun with its default run; `solid` is that command and `article` how the noun
+ * was introduced.
+ *  - **definite** («הקובייה»): the figure's ONE solid the noun admits (`nounAdmits`, the #766 resolver's vocabulary)
+ *    with as many vertices — the row is that solid (its kind and letters); two or more → `ambiguous-definite-shape`,
+ *    naming them; none → as the indefinite noun;
+ *  - **indefinite / prefixed** («קובייה», «פירמידה ישרה שבסיסה ריבוע»): a NEW solid — on the default letters while the
+ *    figure holds none of them, else on the first free letters ({@link freeSolidRun3}).
+ * Returns the letter map to apply to the whole row (null: the row stays as parsed) and, for a definite noun, the kind.
+ */
+export function resolveUnletteredSolid3(
+  c: Construction3,
+  solid: SolidCommand,
+  article: ShapeRef3Command['article'],
+): { ok: true; map: Map<Id, Id> | null; kind?: SolidKind } | { ok: false; error: EngineError3 } {
+  const noun = nounOfKind(solid.kind);
+  if (article === 'definite' && noun) {
+    const drawn = c.solids.filter((s) => nounAdmits(noun, s.kind) && s.ids.length === solid.ids.length);
+    if (drawn.length > 1) return { ok: false, error: { code: 'ambiguous-definite-shape', shapes: drawn.map((s) => s.ids.join('')), sides: 0, solid: noun } };
+    if (drawn.length === 1) return { ok: true, map: new Map(solid.ids.map((id, i) => [id, drawn[0].ids[i]])), kind: drawn[0].kind };
+  }
+  if (!solid.ids.some((id) => c.points.has(id))) return { ok: true, map: null };
+  return { ok: true, map: freeSolidRun3(solid.ids, (id) => c.points.has(id)) };
+}
+
+/** `cmds` with every point id `map` names renamed — a pure rename over the command data (the {@link fillShapeHoles3} walk). */
+export function renameIds3(cmds: readonly Command3[], map: ReadonlyMap<Id, Id>): Command3[] {
+  const fill = (v: unknown): unknown => {
+    if (typeof v === 'string') return map.get(v) ?? v;
+    if (Array.isArray(v)) return v.map(fill);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, fill(x)]));
+    return v;
+  };
+  return cmds.map((k) => fill(k) as Command3);
 }
 
 export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
@@ -3363,7 +3489,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // distinct symbol joins the pivot as an extra unknown, OPEN until data pins it.
         // The letters share one namespace per role: a pin symbol that is ALSO the figure's
         // coord-sym parameter would be resolved by two different mechanisms — refused.
-        const exprs = cmd.symExprs ?? [null, null, null];
+        // #2785 (ADR-3D-488): a BARE letter already written elsewhere («B(k,1,2)» then «C(k,3,4)», or after
+        // «B(2t,t,k)») is the affine form 1·k: one pin symbol per name, wherever it is written.
+        const exprs = coordLetterExprs3(cmd, (sym) => coordLetterShared3(c, sym));
         // #1561/#1615 (ADR-3D-292, ADR-3D-293): a coord-sym point's letter is the FIGURE parameter, not a carrier
         // parameter, so a coordinate given that fixes it («B(1,t,2)» then «B(n,4,p)») first values the letter —
         // the `symbol-value` of «t = 4». Every carrier point is placed by the generic determination below.
@@ -3377,6 +3505,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const adopted = adoptParamAsPinSym(base, exprs); // #801: the letter re-homes to the pivot when it can
         if (!adopted) return { ok: false, error: { code: 'two-params' } };
         const next = clone(adopted);
+        promoteNamedComponents3(next, [...new Set(exprs.flatMap((e) => (e ? symsOfAffine(e) : [])))]); // #2785
         const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
         const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
           [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
@@ -3385,10 +3514,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // pattern its siblings — plane pins, coord-plane-rel, on-line, the `A = (…)` twin — already follow).
         // A pin acts only where the pivot owns something that moves the point (a solid's gauge and dims, a
         // pin symbol); on a coordinate, coord-sym or derived point nothing moves, and without the claim a
-        // false restatement read green over a figure that contradicts it. The claim carries the NUMERIC
-        // components only — a symbolic one («B(2t, t, k)») is the pivot's to satisfy, and null is unchecked.
-        if (cmd.x !== null || cmd.y !== null || cmd.z !== null)
-          recordClaim3(next, c, { type: 'coords-eq', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z, given: true });
+        // false restatement read green over a figure that contradicts it. Null is unchecked.
+        // #2785 (ADR-3D-488): the claim carries the SYMBOLIC components too («B(2t, t, k)»), judged at the letters'
+        // resolved values, so a letter whose equations disagree («B(2,15,-8)» then «B(2t,t,k)») is refuted.
+        const symClaim = exprs.some((e) => e !== null) ? { sym: exprs } : {};
+        if (cmd.x !== null || cmd.y !== null || cmd.z !== null || exprs.some((e) => e !== null))
+          recordClaim3(next, c, { type: 'coords-eq', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z, ...symClaim, given: true });
         // #1615 (ADR-3D-293): ONE mechanism for every point that sits on something. If the point's position
         // carries drivable parameters in the sampled-carrier table — a segment's `t`, a line's or a plane's
         // offset, a partial point's missing coordinate, … — the STATED components are recorded, and `resolve3`
@@ -4051,6 +4182,48 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (namedErr) return { ok: false, error: namedErr };
       const unknowns = [...new Set(relPointIds(c, cmd.from, cmd.to, cmd.terms).filter((id) => !c.points.has(id)))];
       if (unknowns.length === 0) {
+        /**
+         * #1551 ([ADR-3D-472](../../docs/06b-decisions-3d.md#adr-3d-472)) — LETTERS OVER PLACED POINTS ARE UNKNOWNS OF A
+         * GIVEN. «EM = a·EA + b·EC» with every point placed states that SOME a and b make it hold: it lowers to the
+         * same `vec-eq` given its numeric twin «EM = 2/3EA + 1/6EC» lowers to (pin + claim, #1183), its lettered
+         * coefficients solved per drawing by least squares (`vecEqLetters3`). Holds for every shape: the letters are
+         * seed-stable and the panel prints them; for some shapes: the pin moves the free shape; for none: refused.
+         * The cevian pair below keeps its one-letter reading first; a letter another lane already owns (a ratio, a
+         * coordinate) keeps the old path — one letter, one number.
+         */
+        const letters = exprLetters3(cmd);
+        // #1551 + #2785 (ADR-3D-472 Am. 1): a letter is one unknown wherever it is written — one a coordinate already
+        // carries (a pin symbol, or a point component an earlier coordinate named, promoted below) is the same letter
+        const shareable = (o: SymbolOwner) => o.kind === 'vec-letter' || o.kind === 'pin-sym' || (o.kind === 'component' && o.target.kind === 'point');
+        const fresh = letters.length > 0 && letters.every((l) => symbolOwnersOf(c, l).every(shareable));
+        const cevian = cmd.symbol !== undefined && relPointIds(c, cmd.from, cmd.to, cmd.terms).some((id) => {
+          const d = c.points.get(id);
+          if (d?.kind !== 'vec-defined') return false;
+          const sym = c.vecDefs[d.def].symbol;
+          return sym !== undefined && !c.symbolPins.some((p) => p.sym === sym);
+        });
+        if (fresh && !cevian) {
+          // a point component the letter names becomes the pool's unknown, as a second coordinate use promotes it (#2785)
+          const named = letters.filter((l) => symbolOwnersOf(c, l).some((o) => o.kind === 'component'));
+          const base = named.length > 0 ? clone(c) : c;
+          if (named.length > 0) promoteNamedComponents3(base, named);
+          const asClaim = applyCommand3(base, {
+            type: 'claim',
+            claim: {
+              type: 'vec-eq',
+              lhs: [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }],
+              rhs: cmd.terms.map((t) => {
+                const sym = termLetter3(t, cmd.symbol);
+                return { coeff: t.coeff.k, ...(t.src ? { src: t.src } : {}), atom: t.atom, ...(t.coeff.p !== 0 && sym ? { letter: { sym, p: t.coeff.p } } : {}) };
+              }),
+            },
+          });
+          if (!asClaim.ok) return asClaim;
+          if (hasSegment(asClaim.next, cmd.from, cmd.to)) return asClaim;
+          const withSeg = clone(asClaim.next);
+          withSeg.segments.push([cmd.from, cmd.to]);
+          return { ok: true, next: withSeg };
+        }
         // the CEVIAN pair: a second symbol-relation naming an already vec-defined point
         if (cmd.symbol) {
           const target = relPointIds(c, cmd.from, cmd.to, cmd.terms).find((id) => {
@@ -4122,7 +4295,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const unknown = unknowns[0];
       const next = clone(c);
       const defIndex = next.vecDefs.length;
-      next.vecDefs.push({ from: cmd.from, to: cmd.to, terms: cmd.terms, unknown, symbol: cmd.symbol });
+      // #1551 (ADR-3D-472): several letters define a point with one free number per letter («EN = a·EA + b·EC»: N free in
+      // the plane EAC), each sampled and moved by «הציגו תצורה אחרת» like a one-letter ratio
+      next.vecDefs.push({ from: cmd.from, to: cmd.to, terms: cmd.terms, unknown, symbol: cmd.symbol, ...(cmd.symbols ? { symbols: cmd.symbols } : {}) });
       next.points.set(unknown, { kind: 'vec-defined', def: defIndex });
       if (!hasSegment(next, cmd.from, cmd.to)) next.segments.push([cmd.from, cmd.to]); // the stated vector is drawn
       return { ok: true, next };
@@ -4304,10 +4479,15 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // parameter's one admissible root. It replaces any prior pin on the symbol (the student
       // substituting the value the earlier relation produced).
       // #1188 step 2 (ADR-3D-390): a free vector's letter reads the same record — the free-vector system substitutes it
-      if (owners.some((o) => o.kind === 'vec-def' || o.kind === 'pin-sym' || o.kind === 'param' || o.kind === 'free-sym')) {
+      if (owners.some((o) => o.kind === 'vec-def' || o.kind === 'pin-sym' || o.kind === 'param' || o.kind === 'free-sym' || o.kind === 'vec-letter')) {
         const next = clone(c);
         next.symbolPins = next.symbolPins.filter((p) => p.sym !== cmd.symbol);
         next.symbolPins.push({ rel: 'value', value: cmd.value, sym: cmd.symbol });
+        // #2785 (ADR-3D-488): the value is a statement about every coordinate written with the letter, so this line
+        // carries those coordinate claims too, judged at the value: on a figure the pivot does not move («B(2,1,-8)» ·
+        // «B(2t,t,k)» · «k = 3») the line that contradicts them is refused, not the earlier row turned red.
+        for (const cl of c.claims)
+          if (cl.type === 'coords-eq' && cl.given && cl.sym?.some((e) => e !== null && symsOfAffine(e).includes(cmd.symbol))) next.claims.push({ ...cl });
         r = { ok: true, next };
       }
       for (const owner of owners) {

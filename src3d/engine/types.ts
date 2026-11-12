@@ -62,6 +62,11 @@ export interface VecTerm {
   /** #1497 (ADR-3D-426): the coefficient as typed, for DISPLAY only. Nothing solves from it. */
   src?: string;
   atom: VecAtom;
+  /**
+   * #1551 (ADR-3D-472): a LETTER in the coefficient — the coefficient is `coeff + letter.p · letter.sym`, the letter an
+   * unknown of the equation («EM = a·EA + b·EC»). Absent on every numeric term, so a saved file is unchanged.
+   */
+  letter?: { sym: string; p: number };
 }
 
 /**
@@ -81,7 +86,18 @@ export interface SymTerm {
   /** #1497 (ADR-3D-426): a numeric coefficient as typed, for DISPLAY only. */
   src?: string;
   atom: VecAtom;
+  /**
+   * #1551 (ADR-3D-472): the letter `coeff.p` multiplies, when the expression carries SEVERAL letters
+   * («a·EA + b·EC»). Absent: the expression's one `symbol` — every one-letter command and saved file is unchanged.
+   */
+  sym?: string;
 }
+
+/** #1551 (ADR-3D-472): the letter a term's `coeff.p` multiplies — its own, else the expression's one letter. */
+export const termLetter3 = (t: SymTerm, symbol: string | undefined): string | undefined => t.sym ?? symbol;
+
+/** #1551: every letter an expression carries, in first-written order — the one letter, or the several. */
+export const exprLetters3 = (x: { symbol?: string; symbols?: string[] }): string[] => x.symbols ?? (x.symbol !== undefined ? [x.symbol] : []);
 
 export type Claim3 =
   | { type: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number; given?: true } // |a1b1| = c·|a2b2|
@@ -136,7 +152,9 @@ export type Claim3 =
   // always carries all three. `given` marks the ARBITER of a coordinate GIVEN («B(3,7,8)» on an existing B),
   // as opposed to the student's ANSWER («K = (-3,4,6)»): only the given defers to the pivot's
   // no-placement verdict; an answer keeps its verify-your-answer register (ADR-3D-075).
-  | { type: 'coords-eq'; id: Id; x: number | null; y: number | null; z: number | null; given?: true } // A = (2, 0, -10)
+  // #2785 (ADR-3D-488): `sym` holds the components written with letters («B(2t, t, k)»), judged at the letters' resolved
+  // values (`lettersAt3`); a component is numeric (x/y/z) or symbolic (sym[i]) or neither, never both.
+  | { type: 'coords-eq'; id: Id; x: number | null; y: number | null; z: number | null; sym?: [SymComp | null, SymComp | null, SymComp | null]; given?: true } // A = (2, 0, -10)
   | { type: 'never-parallel'; line: string; plane: string } // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
   | { type: 'plane-eq'; ids: Id[]; cx: number; cy: number; cz: number; d: number } // המישור KBC: x+2y+3z-26=0
   | { type: 'angle-seg-eq'; a1: Id; b1: Id; a2: Id; b2: Id; deg: number; given?: true } // הזווית בין A'C לבין BC' היא 90 (between lines, ≤90°)
@@ -930,6 +948,8 @@ export interface VecRelCommand {
   to: Id;
   terms: SymTerm[];
   symbol?: string;
+  /** #1551 (ADR-3D-472): two or more letters («EM = a·EA + b·EC»); then `symbol` is absent and each term names its own. */
+  symbols?: string[];
   /**
    * #1183 — the student wrote the VECTOR marking explicitly (`⃗`/`→`/`⟶`, or the «וקטור»/`vector`
    * word), so this relation is not the two-reading sentence {@link segmentEquationReading} asks about.
@@ -1637,7 +1657,7 @@ export interface Construction3 {
   /** #253 (ADR-3D-419): the PLACED points stated on a free circle. Each pins it; a rider is defined by it instead. */
   circleMembers3: { point: Id; circle: string }[];
   /** V7 — vector definitions: `X⃗Y = Σ terms`, solving `unknown` (affine; `symbol` = the free coefficient). */
-  vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string }[];
+  vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string; /** #1551 (ADR-3D-472): two or more letters (then no `symbol`) */ symbols?: string[] }[];
   /**
    * V7 — conditions that PIN a figure SYMBOL. #902 (ADR-3D-219): keyed by the symbol's NAME, never by
    * the vec-def that introduced it. A letter is owned by whichever mechanism carries it — a vec-def's
@@ -1885,8 +1905,9 @@ export const emptyConstruction3 = (): Construction3 => ({
  */
 export function figureSymbolsOf(c: Construction3): string[] {
   const out = new Set<string>();
-  for (const vd of c.vecDefs) if (vd.symbol) out.add(vd.symbol);
+  for (const vd of c.vecDefs) for (const s of exprLetters3(vd)) out.add(s); // #1551: every letter of a definition
   for (const s of pinSymsOf(c)) out.add(s);
+  for (const s of vecEqLettersOf3(c)) out.add(s); // #1551: a vector equation's letters
   if (c.param) out.add(c.param);
   // The three kinds the address registry knew and the panel did not price (#939).
   for (const b of c.partialNames) out.add(b.sym);
@@ -2096,7 +2117,20 @@ export type SymbolOwner =
   | { kind: 'rider'; id: Id; fromB: boolean }
   /** #1188 step 2 (ADR-3D-390): a letter in an AFFINE component of a free vector («u = (k-1, 2, k)») — an unknown of
    *  the free-vector system, solved there and never by the pivot */
-  | { kind: 'free-sym' };
+  | { kind: 'free-sym' }
+  /** #1551 (ADR-3D-472): a letter of a vector equation over placed points («EM = a·EA + b·EC») — read off the drawing by
+   *  least squares (`vecEqLetters3`), never a pivot unknown */
+  | { kind: 'vec-letter' };
+
+/** #1551 (ADR-3D-472): the letters the vector equations over placed points carry, in first-written order. */
+export function vecEqLettersOf3(c: Pick<Construction3, 'claims'>): string[] {
+  const out: string[] = [];
+  for (const k of c.claims) {
+    if (k.type !== 'vec-eq') continue;
+    for (const t of [...k.lhs, ...k.rhs]) if (t.letter && !out.includes(t.letter.sym)) out.push(t.letter.sym);
+  }
+  return out;
+}
 
 /** #1188 step 2 (ADR-3D-390): the letters the free vectors' affine components name, in first-written order. */
 export function freeVecSymsOf(c: Pick<Construction3, 'freeVectors'> & Partial<Pick<Construction3, 'freeVecMetrics'>>): string[] {
@@ -2109,8 +2143,9 @@ export function freeVecSymsOf(c: Pick<Construction3, 'freeVectors'> & Partial<Pi
 export function symbolOwnersOf(c: Construction3, sym: string): SymbolOwner[] {
   const out: SymbolOwner[] = [];
   c.vecDefs.forEach((vd, def) => {
-    if (vd.symbol === sym) out.push({ kind: 'vec-def', def });
+    if (vd.symbol === sym || vd.symbols?.includes(sym)) out.push({ kind: 'vec-def', def });
   });
+  if (vecEqLettersOf3(c).includes(sym)) out.push({ kind: 'vec-letter' }); // #1551
   if (pinSymsOf(c).includes(sym)) out.push({ kind: 'pin-sym' });
   if (c.param === sym) out.push({ kind: 'param' });
   const marks = c.angleMarks.filter((m) => m.label === sym);
@@ -2318,7 +2353,13 @@ export type EngineError3 =
   /** #1923 (ADR-3D-314): a polygon DECLARED over points fixed by coordinates whose ring, in the order named, crosses
    *  itself — not that shape. `stated` is the line that completed it (the declaration, or the coordinate that came
    *  last). Analytic's `ring-contradicts-noun` (ADR-AG-129), worded as analytic's. */
-  | { code: 'ring-crossed'; stated: string }
+  | {
+      code: 'ring-crossed';
+      stated: string;
+      /** #2813 (ADR-3D-490): the ring was proved convex by its STATED INTERIOR ANGLES — the angle lines as typed (each in
+       *  guillemets), the proved ring and the other order; the refusal names them (2-D's `input.ringContradictsAngles`) */
+      angles?: { forcing: string; ring: string; other: string };
+    }
   /** #1978 (ADR-3D-325): a polygon DECLARED over placed points that no configuration makes coplanar (ADR-3D-319's
    *  skew arm). Same verdict and the same `stated`/`others` as the `givens-contradict` it used to reuse, plus the
    *  reason: `sides` names the shape (its noun by vertex count) and `vertices` the corners off one plane. */
@@ -2345,7 +2386,7 @@ export type EngineError3 =
   // #2235 (ADR-3D-351): a DEFINITE unnamed shape noun («המשולש ישר זווית») on a figure holding two or more declared
   // flat polygons of its size — which one is the student's to say (operator ruling 2026-10-16, card `g2235-3d`).
   // `shapes` in figure order. `sentence` / `example` are filled by the store, which knows the utterance.
-  | { code: 'ambiguous-definite-shape'; shapes: string[]; sides: number; sentence?: string; example?: string }
+  | { code: 'ambiguous-definite-shape'; shapes: string[]; sides: number; sentence?: string; example?: string; /** #2838 (ADR-3D-486): a definite SOLID noun's family (`sides` 0) */ solid?: SolidNounOf }
   | { code: 'bound-unsatisfiable'; id: Id } // #273: no sampled configuration puts the measure inside the stated bound
   | { code: 'vacuous-relation' } // S4 (#378): a mutual position stated between an object and itself
   | { code: 'plane-not-determined'; id: string } // #487: this construct needs a plane with a stated equation — π is still free
@@ -2380,3 +2421,13 @@ export const incircleRefusal3 = (sides: number): EngineError3 =>
 export type ApplyResult3 = { ok: true; next: Construction3 } | { ok: false; error: EngineError3 };
 
 export type Positions3 = Map<Id, Vec3>;
+
+/**
+ * #2795 ([ADR-3D-483](../../docs/06b-decisions-3d.md#adr-3d-483)) — WHERE A DRIVING SCALAR PIN CAME FROM: the claim it
+ * drives (set by the one claim recorder, `recordClaim3`) and the list position of the fact that stated it (set by the
+ * store's fold, `applyFact`, by count-delta). Read by the pivot's held-pin release (`resolveHeld3`): a pin is left out of
+ * the solve only when the figure is forced to hold it already, newest fact first, and its claim is then checked where
+ * the pin would have driven. Keyed by the pin OBJECT, so a construction's copies (`{ ...c, scalarPins }`, the parts of a
+ * split figure) share it; a pin with no entry (a query's temporary pin, the joint rung's) is never left out.
+ */
+export const scalarPinOrigin3 = new WeakMap<ScalarPin, { claim?: Claim3; fact?: number }>();

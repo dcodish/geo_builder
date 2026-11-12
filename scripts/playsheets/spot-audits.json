@@ -12,6 +12,132 @@
         "z1 = 3+4i"
       ],
       "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i»."
+    },
+    {
+      "sheet": "prod-2026-11-10-3",
+      "id": "P6",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-10",
+      "product": "analytic",
+      "base": "https://themathbible.com",
+      "path": "/analytic-builder/",
+      "lines": [
+        "נתונה פרבולה שמשוואתה y^2=4px",
+        "p > 0",
+        "K על הפרבולה",
+        "y_K = 12",
+        "F מוקד הפרבולה",
+        "KF = 20"
+      ],
+      "lookFor": "«p» answers «2 או 18»."
+    },
+    {
+      "sheet": "prod-2026-11-12",
+      "id": "P10",
+      "kind": "3d:assertion",
+      "queued": "2026-11-12",
+      "product": "3d",
+      "base": "https://themathbible.com",
+      "path": "/3d-builder/",
+      "lines": [
+        "תיבה ABCDA'B'C'D'",
+        "נסמן: AA' = w, AB = v, AD = u",
+        "הנקודה E היא אמצע המקצוע BB'",
+        "הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w",
+        "מישור AEC",
+        "האם הנקודה M נמצאת במישור AEC?"
+      ],
+      "lookFor": "Every line builds; the last one adds nothing and says the answer is in the data panel's point × plane row."
+    },
+    {
+      "sheet": "round-2855-w1",
+      "id": "T7",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "x^2+2y^2=16",
+        "AB מיתר באליפסה",
+        "M אמצע AB",
+        "AB מקביל לישר y=x"
+      ],
+      "lookFor": "Exactly one chip, «הצג מקום גאומטרי», on M's row; none on the chord row (read from the shot: only the M row carries it)."
+    },
+    {
+      "sheet": "prod-2026-11-12-2",
+      "id": "P9",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "https://themathbible.com",
+      "path": "/analytic-builder/",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "נקודה M",
+        "MA = MB"
+      ],
+      "lookFor": "M's row still has «הצג מקום גאומטרי»."
+    },
+    {
+      "sheet": "round-2855-w2",
+      "id": "T20",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "נתון מעגל O שמשוואתו x^2+y^2=25",
+        "AB הוא קוטר המעגל"
+      ],
+      "lookFor": "A and B on circle O, through its centre."
+    },
+    {
+      "sheet": "round-2855-w3",
+      "id": "T29",
+      "kind": "3d:assertion",
+      "queued": "2026-11-12",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "A(0,0,0)",
+        "B(2,15,-8)",
+        "B(2t,t,k)"
+      ],
+      "lookFor": "«B(2t,t,k)» refused «הטענה לא מתקיימת בציור — בדקו את החישוב»."
+    },
+    {
+      "sheet": "prod-2026-11-12-3",
+      "id": "P8",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "https://themathbible.com",
+      "path": "/analytic-builder/",
+      "lines": [
+        "x^2/25+y^2/9=1",
+        "קוטר האליפסה AB",
+        "CD מיתר האליפסה"
+      ],
+      "lookFor": "Both rows built: AB a diameter, CD a chord, all four points on the ellipse."
+    },
+    {
+      "sheet": "prod-2026-11-12-3",
+      "id": "P9",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "https://themathbible.com",
+      "path": "/analytic-builder/",
+      "lines": [
+        "נתון מעגל O שמשוואתו x^2+y^2=25",
+        "AB הוא קוטר המעגל"
+      ],
+      "lookFor": "A and B on circle O, through its centre."
     }
   ],
   "results": [

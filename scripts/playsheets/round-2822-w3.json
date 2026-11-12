@@ -1,0 +1,206 @@
+{
+  "name": "round-2822-w3",
+  "title": "Round #2822, wave 3: a restated fact becomes its own row (2-D, analytic, complex); 3-D answers keep t; «הנקודה M מקיימת»",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "2-D: restating a fact the triangle already holds adds it as its own row, with a notice",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "AB = AC",
+        "זווית ABC = זווית ACB"
+      ],
+      "lookFor": "The last line is accepted as a third row of the givens, with the notice «זה כבר קיים באיור — נוסף כנתון נפרד.» (new text). The triangle does not move.",
+      "before": "Prod records the row without saying it was already there.",
+      "expectRows": [
+        "זווית ABC = זווית ACB"
+      ],
+      "expectRefusal": "זה כבר קיים באיור — נוסף כנתון נפרד."
+    },
+    {
+      "id": "T2",
+      "title": "2-D: switch the first row off; the restated row keeps the relation",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "AB = AC",
+        "זווית ABC = זווית ACB"
+      ],
+      "after": [
+        {
+          "toggle": 2
+        }
+      ],
+      "lookFor": "With «AB = AC» switched off, the triangle stays isosceles: the base angles at B and C are still equal, held by the row typed last.",
+      "before": "Unchanged in effect on prod (the row was recorded there too); this locks the reason the ruling keeps it as a row.",
+      "expectRefusal": "זה כבר קיים באיור — נוסף כנתון נפרד."
+    },
+    {
+      "id": "T3",
+      "title": "2-D: a trapezoid's equal diagonals, restated, do not move the drawing",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "טרפז שווה שוקיים ABCD",
+        "AC = BD"
+      ],
+      "cycles": 1,
+      "lookFor": "«AC = BD» is accepted with the notice «זה כבר קיים באיור — נוסף כנתון נפרד.». The trapezoid looks the same before and after the line, in this view and in the next configuration.",
+      "before": "Prod moves the figure up to 2.9 units at the second configuration, with no notice.",
+      "expectRefusal": "זה כבר קיים באיור — נוסף כנתון נפרד."
+    },
+    {
+      "id": "T4",
+      "title": "2-D: «D על BA» after «D על AB» does not move D",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "D על AB",
+        "D על BA"
+      ],
+      "lookFor": "The last line is accepted with the notice «זה כבר קיים באיור — נוסף כנתון נפרד.»; D stays where it was on AB.",
+      "before": "Prod reads the reversed letters as a second placement and moves D, at every configuration.",
+      "expectRefusal": "זה כבר קיים באיור — נוסף כנתון נפרד.",
+      "expectRows": [
+        "D על BA"
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "2-D: a restatement that contradicts the figure is still refused",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "זווית ABC = 40",
+        "זווית ABC = 50"
+      ],
+      "lookFor": "The last line is refused, naming the conflicting statement; the triangle keeps its 40° angle and there is no third row.",
+      "before": "Unchanged (prod refuses it too).",
+      "expectAbsent": [
+        "זה כבר קיים באיור — נוסף כנתון נפרד."
+      ],
+      "expectRefusal": "40"
+    },
+    {
+      "id": "T6",
+      "title": "Analytic: the same restatement is its own row, with the notice",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "AB = AC",
+        "∢ABC = ∢ACB"
+      ],
+      "lookFor": "The last line is accepted as a third row, with the notice «זה כבר קיים באיור — נוסף כנתון נפרד.».",
+      "before": "Prod records the row without the notice.",
+      "expectRows": [
+        "∢ABC = ∢ACB"
+      ],
+      "expect": [
+        "זה כבר קיים באיור — נוסף כנתון נפרד."
+      ]
+    },
+    {
+      "id": "T7",
+      "title": "Complex: «|z1| = 5» after «z1 = 3+4i» is its own row, with the notice",
+      "class": "verified",
+      "product": "complex",
+      "base": "http://localhost:5173",
+      "path": "/complex.html",
+      "lines": [
+        "z1 = 3+4i",
+        "|z1| = 5"
+      ],
+      "lookFor": "The second line is accepted as its own row with the notice «זה כבר קיים באיור — נוסף כנתון נפרד.».",
+      "before": "Prod answers that it is already known, with no row.",
+      "expectRows": [
+        "|z1| = 5"
+      ],
+      "expect": [
+        "זה כבר קיים באיור — נוסף כנתון נפרד."
+      ]
+    },
+    {
+      "id": "T8",
+      "title": "3-D (unchanged this wave): an exact repeat still answers «כבר קיים» without a row",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ABC",
+        "AB = AC",
+        "AB = AC"
+      ],
+      "lookFor": "The repeated «AB = AC» answers «זה כבר קיים באיור — אין מה להוסיף.», and no third row is added. In 3-D a restated line becoming its own row waits on your ruling on #2790.",
+      "before": "Unchanged.",
+      "expectAbsent": [
+        "נוסף כנתון נפרד"
+      ],
+      "expect": [
+        "זה כבר קיים באיור — אין מה להוסיף."
+      ]
+    },
+    {
+      "id": "T9",
+      "title": "3-D: asking for a vector answers with the figure's letter t (PR #2826, you passed it)",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "מלבן ABCD",
+        "AB→ = u",
+        "AD→ = v",
+        "AB=1",
+        "|AD|=√7",
+        "DF→ = t*DC→",
+        "BE→ = t*BC→"
+      ],
+      "asks": [
+        "AE"
+      ],
+      "lookFor": "The ask «AE» answers «AE⃗ = u + t·v».",
+      "before": "Prod cannot answer: the answer would need the letter t.",
+      "expect": [
+        "+ t"
+      ]
+    },
+    {
+      "id": "T10",
+      "title": "3-D: the exam's «הנקודה M מקיימת …» builds, and the membership question points at the panel (PR #2830, you passed it)",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "תיבה ABCDA'B'C'D'",
+        "נסמן: AA' = w, AB = v, AD = u",
+        "הנקודה E היא אמצע המקצוע BB'",
+        "הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w",
+        "מישור AEC",
+        "האם הנקודה M נמצאת במישור AEC?"
+      ],
+      "lookFor": "Every line builds; the last one adds nothing and says the answer is in the data panel's point × plane row.",
+      "before": "Prod does not read «הנקודה M מקיימת …» and has no point × plane row.",
+      "expectRefusal": "התשובה מופיעה בלוח הנתונים"
+    }
+  ]
+}

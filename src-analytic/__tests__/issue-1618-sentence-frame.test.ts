@@ -10,6 +10,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { parseLine } from '../parser/parseAnalytic';
+import { satisfiesClause } from '../parser/frameAnalytic';
 import { decideSubmit } from '../app/submit';
 
 /** The facts a line lowers to, without the provenance a rule may stamp on them. */
@@ -278,5 +279,17 @@ describe('#1628 — the origin as an unnamed point', () => {
   });
   it('«ראשית הצירים» alone states nothing', () => {
     expect(parseLine('ראשית הצירים').ok).toBe(false);
+  });
+});
+
+// #2062 (ADR-AG-460): the subject frame with the exam's colon, and the masculine «מקיים», read as 2-D and 3-D read them
+describe('#2062 — «הנקודה M מקיימת: …» is the subject frame', () => {
+  it('every spelling yields the subject and its statement', () => {
+    for (const l of ['הנקודה M מקיימת: AM = MB', 'הנקודה M מקיימת AM = MB', 'M מקיימת: AM = MB', 'M מקיים AM = MB', 'the point M satisfies: AM = MB', 'M satisfy AM = MB'])
+      expect(satisfiesClause(l), l).toEqual({ subject: 'M', clause: 'AM = MB' });
+  });
+  it('the colon form parses as the plain frame does', () => {
+    same('הנקודה M מקיימת: AM = MB', 'הנקודה M מקיימת AM = MB');
+    expect(parseLine('הנקודה M מקיימת: AM = MB').ok).toBe(true);
   });
 });

@@ -171,7 +171,8 @@ The operator-invoked batch loop that replaces one-at-a-time fix dispatch. Full p
 **A round runs continuously, with no item cap** ([ADR-W-201](06w-decisions-workspace.md#adr-w-201), operator
 2026-11-10, replacing [ADR-W-067](06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028)'s 20): whenever a stream
 finishes it takes the next eligible item in plan order; items waiting on the operator are parked while the
-rest go on, and his answers given mid-run return them to the queue; finished items **land and deploy in
+rest go on, and his answers given mid-run (on the **Rulings Inbox** page, [ADR-W-202](06w-decisions-workspace.md#adr-w-202),
+which carries every test and decision waiting on him with its evidence) return them to the queue; finished items **land and deploy in
 waves**; the round **stops at 24 hours, at more than 10 🎮 cases waiting for him, when nothing is eligible**,
 or on the escalation rate below. It takes its items from
 the open issues labeled **`auto-ok`** — the label records an **operator approval** of the issue's fix

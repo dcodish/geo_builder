@@ -36,7 +36,10 @@ duality possible. **Reach for M1 duality before adding a construct.**
 
 **The normalisation seam and case (ADR-3D-039, ADR-3D-223).** `normalize3` is the one boundary every rule
 reads: format controls stripped, primes and minus unified, look-alike glyphs folded, script transitions
-split. **The look-alike glyph fold is the SHARED table** ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329)):
+split. Last, the subject frame comes off ([ADR-3D-479](06b-decisions-3d.md#adr-3d-479), #2062): `normalize3` =
+`subjectFrame3(normalizeText3(s))`, where `readSubjectFrame3` reads «HE_SUBJ X מקיי(ם|מת|מים|מות) :? rest» / "(the)?
+(point)? X satisf(ies|y) :? rest" (behind «נתון כי» too) and gives `rest` only when it names X. `subjectFrameOf3` reads it
+before it comes off, for `unreadParts3`' exemption (the frame's subject is a co-reference to its statement's label). The number gate's bare-number pass (`droppedGivenNumbers3`) takes `−1/n` beside `1/n`, so a minus-signed `x/n` vector term pays its denominator (ADR-3D-479). **The look-alike glyph fold is the SHARED table** ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329)):
 `shell/glyphFold.ts` `foldGlyphs` (⟂ → ⊥, ∡/∢ → ∠, the guarded `<` → ∠, ⁰/º/˚ → °, «שורש N» → √, the infix «‖» / «||» → ∥), called by
 `normalize3` right after `foldPrimes3` and by the ask lane's `parseQuery` — 3-D folded none of them, which is
 why «AC ⟂ AB» was not-understood while «AC ⊥ AB» built (#1912); 2-D's and analytic's boundaries call the same
@@ -118,6 +121,21 @@ per fact against the figure before that fact (so `droppedSoft` / `seated` see re
 crossing, collapse and narrowing passes). `decideCommands3` resolves the line the same way before the honesty gates
 and the twin rule, and words the refusal with the sentence and its taught remedy (`definiteShapeExample3`).
 
+**An unlettered SOLID noun** (#2838, [ADR-3D-486](06b-decisions-3d.md#adr-3d-486)) keeps the parser's default run in
+the fact (the parser stays context-free and the stored commands are unchanged) and is read against the figure by the
+fold: `unletteredSolidRow3` (`store3.ts`) finds a `solid` command whose run the row's text does not type
+(`typesSolidRun3`: the whole run, or its unprimed letters), reads the solid noun's article (`solidNounArticle3`,
+`lexicon/shapePhrase3.ts`, the `shapeNounSpan3` rule over the solid nouns), and asks `resolveUnletteredSolid3`
+(`engine/apply.ts`): definite → the one drawn solid the noun admits (`nounAdmits`, same vertex count), whose kind and
+letters the row takes, or `ambiguous-definite-shape` with `solid` set; indefinite, or definite with none → unchanged
+while no letter of the run is a point, else `freeSolidRun3` (`freeVertexRun3` per letter root, primes following).
+The one letter map renames the WHOLE row (`renameIds3`), so the noun's own relations follow. `expandFact` runs it
+first, before the pyramid readings of ADR-3D-434/436, and records the renamed typed commands in
+`Derived3.relettered`; `decideCommands3` resolves the new line with the same function against the figure as it
+stands and compares it with `relettered` rows, so the twin rule sees «קובייה» · «קובייה» as two cubes. The fold's twin
+pairing (`standingTwins3`) asks the same question through `newShapeEachTime3` — an indefinite flat noun or an
+unlettered, non-definite solid noun is a new shape each time, never a row that stands aside for its twin.
+
 ### Relations as a disposition map
 
 `relationTable.ts` maps each `relation × operand-kind` pair to a status and the actions it licenses
@@ -154,6 +172,16 @@ every pin family that can land elsewhere records its claim: `coords-eq` for the 
 `vec-val` for `inject-vector` and `inject-pair` (one `VecAtom` form), `dot-val` for `dot-given`
 (ADR-3D-284, #1560); and (ADR-3D-285, #1567) `length` → `length-eq`, `seg-angle` → `angle-seg-eq`,
 `vangle` → `vertex-angle-eq`, `length-rel` → `length-rel`, `seg-perp/par-plane` → `perp-plane`/`par-plane`.
+**A coordinate letter is one pin symbol, and the claim judges it** (#2785, [ADR-3D-488](06b-decisions-3d.md#adr-3d-488)). A bare
+letter written for the first time names a free component (ADR-3D-175); written a second time (`coordLetterShared3`: a pin
+symbol, the figure parameter, or a named point component) it is lowered to 1·k (`coordLetterExprs3`) and the earlier
+statement's named component is promoted to the same pin symbol (`promoteNamedComponents3`). The `coords-eq` claim carries
+the symbolic components (`sym`), read at `lettersAt3` — the ONE letter reader ([ADR-3D-472](06b-decisions-3d.md#adr-3d-472) Am. 1): the pivot's
+`pinSymbols`, or, where the pivot does not run, a least-squares read of the letters off the placed points over every
+point pin; then every remaining vector-coefficient letter, read jointly over every lettered `vec-eq` (`vecEqSystem3`,
+`solveNormal3`) with the coordinate letters as numbers. A letter a coordinate and a vector relation both carry is one
+pin symbol: `coordLetterShared3` counts a `vec-letter` owner, the vector relation's lowering promotes a named point
+component (`promoteNamedComponents3`), and the `vec-eq` pin reads it at the pivot's `symAt`.
 A given's claim carries `given: true`; **the placed-figure rule is claim-level**, at the head of
 `holdsAt`: a `given` claim is judged on a placed figure only, and at the displayed seed the pin-owner guard
 answers (`injection-unsatisfiable` for a coordinate pin, `givens-contradict` otherwise). So
@@ -229,6 +257,14 @@ it does not apply:
    and the rotation question (`evaluate.ts`); one that fixes nothing leaves the placement sampled.
 9. **Marks and surfacing.** A new source of a 90° angle gets its knee. The relation surfaces in the data
    view and the query lane (`dataView.ts`, `queries.ts`): the operator's *"and show that"*.
+   **The point × plane row** ([ADR-3D-480](06b-decisions-3d.md#adr-3d-480), #2062): the mutual universe's point side is
+   every student-introduced point that is no solid's vertex, paired with every planar side it does not define; the
+   relation (`on-plane` / `off-plane`, `distanceBetween` over the figure's extent, `MUTUAL_VERIFY_TOL`-class 1e-4) is
+   pushed only when every knowledge sample agrees. `pointPlaneRowKey3` keys it (a run plane by its letters as a set);
+   `pointPlaneRow3(panel, point, plane)` is the one decision both question surfaces read: `membershipQuestion3`
+   (`parse3.ts`) feeds `readStatement3`'s `answer-in-panel` refusal (category `guided`, never the model) and
+   `parseQuery`'s `membership` kind (`note: 'inPanel'`). App3 opens the panel on a known answer and highlights the row
+   by its `data-row-key`.
 10. **The parameter pin.** When either operand can carry the figure parameter, `paramPinningRels`
     (`operands.ts`, through `claimPinsParam` and `operandCarriesParam`) must admit the relation, with
     what it reads declared: direction or position. `pinningGivens` and `paramRoots` read that one list
@@ -385,7 +421,10 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   letters, with its riders and members; a `concyclic` claim or pin; a right quad pyramid's base): concyclic points are in
   convex position. When the circle is the proof, the facts that stated it (`commandStatesCircle3`) join the blame, so
   a circle or right-pyramid line that completed the contradiction is the one refused; a quad pyramid declares its base
-  ring for the blame too.
+  ring for the blame too. A third sufficient reason since #2813 ([ADR-3D-490](06b-decisions-3d.md#adr-3d-490)):
+  `anglesProveConvex3` — the ring's stated vertex angles (`statedRingCorners3`: a `vertex-angle-eq` claim or `vangle` pin at
+  a corner, below 180°) sum to at least (n − 3)·180°. The facts that state those angles join the blame, and the status
+  carries `angles` (the angle lines, the ring, the other order) so the refusal reads `err.ringContradictsAngles`.
 - **The IMPLIED re-declaration** (#1988, [ADR-3D-326](06b-decisions-3d.md#adr-3d-326)). The same split's other arm
   has ONE outcome: `quadImplies(known, cmd.base)` records the statement in `redundantShapes` and returns the figure
   untouched, so `buildNotices3` says it added nothing. `shape-less-specific` is gone from `EngineError3`. The store's
@@ -829,7 +868,7 @@ dry run and the mint pass's dry runs all apply the row as read, and `applyComman
 before its own kind (ADR-3D-460). The outermost
 `applyCommand3` then applies it: `'vector'` as the vector command plus an ink arrow (`arrows`) for each pair of the
 sentence; `'length'` as exactly «|XY| = k|ZW|»'s commands (`segment3` + `length-rel`); `'ask'` or no reading as
-`ambiguous-vector-length`, which carries the pairs except at `k = 1`. `decideCommands3` answers `already-stated` for
+`ambiguous-vector-length`, which carries the pairs except at `k = 1`. `decideCommands3` answers a held `record` (ADR-3D-484) for
 a two-reading line whose reading `verifyClaim` finds true in every sample of the figure before it (T45).
 The fact row reads the same record (Am. 2): `App3` hands `Derived3.readings[f.id]` to `factRowText3` / `FactRowText3`
 (`render/FactRow3.tsx`), and a `'length'` row bypasses the command-kind vector gate — `factDisplay3` returns
@@ -838,9 +877,9 @@ wrapped in bars («AA'=3BC» → «|AA'|=3|BC|»), composed from the command whe
 
 **Stated numbers restated** (ADR-3D-423, #2341). `numbersRestatementTwin3` is the third test of the twin rule, after `sameStatement` and `ringRestatementTwin3`. `statedNumbers3` reads what a command states as numbers, of what: a point's coordinates (`point3`, the `coords-eq` claim) or a segment's length in either letter order (the `length-eq` claim). It compares them at `CLAIM_REL_TOL`, and the twin must already draw the line's `segment3` ink. A line with no stated numbers to match has no twin, so a coordinate answer or a first length stays a row. A plane's equation is read as the plane it names ([ADR-3D-429](06b-decisions-3d.md#adr-3d-429), #1542): the `plane-eq` claim under its letters in any order, a `plane3` with no parameter under its name, each as a unit normal with its first nonzero coefficient positive, so a multiple of the equation is the same numbers.
 
-**A statement the figure already holds** (ADR-3D-449, #2341). `impliedByPrior3` is the last test of the twin step in `decideCommands3`, after `knownSegmentEquationTwin3`, on the grammar lane only. It reads the candidate fold the decision already paid against the figure before the row: (1) no construction part outside `STATEMENT_PARTS3` (claims, pins, mutual requirements, memberships, the statement's own segments and point-run planes) changes size, the line states something, declares no shape (`solid`), and touches no default (`touchesDefault3`, which reads the fold's own defaults-yield registry through `yieldEntry3`: a soft right angle, a soft equal pair, a trapezoid's pair); (2) every `knowledgeSamples3` sample at every claim seed places every point, plane and line where the prior one did, and every earlier row keeps its status; (3) a mutual requirement holds at every claim seed (`meetsRequirements3`). Signs and angle bounds are outside `STATEMENT_PARTS3`, so they always commit. The verdict is `already-stated`, its twin the latest enabled row naming every point of the line (`knownTwin3`). It costs the prior samples, memoised per construction, and only after (1).
+**A statement the figure already holds** (ADR-3D-449, #2341; outcome [ADR-3D-484](06b-decisions-3d.md#adr-3d-484), #2790). `impliedByPrior3` is the last test of the twin step in `decideCommands3`, after `knownSegmentEquationTwin3`, on the grammar lane only. It reads the candidate fold the decision already paid against the figure before the row: (1) no construction part outside `STATEMENT_PARTS3` (claims, pins, mutual requirements, memberships, the statement's own segments and point-run planes) changes size, the line states something, declares no shape (`solid`), and touches no default (`touchesDefault3`, which reads the fold's own defaults-yield registry through `yieldEntry3`: a soft right angle, a soft equal pair, a trapezoid's pair); (2) every `knowledgeSamples3` sample at every claim seed places every point, plane and line where the prior one did, and every earlier row keeps its status; (3) a mutual requirement holds at every claim seed (`meetsRequirements3`). Signs and angle bounds are outside `STATEMENT_PARTS3`, so they always commit. Statement parts include the statement's own marks (`angleMarks`, `lengthMarks`) and the apply-time `redundantShapes` flag. Since ADR-3D-484 every twin test leads to a `record` verdict with `held: true` (the store's `already-held` notice, `suite.notice.alreadyHeld`); a muted twin is `retick`. Before the fold, `standingTwins3` (`derive3Uncached`, ADR-3D-484 Am. 1) pairs every enabled row with the first earlier enabled row that does not itself stand aside and that the submit decision's own twin tests pair it with (`sameStatement`, `ringRestatementTwin3`, `numbersRestatementTwin3`): the row is folded as muted, so a repeated definition (a plane's equation in another spelling, «D על המעגל» again, a pyramid typed twice) never reads `already-defined` / `not-on-circle`, and it then reads its twin's status. The pairing is read from the list on every fold, so undo, save and load keep it; untick or delete the twin and the row applies itself. Rows the twin tests do not pair apply, and a repeated pin is left out of the solve by ADR-3D-483. It costs the prior samples, memoised per construction, and only after (1).
 
-**A row's lead** (ADR-3D-429, ADR-3D-431, #1542). Since ADR-3D-449 no submit records a claim the figure already held, so the ✓ is reached only by a row saved before it. `factLead3` is the row's whole rule: ✓ for an `ok` row holding a claim, except a row `claimGivens3` names, which keeps the status dot. That read asks `verifyClaim` of the construction before the row: a claim that did not hold on every sample of it is the row that made it true. Each row's answer is memoised on a trie keyed on the fact objects, and asked at seed 0, so a commit pays for its own row and a press pays nothing. It is a view read, memoised in `App3` on `(facts, seed)`, and never part of `derive3`, so a seed search pays nothing and a row with no plane equation costs nothing.
+**A row's lead** (ADR-3D-429, ADR-3D-431, #1542; [ADR-3D-484](06b-decisions-3d.md#adr-3d-484), #2790). Every row leads with its status dot: every claim row is a given (ADR-W-200, sr-19), so the ✓ lead, `factLead3` and `claimGivens3` are gone.
 
 **One plane head** (ADR-3D-429). `planeByEquation` and `planeEqClaim` read `PLANE_DEF_NOUN` through `matchDefHead`; the "equation of" lead (`EQ_OF_HE`, `EQ_OF_EN`) is shared with `parametricLine`, and `defBody` is the one separator reader. The space of «π 1» belongs to the index in `PLANE_NAME`.
 
@@ -996,6 +1035,17 @@ existing `givens-contradict`. `applyBoundPyramid3` asks the claim verifier wheth
 the line (`verifyClaim` concyclic, every claim seed × branch, M3) and stamps `SolidObj.boundCyclic`; then neither the
 `base-constrained` note nor a narrowing cause is read off the pyramid (`rowClass3` takes the folded figure), since it
 narrowed nothing (Q-2490d).
+
+### A held pin is left out of the solve (#2795, [ADR-3D-483](06b-decisions-3d.md#adr-3d-483))
+
+A restatement («זווית ABC = זווית ACB» after «AB = AC») is a scalar pin whose rows lie in the span of the
+others'. It removes no freedom but changes the least-squares path, so it used to move the figure about 1e-3. Each
+driving pin carries its provenance (`scalarPinOrigin3`: the claim it drives, set by `recordClaim3`; the fact that
+stated it, set by the fold). Each pivot solution measures lazily (`heldPins`) which facts' pins are held: newest fact
+first, a fact's pins are held when leaving their rows out keeps the rank of the Jacobian of the pin rows over every
+unknown. `resolveHeld3` (inside `resolve3`'s memo, around the joint rung) then solves the figure without them, which
+is the figure as it was before that fact, and keeps that solution only when every left-out claim holds there
+(`claimHoldsAt3`). A left-out pin stays a checked claim; once its earlier twin is gone it is no longer held and drives.
 
 ### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
 
@@ -1223,7 +1273,9 @@ renderer orients faces of a solid that may be non-convex by a consistent winding
 (`statedConcyclic3`, #2810, [ADR-3D-467](06b-decisions-3d.md#adr-3d-467)) — a circle through the letters, a cyclic fix, a
 right pyramid's base: concyclic letters have no concave drawing, and the `concyclic` claim verifies in-order
 concyclicity — coplanar, diagonals crossing, opposite angles supplementary — so a dart can no longer verify the circle
-(the solver pin keeps its sign-crossing descent form). **The ring preference** — a seed whose
+(the solver pin keeps its sign-crossing descent form). Since #2813 ([ADR-3D-490](06b-decisions-3d.md#adr-3d-490)) a stated
+interior angle restricts the seat too: a vertex with a stated angle at its corner in any declared ring over the letters is never
+the reflex one, and letters whose stated angles prove convex position (`anglesProveConvex3`) get no concave seat. **The ring preference** — a seed whose
 declared rings (`declaredRings3`, the one enumeration this loop and the seed search share) are all simple joins
 `meetsShapePreferences3`'s tier in `firstSatisfyingSeed3`, so a forced crossing still resolves at today's fallback seed.
 **The reach** — an unpinned coordinate letter whose default draw crosses a declared ring over its point is re-drawn at
@@ -1258,6 +1310,21 @@ flat-polygon arm, in the mixed run when a known corner is itself free, and in `q
 ring with exactly ONE placeholder corner first yields it to ARM 2 (the family's own corner: closed form for the
 parallelogram family and the kite, a plane rider otherwise), keeping the point's original slot in the order
 (`keepPointSlot3`) so its dependents still follow it.
+
+### Letters in a vector equation over placed points (#1551, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472))
+
+A `vec-eq` given may carry lettered coefficients (`VecTerm.letter`: coefficient = `coeff + p·sym`). Its letters are
+never pivot unknowns. At any drawing the equation is `R = Σₛ s·Dₛ` with numbers R and Dₛ, so `vecEqLetters3`
+(`vecExpr.ts`) solves the letters by linear least squares and returns the residual no letter can absorb. That residual
+is the pin's three rows in the pivot (the free shape moves until the relation can hold; scale-covariant like the
+numeric `vec-eq`, so the `invariantOnly` lane and the rank probe need no change, and the probe charges the box only
+for the residual's rank), the drive's measure. The verifier, the panel's `vec-letter` owner and the claims' number reader read the letters
+through `lettersAt3` (ADR-3D-472 Am. 1): jointly over every lettered equation, so one letter has one value in every
+relation that writes it; the `vec-eq` claim is judged at those values (the span residual for a letter the drawing
+leaves open). A value given to a letter («a = 1/2») substitutes; dependent letter
+directions leave the letters undetermined (`a = ?`). A definition with several letters (`vecDefs[].symbols`, each term
+naming its letter in `SymTerm.sym`) samples each letter as a one-letter ratio is sampled, and `vecDefLetterAt3` reads
+the letters back through the same least squares.
 
 ### Claims
 
@@ -1326,7 +1393,7 @@ change to LM start noise cannot move which configuration a seed draws.
 ### The submit decision (#1394, [ADR-3D-258](06b-decisions-3d.md#adr-3d-258))
 
 `store3.submit` decides nothing: `decideSubmit3(state, utterance)` returns a `Verdict3` (rename ·
-not-understood · refused · already-stated · record) and `submit` dispatches it. The decision is pure, so
+not-understood · refused · retick · record, a record carrying `held` for a line the figure already holds) and `submit` dispatches it. The decision is pure, so
 #1358's register can ask "would you accept this line?". The statement seams share `readStatement3` (the
 grammar plus the #866 repair and the #516 typed refusals), `lostGivens3` (the honesty gates) and
 `decideCommands3` (gates → twin → derive → search), where the LLM lane's `submitSteps` also ends. The twin is

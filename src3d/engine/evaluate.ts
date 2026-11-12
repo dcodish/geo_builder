@@ -45,13 +45,13 @@ import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scaleP
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
-import { absolutePointCount, claimPointIds, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, orientationStated3, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
+import { absolutePointCount, claimPointIds, scalarPinOrigin3, type ScalarPin, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, orientationStated3, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
 import { carrierParams3, determinationReach3, figureLanes3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Claim3, Construction3, Determination3, Id, LinExpr, Operand3, PointDef, Positions3, Requirement3, SolidKind, SolidObj } from './types';
-import { claimResidual3, claimSeeds, residualHolds3 } from './claims';
+import { claimHoldsAt3, claimResidual3, claimSeeds, residualHolds3 } from './claims';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
@@ -584,7 +584,7 @@ export interface Resolved3 {
    *  the pool holds more than one solution, since that is the only case where a coordinate can be a
    *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
    *  branch pick reads seed-stable and prints as fact. */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => { dims: number; block: number }; /** #1815 (ADR-3D-309): no solution because every one collapsed a flat ring that only a rider's incidence forced. */ collapse?: InventedCollapse3; /** #2368 (ADR-3D-375): lazy — the applied placement's LEFTOVER rigid freedom, measured under every placement given (the read-back sampler reads this). */ placementFreedom?: () => PlacementFreedom3 } | null;
+  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => { dims: number; block: number }; /** #2795 (ADR-3D-483): lazy — the scalar pins the chosen solution holds without driving them (`resolveHeld3` reads this). */ heldPins?: () => ScalarPin[]; /** #1815 (ADR-3D-309): no solution because every one collapsed a flat ring that only a rider's incidence forced. */ collapse?: InventedCollapse3; /** #2368 (ADR-3D-375): lazy — the applied placement's LEFTOVER rigid freedom, measured under every placement given (the read-back sampler reads this). */ placementFreedom?: () => PlacementFreedom3 } | null;
   /** #930 (ADR-3D-236) — each vec-def RATIO symbol's solved value («SN = k·SC» → k), so a consumer can
    *  read what the branch pick actually chose. The sign verifier needs it: without it a correctly
    *  honoured «k חיובי» reported `sign-unsatisfiable`, because the verifier knew how to read a figure
@@ -1454,7 +1454,7 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
 type VecDef = Construction3['vecDefs'][number];
 
 /** Solve the relation for its unknown point at a fixed symbol value; null when degenerate. */
-function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>): Vec3 | null {
+function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>, letterVal?: (sym: string) => number): Vec3 | null {
   const evalR = (P: Vec3): Vec3 | null => {
     const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
     const from = get(vd.from);
@@ -1477,7 +1477,8 @@ function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: numb
         vvec = a && b ? sub3(b, a) : null;
       }
       if (!vvec) return null;
-      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * kValue));
+      // #1551 (ADR-3D-472): a term naming its own letter (a definition with several) reads that letter's number
+      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * (t.sym !== undefined && letterVal ? letterVal(t.sym) : kValue)));
     }
     return acc;
   };
@@ -2122,7 +2123,7 @@ export function resolve3(c: Construction3, seedIn: Seed3, opts: Resolve3Opts = {
   const solvedKey = `${base}|raw`;
   let solved = memo.get(solvedKey);
   if (solved) resolveStats3.hits++;
-  else solved = remember(solvedKey, resolveJoint3(c, seed, opts));
+  else solved = remember(solvedKey, resolveHeld3(c, seed, opts));
   if (opts.solvedFrame) return solved;
   return memo.get(base) ?? remember(base, drawnFrame3(c, solved));
 }
@@ -2265,6 +2266,40 @@ function resolveJoint3(c: Construction3, seed: number, opts: Resolve3Opts): Reso
     if (retry.freeHolds) return gauge ? { ...retry, freeDriven: true } : retry;
   }
   return first;
+}
+
+/**
+ * #2795 ([ADR-3D-483](../../docs/06b-decisions-3d.md#adr-3d-483)) — A RESTATEMENT NEVER MOVES THE DRAWING (the ADR-623 port).
+ * A pin the figure is already forced to hold (the pivot's measured `heldPins`: its rows add no rank, newest stating fact
+ * first) is left out, and the figure is solved as it was before that fact: the same rows from the same `dims0`, so the same
+ * drawing. Kept only when every left-out pin's claim holds there at the verifier's own tolerance (`claimHoldsAt3`) and the
+ * solve placed the figure; otherwise today's solution stands. A left-out pin stays a claim, so nothing is dropped: delete the
+ * earlier given and the restated pin is no longer held, so it drives. The released construction is memoised per pin set,
+ * so its solves (and a read-back image's replay) are shared across seeds.
+ */
+const releasedMemo3 = new WeakMap<Construction3, Map<string, Construction3>>();
+/** #2795 (docs/17 §9): exercised counters — solves that found a held pin, and those whose release was kept. */
+export const heldReleaseStats3 = { held: 0, released: 0 };
+function resolveHeld3(c: Construction3, seed: number, opts: Resolve3Opts): Resolved3 {
+  const first = resolveJoint3(c, seed, opts);
+  if (!c.scalarPins.some((p) => scalarPinOrigin3.get(p)?.claim !== undefined)) return first;
+  const held = first.pivot && first.pivot.solutions > 0 ? (first.pivot.heldPins?.() ?? []) : [];
+  if (held.length === 0) return first;
+  heldReleaseStats3.held++;
+  const key = held.map((p) => c.scalarPins.indexOf(p)).join(',');
+  let per = releasedMemo3.get(c);
+  if (!per) releasedMemo3.set(c, (per = new Map()));
+  let released = per.get(key);
+  if (!released) per.set(key, (released = { ...c, scalarPins: c.scalarPins.filter((p) => !held.includes(p)) }));
+  const retry = resolveJoint3(released, seed, opts);
+  if (retry.pivot && retry.pivot.solutions === 0) return first;
+  if (first.freeHolds && !retry.freeHolds) return first;
+  const holds = held.every((p) => {
+    const claim = scalarPinOrigin3.get(p)?.claim;
+    return claim !== undefined && claimHoldsAt3(claim, c, retry);
+  });
+  if (holds) heldReleaseStats3.released++;
+  return holds ? retry : first;
 }
 
 /** What a configuration is resolved at. */
@@ -2546,6 +2581,23 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       reseatMixed3(c, seed, out, planes, lines, ridersOf(sol));
       return out;
     };
+    /**
+     * #2795 (ADR-3D-483): a lazy probe asked AFTER the resolve evaluates the canonical figure at trial unknowns, and that
+     * evaluation writes this resolve's plane and line maps — the very maps the resolved figure carries. The probe is run
+     * with both restored afterwards, so asking it never changes the figure it measured.
+     */
+    const keepMaps = <T,>(probe: () => T): (() => T) => () => {
+      const savedPlanes = [...planes];
+      const savedLines = [...lines];
+      try {
+        return probe();
+      } finally {
+        planes.clear();
+        for (const [k, v] of savedPlanes) planes.set(k, v);
+        lines.clear();
+        for (const [k, v] of savedLines) lines.set(k, v);
+      }
+    };
     const applySolutions = (solutions: PivotPool): void => {
       const satisfiesSigns = (sol: PivotResult): boolean => {
         const p2 = evalCanonical(sol.dims, false, overrideOf(sol), ridersOf(sol));
@@ -2640,6 +2692,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols,
           ...(chosen.riderTs ? { riderTs: chosen.riderTs } : {}),
           ...(chosen.scalarConsumed ? { scalarConsumed: chosen.scalarConsumed } : {}), // #990: lazy, display-path only
+          ...(chosen.heldPins ? { heldPins: keepMaps(chosen.heldPins) } : {}), // #2795 (ADR-3D-483): lazy, read by `resolveHeld3`
           ...(Object.keys(symRoots).length > 0 ? { symRoots } : {}),
           ...(Object.keys(pointRoots).length > 0 ? { pointRoots } : {}),
         };
@@ -3848,7 +3901,7 @@ function solveLengthDetermination(
 }
 
 /** Gaussian elimination with partial pivoting for the ≤ 3×3 normal equations; null when singular. */
-function solveSmall(M: number[][], r: number[]): number[] | null {
+export function solveSmall(M: number[][], r: number[]): number[] | null {
   const n = r.length;
   const a = M.map((row, i) => [...row, r[i]]);
   const norm = Math.max(1e-300, ...M.flat().map(Math.abs));
@@ -4203,8 +4256,22 @@ function evaluateSolidsAndPoints(
       // and the sampled free DOF alike. Recording per-branch missed the sampled case, and the sign
       // verifier then reported `sign-unsatisfiable` on a figure whose k was a perfectly positive sample.
       if (vd.symbol) ratioSymbols?.set(vd.symbol, k);
+      /**
+       * #1551 (ADR-3D-472): a definition with SEVERAL letters («EN = a·EA + b·EC») — each letter a free number, given its
+       * stated value or sampled like a one-letter ratio (one letter, one number: keyed by its first definition, the sign
+       * given choosing the side). No relation drives these letters; a point placed by them has one free DOF per letter.
+       */
+      const letterVals = new Map<string, number>();
+      for (const sym of vd.symbols ?? []) {
+        const given = symbolValueOf(c, sym);
+        const keyPt = c.vecDefs.find((d) => d.symbols?.includes(sym) || d.symbol === sym)?.unknown ?? vd.unknown;
+        const neg = c.paramSigns.some((g) => g.sym === sym && !g.positive);
+        const v = given ?? (neg ? sample(seed, `sym-${sym}-${keyPt}`, -0.8, -0.2) : sample(seed, `sym-${sym}-${keyPt}`, 0.2, 0.8));
+        letterVals.set(sym, v);
+        ratioSymbols?.set(sym, v);
+      }
       // #1188 step 2: a definition over a free vector reads its pure value (apply admits only pure, symbol-free ones)
-      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined);
+      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined, (sym) => letterVals.get(sym) ?? 0);
       if (P) pos.set(id, P);
     } else if (def.kind === 'vec-pair') {
       // the cevian intersection: each relation traces an affine line in its own symbol

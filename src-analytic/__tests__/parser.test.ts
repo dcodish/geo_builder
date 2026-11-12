@@ -695,3 +695,48 @@ describe('#2625 (ADR-AG-454 Am. 1) — the centre of a parabola is refused with 
     expect(errorText(err, analyticI18n.getFixedT('en') as unknown as T)).toBe('A parabola has no centre. If you meant its vertex, the tool does not read it yet.');
   });
 });
+
+describe('#2502 (ADR-AG-468) — the construct state «קוטר/מיתר המעגל/האליפסה» reads as its «ב/של» twin (2-D’s reading)', () => {
+  /** The facts with the student's line taken out — two spellings of one sentence lower to the same statements. */
+  const facts = (line: string) => {
+    const r = parseLine(line);
+    return r.ok ? JSON.parse(JSON.stringify(r.facts, (k, v) => (k === 'src' ? undefined : v))) : r;
+  };
+  it.each([
+    ['AB קוטר המעגל', 'AB קוטר במעגל'],
+    ['AB הוא קוטר המעגל', 'AB קוטר במעגל'],
+    ['קוטר המעגל AB', 'AB קוטר במעגל'],
+    ['AB קוטר האליפסה', 'AB קוטר באליפסה'],
+    ['AB הוא קוטר האליפסה', 'AB קוטר באליפסה'],
+    ['קוטר האליפסה AB', 'AB קוטר באליפסה'],
+    ['AB מיתר המעגל', 'AB מיתר במעגל'],
+    ['AB הוא מיתר המעגל', 'AB מיתר במעגל'],
+    ['CD הוא מיתר של המעגל', 'CD מיתר במעגל'],
+    ['מיתר המעגל AB', 'AB מיתר במעגל'],
+    ['מיתר AB של המעגל', 'AB מיתר במעגל'],
+    ['AB מיתר האליפסה', 'AB מיתר באליפסה'],
+    ['AB מיתר של האליפסה', 'AB מיתר באליפסה'],
+    ['מיתר האליפסה AB', 'AB מיתר באליפסה'],
+    ['AB מיתר הפרבולה', 'AB מיתר בפרבולה'],
+  ])('«%s» = «%s»', (construct, twin) => {
+    expect(parseLine(construct).ok).toBe(true);
+    expect(facts(construct)).toEqual(facts(twin));
+  });
+  it.each([['AB קוטר הפרבולה'], ['AB הוא קוטר הפרבולה'], ['קוטר הפרבולה AB']])('«%s» → #2625’s parabola-no-diameter', (line) => {
+    expect(parseLine(line)).toEqual({ ok: false, code: 'parabola-no-diameter', detail: 'AB' });
+  });
+  it('the definite noun never defines a circle: «AB קוטר המעגל» is about the drawn one, «AB קוטר של מעגל» still makes one', () => {
+    const def = (line: string) => {
+      const r = parseLine(line);
+      const d = r.ok ? r.facts.find((f) => f.t === 'diameter-of') : undefined;
+      return d && d.t === 'diameter-of' ? d.define : null;
+    };
+    expect(def('AB קוטר המעגל')).toBe(false);
+    expect(def('AB קוטר של מעגל')).toBe(true);
+  });
+  it('«AB מיתר של מעגל» (indefinite) is not read here, and the other construct sentences keep their readers', () => {
+    expect(parseLine('AB מיתר של מעגל').ok).toBe(false);
+    expect(parseLine('AB קוטר המעגל M').ok).toBe(true);
+    expect(parseLine('קוטר מעגל O היוצא מנקודה F').ok).toBe(true);
+  });
+});

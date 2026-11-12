@@ -12,9 +12,9 @@
  * for the identical ring declared directly. Both halves are locked here: the guard SEES the ring, and
  * the requirement machinery therefore stops accepting those configurations.
  */
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { factsOf } from '../../__tests__/scenario-pipeline';
-import { meetsRequirements, polygonsConvex, replay } from '../../store/geoStore';
+import { lastConfigTier, meetsRequirements, polygonsConvex, reflexSeatsYieldToStatedCorners, replay, ringConvexityProofs, ringOrderContradiction } from '../../store/geoStore';
 import type { Id, Vec } from '../../engine';
 
 /** A hand-built DART over A,B,C,D — concave whatever the figure's own sample happens to be. */
@@ -95,5 +95,141 @@ describe('#443 — a macro-declared ring is a declared polygon', () => {
   it('a triangle-shaped macro is untouched (nothing to be concave about)', () => {
     const facts = factsOf(['משולש שווה שוקיים ABC']);
     expect(meetsRequirements(facts, 0)).toBe(true);
+  });
+});
+
+/**
+ * #2813 (ADR-823, operator ruling 2026-11-10 (b): a stated polygon angle is always the INTERIOR angle). The view floor
+ * never seats a stated corner as the reflex corner of a dent, on a ring held only to simplicity; and the stated interior
+ * angles that leave no room for a reflex corner — Σ ≥ (n − 3)·180° — prove the ring is in convex position.
+ */
+describe('#2813 — a stated corner angle is the interior angle', () => {
+  const twoOrders = ['מרובע ABCD', 'מרובע ABDC'];
+
+  it('the dart with its stated corner reflex fails the floor; with the stated corner convex it passes', () => {
+    // DART is reflex at C (ring ABCD); ABCD and ABDC both yield to simplicity, so the dart passed before #2813
+    expect(polygonsConvex(factsOf(twoOrders), DART), 'no stated angle: the dart is a view').toBe(true);
+    expect(polygonsConvex(factsOf([...twoOrders, 'זווית DAB = 70']), DART), 'A is stated, and A turns with the ring').toBe(true);
+    expect(polygonsConvex(factsOf([...twoOrders, 'זווית BCD = 110']), DART), 'C is stated, and C is the dent').toBe(false);
+    expect(polygonsConvex(factsOf([...twoOrders, 'BC מאונך ל-CD']), DART), 'a stated right angle at C reads the same').toBe(false);
+  });
+
+  it('the proof: stated interior angles summing to (n − 3)·180° or more, equality included, at n = 4, 5, 6', () => {
+    const proved = (lines: string[]) => ringConvexityProofs(factsOf(lines)).map((p) => p.ring.join(''));
+    expect(proved(['מרובע ABCD', 'זווית DAB = 70', 'זווית BCD = 110'])).toEqual(['ABCD']);
+    expect(proved(['מרובע ABCD', 'זווית DAB = 70', 'זווית BCD = 100']), '170° leaves room for a dent at B or D').toEqual([]);
+    expect(proved(['מרובע ABCD', 'זווית ABD = 70', 'זווית BCD = 110']), 'a diagonal angle is not a corner').toEqual([]);
+    expect(proved(['מחומש ABCDE', 'זווית EAB = 120', 'זווית ABC = 120', 'זווית BCD = 120'])).toEqual(['ABCDE']);
+    expect(proved(['מחומש ABCDE', 'זווית EAB = 120', 'זווית ABC = 120', 'זווית BCD = 119'])).toEqual([]);
+    expect(proved(['משושה ABCDEF', 'זווית FAB = 135', 'זווית ABC = 135', 'זווית BCD = 135', 'זווית CDE = 135'])).toEqual(['ABCDEF']);
+    expect(proved(['משושה ABCDEF', 'AB = 4', 'זווית ABC = 120', 'זווית BCD = 120', 'זווית CDE = 120', 'זווית DEF = 120'])).toEqual([]);
+  });
+
+  it('ringOrderContradiction blames the line that completes it, in every order, and never an unrelated line', () => {
+    const prior = (lines: string[]) => factsOf(lines);
+    const cmds = (line: string, before: string[]) => factsOf([...before, line]).slice(prior(before).length).map((f) => f.cmd);
+    const hit = (before: string[], line: string) => ringOrderContradiction(prior(before), cmds(line, before));
+    const angles = ['זווית DAB = 70', 'זווית BCD = 110'];
+    expect(hit(['מרובע ABCD', ...angles], 'מרובע ABDC')).toMatchObject({ ring: ['A', 'B', 'C', 'D'], other: ['A', 'B', 'D', 'C'] });
+    expect(hit(['מרובע ABCD', 'מרובע ABDC', angles[0]], angles[1])?.proof.facts.length).toBe(2);
+    expect(hit(['מרובע ABDC', ...angles], 'מרובע ABCD'), 'the proved ring declared last').not.toBeNull();
+    expect(hit(['מרובע ABCD', 'מרובע ABDC', ...angles], 'AB = 5'), 'a saved contradiction is never blamed on an unrelated line').toBeNull();
+    expect(hit(['מרובע ABCD', 'זווית DAB = 70', 'זווית BCD = 100'], 'מרובע ABDC'), 'no proof, no structural refusal').toBeNull();
+  });
+});
+
+/**
+ * #2811 (ADR-826) — ONE STRUCTURAL READER OF "THESE LETTERS ARE IN CONVEX POSITION", and the refusal it backs:
+ * `ringConvexityProofs` names the facts that prove a declared ring convex (a stated «קמור», one circle through every
+ * letter), and `ringOrderContradiction` refuses, on the line that completes it, another declared order of its letters.
+ */
+const proofs2811 = (lines: string[]) => ringConvexityProofs(factsOf(lines)).map((p) => `${p.ring.join('')}:${p.reason}:${p.facts.map((f) => f.utterance).join('|')}`);
+/** Would `line`, after `before`, complete a contradiction? */
+const hit2811 = (before: string[], line: string) => {
+  const prior = factsOf(before);
+  return ringOrderContradiction(prior, factsOf([...before, line]).slice(prior.length).map((f) => f.cmd));
+};
+
+describe('ringConvexityProofs (#2811)', () => {
+  it('names the circle fact for an inscribed ring, in either spelling', () => {
+    expect(proofs2811(['מרובע ABCD', 'מעגל חוסם את ABCD'])).toEqual(['ABCD:circle:מעגל חוסם את ABCD']);
+    expect(proofs2811(['מרובע ABCD', 'המרובע ABCD חסום במעגל'])[0]).toMatch(/^ABCD:circle:/);
+  });
+  it('names a circle whose riders cover the letters', () => {
+    expect(proofs2811(['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD'])).toEqual(['ABCD:circle:מעגל חוסם את ABC|D על המעגל']);
+  });
+  it('names a stated «קמור»', () => {
+    expect(proofs2811(['מרובע ABCD', 'המרובע ABCD קמור'])[0]).toMatch(/^ABCD:stated-convex:/);
+  });
+  it('a circle through three of the four letters proves nothing', () => {
+    expect(proofs2811(['משולש ABC', 'מעגל חוסם את ABC', 'נקודה D', 'מרובע ABCD'])).toEqual([]);
+  });
+});
+
+describe('ringOrderContradiction (#2811) blames the latest line, in all three orders', () => {
+  it('ring, ring, circle: the circle line', () => {
+    expect(hit2811(['מרובע ABCD', 'מרובע ABDC'], 'מעגל חוסם את ABDC')).toMatchObject({ other: expect.any(Array) });
+    expect(hit2811(['מרובע ABCD', 'מרובע ABDC'], 'מעגל חוסם את ABCD')).not.toBeNull();
+  });
+  it('ring, circle, ring: the second ring', () => {
+    expect(hit2811(['מרובע ABCD', 'מעגל חוסם את ABCD'], 'מרובע ABDC')).toMatchObject({ ring: ['A', 'B', 'C', 'D'], other: ['A', 'B', 'D', 'C'] });
+  });
+  it('the rider completing the circle, then two orders: the second ring', () => {
+    expect(hit2811(['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD'], 'מרובע ABDC')).not.toBeNull();
+  });
+  it('a saved contradiction is never blamed on an unrelated line; no proof, no refusal', () => {
+    expect(hit2811(['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABCD'], 'AB = 5')).toBeNull();
+    expect(hit2811(['מרובע ABCD'], 'מרובע ABDC'), 'two orders of free points: a concave quadrilateral (ADR-622)').toBeNull();
+  });
+});
+
+/**
+ * #2813 (ADR-823 Am. 1) — THE BROWSER PATH: the post-commit search runs in the geometry WORKER (`geoWorker.ts`,
+ * `autoResolve` → `findValidConfig` under `WORKER_SEARCH_BUDGET_MS`), and the submit gate drops an Enter while it is in
+ * flight. Found by round #2855's pre-play: «מרובע ABCD · מרובע ABDC · ∠DAB = 70°» left the search re-seating ABCD's
+ * stored reflex vertex (A, now a stated corner) only after the whole seed sweep, so «∠BCD = 110°» typed next was never
+ * answered. The stored seat yields to the statement structurally: the worker answers at the 'current' tier.
+ */
+describe('#2813 — a stored reflex seat yields to a later stated angle (the worker path)', () => {
+  type Posted = { done?: { op: string; found?: { facts: { cmd: { type: string; reflex?: number } }[]; seed: number } | null; ok?: true } };
+  const g = globalThis as unknown as { self?: { postMessage: (m: unknown) => void; onmessage?: (e: { data: unknown }) => void } };
+  const posted: Posted[] = [];
+  let onmessage: ((e: { data: unknown }) => void) | undefined;
+  // the worker posts through the global `self` at call time, so the fake stays installed for this block
+  let before: typeof g.self;
+  beforeAll(async () => {
+    before = g.self;
+    g.self = { postMessage: (m) => posted.push(m as Posted) };
+    await import('../../store/geoWorker'); // load-in-body-ok: the subject IS what loading does — the worker registers self.onmessage
+    onmessage = g.self.onmessage;
+  }, 60_000);
+  afterAll(() => {
+    g.self = before;
+  });
+  it('the worker re-seats A off the reflex corner at once, and the next line is refused', () => {
+    {
+      const worker = (facts: ReturnType<typeof factsOf>, seed: number) => {
+        posted.length = 0;
+        onmessage!({ data: { id: 1, op: 'autoResolve', facts, seed } });
+        return posted[posted.length - 1]!.done!;
+      };
+      // the store as the App leaves it: each commit, then the worker's search applied
+      let facts = factsOf(['מרובע ABCD', 'מרובע ABDC']);
+      const r2 = worker(facts, 0);
+      if (r2.found) facts = r2.found.facts as typeof facts;
+      expect(facts.some((f) => f.cmd.type === 'quadrilateral' && (f.cmd as { reflex?: number }).reflex !== undefined), 'the dart is a stored reflex seat').toBe(true);
+      const withAngle = [...facts, ...factsOf(['זווית DAB = 70']).filter((f) => f.cmd.type === 'set-angle')];
+      const r3 = worker(withAngle, 0);
+      const found = r3.found ?? null;
+      expect(found, 'the worker finds a view').not.toBeNull();
+      expect(lastConfigTier, 'at once: the stored seat yields before any sample').toBe('current');
+      const quad = found!.facts.find((f) => f.cmd.type === 'quadrilateral' && f.cmd.reflex !== undefined)!;
+      expect((quad.cmd as unknown as { ids: string[] }).ids[quad.cmd.reflex!], 'the reflex vertex is not the stated corner A').not.toBe('A');
+      expect(reflexSeatsYieldToStatedCorners(withAngle), 'and the helper is the identity once nothing is ruled out').not.toBe(withAngle);
+      expect(reflexSeatsYieldToStatedCorners(found!.facts as typeof facts)).toBe(found!.facts);
+      // and the line typed next is refused structurally, naming the angles
+      const next = factsOf(['מרובע ABCD', 'זווית BCD = 110']).filter((f) => f.cmd.type === 'set-angle').map((f) => f.cmd);
+      expect(ringOrderContradiction(found!.facts as typeof facts, next)?.proof.reason).toBe('angles');
+    }
   });
 });

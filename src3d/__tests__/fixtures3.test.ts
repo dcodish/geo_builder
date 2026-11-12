@@ -29,6 +29,17 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2785 (ADR-3D-488) — the triage's sequence: a letter written in two points' coordinates is one unknown (C.x = B.z).
+  // The class is asserted in shared-letter-coords-2785.test.ts; this is the build + drift + load net.
+  'shared-letter-coords-2785.geo3.json': ['פירמידה SABCD', 'B(2t, t, k)', 'C(k,1,2)'],
+  // #2790 (ADR-3D-484) — the held row: the base angles restated after «AB = AC» are their own row, with the notice, and move
+  // nothing (#2795, ADR-3D-483). The file is saved with «AB = AC» UNTICKED (set after generation): the restated row holds
+  // the triangle isosceles on its own. The class is asserted in already-drawn-1990.test.ts; this is the build + drift + load net.
+  'held-row-2790.geo3.json': ['משולש ABC', 'AB = AC', 'זווית ABC = זווית ACB'],
+  // #2790 (ADR-3D-484 Am. 1, judged 2026-11-11) — a held row that restates a DEFINITION: the plane's equation in another
+  // spelling and «D על המעגל» in another wording are each their own row. Saved with both EARLIER rows unticked (set after
+  // generation): each restated row defines its object on its own. The class is asserted in already-drawn-1990.test.ts.
+  'held-definition-2790.geo3.json': ['משוואת המישור π היא x+y+z=1', 'המישור π: x+y+z-1=0', 'D על המעגל', 'D נמצאת על המעגל'],
   // #2814 (ADR-3D-461) — the operator's #827 exam pyramid, p = ±4 with no sign: the row lists both configurations at every
   // seed and presses alternate them. The sweep over seeds 0–23 is asserted in issue-827.test.ts and the pool in
   // engine/__tests__/pivot3.test.ts; this is the build + drift + load net.
@@ -45,6 +56,13 @@ const SEEDED: SeededCorpus = {
   // #2820 (ADR-3D-482) — the report: the data panel printed «π: π = …» for a plane the student named π. The row is asserted
   // in data-view.test.ts; this is the build + drift + load net.
   'plane-named-pi-2820.geo3.json': ['מישור π 2x+y=1'],
+  // #2062 (ADR-3D-479, ADR-3D-480) — bagrut 03572 Q2 in the exam's own wording: the subject frame «הנקודה M מקיימת …» reads
+  // as the bare «BM = …», and «מישור AEC» gives the panel its «M נמצאת במישור AEC» row (asserted in data-view.test.ts and
+  // queries.test.ts); this is the build + drift + load net. The figure prefix «בסרטוט שלפניכם» is 3-D's parked #1679.
+  // #2062 (ADR-3D-479) — a vector term with a minus and a divisor («−v/2») is accepted as its «−1/2v» twin; the gate's
+  // candidate is asserted in honesty3.test.ts. Build + drift + load net.
+  'negative-divisor-terms-2062.geo3.json': ["תיבה ABCDA'B'C'D'", "נסמן: AA' = w, AB = v, AD = u", 'BN=u/2-v/2', 'BK=-v/2+w/4'],
+  'bagrut-03572-q2-wording-2062.geo3.json': ["תיבה ABCDA'B'C'D'", "נסמן: AA' = w, AB = v, AD = u", "הנקודה E היא אמצע המקצוע BB'", 'הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w', 'מישור AEC'],
   // #2789 (ADR-3D-457) — the report: a size beside a point on the positive x-axis was refused size-on-solid, and the cube sat with
   // P on edge AB. The size, the axis and the sampled placement are asserted in placement-gauge.test.ts; this is the build + drift + load net.
   'cube-size-half-axis-2789.geo3.json': ["קובייה ABCDA'B'C'D'", 'P נמצא על החלק החיובי של ציר ה-x', 'אורך AB = 4'],
@@ -616,6 +634,9 @@ const SEEDED: SeededCorpus = {
   // #1829 (ADR-3D-471): the operator's rectangle, saved with his «AE» ask (before: «AE⃗ — לא נקבע על ידי הנתונים»; now
   // «u + t·v»). The answers, the shared t and the panel parity are asserted in queries.test.ts; this is the build + drift net.
   'vector-answer-in-parameter-1829.geo3.json': ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'AB=1', '|AD|=√7', 'DF→ = t*DC→', 'BE→ = t*BC→'],
+  // #1551 (ADR-3D-472): bagrut 2026 summer 03572 Q2 as typed in prod (before: «EM = a·EA + b·EC» not understood). The
+  // letters (a = 2/3, b = 1/6), M in plane AEC and the 2/1/4 box are asserted in issue-1551-two-letter-vec-rel.test.ts.
+  'bagrut-03572-q2-1551.geo3.json': ["תיבה ABCDA'B'C'D'", "נסמן: AA' = w, AB = v, AD = u", "E אמצע BB'", 'EA', 'EC', 'BM=u/6-2v/3+w/12', 'EM = a·EA + b·EC', 'מישור AEC', '|w| = 4', 'BM ⊥ AEC'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

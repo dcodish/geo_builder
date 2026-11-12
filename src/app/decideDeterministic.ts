@@ -55,6 +55,7 @@ import { independentConstructs } from './independence';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { clauseCoverageVerdict, compoundNotHonoured, joinedSubject, splitStatements } from './clauseCoverage';
 import { extensionSideVerdict } from './extensionSide';
+import { ringOrderVerdict } from './ringOrder';
 import { lostPartNote, rightAngleVertexNote } from './unreadParts';
 import { lostRoleNote } from './unreadRoles';
 import { lostRingNote } from './unreadRingRole';
@@ -860,6 +861,12 @@ export async function decideFromParse(
       // #1927 (ADR-608, ADR-W-121): a ring declared over points the figure already placed, in an order that crosses
       // in EVERY configuration, is refused naming the line — before any dry run, so it precedes ADR-157's raw
       // redefinition refusal of a shape over existing vertices, and it never escalates (the parse was right).
+      // #2811 (ADR-826): a ring a statement proves convex (a circle through its letters, «קמור»), and another declared order
+      // of its letters — refused structurally on the line that completes it, in any order, before the sampled question
+      const byProof = ringOrderVerdict(utterance, r.commands, facts);
+      if (byProof) {
+        return refuse('conflict', { source: 'parser', result: byProof.result, detail: byProof.other, commands: r.commands }, { key: byProof.messageKey, params: byProof.params });
+      }
       const crossedRing = forcedCrossedRing(facts, r.commands, seed);
       if (crossedRing) {
         return refuse(

@@ -142,7 +142,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
     («K על AB · K(1,0,0)» puts K at the midpoint).
   - **A length, angle, ratio or ⊥/∥-to-plane given is judged whatever else is on the canvas.**
   - For the coordinate, vector and measure rules: a true restatement is never refused, and one the figure already
-    holds adds no row (FR-SP-19a); an unstated or symbolic component is not checked, and
+    holds is its own row with the held notice (FR-SP-19a); an unstated or symbolic component is not checked, and
     on a solid or a free figure the statement drives instead.
   - **A refusal never tells a student who may be right that they miscalculated:** a given the tool cannot
     yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit (for a solid's size,
@@ -370,8 +370,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 - **FR-SP-19 (Must)** — **A polygon restated is the polygon already there.** A line that only declares a ring the
   figure already declares — the same letters read from another vertex or the other way round («ריבוע ABCD» ·
   «מרובע ADCB», «משולש ABC» · «משולש ACB»), or the generic word over a named shape («מרובע ABCD» over a square) —
-  adds no row and shows the restatement note, exactly as the same line in the same spelling does (#613). The note is
-  2-D's «זה כבר קיים באיור — אין מה להוסיף.» and quotes nothing; re-typing the statement of an UNTICKED row ticks it
+  is its own row and shows the held notice, exactly as the same line in the same spelling does (#2790, operator ruling
+  2026-11-09, [ADR-3D-484](06b-decisions-3d.md#adr-3d-484)). The notice is 2-D's «זה כבר קיים באיור — נוסף כנתון נפרד.» and quotes nothing; re-typing the statement of an UNTICKED row ticks it
   again with no note, as in 2-D ([ADR-3D-377](06b-decisions-3d.md#adr-3d-377), operator ruling 2026-10-10). A
   reading that changes what a shape says (a trapezoid read so its OTHER pair is named) is a new statement, and a
   crossing order is a different ring (#1927 refuses it). The generic word is only the extreme case: **any** noun the
@@ -382,23 +382,31 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   naming both (FR-SP-18). The twin of 2-D FR-EN-9 and analytic R45. **Two sibling nouns** («מלבן ABCD» · «מעוין ABCD»,
   «מלבן» · «דלתון», «מקבילית» · «דלתון», either order) build with 2-D's one note, «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם
   מעוין.» ([ADR-3D-345](06b-decisions-3d.md#adr-3d-345)); and the restatement is judged against what EVERY enabled noun
-  makes the ring together — «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» adds no row ([ADR-3D-346](06b-decisions-3d.md#adr-3d-346), #2180).
-  - Sources: ADR-3D-324, ADR-3D-326, ADR-3D-345, ADR-3D-346, ADR-3D-377; #1953, #1988, #1990, #2171, #2180.
-- **FR-SP-19a (Must)** — **Stated numbers restated are already known.** «B(√2,0,0)» · «B=(√2,0,0)», in either order and
-  any spelling of the same numbers, adds no row and shows the note of FR-SP-19 (operator 2026-10-17: *"the 3rd line
-  should not be accepted and we say that it is already known"*). So does a stated length in the other letter order or
+  makes the ring together — «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» is held ([ADR-3D-346](06b-decisions-3d.md#adr-3d-346), #2180).
+  - Sources: ADR-3D-324, ADR-3D-326, ADR-3D-345, ADR-3D-346, ADR-3D-377, ADR-3D-484; #1953, #1988, #1990, #2171, #2180, #2790.
+- **FR-SP-19a (Must)** — **Stated numbers restated are already known, and accepted as their own row.** «B(√2,0,0)» ·
+  «B=(√2,0,0)», in either order and any spelling of the same numbers, is its own row with the notice of FR-SP-19 (operator
+  2026-11-09, ADR-W-200, which replaces the 2026-10-17 *"the 3rd line should not be accepted"*). The row holds its
+  relation on its own: untick or delete the earlier row and it stays in force; and adding it moves nothing (#2795,
+  [ADR-3D-483](06b-decisions-3d.md#adr-3d-483)). So does a stated length in the other letter order or
   any spelling of the same value («AB = 3» · «BA = 3», «BA = 6/2»), as in 2-D. So does a plane's equation restated: the
   same plane in any letter order, and any multiple of its equation («מישור ABC: x+y=1» · «משוואת המישור CBA היא 2x+2y-2=0»,
-  «π: x+y=1» · «π: x+y-1=0»). Different numbers are refused as before.
+  «π: x+y=1» · «π: x+y-1=0»). Different numbers are refused as before. A restatement of a DEFINITION — a plane's
+  equation in another spelling («משוואת המישור π היא x+y+z=1» · «המישור π: x+y+z-1=0» or «… 2x+2y+2z=2»), a point placed
+  on the circle again («D על המעגל» · «D נמצאת על המעגל» / "D is on the circle"), any line typed twice — is never refused
+  as a second definition: it is its own row with the notice, it keeps the configuration on screen, and while the earlier
+  row is ticked it adds nothing to the figure; untick or delete the earlier row and it holds the same figure itself
+  ([ADR-3D-484](06b-decisions-3d.md#adr-3d-484) Am. 1, [judged] 2026-11-11 on ADR-W-200).
   **And any statement the figure already holds is already known** (operator 2026-11-06: *"In all cases it should say
-  כבר קיים"*): a relation («קובייה» · «AB ∥ CD», «AB ⟂ AD», which draws no new knee), a correct computed answer
+  כבר קיים"*; since 2026-11-09 it is accepted as its own row): a relation («קובייה» · «AB ∥ CD», «AB ⟂ AD», which draws no new knee), a correct computed answer
   («M אמצע AB» · «M=(1,0,0)»), and a value the earlier givens decide in every admissible configuration («A(0,0,0)» ·
-  «B(3,0,0)» · «AB = 3», «קובייה» · «זווית DAB = 90», no new label or mark; [judged] Q-2341) add no row, mark, label or
-  ink and show the same note. Something true only at the drawn configuration is not this. A statement that pins a free
+  «B(3,0,0)» · «AB = 3», «קובייה» · «זווית DAB = 90»; [judged] Q-2341) are each their own row with the same notice, and
+  are drawn like any accepted row: the knee, the angle's value, a length's value and its segment («קובייה» · «AB = 3» ·
+  «AC = 3√2» draws AC marked 3√2, operator 2026-11-10), both operands of a relation. Something true only at the drawn configuration is not this. A statement that pins a free
   size («AB = 1» on a cube), adds a point, an object, a letter, a sign or an angle bound, declares a shape, or confirms a
   default reading («טרפז ABCD» · «AB ∥ DC», a right triangle's right angle, an isosceles triangle's equal pair) records
   as before.
-  - Sources: ADR-3D-423, [ADR-3D-429](06b-decisions-3d.md#adr-3d-429), [ADR-3D-449](06b-decisions-3d.md#adr-3d-449); #2341, #1542.
+  - Sources: ADR-3D-423, [ADR-3D-429](06b-decisions-3d.md#adr-3d-429), [ADR-3D-449](06b-decisions-3d.md#adr-3d-449) (superseded), [ADR-3D-484](06b-decisions-3d.md#adr-3d-484); #2341, #1542, #2790.
 - **FR-SP-24 (Must)** — **An unnamed shape noun is read against the figure: a definite one is the drawn shape, an
   indefinite one a new shape.** A definite noun with no letters («המשולש ישר זווית», «המשולש», «המשולש שווה שוקיים»,
   "the triangle is isosceles", «הריבוע») with ONE flat polygon of that size declared does exactly what the same
@@ -409,7 +417,17 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «ריבוע») draws a NEW shape on the first free letters — the letters 2-D gives («משולש ABC» · «משולש ישר זווית» → DEF).
   A solid's faces are not declared polygons here (a definite triangle on a bare pyramid is unchanged). The twin of
   2-D FR-IN-11's definite / indefinite sentences.
-  - Sources: ADR-3D-351; #2235 (operator ruling 2026-10-16, card `g2235-3d`); 2-D ADR-654, ADR-685 (#2205).
+  **The same reading holds for a SOLID noun with no letters** («קובייה», «תיבה», «מנסרה משולשת», «פירמידה ישרה שבסיסה
+  משולש שווה שוקיים»): an indefinite one draws a NEW solid, on its usual letters while the figure holds none of them and
+  otherwise on the first free letters, each primed vertex following its letter («משולש ABC» · «קובייה» → a cube on D, E,
+  F, G, D', E', F', G'; «משולש ABC» · «פירמידה ישרה שבסיסה משולש שווה שוקיים» → a pyramid on D, E, F with apex G, the
+  equal pair on the new base), and typed again it draws another one («קובייה» · «קובייה» → two cubes). A definite one
+  («הקובייה», «התיבה») with ONE drawn solid of that noun is that solid (typed alone it is a held row with the «זה כבר קיים באיור» notice, as any restated line); with two or
+  more it is refused with the same sentence, naming them («… בשרטוט יש כמה קוביות (…) …», «הקובייה ABCDA'B'C'D'» as the
+  next step); with none it draws a new one. A solid named by its letters («קובייה ABCDA'B'C'D'», «קובייה ABCD») keeps
+  them: typed twice it is the same solid (a held row with the notice). A cylinder, cone or sphere carries no letters to clash and is unchanged.
+  - Sources: ADR-3D-351; #2235 (operator ruling 2026-10-16, card `g2235-3d`); 2-D ADR-654, ADR-685 (#2205);
+    [ADR-3D-486](06b-decisions-3d.md#adr-3d-486) (#2838, operator rulings 2026-11-10 and 2026-11-12).
 - **FR-SP-20 (Must)** — **A crossing ORDER of a ring's letters is refused for its order, whatever noun it carries.**
   When two declared rings spell the same four letters in different cyclic orders and either noun is convex whenever
   simple (every quad noun but «דלתון» and the bare «מרובע»), the other order crosses in every configuration — four
@@ -445,7 +463,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   even if the length reading cannot hold either, and then it gets the length statement's own verdict (a
   contradiction naming it), never the question («פירמידה SABCD» · «AB = 1AC»). A line read as lengths shows in the
   fact list in the length spelling, «|AA'| = 3|BC|» for «AA'=3BC»; a line read as vectors keeps its arrows. A line the figure already states
-  («E על AA' כך ש-AE = 2EA'» · «AE = 2EA'», «M אמצע BC» · «BM = MC») answers «זה כבר קיים באיור» and adds no row.
+  («E על AA' כך ש-AE = 2EA'» · «AE = 2EA'», «M אמצע BC» · «BM = MC») is its own row with the held notice (FR-SP-19a).
   A vector reading draws every vector of the sentence as an arrow («BE = EC»: BE and EC). An unmarked statement
   over a point on a segment is never refuted as the student's arithmetic.
   - Sources: ADR-052, ADR-3D-249, ADR-3D-250, ADR-3D-252, ADR-3D-255, ADR-3D-391 (and Am. 1, Am. 2), ADR-3D-460; #1183, #1185, #1194, #1195, #1312, #1680, #1783, #2804; operator rulings 2026-10-04 and 2026-10-13 on #1680, and 2026-10-30 on PR #2605 (T36; T64, T66).
@@ -509,9 +527,18 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   them until |AB| = 5 holds, and keeps holding on «הציגו תצורה אחרת». What was not stated keeps varying; a
   conflicting magnitude is refused, naming the statement it conflicts with.
   - Sources: ADR-3D-260, #1311.
-- **FR-VC-2 (Must)** — Support **at most one symbolic parameter** in a vector expression, pinned by a
-  given through root-finding. Two unknowns in one expression is a known boundary.
-  - Sources: #301, superseded by #1551.
+- **FR-VC-2 (Must)** — **A vector expression may carry several letters, one per term (degree 1), in any
+  alphabet.** Over points already placed («EM = a·EA + b·EC» after the exam's «BM = u/6 − 2v/3 + w/12») the letters are
+  solved with the figure's free shape: a relation that holds for every shape gives seed-stable letters and the data panel
+  prints them (**a = 2/3, b = 1/6**); one that holds only for some shapes reshapes the box (and moves riders) so that it
+  holds, the rest staying free for «הציגו תצורה אחרת»; one that no shape satisfies is refused by name, «הנתונים סותרים זה
+  את זה — אין גוף שמקיים את «EB' = a·EA + b·EC» יחד עם שאר הנתונים». Over a new point («EN = a·EA + b·EC») each letter is
+  a free number: N lies free in the plane EAC, the panel reads «a = ?», «b = ?» and writes EN in a and b. A letter
+  carried by one term only («EM = aEA + 1/6EC») is the same case. «ab·EA», «a²EA» stay refused (FR-VC-3). **A letter is
+  one number wherever it is written**: two vector relations that give a letter two values («EM = a·EA + b·EC» then
+  «EM = b·EA + a·EC» on the exam) are refused naming the second; a letter written in a vector relation and in a placed
+  point's coordinates («AC = a·AB + b·AD» · «B(a,1,2)», in either order) has the same value in both (FR-VC-2b).
+  - Sources: #301, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472) (Am. 1: one reader with ADR-3D-488), #1551 (operator rulings 2026-08-16, 2026-09-29, 2026-10-05, 2026-10-13).
 - **FR-VC-2a (Must)** — **A POWER in a coordinate component is supported where the solver can pin it,
   and refused BY NAME where it cannot.** On a figure carrying a solid, `C(p², p, 0)` builds and the
   relation `x = y²` holds. With no solid it is refused by name, never accepted with the power discarded.
@@ -521,8 +548,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   («C(p²,1,0)»), in a vector or pair injection, in a line or plane equation, as the algebraic lane's
   parameter, as an angle label («∠SAB = α») or as the name of a free component («C(p,1,0)», #814). A value
   the figure cannot satisfy is refused naming the statement, an unknown letter as unknown; a stated sign
-  («k חיובי») is honoured the same way.
-  - Sources: ADR-052, ADR-3D-219, ADR-3D-236, ADR-3D-433 (the coordinate parameter's value against the givens that pin it, in either order); #814, #902, #922, #930, #1896.
+  («k חיובי») is honoured the same way. **A letter written in several coordinates is ONE number**: «B(k,1,2)» ·
+  «C(k,3,4)» draws B and C at the same x at every configuration, the value reaches every place the letter is written,
+  and coordinates that give it two values («B(2,15,-8)» then «B(2t,t,k)») are refused naming the line.
+  - Sources: ADR-052, ADR-3D-219, ADR-3D-236, ADR-3D-433 (the coordinate parameter's value against the givens that pin it, in either order), ADR-3D-488; #814, #902, #922, #930, #1896, #2785.
 - **FR-VC-2c (Must)** — **A value whose letter is no longer defined is a fact in error, and the change that
   undefined it says so.** When the row that introduced the letter («∠SAB = α», «C(p²,1,0)», «SN = k·SC»)
   is deleted, muted or edited away, the value row («α = 70», «p = 3», «k = 1/2») stays in the list, is
@@ -541,7 +570,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   refused with 2-D's sentence «לזווית ABC כבר יש שם: α (בשורה «זווית ABC=α»). לכל זווית שם אחד — המשיכו עם α.»;
   the same letter with another coefficient («∠ABC=2α» · «∠ABC=3α») is refused in 3-D's conflict sentence
   «הנתונים סותרים זה את זה — אין גוף שמקיים את «∠ABC=3α» יחד עם «∠ABC=2α»». The same letter and coefficient
-  again stays already-stated; an unlabelled mark still takes its first name; a letter already naming another
+  again is a held row (FR-SP-19a); an unlabelled mark still takes its first name; a letter already naming another
   angle is the FR-VC-2d equality. A saved list holding both lines opens with the second refused. This amends
   FR-VC-2d's relabel (ADR-3D-052's equality rule stands). A 3-D «AB=a» is a vector (X7), so the length half of
   the ruling has no 3-D sentence.
@@ -682,15 +711,17 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   area, a ratio) on points whose coordinates carry the parameter, whatever sentence states it: «A(0,0,0) ·
   B(k-1,k,3) · C(k+1,0,k-3) · AB ⊥ AC» gives k = 2 or k = −5, one drawn and the other a press of «הציגו תצורה
   אחרת» away, shown as «k = -5 או k = 2»; when no k works it is refused naming the statement (FR-EQ-3). A claim the figure already
-  holds in every admissible configuration is answered «זה כבר קיים באיור — אין מה להוסיף.» and adds no row (FR-SP-19a).
-  - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286, ADR-3D-396, ADR-3D-433, [ADR-3D-449](06b-decisions-3d.md#adr-3d-449); #508, #512, #552, #1311, #1439, #1472, #1528, #1896, #2341.
+  holds in every admissible configuration is its own row with the notice «זה כבר קיים באיור — נוסף כנתון נפרד.» (FR-SP-19a),
+  and so is a claim that restates an earlier row's definition: it is never refused as defining the object twice.
+  - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286, ADR-3D-396, ADR-3D-433, [ADR-3D-449](06b-decisions-3d.md#adr-3d-449), [ADR-3D-484](06b-decisions-3d.md#adr-3d-484); #508, #512, #552, #1311, #1439, #1472, #1528, #1896, #2341.
 - **FR-VC-10 (Must)** — **A segment equation is asked about only when both readings can be true.** As vectors, «AC = 2BD» over «מרובע ABCD» makes the diagonals parallel, which crosses the ring, and a crossed ring is not a quadrilateral. So it builds as lengths with no question, shows «|AC| = 2|BD|» and draws both segments. «AB = DC», a parallelogram as vectors, keeps asking ([ADR-3D-431](06b-decisions-3d.md#adr-3d-431)).
-- **FR-CL-8 (Must)** — **A claim row that moved the figure is a given, one that was checked is a claim** (every claim since [ADR-3D-431](06b-decisions-3d.md#adr-3d-431): «AB = 3» on a free cube leads with ●). **A plane equation that moved the figure is a given, one that was checked is a claim.** A plane
-  equation that did not already hold on the figure before its row (a free cube, a cube of a stated side, points the row
-  creates) places the plane and shows the status dot ● like every other given. One that held on every sample of the
-  figure before its row, the plane already fixed, is already known and adds no row (FR-SP-19a, operator 2026-11-06). The
-  ✓ «הטענה אומתה מול הציור» lead shows only on such a row saved before that rule, which loads as saved.
-  - Sources: [ADR-3D-429](06b-decisions-3d.md#adr-3d-429), [ADR-3D-449](06b-decisions-3d.md#adr-3d-449), ADR-3D-030, ADR-W-175 sr-19; #1542, #2341.
+- **FR-CL-8 (Must)** — **Every claim row is a given and leads with its status dot ●** ([ADR-3D-484](06b-decisions-3d.md#adr-3d-484),
+  #2790: a held row is "a given in its own right", ADR-W-200; sr-19, ADR-W-175: *"No ✓ "verified" ever appears on a given"*).
+  A plane equation that did not already hold places the plane; one that held on every sample of the figure before its
+  row is its own row with the held notice (FR-SP-19a); so is the plane's equation restated in another spelling, which
+  defines π again only once the earlier row is unticked or deleted (ADR-3D-484 Am. 1). No row leads with ✓; a row saved
+  with ✓ loads with ●.
+  - Sources: [ADR-3D-429](06b-decisions-3d.md#adr-3d-429), [ADR-3D-449](06b-decisions-3d.md#adr-3d-449), ADR-3D-030, ADR-3D-484, ADR-W-175 sr-19; #1542, #2341, #2790.
 - **FR-CL-2 (Must)** — **No claim can escape by hiding inside a composite.** Every claim is recorded on
   the construction and verified on evaluation, so a claim arriving as part of a larger command is checked
   like any other. A role noun («אלכסון AB») is a claim too, judged again on the final figure; named
@@ -789,7 +820,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   over a ring with a circumcircle («מעגל חוסם את ABCD», «המרובע ABCD חסום במעגל»), a cyclic fix, a right pyramid's base
   or points stated on one circle, another order of the same letters («מרובע ABDC») is refused in the same words on the
   line that completes it — the ring, the circle line or the right pyramid line — and a circle through a ring is never
-  drawn green over points that are not on it (no dart under a circle). **Nor is one drawn off one plane:** a flat polygon
+  drawn green over points that are not on it (no dart under a circle). **A stated angle at a polygon's corner is its interior
+  angle** (#2813, ADR-3D-490; 2-D's FR-EN-16): a corner stated «∠BCD = 110°» is never seated as the reflex corner of a dent, and
+  stated interior angles summing to at least (n − 3)·180° («מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°») put the letters in convex
+  position, so another order («מרובע ABDC») is refused on the line that completes it — the ring or the angle line — naming the
+  angle lines, with «שנו את אחת הזוויות או את סדר האותיות». **Nor is one drawn off one plane:** a flat polygon
   declared over points the figure has already PLACED — typed coordinates, a coordinate given, a derived point over
   those, or a solid's vertex — whose vertices do not lie in one plane («A(0,0,0) · B(4,0,0) · C(4,3,0) · D(0,3,5) ·
   מרובע ABCD», «קובייה ABCDA'B'C'D' · מרובע ABCA'») is refused on the line that completed it, naming the
@@ -981,6 +1016,23 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   opens, never refused. «הציגו תצורה אחרת» redraws every shape. A figure tied to coordinates, a coordinate letter, a free
   vector, a stated size or a solid of revolution is still drawn as one.
   - Sources: ADR-3D-454, ADR-3D-455; #2764.
+- **FR-SP-31 (Must)** — **The exam's subject frame reads as its statement** (#2062; operator 2026-10-14, card
+  `d14b-2062-frame` A: *"read in front of any statement, in all three tools"*). «הנקודה M מקיימת BM = 1/6u − 2/3v +
+  1/12w», «נקודה M מקיימת: …», «M מקיים …», "the point M satisfies …" build exactly as the statement after the frame
+  does, behind «נתון כי» too, whenever that statement names M. A frame whose statement does not name its point
+  («הנקודה D מקיימת AB = 3») is not read this way. 2-D and analytic read the same frame (ADR-819, ADR-AG-460).
+  A vector term with a minus and a divisor («BN=u/2-v/2», «BK=-v/2+w/4») builds as its «−1/2v» spelling does (two spellings
+  of one vector, docs/17 §9).
+  - Sources: ADR-3D-479; #2062.
+- **FR-SP-32 (Must)** — **Whether a point lies in a plane is in the data panel, and the exam's question points there**
+  (#2062; operator 2026-10-14, card `d14b-2062-question` A, *"if now - we should"*). The panel's mutual-position
+  section lists, for every point the student introduced that is not a vertex of a solid, against every plane in the
+  figure it does not define: «M נמצאת במישור AEC» or «M אינה נמצאת במישור AEC», only when it holds in every
+  configuration. «האם הנקודה M נמצאת במישור AEC?» (the main input or the ask box, "is M in plane AEC?" too) adds
+  nothing to the figure and answers «התשובה מופיעה בלוח הנתונים — שורת המיקום ההדדי של M ומישור AEC»; the main input
+  opens the panel, and the row is highlighted. Where the panel has no such row, the answer is «לא נקבע על ידי הנתונים».
+  The question never goes to the model.
+  - Sources: ADR-3D-480; #2062.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

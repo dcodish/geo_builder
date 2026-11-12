@@ -121,6 +121,12 @@ export type ApplyErrorCode =
    */
   | 'ring-contradicts-noun'
   /**
+   * #2813 (ADR-AG-471, 2-D's ADR-823): a ring its STATED INTERIOR ANGLES put in convex position, and another declared
+   * order of its letters, which must cross. Emitted by `derive` only, on the line that completes it: `polygon` the proved
+   * ring, `pair` the other order, `declared` the angle lines as typed (each in guillemets).
+   */
+  | 'ring-contradicts-angles'
+  /**
    * A HEIGHT STATED AS A MAGNITUDE ON A SHAPE WITH SEVERAL HEIGHTS (#1737, ADR-AG-265; 2-D's ADR-575) — «גובה המשולש
    * 4», «גובה המקבילית הוא 4»: which one is the student's to say (ADR-052), so it is ASKED, `options` the sentences
    * that each build, carrying the student's own connective and value.
@@ -3394,6 +3400,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
             ok: true,
             effect: 'narrowed',
             next: { ...c, objects: c.objects.map((o) => (o.id === twin.id ? { ...twin, label, stated: twin.stated || f.stated } : o)) },
+            // #2790 (ADR-AG-463 Am. 1, judged Q-2790b (a)): a DRAWN line restated under the student's name over the tool's
+            // l-number is its own row with the already-held notice, and the name replaces the l-number (2026-10-20)
+            ...(twin.stated ? { notice: heldName(f.src, incoming) } : {}),
           };
         }
         if (verdict === 'already-named') {

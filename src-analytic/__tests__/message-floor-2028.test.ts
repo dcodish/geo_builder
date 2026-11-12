@@ -70,6 +70,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'kind-mismatch': [{ existing: 'curve:circle', expected: 'parabola' }],
   'does-not-exist': [{ existing: 'curve:circle' }],
   'ring-contradicts-noun': [{}],
+  'ring-contradicts-angles': [{ polygon: 'ABCD', pair: 'ABDC', declared: '«∠DAB = 70°», «∠BCD = 110°»' }],
   'polygon-collapsed': [{ polygon: 'ABC', shape: 'משולש', declared: 'משולש ABC' }],
   'inscribed-contradicts-noun': [{ shape: 'טרפז ישר זווית', forced: 'מלבן' }],
   'inscribed-contradicts-declared': [{ shape: 'טרפז ישר זווית', forced: 'מלבן', declared: 'משולש ABC' }],

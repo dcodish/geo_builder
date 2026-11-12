@@ -256,15 +256,17 @@ describe('#2490 — a pyramid over an existing base', () => {
     expect(derived().construction.solids).toHaveLength(1);
   });
 
-  it('an UNLETTERED pyramid never binds to the letters the parser gave it: today\'s reading stands (FR-SP-24 is the operator\'s)', () => {
-    for (const lines of [
-      ['משולש ABC', 'פירמידה ישרה שבסיסה משולש שווה שוקיים'],
-      [CUBE, 'פירמידה ישרה שבסיסה ריבוע'],
-      ['ריבוע ABCD', 'פירמידה ישרה שבסיסה טרפז שווה שוקיים'],
-    ]) {
+  it('an UNLETTERED pyramid never binds to the letters the parser gave it: a NEW pyramid on the first free letters (#2838, ADR-3D-486)', () => {
+    for (const [lines, drawn] of [
+      [['משולש ABC', 'פירמידה ישרה שבסיסה משולש שווה שוקיים'], 'pyramid3:DEFG'],
+      [[CUBE, 'פירמידה ישרה שבסיסה ריבוע'], 'pyramid4:EFGHI'],
+      [['ריבוע ABCD', 'פירמידה ישרה שבסיסה טרפז שווה שוקיים'], 'pyramidTrapR:EFGHI'],
+    ] as const) {
       build(lines);
-      expect(state().lastError, lines.join(' · ')).toEqual({ code: 'already-defined', id: 'A' });
-      expect(state().facts, lines.join(' · ')).toHaveLength(1);
+      expect(state().lastError, lines.join(' · ')).toBeNull();
+      expect(state().facts, lines.join(' · ')).toHaveLength(2);
+      expectAllOk();
+      expect(derived().construction.solids.map((s) => `${s.kind}:${s.ids.join('')}`), lines.join(' · ')).toContain(drawn);
     }
   });
 });
@@ -375,14 +377,14 @@ describe('#2490 — an unstated pyramid base keeps the shape of the ring it stan
     expect(state().lastError).toEqual({ code: 'shape-disjoint', stated: 'rectangle', actual: 'trapezoid' });
   });
 
-  it('the pyramid typed again is still «already stated», with a shape reference elsewhere in the figure too', () => {
+  it('the pyramid typed again is held (#2790: its own row), with a shape reference elsewhere in the figure too', () => {
     for (const lines of [['מרובע ABCD', 'פירמידה ABCDS'], ['משולש EFG', 'המשולש ישר זווית', 'מרובע ABCD', 'פירמידה ABCDS']]) {
       build(lines);
       const n = state().facts.length;
       submit('פירמידה ABCDS');
       expect(state().lastError, lines.join(' · ')).toBeNull();
-      expect(state().lastNotice, lines.join(' · ')).toEqual({ code: 'already-stated' });
-      expect(state().facts, lines.join(' · ')).toHaveLength(n);
+      expect(state().lastNotice, lines.join(' · ')).toEqual({ code: 'already-held' });
+      expect(state().facts, lines.join(' · ')).toHaveLength(n + 1);
     }
   });
 });

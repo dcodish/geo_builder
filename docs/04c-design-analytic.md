@@ -379,7 +379,8 @@ that rewrite to the twin's own text, so no second lowering exists: `circleCentre
 named by its centre with an equation), `centresRespectivelyClauses` (two namings paired by the shared `respectively`
 helper), `namedCirclesClauses` (a plural subject distributed over its named members), the copula/construct forms in
 `centreClauses` and `diameterClauses`, and `satisfiesClause` (taken in `readLine` only when the statement's facts name
-the point; the point is then declared). `circleCentreClauses` keeps the A2 ordinal («M מרכז המעגל האחד EQ»; English "one of
+the point; the point is then declared; the colon after the verb and the masculine «מקיים» since ADR-AG-460, #2062 — the
+spelling 2-D's `readSubjectFrame` and 3-D's `readSubjectFrame3` share). `circleCentreClauses` keeps the A2 ordinal («M מרכז המעגל האחד EQ»; English "one of
 the circles" / "the other circle"), which `centreOfCircle` reads off the tail (`PAIR_ORDINAL`) as `centre-of { ofPair }`
 ([ADR-AG-322](06c-decisions-analytic.md#adr-ag-322), #2397). `orthography` folds a capital's underscored digit index into the subscript
 glyph (`SUB_INDEX`), and `unwrap`'s glued «ש-» after a given-word never takes the first letter of a cardinal
@@ -809,7 +810,9 @@ constraint records.
 #### Incidence in every order ([ADR-AG-164](06c-decisions-analytic.md#adr-ag-164), #1281, #1495)
 
 `parseIncidence` normalises any order into the canonical sentence (`viaCanonical`); a coordinate point is a
-`MINT_PREFIX` placeholder named by `derive.resolveMints` (`Derivation.minted`). `incidenceOn` is the one operand
+`MINT_PREFIX` placeholder named by `derive.resolveMints` (`Derivation.minted`). The letters it treats as taken are
+those of the lines up to the mint's own, never a later line's ([ADR-AG-464](06c-decisions-analytic.md#adr-ag-464), #2848): a later
+line that types the minted name refers to that point, and one that defines another point under it is a name clash. `incidenceOn` is the one operand
 resolver ([ADR-AG-168](06c-decisions-analytic.md#adr-ag-168)); an equation operand (`eqSrc`/`eq`) resolves by
 `resolveCurveByEq`, so `curve-anon` ids never reach a refusal. Crossing spellings go through
 `intersectionSpellings` and `meetingSpelling` ([ADR-AG-230](06c-decisions-analytic.md#adr-ag-230); `CONCURRENCY_HE`);
@@ -1058,6 +1061,13 @@ and the line-first order of `parseCircleAt`. The inscribed family adds `parseCon
 and «קודקודי ה<noun> XYZW נמצאים על <host>» (`VERTICES_ON_HE/EN`) is `cyclicFacts` on a circle and
 `conicInscribedFacts` on a conic. A conic takes no name or centre tail: the fact carries its kind as
 `host?: ConicHost` beside `circle?`, absent for the circle.
+
+**The host phrase's three spellings** ([ADR-AG-468](06c-decisions-analytic.md#adr-ag-468), #2502). After the chord or the diameter
+the host is «ב(ה)…», «של ה…» or the construct state «ה…» with no preposition: `CHORD_HOST_HE` for the one chord (the same
+three groups as `CHORD_CIRCLE_HE`, which the pair and list readers keep), and a `(?=ה)` alternative to the preposition
+group in `DIAM_HE` / `DIAM_NOUN_FIRST_HE` (no group added, so the define rule — «של מעגל» with no article — is unchanged).
+The host BEFORE the ends («קוטר האליפסה AB», «מיתר המעגל AB») is `hostBeforeEnds`, a rewrite to «קוטר AB של האליפסה» at
+the entry of `parseCircleThru` and `parseChord`, so the two orders cannot lower apart.
 
 **Apply: one resolver.** `curveHost(c, host, name, src)` is `circleNamed` with no host, and otherwise the figure's ONE
 curve of that kind (`noHost` for none or several). `tangent-of`, `tangent-line-at`, `tangent-eq` (through `tangent-of`),
@@ -1612,7 +1622,18 @@ the constraints' tangent space, tolerance relative to the read's own scale — a
 freedom). An affine map keeps every proper crossing, so 0 proves it. The arm adds those `crossed` faults; `decideSubmit`
 re-attributes a fault that appeared to the submitted line, so the ring-first order refuses the shape line.
 
-**…or STRUCTURALLY, with no figure at all** ([ADR-AG-261](06c-decisions-analytic.md#adr-ag-261), #1991). The walk's evidence
+**A stated corner is the interior corner** ([ADR-AG-471](06c-decisions-analytic.md#adr-ag-471), #2813). `ringFaultsOf`
+reports a simple ring that seats a STATED corner (`statedCornersAg`: an `angle` constraint of any measure, or a corner
+`perpendicular`, between the vertex's two ring neighbours) against the ring's orientation as the hard `reflex-corner` fault,
+so `drawableAt` never draws it. `ringConvexityProofAg` (rings.ts, 2-D's `ringConvexityProofs` copied) returns the
+constraints whose stated degrees sum to at least (n − 3)·180°, a proof of convex position that `ringOrderFault` reads beside
+the noun (below): the angle lines join the blame and the fault is `ring-contradicts-angles` (`polygon`, `pair`, `declared`).
+
+**…or STRUCTURALLY, with no figure at all** ([ADR-AG-261](06c-decisions-analytic.md#adr-ag-261), #1991; the proof is
+`ringConvexityProofAg` in rings.ts since #2812, [ADR-AG-475](06c-decisions-analytic.md#adr-ag-475): the noun, or ONE CIRCLE
+through every letter — a `circle-thru`'s through points, or an `on-curve` constraint on a circle object for each other letter,
+which is what «מעגל חוסם את ABCD» and a rider «D על המעגל» lower to; rings of four or more; the lines that made the circle
+and its riders join the blame, so the circle line that completes it is the one refused). The walk's evidence
 needs a candidate whose GIVENS hold, and a second ring's own noun can be exactly what cannot hold — «ריבוע ABCD» ·
 «מקבילית ACBD» leaves `forcedCrossed` empty and the crossed ring's `ringDof` at 4, so both arms above are silent and
 «לא נמצאה תצורה» spoke for an order mistake. `derive`'s `ringOrderFault`, computed before the drop-one probe's arms,
@@ -1952,13 +1973,15 @@ by a line id, drawn BESIDE the name (2026-10-09 answer 4) through the same place
 Each is a facet, a reader in `cleanAnnotations`, and a projection into `SceneKnowledge`; no store or envelope field.
 
 **The chip.** `app/conicMarks.ts` `conicChips(d, annotations)`: one per STATED parabola or ellipse, on its
-`objectLine` row, in the givens row's `trail` seat after the locus chips; `state` and `next` from
-`CONIC_CYCLE` (none → directrix → focus → both). The label key is `conicChip.<kind>.<next>`. A press is
+`objectLine` row, in the givens row's `trail` seat after the locus chips; `state` and `next` from the kind's cycle
+(#2709, [ADR-AG-466](06c-decisions-analytic.md#adr-ag-466)): a parabola's `CONIC_CYCLE` (none → directrix → focus → both),
+an ellipse's `ELLIPSE_CYCLE` (none → focus). `stateOn` is the ONE read of the map for the chip and the marks: a state
+the kind lacks (a saved `both` / `directrix` on an ellipse) folds to `focus` / `none`; the map is never rewritten. The label key is `conicChip.<kind>.<next>`. A press is
 `setAnnotations(withConic(map, id, next))`: one undo entry, nothing submitted.
 
 **The marks.** `conicMarksOf(d, annotations, hidden)` returns world-space marks from the closed forms
-(`parabolaFocus`, `parabolaDirectrix`, `ellipseFoci`, `ellipseDirectrices` — new, `x = ±a²/c` or `y = ±b²/c`, null
-when a = b). Labels: the book's letter unless a student's point holds it (`F₁` ≡ `F1`), plus `(x, y)` through
+(`parabolaFocus`, `parabolaDirectrix`, `ellipseFoci`; an ellipse draws no directrix, #2709, and `ellipseDirectrices`
+is gone). Labels: the book's letter unless a student's point holds it (`F₁` ≡ `F1`), plus `(x, y)` through
 `fmtAnalytic` only when `knownCurve` holds; a directrix's `roleLineOf` (the panel's `roleLineText`) only when known;
 nothing at all where a student's point stands at the focus. A hidden curve (#2238) draws none. `buildScene` takes them
 as `SceneKnowledge.roleMarks` and returns `scene.roles`: foci as dots, directrices clipped to the view box by
@@ -2246,7 +2269,7 @@ range tail read here only when it is selectors (any other tail is the condition 
 
 #### The way in: the chip and the guide row ([ADR-AG-352](06c-decisions-analytic.md#adr-ag-352), #1177; the only way in since [ADR-AG-381](06c-decisions-analytic.md#adr-ag-381), #2673)
 
-`locusChips(d)` (`app/locusChip.ts`) returns one chip per figure point for which the engine's `hasLocus` holds at `d.seed`, started from `drawableAt`'s free positions (`locusOf`'s start). It sits on the line `Construction.objectLine` names — #1687's line provenance (ADR-AG-348), the fold's per-object attribution (the first commit whose construction holds the id, mapped to its line); one record serves the solve's fit and the chip (ADR-AG-352 Am. 1). The chip carries the sentence «המקום הגיאומטרי של X». `App.tsx` renders it in `FactRow.trail`; a click is `pressChip` (`app/answers.ts`), the measure menu's ADR-AG-067 lifetime (`toggleDrawn`) over a record marked `AskedQuestion.via: 'chip'`, and its label follows `chipState` (`'off' | 'drawn' | 'hidden'`; a later state is a new member and a new arm). A record is identified by its sentence AND its `via` (`isQuery`), so the chip's question and the same words typed are two rows. The page answers a record by `askSettled(d, sentence, fmt, kindWord, q.via)`, and `askOne`'s one gate, where `LOCUS_OF` has matched and before the name is looked up, answers every record not `via: 'chip'` with `Answer.chipOnly`, worded `askLocusByChip` (the chip named by `locusChipShow`). `askLocus(d, id, …)` (`app/locusChip.ts`) is the chip's entry point for tests and corpus checks. A chip-only whole is split like a `missing` one (`splitAsk`), so a conjoined question keeps its other parts. The guide's locus row is `lane: 'chip'` in category `locus`: its example is the chip's label, its description (`guideLocusChip`) its `needs` and its `point`, and it has no «try». The construction lane is `!e.lane` in every consumer: the LLM vocabulary, the parse and build guards, and the corpus. The one-line point is arm 4 of the lost-part refusal (`declinedPointProperty`): taught only when both parts record.
+`locusChips(d)` (`app/locusChip.ts`) returns one chip per figure point for which the engine's `hasLocus` holds at `d.seed`, started from `drawableAt`'s free positions (`locusOf`'s start), and `onFixedCarrier` does not ([ADR-AG-472](06c-decisions-analytic.md#adr-ag-472), #2849): a point stated on a carrier that holds still (`on-curve`, `on-line`, `on-line-2pt`) has that carrier for its locus, already drawn. `onFixedCarrier` (`engine/locus.ts`) reads the point's part (`locusPartAt`) with the parameters fixed, as `hasLocus` does; the carrier holds still when no point it is built from (`inputsOf`) moves along any free direction of the part (`jacobianRank`'s null basis, central differences, `MOVES`). The chip is decided in that one loop; the ask answers a chip's record and never re-decides it. It sits on the line `Construction.objectLine` names — #1687's line provenance (ADR-AG-348), the fold's per-object attribution (the first commit whose construction holds the id, mapped to its line); one record serves the solve's fit and the chip (ADR-AG-352 Am. 1). The chip carries the sentence «המקום הגיאומטרי של X». `App.tsx` renders it in `FactRow.trail`; a click is `pressChip` (`app/answers.ts`), the measure menu's ADR-AG-067 lifetime (`toggleDrawn`) over a record marked `AskedQuestion.via: 'chip'`, and its label follows `chipState` (`'off' | 'drawn' | 'hidden'`; a later state is a new member and a new arm). A record is identified by its sentence AND its `via` (`isQuery`), so the chip's question and the same words typed are two rows. The page answers a record by `askSettled(d, sentence, fmt, kindWord, q.via)`, and `askOne`'s one gate, where `LOCUS_OF` has matched and before the name is looked up, answers every record not `via: 'chip'` with `Answer.chipOnly`, worded `askLocusByChip` (the chip named by `locusChipShow`). `askLocus(d, id, …)` (`app/locusChip.ts`) is the chip's entry point for tests and corpus checks. A chip-only whole is split like a `missing` one (`splitAsk`), so a conjoined question keeps its other parts. The guide's locus row is `lane: 'chip'` in category `locus`: its example is the chip's label, its description (`guideLocusChip`) its `needs` and its `point`, and it has no «try». The construction lane is `!e.lane` in every consumer: the LLM vocabulary, the parse and build guards, and the corpus. The one-line point is arm 4 of the lost-part refusal (`declinedPointProperty`): taught only when both parts record.
 
 *Identifiers:* `locusChips` · `objectLine` · `declinedPointProperty` · `pressChip` · `chipState` · `askLocus` · `lane: 'chip'`
 
