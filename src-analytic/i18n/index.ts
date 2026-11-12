@@ -121,6 +121,8 @@ const he = {
   askUnreadable: 'לא זוהה — נסו A, AB, שטח ABC, שיפוע AB',
   // #2673 (ADR-AG-381) — a typed locus question points at the chip (the session's words, ADR-W-174)
   askLocusByChip: 'את המקום הגאומטרי מציגים בכפתור «{{chip}}» שליד הנקודה ברשימת הנתונים.',
+  // #2865 (ADR-AG-477) — a typed locus question about a point stated on a fixed curve (operator, 2026-11-12, option (b))
+  askLocusIsCarrier: '{{point}} נמצאת על {{curve}} — המקום הגאומטרי שלה הוא העקום עצמו.',
   // #2673 — the guide's locus row teaches the chip: the givens it appears after, and where to press it
   guideLocusChip: 'הקלידו את הנתונים {{lines}}, ואז לחצו על הכפתור בשורה של {{point}}.',
   // #1431 — the contextual distance could not resolve; name which noun to letter
@@ -546,6 +548,9 @@ const he = {
   nounTheParabolas: 'הפרבולות',
   nounTheEllipses: 'האליפסות',
   nounTheCurves: 'העצמים',
+  // #2865 — a carrier the givens name: «P על הקטע AB», «A על ציר ה-x»
+  nounTheSegment: 'הקטע',
+  nounTheAxis: 'ציר ה-{{axis}}',
   kindMidpoint: 'אמצע קטע',
   kindCentroid: 'מפגש התיכונים',
   kindIncentre: 'מפגש חוצי הזוויות',
@@ -780,6 +785,7 @@ const en: typeof he = {
     'the lines intersect, so there is no single distance between them — it is zero at the crossing and grows away from it. A distance is defined only between PARALLEL lines. You can ask for the distance from a point to a line, for example "the distance from A to line l1", or name the crossing point itself.',
   askUnreadable: 'not recognised — try A, AB, area ABC, slope AB',
   askLocusByChip: 'A locus is shown with the «{{chip}}» button beside the point in the givens list.',
+  askLocusIsCarrier: '{{point}} lies on {{curve}} — its locus is the curve itself.',
   guideLocusChip: 'Type the givens {{lines}}, then press the button on the row of {{point}}.',
   askContextualPoint: 'the figure has {{points}} points — name the point (e.g. "המרחק של A מהישר")',
   askContextualLine: 'the figure has {{lines}} lines — name the line (e.g. "המרחק של הנקודה מהישר l1")',
@@ -1131,6 +1137,8 @@ const en: typeof he = {
   nounTheParabolas: 'the parabolas',
   nounTheEllipses: 'the ellipses',
   nounTheCurves: 'the objects',
+  nounTheSegment: 'the segment',
+  nounTheAxis: 'the {{axis}}-axis',
   kindMidpoint: 'a midpoint',
   kindCentroid: 'the centroid',
   kindIncentre: 'the incentre',

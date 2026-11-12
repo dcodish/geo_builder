@@ -528,17 +528,31 @@ export function hasLocus(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>
  * itself moves («P על הישר AB» while A moves) traces something else and is not this case.
  */
 export function onFixedCarrier(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed = 0, choiceSeed?: number): boolean {
+  return fixedCarrierOf(raw, env, id, start, seed, choiceSeed) !== null;
+}
+
+/**
+ * THE INCIDENCE STATEMENT a point's fixed carrier was stated by (#2865, ADR-AG-477) — `onFixedCarrier`'s own decision, with
+ * the carrier it found, so the typed locus question can NAME the curve whose chip #2849 dropped. Null when there is none.
+ */
+export type FixedCarrier =
+  | { t: 'on-curve'; curve: Id }
+  | { t: 'on-line'; a: number; b: number; c: number }
+  | { t: 'on-line-2pt'; a: Id; b: Id; bounded?: boolean };
+
+export function fixedCarrierOf(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed = 0, choiceSeed?: number): FixedCarrier | null {
   const c: Construction = locusPartAt(raw, seed, choiceSeed ?? choiceSeedOf(raw, seed), id);
-  const carriers: Id[][] = [];
+  const carriers: Array<{ k: FixedCarrier; pts: Id[] }> = [];
   for (const k of c.constraints) {
-    if (k.t === 'on-line' && k.id === id) carriers.push([]);
-    else if (k.t === 'on-curve' && k.id === id) carriers.push(inputsOf(c, k.curve).points);
-    else if (k.t === 'on-line-2pt' && k.id === id) carriers.push([k.a, k.b]);
+    if (k.t === 'on-line' && k.id === id) carriers.push({ k: { t: 'on-line', a: k.a, b: k.b, c: k.c }, pts: [] });
+    else if (k.t === 'on-curve' && k.id === id) carriers.push({ k: { t: 'on-curve', curve: k.curve }, pts: inputsOf(c, k.curve).points });
+    else if (k.t === 'on-line-2pt' && k.id === id)
+      carriers.push({ k: { t: 'on-line-2pt', a: k.a, b: k.b, ...(k.bounded ? { bounded: true } : {}) }, pts: [k.a, k.b] });
   }
-  if (carriers.length === 0) return false;
+  if (carriers.length === 0) return null;
   const sys = carrierSystem(c, env, { params: 'fixed' });
   const x0 = sys.toVec(start);
-  if (x0.some((v) => !Number.isFinite(v))) return false;
+  if (x0.some((v) => !Number.isFinite(v))) return null;
   const nullBasis = sys.ids.length === 0 || sys.residualsAt(x0).length === 0 ? [] : jacobianRank(x0, sys.residualsAt).nullBasis;
   const ups = nullBasis.map((b) => sys.positionsAt(x0.map((v, k) => v + MOTION_STEP * b[k])));
   const dns = nullBasis.map((b) => sys.positionsAt(x0.map((v, k) => v - MOTION_STEP * b[k])));
@@ -548,7 +562,35 @@ export function onFixedCarrier(raw: Construction, env: Env, id: Id, start: Map<I
       const b = dns[j].get(p);
       return !a || !b || Math.hypot(a.x - b.x, a.y - b.y) / (2 * MOTION_STEP) <= MOVES;
     });
-  return carriers.some((pts) => pts.every(still));
+  return carriers.find(({ pts }) => pts.every(still))?.k ?? null;
+}
+
+/**
+ * THE ONE DECISION #2849 DROPS A CHIP BY, at the configuration shown (#2865, ADR-AG-477): the point moves along one
+ * direction (`hasLocus`) and is stated on a carrier that holds still (`fixedCarrierOf`) — the carrier, or null. The chip
+ * loop (`locusChips`) and the typed locus question (`ask`) both ask it, so the question names exactly the curve whose chip
+ * is not there. `start` is built by the caller once per figure (`carrierStart`).
+ */
+export function locusIsFixedCarrier(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed: number, choiceSeed: number): FixedCarrier | null {
+  if (!hasLocus(raw, env, id, start, seed, choiceSeed)) return null;
+  return fixedCarrierOf(raw, env, id, start, seed, choiceSeed);
+}
+
+/**
+ * The drawn figure's free positions at the configuration shown, the walk's starting point — null when a free carrier has
+ * no position (nothing to start from). One reading for the chip loop and the typed question (#2865).
+ */
+export function carrierStart(raw: Construction, at: Seed): { env: Env; start: Map<Id, Pt>; seed: number; choice: number } | null {
+  const f = drawableAt(raw, at);
+  const start = new Map<Id, Pt>();
+  for (const o of raw.objects) {
+    if (!isFree(o)) continue;
+    const p = f.points.find((q) => q.id === o.id);
+    if (!p) return null;
+    start.set(o.id, { x: p.x, y: p.y });
+  }
+  const seed = configurationOf(at).seed;
+  return { env: f.env, start, seed, choice: drawnChoiceSeed(f, seed) };
 }
 
 /**

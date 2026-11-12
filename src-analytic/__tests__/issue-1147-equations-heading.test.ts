@@ -45,8 +45,11 @@ describe('#1147 — the equations section says «משוואות»', () => {
      * and prints NO equation for (`chose-2628-unnamed-locus`, ADR-W-174). It is not an equation called a curve — the
      * defect this sweep closes — but a curve with no equation, which is exactly where the word is the student's.
      * Listed by key, so any other string saying «עקום» still fails.
+     *
+     * And `askLocusIsCarrier` (#2865, ADR-AG-477): «… המקום הגאומטרי שלה הוא העקום עצמו.», the operator's own sentence
+     * (2026-11-12, Rulings Inbox option (b)). It names the drawn curve a point lies on as its locus, never an equation.
      */
-    const CURVE_NOT_EQUATION = /^\s*'locus\.unnamed(?:\.2)?':/;
+    const CURVE_NOT_EQUATION = /^\s*(?:'locus\.unnamed(?:\.2)?'|askLocusIsCarrier):/;
     const offenders = locale
       .split('\n')
       .filter((l) => /עקו[מם]/.test(l) && !l.trimStart().startsWith('*') && !l.trimStart().startsWith('//'))

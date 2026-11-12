@@ -14915,6 +14915,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 **Behaviour change for a student:** an ellipse whose axes are equal shows no focus chip, gets a clickable centre cross with «(0, 0)» (a click asks for a letter and records «K מרכז האליפסה»), its panel row lists «מרכז: (0, 0)» instead of the foci, and a notice says it is now a circle. «O מרכז האליפסה» is a new sentence for any ellipse.
 ## ADR-AG-381 — The locus is reached by its chip only: a typed locus question answers a pointer to the chip (#2673)
 
+> **⚠ Superseded in part** 2026-11-12 by [ADR-AG-477](#adr-ag-477) (#2865): a typed locus question about a point stated on a carrier that holds still (which has no chip since ADR-AG-472) answers that its locus is that curve, not the pointer. Every other point keeps the pointer.
+
 **Date:** 2026-11-03 · **Status:** accepted · feature (a withdrawal; P2, analytic) · fix round #2678 stream N · branch `feat/2673-locus-chip-only` · **Supersedes in part** [ADR-AG-072](#adr-ag-072) (the typed question), [ADR-AG-341](#adr-ag-341) (its wordings answer the pointer), [ADR-AG-316](#adr-ag-316) R10 (the set-former's condition trial), [ADR-AG-352](#adr-ag-352) (the guide row). LADDER stage: none (an ask-lane gate and a record field; no solve).
 **Requirements:** [02c](02c-requirements-analytic.md) F13, R87, R200 (rewritten), R60 and R69a (examples), R226 (new) · **Design:** [04c](04c-design-analytic.md) § *The way in: the chip and the guide row*, § *The exam's questions*.
 
@@ -16430,6 +16432,8 @@ This also settles the open card about the «both» state zooming out to keep an 
 
 ## ADR-AG-472 — A point stated on a given curve has no locus chip: its locus is that curve, already drawn (#2849)
 
+> **⚠ Amended** 2026-11-12 by [ADR-AG-477](#adr-ag-477) (#2865): Decision §2's "the ask does not read `hasLocus`" no longer holds. The typed locus question now asks the chip's own decision (`locusIsFixedCarrier`) to name the carrier, so the two cannot disagree.
+
 **Date:** 2026-11-12 · **Status:** accepted · bug (analytic, P2) · fix round #2855 stream F · branch `fix/2849-no-chip-on-given-curve` · **supersedes in part [ADR-AG-426](#adr-ag-426)** (which points get a chip) · **LADDER stage:** none (the chip's choice over the solved figure, not a rung)
 **Requirements:** [02c](02c-requirements-analytic.md) R200 (amended: a point on a given curve has no chip) · **Design:** [04c](04c-design-analytic.md) § "The way in: the chip and the guide row"
 **Operator:** 2026-11-12, on `x^2+2y^2=16` · «AB מיתר באליפסה» · «M אמצע AB»: *"in this case, A and B should not have the chip. they are on the ellipse so their locus is just the ellipse."*; then, confirming the reach: *"whenever a point is on a given curve, there is no point of giving it a chip. it just clutters the screen and is meaningless"*; and a second figure, `7x^2+9y^2=63` · «F1 מוקד ימני של האליפסה» · «F2 מוקד שמאלי» · «משולש F1F2D» · «D על האליפסה», where the chip sat on the triangle row: *"the show locus chip appears on the triangle for some reason"*.
@@ -16518,3 +16522,25 @@ This also settles the open card about the «both» state zooming out to keep an 
 **Ports (ADR-W-157).** 2-D is the reference and is unchanged. 3-D's circles are a different construct, so no port.
 
 **Behaviour change for a student:** in analytic, «AB קוטר האליפסה», «AB הוא קוטר האליפסה», «קוטר האליפסה AB» and «AB מיתר האליפסה» draw the diameter or chord of the drawn ellipse. «AB הוא קוטר המעגל», «קוטר המעגל AB», «CD הוא מיתר של המעגל» and «מיתר המעגל AB» draw on the drawn circle. With two curves of that kind the tool asks which. «AB קוטר הפרבולה» gets the parabola's «לפרבולה אין מרכז…» sentence. Before, each went to the AI.
+
+## ADR-AG-477 — Asking the locus of a point stated on a given curve answers that its locus is the curve itself (#2865)
+
+**Date:** 2026-11-12 · **Status:** accepted · bug (analytic, P2) · fix round #2855 stream N · branch `fix/2865-locus-ask-on-curve` · **amends [ADR-AG-472](#adr-ag-472)** (§2) · **supersedes in part [ADR-AG-381](#adr-ag-381)** (the typed question's pointer, for these points) · **LADDER stage:** none (the ask lane's wording over the solved figure)
+**Requirements:** [02c](02c-requirements-analytic.md) R200 and R226 (amended) · **Design:** [04c](04c-design-analytic.md) § "The way in: the chip and the guide row"
+**Operator:** 2026-11-12, Rulings Inbox card `d-2849-ask-pointer`, option **(b)**: answer «{P} נמצאת על {curve} — המקום הגאומטרי שלה הוא העקום עצמו.», the curve named as the givens name it.
+
+**Measured at pickup** (`origin/main` @ `b9f8b916`, `derive` → `ask` without `via`, model never called): `x^2+2y^2=16` · «AB מיתר באליפסה», ask «המקום הגיאומטרי של A» → `chipOnly`, worded «…מציגים בכפתור «הצג מקום גאומטרי» שליד הנקודה…». Since ADR-AG-472, A has no such button.
+
+**Root cause.** ADR-AG-472 narrowed WHICH points have a chip in the chip loop alone, and declared that the ask need not know. But the typed question's answer (ADR-AG-381's pointer) is a claim about the chip: it is true only of a point that has one. The pointer's gate never asked, so every point whose chip #2849 dropped was pointed at nothing.
+
+**Class.** Every point the chip loop drops by `onFixedCarrier`: a point on a stated curve (named, anonymous, by its equation), on an axis, on the line through two fixed points; in every wording the locus grammar reads (the plain question, «משוואת …», «הראו כי …», a part of a conjoined question). 2-D and 3-D have no locus chip, so nothing to port.
+
+**Decision.**
+1. **One decision for the chip and the question** (`engine/locus.ts`): `fixedCarrierOf` is `onFixedCarrier` returning the incidence statement it found; `locusIsFixedCarrier` = `hasLocus` and `fixedCarrierOf`, exactly the chip loop's skip; `carrierStart` is the free positions both read, at the configuration shown. `locusChips` reads `carrierStart` (unchanged behaviour).
+2. **The gate** (`app/ask.ts`, the one ADR-AG-381 gate): a question not `via: 'chip'` whose point `locusIsFixedCarrier` holds answers `Answer.onCarrier: { point, carrier }`; every other point keeps `chipOnly`. The chip's own record is answered as before (the curve's equation).
+3. **The carrier's name, as the givens name it** (`CarrierName`, worded by `carrierText` in `app/errorText.ts`): the definite noun, then the student's name (`statedName`: «המעגל I», «הישר l7», «הישר AB»), or for a curve without one its typed equation («הישר y=x», «המעגל x^2+y^2=4»; a tool l-number yields to it), or nothing for the one anonymous ellipse or parabola («האליפסה»; ADR-AG-005 D6 refuses a second); an axis is «ציר ה-x»; a bounded two-point carrier «הקטע AB».
+4. **Words:** `askLocusIsCarrier` (he: the operator's sentence; en: «{P} lies on {curve} — its locus is the curve itself.»), and the nouns `nounTheSegment`, `nounTheAxis`.
+
+**Locks.** Unit: `src-analytic/__tests__/ask.test.ts` (#2865 block: the tokens for an anonymous ellipse, a named circle, an anonymous circle, a line by its equation, a named line, the line through two points, an axis, the parabola; the pointer kept for a free point, the bisector, the chord midpoint and a point on a moving carrier; the chip's record unchanged; a conjoined question). `src-analytic/__tests__/issue-2865-locus-ask-on-curve.test.ts` (`pipeline-lock:`): the operator's lines through `decideSubmit` → `derive` → `askSettled`, worded he and en, at seeds 0 to 2. The #1147 «עקום» sweep (`issue-1147-equations-heading.test.ts`) lists `askLocusIsCarrier` by key beside `locus.unnamed`: the operator's sentence names the drawn curve a point lies on, never an equation.
+
+**Behaviour change for a student:** typing «המקום הגיאומטרי של A» for a point placed on a given curve answers «A נמצאת על האליפסה — המקום הגאומטרי שלה הוא העקום עצמו.» (the curve named as in the givens) instead of pointing at a «הצג מקום גאומטרי» button the point does not have. A free point and the bisector's «נקודה M» keep today's answers.

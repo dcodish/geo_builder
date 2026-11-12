@@ -14,6 +14,7 @@ import type { InputError } from '../store/useAnalyticStore';
 import type { HostRef } from '../engine/apply';
 import { hostKey, rangeText } from './hostKey';
 import { EN_SHAPE } from '../engine/shapes';
+import type { CarrierName } from './ask';
 
 /** The slice of i18next's `t` this needs — a key and its interpolation values, back a string. */
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -101,6 +102,16 @@ const THE_NOUN_KEY: Record<RefKind, string> = {
   ellipse: 'nounTheEllipse',
   curve: 'nounTheCurve',
 };
+
+/**
+ * A CARRIER AS THE GIVENS NAME IT (#2865, ADR-AG-477) — «האליפסה», «המעגל I», «הישר y=x», «הקטע AB», «ציר ה-x»: the
+ * definite noun and what `ask` found follows it.
+ */
+export function carrierText(c: CarrierName, t: Translate): string {
+  if (c.noun === 'axis') return t('nounTheAxis', { axis: c.name });
+  const noun = t(c.noun === 'segment' ? 'nounTheSegment' : THE_NOUN_KEY[c.noun]);
+  return c.name ? `${noun} ${c.name}` : noun;
+}
 
 /**
  * The curve a line has no further crossing with (#1909, #1932 — ADR-AG-292): the definite noun «הפרבולה», the

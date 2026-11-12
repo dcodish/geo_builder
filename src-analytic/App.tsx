@@ -38,7 +38,7 @@ import { derive } from './engine/derive';
 import { commitRecord, decideEditHost, decideSubmit, decideToggle, noticeText, reachesFallback, sentenceOutcome } from './app/submit';
 import { submitTyped, type SentenceOutcome } from '../shell/sentences';
 import { activeOf, activePins, rowOf } from './app/active';
-import { errorText as errorTextOf, type Translate } from './app/errorText';
+import { carrierText, errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
 import { nameRetryEvent } from '../shell/llm/retryLostNames';
 import { curveRowName, detailRowText, openCurveText, panelKnowledge, panelRowText, paramRows, segmentKnowledge, segmentLengthText, sideEquationText, slopeRowText, valueText } from './app/panelRows';
@@ -1152,7 +1152,10 @@ export function App() {
    * worded by the input's own refusal text, and a question the tool understands but does not answer by `errOutOfScope`.
    */
   const answerBody = (a: Answer) =>
-    a.chipOnly ? (
+    a.onCarrier ? (
+      /* #2865 (ADR-AG-477) — a typed locus question about a point stated on a fixed carrier: its locus is that curve */
+      `${a.question} — ${t('askLocusIsCarrier', { point: a.onCarrier.point, curve: carrierText(a.onCarrier.carrier, t as unknown as Translate) })}`
+    ) : a.chipOnly ? (
       /* #2673 (ADR-AG-381) — a typed locus question: the pointer to the chip, naming the chip by its own label */
       `${a.question} — ${t('askLocusByChip', { chip: t('locusChipShow') })}`
     ) : a.unsupported ? (

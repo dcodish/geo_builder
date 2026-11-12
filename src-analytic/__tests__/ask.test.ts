@@ -139,3 +139,44 @@ describe('#2625 (ADR-AG-454 Am. 1) — the centre of a parabola: there is none, 
     expect(answer(['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'], 'מרכז האליפסה').value).toBe('(0, 0)');
   });
 });
+
+/**
+ * #2865 (ADR-AG-477) — a typed locus question about a point whose chip #2849 dropped (stated on a carrier that holds still)
+ * names that carrier instead of pointing at a chip it does not have. The tokens `ask` returns; the page words them.
+ */
+describe('#2865 — the typed locus question of a point stated on a fixed carrier names the carrier', () => {
+  const locus = (lines: string[], p: string) => answer(lines, `המקום הגיאומטרי של ${p}`);
+
+  it.each([
+    ['the chord end on the anonymous ellipse: the noun alone', ['x^2+2y^2=16', 'AB מיתר באליפסה'], 'A', { noun: 'ellipse', name: '' }],
+    ['a named circle: its stated name', ['נתון מעגל I שמשוואתו x^2+y^2=4', 'M על המעגל I'], 'M', { noun: 'circle', name: 'I' }],
+    ['an anonymous circle: its equation', ['x^2+y^2=4', 'P על המעגל'], 'P', { noun: 'circle', name: 'x^2+y^2=4' }],
+    ['a line the student did not name: its equation, not the tool l-number', ['y=x', 'P על הישר y=x'], 'P', { noun: 'line', name: 'y=x' }],
+    ['a named line', ['נתון ישר l7 שמשוואתו y=2x+1', 'P על הישר l7'], 'P', { noun: 'line', name: 'l7' }],
+    ['the line through two fixed points', ['A(0,0)', 'B(4,0)', 'P על הישר AB'], 'P', { noun: 'line', name: 'AB' }],
+    ['an axis', ['נקודה A', 'A על ציר x'], 'A', { noun: 'axis', name: 'x' }],
+    ['the anonymous parabola', ['y^2=8x', 'P על הפרבולה'], 'P', { noun: 'parabola', name: '' }],
+  ])('%s', (_t, lines, p, carrier) => {
+    expect(locus(lines, p)).toEqual({ question: `המקום הגיאומטרי של ${p}`, value: null, onCarrier: { point: p, carrier } });
+  });
+
+  it.each([
+    ['a free point', ['נקודה P'], 'P'],
+    ['the bisector point (no carrier stated): its chip', ['A(0,0)', 'B(4,0)', 'נקודה M', 'MA = MB'], 'M'],
+    ['the chord midpoint (derived)', ['x^2+2y^2=16', 'AB מיתר באליפסה', 'M אמצע AB'], 'M'],
+    ['a point on a moving carrier', ['A(0,0)', 'נקודה B', 'AB = 3', 'P על הישר AB', 'AP = 1'], 'P'],
+  ])('%s keeps the pointer', (_t, lines, p) => {
+    expect(locus(lines, p).chipOnly).toBe(true);
+    expect(locus(lines, p).onCarrier).toBeUndefined();
+  });
+
+  it('the chip still answers the curve itself', () => {
+    const d = derive(['נתון מעגל I שמשוואתו x^2+y^2=4', 'M על המעגל I'], 0);
+    expect(ask(d, 'המקום הגיאומטרי של M', fmt, undefined, 'chip').onCarrier).toBeUndefined();
+  });
+
+  it('a conjoined question answers each part', () => {
+    const a = answer(['x^2+2y^2=16', 'AB מיתר באליפסה'], 'המקום הגיאומטרי של A ואת AB');
+    expect(a.parts?.[0].onCarrier).toEqual({ point: 'A', carrier: { noun: 'ellipse', name: '' } });
+  });
+});

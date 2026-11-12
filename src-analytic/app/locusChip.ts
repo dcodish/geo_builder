@@ -45,9 +45,8 @@
  */
 import { ask, type Answer } from './ask';
 import type { Derivation } from '../engine/derive';
-import { drawableAt, drawnChoiceSeed } from '../engine/evaluate';
-import { hasLocus, onFixedCarrier } from '../engine/locus';
-import { isFree, type Id } from '../engine/types';
+import { carrierStart, hasLocus, onFixedCarrier } from '../engine/locus';
+import type { Id } from '../engine/types';
 import { locusSentence } from '../parser/locusPhrases';
 
 /** The question a chip asks — the ask lane's own spelling (`LOCUS_OF`). */
@@ -82,22 +81,17 @@ export interface LocusChip {
  */
 export function locusChips(d: Derivation): LocusChip[] {
   if (d.figure.points.length === 0) return [];
-  const f = drawableAt(d.construction, d.configuration);
-  const start = new Map<Id, { x: number; y: number }>();
-  for (const o of d.construction.objects) {
-    if (!isFree(o)) continue;
-    const p = f.points.find((q) => q.id === o.id);
-    if (!p) return [];
-    start.set(o.id, { x: p.x, y: p.y });
-  }
+  const at = carrierStart(d.construction, d.configuration);
+  if (!at) return [];
+  const { env, start, seed, choice } = at;
   const chips: LocusChip[] = [];
   for (const p of d.figure.points) {
     const line = d.construction.objectLine?.[p.id];
     if (line === undefined) continue;
-    const choice = drawnChoiceSeed(f, d.configuration.seed);
-    if (!hasLocus(d.construction, f.env, p.id, start, d.configuration.seed, choice)) continue;
+    if (!hasLocus(d.construction, env, p.id, start, seed, choice)) continue;
     // #2849 (ADR-AG-472): a point stated on a carrier that holds still has that carrier for its locus, already drawn.
-    if (onFixedCarrier(d.construction, f.env, p.id, start, d.configuration.seed, choice)) continue;
+    // The typed question names that carrier by the same decision (#2865, `locusIsFixedCarrier`).
+    if (onFixedCarrier(d.construction, env, p.id, start, seed, choice)) continue;
     chips.push({ line, id: p.id, sentence: locusSentence(p.id) });
   }
   return chips;

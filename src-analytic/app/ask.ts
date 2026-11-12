@@ -23,8 +23,8 @@ import { foldIndexedName } from '../../shell/indexedName';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
-import { isKnowledge, knownCurve, knownOptions, knownValue, settled, vectorInLetters, withLetters, type Figure } from '../engine/evaluate';
-import { locusOf, type LocusResult } from '../engine/locus';
+import { isKnowledge, knownCurve, knownOptions, knownValue, settled, vectorInLetters, withLetters, type Figure, type FigureCurve } from '../engine/evaluate';
+import { carrierStart, locusIsFixedCarrier, locusOf, type FixedCarrier, type LocusResult } from '../engine/locus';
 import { fmtCoefficient } from '../format';
 
 import { curveByName, objectById, tangentLineId, type Id, type NumCurve } from '../engine/types';
@@ -213,11 +213,42 @@ export interface Answer {
    */
   chipOnly?: true;
   /**
+   * THE LOCUS IS THE CURVE THE POINT WAS STATED ON (#2865, ADR-AG-477). Since #2849 a point stated on a carrier that holds
+   * still has no chip, so the pointer (`chipOnly`) would point at nothing. Operator, 2026-11-12 (option (b)): say that its
+   * locus is the curve itself, the curve named as the givens name it. Tokens: the page words the noun and the sentence.
+   */
+  onCarrier?: { point: Id; carrier: CarrierName };
+  /**
    * UNDERSTOOD, NOT SUPPORTED (#2389 → #2393, ADR-AG-316) — «שיפוע המקום הגיאומטרי של M»: the locus is an answer, not an
    * object (operator ruling 2026-10-20 on #2389), so a measure of it is not a question this tool answers. Worded with the
    * existing `errOutOfScope`; it used to say the figure had no curve by that name.
    */
   unsupported?: true;
+}
+
+/**
+ * HOW THE GIVENS NAME A CARRIER (#2865): the noun's kind and what follows it — a curve's name («המעגל I», «ℓ1»), the
+ * equation of a curve the student gave no other name («הישר y=x»), nothing for the one anonymous ellipse or parabola
+ * («האליפסה»: ADR-AG-005 D6 refuses a second), the two letters of a line through two points («הישר AB», «הקטע AB»), or
+ * the axis's letter.
+ */
+export interface CarrierName {
+  noun: 'line' | 'circle' | 'parabola' | 'ellipse' | 'curve' | 'segment' | 'axis';
+  name: string;
+}
+
+function carrierName(d: Derivation, k: FixedCarrier): CarrierName {
+  if (k.t === 'on-line') return { noun: 'axis', name: k.a === 0 ? 'x' : 'y' };
+  if (k.t === 'on-line-2pt') return { noun: k.bounded ? 'segment' : 'line', name: k.a + k.b };
+  const fc = d.figure.curves.find((q) => q.id === k.curve);
+  const o = objectById(d.construction, k.curve);
+  const label = fc?.label ?? (o && 'label' in o ? (o.label as FigureCurve['label']) : undefined);
+  const noun = fc?.curve.kind ?? label?.kind ?? 'curve';
+  // The student's own name: «I» of `circle-I` (whose label reads «מעגל I»), «l7», «AB». A tool-given l-number (#2425) yields
+  // to the equation the student typed, as the givens read it.
+  if (label?.name && !label.auto) return { noun, name: statedName(k.curve) };
+  const anonymous = noun === 'ellipse' || noun === 'parabola';
+  return { noun, name: anonymous ? '' : (label?.eqSrc ?? label?.name ?? '') };
 }
 
 /**
@@ -501,9 +532,18 @@ function askOne(
      * of a conjoined question) is closed together. The chip asks the same sentence with `via: 'chip'` and is answered below,
      * unchanged. The point the question names is not looked up: the pointer is true of every figure.
      */
-    if (via !== 'chip') return { question, value: null, chipOnly: true };
     const name = loc[1].trim();
     const o = objectById(d.construction, name);
+    if (via !== 'chip') {
+      /*
+       * …EXCEPT A POINT WHOSE CHIP #2849 DROPPED (#2865, ADR-AG-477): its locus is the curve it was stated on, by the chip
+       * loop's own decision (`locusIsFixedCarrier`), so the answer names that curve instead of pointing at no chip.
+       */
+      const at = o ? carrierStart(d.construction, d.configuration) : null;
+      const k = at ? locusIsFixedCarrier(d.construction, at.env, name, at.start, at.seed, at.choice) : null;
+      if (k) return { question, value: null, onCarrier: { point: name, carrier: carrierName(d, k) } };
+      return { question, value: null, chipOnly: true };
+    }
     if (!o) return { question, value: null, missing: { name, kind: 'point' } };
     /**
      * TRACED AT THE CONFIGURATION BEING SHOWN (#1176), not at a fixed pair.
