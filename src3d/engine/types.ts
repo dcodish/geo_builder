@@ -19,6 +19,7 @@
  */
 
 import type { Vec3 } from './vec3';
+import type { Bound3 } from './bound3';
 // #587: the quad-base vocabulary is defined ONCE, in the base registry — the flat `quad-shape` command
 // names the same seven families the solid lane's bases do. Type-only, so the cycle is erased at compile.
 import type { QuadBase } from './baseShapes';
@@ -843,6 +844,18 @@ export interface ParamSignCommand {
   positive: boolean;
 }
 
+/** #1524 (ADR-3D-477) — a RANGE stated on a letter: «t ≥ 0», «k ≤ 3», «2 ≤ k ≤ 5», «k גדול מ-2». The sign's
+ *  sibling with any end and either strictness (a strict end at 0 alone is still lowered as `param-sign`); it shares
+ *  the sign's owner gate, the sign's branch selection, and narrows a free letter's sampled window. */
+export interface ParamBoundCommand {
+  type: 'param-bound';
+  sym: string;
+  lo: number | null;
+  hi: number | null;
+  loStrict: boolean;
+  hiStrict: boolean;
+}
+
 /** #1451 — the UNSIGNED declaration «t הוא פרמטר» / «t פרמטר» / "t is a parameter": an
  *  acknowledgment sharing param-sign's owner gate — idempotent ok for a letter the figure carries,
  *  the honest `unknown-symbol` for one it does not. */
@@ -1274,6 +1287,7 @@ export type Command3 =
   // it PINS THE SCALE — a free-dim figure is driven to it, a determined one verifies (M1).
   | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number }
   | ParamSignCommand
+  | ParamBoundCommand
   | ParamDeclCommand
   | Plane3Command
   | FreePlaneCommand
@@ -1619,7 +1633,7 @@ export interface Construction3 {
    *  coordinate sign given (`signGivens`) one lane wider: the same branch selection, keyed on the
    *  component the letter names rather than on a point+axis, so the vector and pair lanes are not a
    *  second mechanism. Evaluated by `componentValue`. */
-  componentSigns: { target: ComponentTarget; axis: 'x' | 'y' | 'z'; positive: boolean }[];
+  componentSigns: { target: ComponentTarget; axis: 'x' | 'y' | 'z'; bound: Bound3 }[];
   /** V4 — planes through points, name → ids (resolved from positions after the pivot). */
   pointPlanes: Map<string, Id[]>;
   /** #1485 (ADR-3D-278): point-run planes whose FIRST mention called them a face or a base — they draw
@@ -1707,7 +1721,7 @@ export interface Construction3 {
   determinations: Determination3[];
   /** ADR-3D-032 — sign givens on the figure parameter (`k הוא פרמטר חיובי`): select
    *  among the root branches. #325: also on a pin symbol (selects among pivot solutions). */
-  paramSigns: ParamSignCommand[];
+  paramSigns: { sym: string; bound: Bound3 }[]; // #1524 (ADR-3D-477): a sign is the interval (0,∞)/(−∞,0); a range any interval
   /** #324 (ADR-3D-079) — a named ring's relation to a COORDINATE plane/axis, as pivot
    *  residuals (absolute-frame, like injections): `share` = the ring shares its `axis`
    *  coordinate (∥ the coordinate plane ⟂ axis / ⟂ that axis), `zero` = that coordinate is 0
@@ -2342,6 +2356,9 @@ export type EngineError3 =
    * never heard of a letter it had just been given — a refusal naming a cause the figure contradicts.
    */
   | { code: 'sign-not-selectable'; id: string }
+  /** #1524 (ADR-3D-477): `sign-unsatisfiable` / `sign-not-selectable` for a stated RANGE («k ≥ 2»), worded for a range. */
+  | { code: 'param-bound-unsatisfiable'; id: string }
+  | { code: 'param-bound-not-selectable'; id: string }
   | { code: 'ambiguous-angle'; id: Id } // #251: a single-vertex angle whose arms cannot be resolved (≠2 edges at the vertex)
   | { code: 'no-prism-to-make-right' } // #289: `המנסרה ישרה` but the figure has no prism-like solid to make right
   | { code: 'ambiguous-prism' } // #289: `המנסרה ישרה` with more than one oblique prism — "the prism" is ambiguous

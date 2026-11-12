@@ -169,6 +169,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // select here), never that the letter is undefined.
     case 'sign-not-selectable':
       return t('err.signNotSelectable', { id: err.id });
+    case 'param-bound-not-selectable':
+      return t('err.paramBoundNotSelectable', { id: err.id });
     case 'ambiguous-angle':
       return t('err.ambiguousAngle', { id: err.id });
     case 'no-prism-to-make-right':
@@ -308,6 +310,9 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return t('err.injectionUnsatisfiable');
     case 'sign-unsatisfiable':
       return t('err.signUnsatisfiable', { id: err.id });
+    // #1524 (ADR-3D-477): a stated RANGE on a letter («k ≥ 2») the givens do not leave room for, worded for a range
+    case 'param-bound-unsatisfiable':
+      return t('err.paramBoundUnsatisfiable', { id: err.id });
     case 'no-such-solid':
       // #1455: an engine solid NOUN («pyramid», «cone») is the student's word in their language
       return t('err.noSuchSolid', { id: SOLID_NOUNS.has(err.id) ? t(`solidNoun.${err.id}`) : err.id });

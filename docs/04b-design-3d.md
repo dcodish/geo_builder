@@ -534,6 +534,18 @@ configuration. `knowledgeSamples3(c, seeds, { readback: true })` adds one image 
 non-zero; `dataView` and every `answerQuery` lane read back, claims and narrowing keep the plain samples, and the
 drawing never walks.
 
+### A letter's range is one interval (#1524, [ADR-3D-477](06b-decisions-3d.md#adr-3d-477))
+
+A sign («k חיובי», `t > 0`) and a range (`t ≥ 0`, `2 ≤ k ≤ 5`, «k לפחות 2») are one statement: an interval on a letter
+(`engine/bound3.ts`, `Bound3`). `param-sign` lowers to (0, ∞) / (−∞, 0) at apply and `param-bound` to its own ends; both
+land in `paramSigns` (or `componentSigns`, for a letter naming a free component) through the sign's owner gate. Every
+reader asks `bound3`: `boundHolds3` for the root filters, the pivot's pin-symbol filter, the free-vector check, the
+component check and the store's verifier; `boundWindow3` for a free value's sampled window (the coordinate parameter,
+the vec-def ratio, the free-vector sampler); `boundAnchor3` for the pivot's soft anchor; `boundReflect3` for the sign
+walk. A letter's statements fold in the order stated (`foldBounds3`), skipping one that would empty the range, so the
+verifier refuses the newer statement. A root filter reads only its own letter's range (`symBound3`). A new reader of a
+stated sign reads the interval, never a boolean.
+
 ### Who may introduce a point (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253); #1310, [ADR-3D-397](06b-decisions-3d.md#adr-3d-397))
 
 A **carrier** («נסמן: AB = u») never introduces its own subject in its own lane (`v7-t1`). The bare segment

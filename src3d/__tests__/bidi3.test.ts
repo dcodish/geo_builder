@@ -252,6 +252,16 @@ describe('#482 — the bidi alphabet cannot drift from the palette the tool offe
     expect(inserts.filter((i) => i === '||'), 'exactly one owner of ASCII ||').toHaveLength(1);
   });
 
+  it('#1524 (ADR-3D-478) — the palette offers every comparison, and each one it inserts BUILDS a range', () => {
+    const inserts = SYMBOL_PALETTE_3.map(([, insert]) => insert);
+    for (const op of ['<', '>', '≤', '≥']) {
+      expect(inserts, op).toContain(op);
+      const r = parse3(`k ${op} 2`);
+      expect(r.ok, op).toBe(true);
+      if (r.ok) expect(r.commands[0].type, op).toBe('param-bound');
+    }
+  });
+
   it('#511 — the palette offers the POWER, and the character it inserts BUILDS', () => {
     const inserts = SYMBOL_PALETTE_3.map(([, insert]) => insert);
     expect(inserts, 'the second half of the #509 report: a power was untypeable').toContain('²');
