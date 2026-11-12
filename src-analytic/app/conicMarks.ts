@@ -3,9 +3,11 @@
  * (`app/annotations.ts`, ADR-AG-375). And the conic that is a circle (ADR-AG-377).
  *
  * Operator rulings, quoted in the ADRs:
- * - 2026-10-09 / 2026-10-14: a four-state control, nothing → directrix → focus → both, the SAME on a parabola and an
- *   ellipse (an ellipse draws both foci and both directrices); its label names the NEXT action; the marks are named
- *   `F`, `F₁`/`F₂`, a directrix by its equation.
+ * - 2026-10-09 / 2026-10-14: a four-state control on a parabola, nothing → directrix → focus → both; its label names the
+ *   NEXT action; the marks are named `F`, `F₁`/`F₂`, a directrix by its equation.
+ * - 2026-11-04 (#2709, ADR-AG-466): *"foci only for ellipse."* An ellipse's chip is nothing → focus → nothing, and an
+ *   ellipse draws no directrix. A saved `directrix` / `both` on an ellipse is READ as nothing / focus (`stateOn`, the one
+ *   read of the map), never rewritten.
  * - #1863 (2026-10-07, line 3): values (a focus's coordinates, a directrix's equation) are written only when the givens
  *   determine them — the circle-centre rule (`knownCurve`, ADR-AG-036).
  * - sr-07 (2026-11-02): a tool label never repeats a student's letter; a focus the student lettered keeps its letter
@@ -24,11 +26,11 @@
  * `decideSubmit`, because it states nothing. Naming a focus (the click on its mark) is a sentence, and does.
  */
 import type { Derivation } from '../engine/derive';
-import { ellipseDirectrices, ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves';
+import { ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves';
 import { knownCurve, type Figure } from '../engine/evaluate';
 import type { NumCurve } from '../engine/types';
 import { fmtAnalytic } from '../format';
-import { conicStateOf, nextConic, showsDirectrix, showsFocus, type AnnotationMap, type ConicState } from './annotations';
+import { CONIC_CYCLE, ELLIPSE_CYCLE, conicStateOf, nextConic, showsDirectrix, showsFocus, type AnnotationMap, type ConicState } from './annotations';
 import { roleLineOf } from './curveText';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import type { EllipseSide } from '../engine/derived';
@@ -85,14 +87,30 @@ function stated(d: Derivation): Array<{ id: string; kind: ConicKind; name: strin
     .map((c) => ({ id: c.id, kind: c.curve.kind as ConicKind, name: c.label.name, curve: c.curve }));
 }
 
+/** Each kind's chip cycle (#2709, ADR-AG-466): a parabola's four states; an ellipse's foci only. */
+const CYCLE_OF: Record<ConicKind, readonly ConicState[]> = { parabola: CONIC_CYCLE, ellipse: ELLIPSE_CYCLE };
+
+/**
+ * THE ONE READ OF A CONIC'S STATE (#2709, ADR-AG-466) — the map's record folded onto the kind's cycle, for the chip and
+ * the marks alike. A state the kind does not have (a saved `both` or `directrix` on an ellipse, from before the
+ * 2026-11-04 ruling) reads as the focus when it showed the focus, else as nothing. The map itself is never rewritten:
+ * the next press writes the state the chip names.
+ */
+function stateOn(annotations: AnnotationMap, id: string, kind: ConicKind): ConicState {
+  const s = conicStateOf(annotations, id);
+  const cycle = CYCLE_OF[kind];
+  if (cycle.includes(s)) return s;
+  return showsFocus(s) && cycle.includes('focus') ? 'focus' : 'none';
+}
+
 /** One chip per stated parabola or ellipse (not a circle), on the row that introduced it, in figure order. */
 export function conicChips(d: Derivation, annotations: AnnotationMap): ConicChip[] {
   const out: ConicChip[] = [];
   for (const c of stated(d)) {
     const line = d.construction.objectLine?.[c.id];
     if (line === undefined) continue;
-    const state = conicStateOf(annotations, c.id);
-    out.push({ line, id: c.id, kind: c.kind, name: c.name, state, next: nextConic(state) });
+    const state = stateOn(annotations, c.id, c.kind);
+    out.push({ line, id: c.id, kind: c.kind, name: c.name, state, next: nextConic(state, CYCLE_OF[c.kind]) });
   }
   return out;
 }
@@ -120,7 +138,7 @@ export function conicMarksOf(d: Derivation, annotations: AnnotationMap, hidden: 
   const out: ConicMark[] = [];
   const taken = new Set(d.figure.points.map((p) => plain(p.id)));
   for (const c of stated(d)) {
-    const state = conicStateOf(annotations, c.id);
+    const state = stateOn(annotations, c.id, c.kind);
     if (state === 'none' || hidden(c.id)) continue;
     const known = knownCurve(d.construction, c.id) !== null;
     const v = (n: number) => fmtAnalytic(n);
@@ -139,13 +157,9 @@ export function conicMarksOf(d: Derivation, annotations: AnnotationMap, hidden: 
         out.push({ kind: 'focus', curve: c.id, x: f.x, y: f.y, ...(label ? { label } : {}), ...(letter ? { labelNoValues: letter } : {}), ...(offer ? { offer } : {}) });
       });
     }
-    if (showsDirectrix(state)) {
-      const lines =
-        c.curve.kind === 'parabola'
-          ? [parabolaDirectrix(c.curve) as NumCurve & { kind: 'line' }]
-          : c.curve.kind === 'ellipse'
-            ? (ellipseDirectrices(c.curve) ?? [])
-            : [];
+    // only a parabola's cycle reaches a directrix state (#2709): an ellipse draws none
+    if (showsDirectrix(state) && c.curve.kind === 'parabola') {
+      const lines = [parabolaDirectrix(c.curve) as NumCurve & { kind: 'line' }];
       for (const line of lines) out.push({ kind: 'directrix', curve: c.id, line, ...(known ? { label: roleLineOf(line) } : {}) });
     }
   }
