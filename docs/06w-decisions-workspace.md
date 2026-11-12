@@ -5165,7 +5165,7 @@ That makes two copies of one surface, with a third on the way. ADR-W-016 rule 1 
 
 ## ADR-W-107 — A claim to prove is refused in every builder, by one shared rule (#1666)
 
-**⚠ Amended by [ADR-W-194](#adr-w-194) (2026-11-08):** the builders no longer word their own refusal: it is one suite sentence, `suite.refusal.proofTarget`, followed by where the claim can be checked (2-D its relations button; analytic and complex their data panel; 3-D pending the operator, #2492).
+**⚠ Amended by [ADR-W-194](#adr-w-194) (2026-11-08):** the builders no longer word their own refusal: it is one suite sentence, `suite.refusal.proofTarget`, followed by where the claim can be checked (2-D its relations button; analytic and complex their data panel; 3-D what its data panel can check, [ADR-W-205](#adr-w-205)).
 
 **Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*. **Extends** [ADR-W-016](#adr-w-016) (a new `shell/` decision) and applies [ADR-W-071](#adr-w-071) (docs/28 §5c). Product sides: [ADR-561](06-decisions.md#adr-561) (2-D), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295) (3-D); analytic's first copy was ADR-AG-187 (#1618).
 
@@ -7208,6 +7208,8 @@ Each crash also reset the daily AI cap, the concurrency cap and the per-IP limit
 
 ## ADR-W-194 — The proof-target refusal is one suite sentence, and it says where the claim can be checked: 2-D its relations button, analytic and complex their data panel (#2492)
 
+**⚠ Amended by [ADR-W-205](#adr-w-205) (2026-11-12):** decision 4 is replaced. 3-D's refusal ends with a line of its own naming what its panel can check (operator 2026-11-10, option (b)).
+
 **Status:** accepted · 2026-11-08 · feature (P2, all four builders) · fix round #2745, stream G · branch `feat/2492-proof-target-check` · **Operator:** 2026-10-24, playing round #2466 T12: *"For all cases of הוכיחו we should add to the message that they can check if its true using the data panel. ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות וזוויות שוות."*; his ruling the same day (ballot e19, answer B with a note that wins over the card): *"Other tools have the data panel and there is a ask button there that might be able to answer such questions so for non-2d tools, we tell them to check the claim in the data panel"* · plan of 2026-10-24 (#2492), armed `auto-ok` on that ruling · **Amends** [ADR-W-107](#adr-w-107) (each builder no longer words its own refusal) · **Extends** [ADR-W-148](#adr-w-148) (two suite keys) · per-product notes on [ADR-561](06-decisions.md#adr-561), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295), [ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)
 **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 and its parity row *A proof target «הוכיחו כי»*; [02](02-requirements.md) FR-RV-1 (the refusal names the control); [02c](02c-requirements-analytic.md) *Out of the language*; [02d](02d-requirements-complex.md) FR-KN-2 · **Design:** [04w](04w-design-shell.md) § *Suite-wide text* and § *Proof targets*; [04d](04d-design-complex.md) (the complex wording site)
 
@@ -7475,3 +7477,19 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 1. **One notice key** for a held row in every builder: `suite.notice.alreadyHeld` — «זה כבר קיים באיור — נוסף כנתון נפרד.» / "That's already on the figure — added as a separate given." (new text of the session's, ADR-W-174). `suite.notice.alreadyDrawn` retires when the last builder ports.
 2. **One shared table** of held sequences and controls (`held-row-2790.ts`), asserted by each tree through its own decision: one row appended, the notice, no point moves, the relation holding once the earlier row is unticked and deleted.
 3. **Split landing.** The round landed 2-D first (the reference, ADR-W-118 B1), then analytic and complex (ADR-AG-462, ADR-AG-463, ADR-CX-089), each asserting the shared table through its own decision; until 3-D's port lands it answers a held line with its old no-row note — a parity known gap naming #2790.
+
+## ADR-W-205 — 3-D's proof-target refusal names what its own data panel can check: an angle, a perpendicular or a parallel (#2492)
+
+**Status:** accepted · 2026-11-12 · feature (P2, 3-D) · fix round #2855, stream H · branch `feat/2492-prove-refusal-check-pointer` · **Operator:** 2026-11-10, Rulings Inbox, on the 3-D arm escalated in #2492: chose **(b)** *"A 3-D line naming what its panel can check"*, with the example «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «נתונים»: שאלו שם על הזווית ולחצו «שאלו» — למשל ∠(AB, CD).»; the exact text is the session's (ADR-W-174), recorded with `judgments.mjs chose` (`text-2492-3d-proof-target-check`) · **Amends** [ADR-W-194](#adr-w-194) decision 4 · per-product note on [ADR-3D-295](06b-decisions-3d.md#adr-3d-295) · LADDER stage: **none** (a refusal's wording)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 and its parity row *A proof target «הוכיחו כי»* · **Design:** [04w](04w-design-shell.md) § *Proof targets* (the per-builder table)
+
+**Context, measured at pickup (`caf619a5`).** PR #2747 (ADR-W-194) is merged: 2-D, analytic and complex end the refusal with their line; 3-D reads the suite sentence alone. 3-D's ask box (`answerQuery` on `derive3`'s construction, the real submit path) answers the claims the line names: «מקבילית ABCD» `∠(AB, CD)` → «180°»; «תיבה ABCDA'B'C'D'» `∠(AB, D'C')` → «0°», `∠(AA', AB)` → «90°»; «פירמידה SABCD שבסיסה ריבוע · SA מאונך למישור ABCD» `∠SBC` → «90°», `∠(SA, BC)` → «90°». An equal-lengths claim on a figure with no stated size still has no answer there (ADR-W-194's table), which is why the line does not name lengths.
+
+**Decision.**
+1. **A 3-D product key**, `err.proofTargetCheck`: «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «$t(dataPanel.title)»: שאלו שם על הזווית ולחצו «$t(query.add)» — למשל ∠(AB, CD).» / "You can check a claim about an angle, a perpendicular or a parallel in the «$t(dataPanel.title)» panel: ask there for the angle and press «$t(query.add)» — for example ∠(AB, CD)." It renders as the ruling's example byte for byte. Not a suite key: no other builder says it (ADR-W-148's rule).
+2. **The names are nested** from the keys App3 draws the panel heading and the ask button with (`dataPanel.title`, `query.add`), never retyped.
+3. **`errorText3`** composes the refusal: the suite sentence quoting the claim, then the line. It is 3-D's one wording site, so the empty-canvas refusal is the same.
+
+**Locks.** `src3d/__tests__/proof-target-1666.test.ts`: «הוכיחו ש-AB = AC» after «משולש ABC», Hebrew and English, renders the suite sentence then the line, in full; the empty canvas reads the same; the locale nests both names and App3 draws `<DataPanel title={t('dataPanel.title')}>` and `<AskLane addLabel={t('query.add')}>` (`panelDrawnFaults`); the pointer is true: the ask box answers the line's example (180°), a box's parallel edges (0°) and a perpendicular (90°). `suite-vocabulary.test.ts`'s rule that no table outside 2-D names «הצג צלעות וזוויות שוות» still holds.
+
+**Behaviour change for a student:** in 3-D, a «הוכיחו…» line is refused as before, and the message now ends: «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «נתונים»: שאלו שם על הזווית ולחצו «שאלו» — למשל ∠(AB, CD).»

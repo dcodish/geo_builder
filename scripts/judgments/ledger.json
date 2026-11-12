@@ -4355,6 +4355,16 @@
       "reason": "Reverses ADR-3D-047's idempotent re-declare; no precedent.",
       "at": "2026-11-11T10:12:57.683Z",
       "status": "escalated"
+    },
+    {
+      "id": "text-2492-3d-proof-target-check",
+      "kind": "text",
+      "issue": "#2492",
+      "what": "3-D's «הוכיחו…» refusal: the line naming what its data panel can check (operator 2026-11-10, option (b)); the ruling's example kept byte for byte, the panel and button names nested from App3's keys",
+      "choice": "«ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «נתונים»: שאלו שם על הזווית ולחצו «שאלו» — למשל ∠(AB, CD).» / \"You can check a claim about an angle, a perpendicular or a parallel in the «Data» panel: ask there for the angle and press «Ask» — for example ∠(AB, CD).\"",
+      "chosen": true,
+      "at": "2026-11-12T09:33:24.810Z",
+      "status": "pending"
     }
   ],
   "demoted": {
