@@ -36,7 +36,7 @@ import { isTriangleNoun3, POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhra
 export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
 import { cyclicFixCommands, cyclicFixRelations, shapeInternal3, type QuadBase, type ShapeRelation3 } from '../engine/baseShapes';
 import { riderPairsT, riderWholeSide, riderWholeT } from '../engine/onSegmentRatio';
-import { MID_EN, MID_HE } from '../../shell/labelCase';
+import { MID_EN, MID_HE } from '../../shell/lexicon/labelSlots';
 
 export type ParseResult3 =
   // #1902 (ADR-3D-312): `unread` — words of the sentence the answering rule did not read (the inscription rule

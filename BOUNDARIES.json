@@ -243,6 +243,7 @@
     "src3d/i18n": "shell",
     "src3d/parser": "engine",
     "src3d/lexicon": "lexicon",
+    "shell/lexicon": "lexicon",
     "src3d/render": "engine",
     "src3d/store": "engine",
     "src3d/app": "engine",
@@ -285,6 +286,7 @@
   },
 
   "classificationNotes": {
+    "shell/lexicon": "The words of the certain lowercase-label slots (#2823, ADR-W-208): point and vertex nouns, polygon nouns with the length of the run each names, the midpoint frame, the angle word. lexicon: it names vocabulary and maps a noun to a vertex count, and reads nothing; shell/labelCase composes it, and 3-D's midpoint rule reads its frame.",
     "shell/seo": "The page a crawler reads (ADR-W-085): pure SeoPage -> HTML plus the Vite plugin that applies it. shell: it formats text a caller hands it and reasons about nothing; every word and URL arrives in the page.",
     "src/seo": "ASSETS, not code (ADR-W-085): the builder's icon.svg and the two PNGs regenerated from it and from the app. Each product owns its art, so the four seo/ directories are four sets of pictures rather than four copies of a mechanism -- the mechanism is shell/seo, once. src3d/seo, src-complex/seo and src-analytic/seo carry the same classification for the same reason.",
     "src-analytic/debug": "The dev session trace (ADR-AG-131). shell, and deliberately: it OBSERVES the session and reasons about nothing — it holds no geometry, decides nothing a figure depends on, and is a no-op outside DEV. The sibling copies src/debug and src3d/debug carry the same classification for the same reason.",

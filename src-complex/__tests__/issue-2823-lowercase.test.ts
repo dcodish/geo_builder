@@ -5,6 +5,9 @@
  * capitals is asked for in capitals.
  *
  * Measured at b9f8b916 through `decideSubmitCx`: «משולש abc» and "triangle abc" were refused not-understood.
+ *
+ * pipeline-lock: the fold runs inside `decideSubmitCx` before the grammar; the row text and its note are what the submit
+ * decision returns, which a saved fixture (replayed as saved, never folded) cannot reach.
  */
 import { describe, expect, it } from 'vitest';
 import { decideSubmitCx, labelCaseFoldCx } from '../app/submit';

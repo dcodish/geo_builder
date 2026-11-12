@@ -5,6 +5,9 @@
  *
  * Measured at b9f8b916 through `decideDeterministic2D`: every line below was refused with «שמות נקודות נכתבים באות
  * לטינית גדולה. נסו: …», the certain ones included.
+ *
+ * pipeline-lock: the fold is decided BEFORE the parse, by the submit and edit seams themselves, so what is locked is what
+ * those seams commit and say (the row text and the note) — no fixture or corpus scenario reaches the note or the edit seam.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

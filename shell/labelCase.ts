@@ -26,6 +26,8 @@
  * Never certain: a letter the figure already uses (`used`), an axis letter outside S1 and S3, a single letter after
  * the angle sign, and every unanchored run («d על AB», «ab = 5»). One uncertain run leaves the whole line to the ask.
  */
+import { AND_HE, ANGLE_WORD_HE, CLITIC, GIVEN_HE, HE_LETTERS, LIST_JOINT, MID_COPULA_HE, MID_EN, MID_HE, POINT_NOUN_EN, POINT_NOUN_HE, SHAPES, SHAPE_MOD, SUBJECT_NOUN_HE } from './lexicon/labelSlots';
+export { MID_COPULA_HE, MID_EN, MID_HE } from './lexicon/labelSlots';
 
 /** The notice an accepted, capitalised line carries (one suite key, every builder). */
 export const LABEL_CASE_NOTICE = 'suite.notice.labelCase';
@@ -48,6 +50,7 @@ export interface LabelFold {
   readonly folded: readonly string[];
 }
 
+
 const HEB = /[א-ת]/;
 const PRIME = `['’′″]`;
 /** one label: a letter, then digits or subscripts, then primes */
@@ -56,9 +59,7 @@ const TOK_G = () => new RegExp(TOK, 'g');
 /** the end of a run: no letter, digit or prime follows */
 const END = String.raw`(?![A-Za-z0-9₀-₉'’′″])`;
 /** the start of a word: not inside a Latin run or a Hebrew word */
-const START = String.raw`(?<![A-Za-z0-9₀-₉'’′″א-ת])`;
-/** a Hebrew word's clitic prefixes (ו, ב, ל, מ, ש, כ) and the article */
-const CLITIC = String.raw`(?<![א-ת])[ובלמשכ]{0,2}ה?`;
+const START = String.raw`(?<![A-Za-z0-9₀-₉'’′″${HE_LETTERS}])`;
 /** a maximal Latin run with a lowercase letter */
 const RUN_G = () => new RegExp(String.raw`${START}(?=[A-Za-z0-9₀-₉'’′″]*[a-z])[A-Za-z][A-Za-z0-9₀-₉'’′″]*`, 'g');
 
@@ -66,6 +67,11 @@ const RUN_G = () => new RegExp(String.raw`${START}(?=[A-Za-z0-9₀-₉'’′″
 const NOTATION = new Set(['cm', 'mm', 'km', 'sin', 'cos', 'tan', 'tg', 'ctg', 'cot', 'cotg', 'log', 'ln', 'sqrt', 'exp', 'abs', 'arg', 'cis', 'deg', 'rad', 'im', 're']);
 /** English function words — never a label in Latin-only text (2-D's FILLER set and 3-D's EN_STOP, joined). */
 const EN_STOP = new Set(['a', 'an', 'to', 'the', 'and', 'of', 'is', 'are', 'at', 'on', 'in', 'with', 'from', 'that', 'so', 'such', 'for', 'its', 'was', 'has', 'had', 'be', 'by', 'no', 'not', 'it', 'all', 'any', 'one', 'two', 'six', 'ten', 'how', 'why', 'who', 'what', 'side', 'root', 'each', 'both', 'then', 'than', 'this', 'into', 'onto', 'over', 'some', 'have', 'were', 'draw', 'show', 'let', 'say', 'as', 'or', 'if', 'we', 'us', 'he', 'she']);
+/**
+ * English words a shape noun is often followed by, used as a noun adjunct ("a kite base", "the square root"): never
+ * the vertex run of S2 or S4, though their letters are as many as the noun's vertices.
+ */
+const EN_FIGURE_WORDS = new Set(['base', 'bases', 'side', 'sides', 'edge', 'edges', 'face', 'faces', 'apex', 'area', 'root', 'line', 'lines', 'legs', 'arcs', 'half', 'axis', 'plane', 'shape', 'angle', 'point', 'whose', 'where', 'which', 'height', 'inside', 'center', 'centre', 'corner', 'vertex', 'number', 'pyramid', 'prism']);
 
 /** A run the ask may lift (2-D's rule): every run in Hebrew text, a short non-function word in Latin text. */
 const liftable = (run: string, heb: boolean): boolean => {
@@ -100,34 +106,11 @@ export function liftedRuns(utterance: string, keep: (run: string) => boolean = (
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// The certain slots
+// The certain slots (the words are `shell/lexicon/labelSlots`)
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** S1's nouns: a point, a vertex. */
-const POINT_NOUN_HE = String.raw`${CLITIC}(?:נקוד(?:ה|ות)|קודקוד(?:ים)?)`;
-const POINT_NOUN_EN = String.raw`\b(?:[Pp]oints?|[Vv]ert(?:ex|ices))`;
 /** a list of single labels: «a», «a ו-b», «a, b ו-c», "a and b" */
-const LIST = String.raw`${TOK}${END}(?:\s*(?:,|ו-?|\band\b)\s*${TOK}${END})*`;
-
-/** S2's nouns, with the arity of the run each one names (null: three or more). */
-const SHAPES: readonly (readonly [string, number | null])[] = [
-  ['משולש', 3], ['ריבוע', 4], ['מלבן', 4], ['מעוין', 4], ['מקבילית', 4], ['טרפז', 4], ['דלתון', 4], ['מרובע', 4],
-  ['מחומש', 5], ['משושה', 6], ['מתומן', 8], ['מצולע', null],
-  ['triangle', 3], ['square', 4], ['rectangle', 4], ['rhombus', 4], ['parallelogram', 4], ['trapezoid', 4], ['trapezium', 4], ['kite', 4], ['quadrilateral', 4],
-  ['pentagon', 5], ['hexagon', 6], ['octagon', 8], ['polygon', null],
-];
-/** the words that may stand between a shape noun and its run («משולש ישר-זווית abc») */
-const SHAPE_MOD = String.raw`(?:ישר[- ]?זווית|ישר[- ]?זוית|שווה[- ]?שוקיים|שווה[- ]?צלעות|משוכלל|קמור|right(?:[- ]angled)?|isosceles|equilateral|regular|convex|scalene)`;
-
-/**
- * The MIDPOINT frame (#1523, ADR-3D-287), spelled once — 3-D's `midpoint` rule reads it too. `(?!י)` keeps «אנך אמצעי» /
- * «קטע אמצעים» out (#330).
- *  - `MID_COPULA_HE` / `MID_HE`: «X [היא|הוא] [נקודת] [ה]אמצע …»
- *  - `MID_EN`: "X is the midpoint of …" / "X is the middle (point) of …"
- */
-export const MID_COPULA_HE = String.raw`(?:(?:הוא|היא)\s+)?`;
-export const MID_HE = String.raw`(?:ה?נקודת\s+)?ה?אמצע(?!י)`;
-export const MID_EN = String.raw`[Mm]id(?:dle(?:\s+point)?|point)`;
+const LIST = String.raw`${TOK}${END}(?:\s*${LIST_JOINT}\s*${TOK}${END})*`;
 const MID_FRAME_HE = `${MID_COPULA_HE}${MID_HE}`;
 const MID_FRAME_EN = String.raw`is\s+the\s+${MID_EN}\b`;
 
@@ -185,12 +168,12 @@ function slots(opts: LabelCaseOptions): Slot[] {
       arity: shapeArity, // a solid noun names no polygon: any arity from three up
     },
     // S3 — the subject of a midpoint sentence (the whole utterance; an axis is never a midpoint, #1594)
-    { re: new RegExp(String.raw`(^\s*(?:ה?נקודה\s+)?)(${TOK})${END}(?=\s+${MID_FRAME_HE}\s)`, 'g'), kind: 'single', axesOk: true },
+    { re: new RegExp(String.raw`(^\s*${SUBJECT_NOUN_HE})(${TOK})${END}(?=\s+${MID_FRAME_HE}\s)`, 'g'), kind: 'single', axesOk: true },
     { re: new RegExp(String.raw`(^\s*(?:[Tt]he\s+)?(?:[Pp]oint\s+)?)(${TOK})${END}(?=\s+${MID_FRAME_EN})`, 'g'), kind: 'single', axesOk: true },
     // S4 — an angle's vertex triple
-    { re: new RegExp(String.raw`((?:[∠∡∢]\s*)|${CLITIC}זו?וית\s+|\b[Aa]ngle\s+)(${TOK}${TOK}${TOK})${END}`, 'g'), kind: 'vertices', axesOk: false, arity: () => 3 },
+    { re: new RegExp(String.raw`((?:[∠∡∢]\s*)|${ANGLE_WORD_HE}\s+|\b[Aa]ngle\s+)(${TOK}${TOK}${TOK})${END}`, 'g'), kind: 'vertices', axesOk: false, arity: () => 3 },
     // S5 — a coordinate head: at the start, after a comma or «ו», before a tuple
-    { re: new RegExp(String.raw`((?:^\s*(?:נתונ(?:ה|ות)\s+)?)|[,;]\s*|(?<![א-ת])ו-?\s*)(${TOK})${END}(?=\s*\([^()]*,[^()]*\))`, 'g'), kind: 'single', axesOk: false },
+    { re: new RegExp(String.raw`((?:^\s*${GIVEN_HE})|[,;]\s*|${AND_HE}\s*)(${TOK})${END}(?=\s*\([^()]*,[^()]*\))`, 'g'), kind: 'single', axesOk: false },
   ];
 }
 
@@ -239,7 +222,7 @@ export function certainLabelFold(line: string, opts: LabelCaseOptions = {}): Lab
         if (want !== null ? toks.length !== want : toks.length < 3) continue;
         const letters = toks.map((t) => t[0].toUpperCase());
         if (new Set(letters).size !== letters.length) continue;
-        if (!heb && EN_STOP.has(body.toLowerCase())) continue;
+        if (!heb && (EN_STOP.has(body.toLowerCase()) || EN_FIGURE_WORDS.has(body.toLowerCase()))) continue;
         if (toks.some((t) => blocked(t[0], slot.axesOk, opts))) continue;
         certain.set(at, at + body.length);
       } else {
