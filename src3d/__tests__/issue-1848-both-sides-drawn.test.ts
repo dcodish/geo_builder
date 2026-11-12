@@ -17,7 +17,7 @@ function play(lines: readonly string[]) {
   const verdicts: string[] = [];
   for (const line of lines) {
     const v = decideDeterministic3({ facts, seed: 0 }, line, () => `f${++n}`);
-    verdicts.push(v.kind);
+    verdicts.push((v.kind === 'record' && v.held ? 'held' : v.kind));
     if (v.kind === 'record') facts = v.facts;
   }
   const c = derive3(facts, 0).construction;
@@ -36,9 +36,10 @@ const keysOf = (c: Construction3) => c.segments.map(([a, b]) => inkKey(a, b)).so
 
 describe('#1848 — a stated relation between two lengths draws both segments (3-D)', () => {
   it.each(STATED_LENGTH_RELATION_INK.map((r) => [r.steps.join(' · '), r] as const))('%s', (_name, row) => {
-    // #2341 (ADR-3D-449): a relation the figure already holds is «כבר קיים», no row, so it draws nothing
-    if (row.alreadyKnownIn?.includes('3d')) expect(play(row.steps)).toEqual({ verdicts: ['record', 'already-stated'], drawn: [] });
-    else expect(play(row.steps)).toEqual({ verdicts: ['record'], drawn: row.drawn });
+    // #2790 (ADR-3D-484): a relation the figure already holds is its own row (held), drawn like any row: both segments
+    const r = play(row.steps);
+    expect(r.drawn).toEqual(row.drawn);
+    expect(r.verdicts.every((v) => v === 'record' || v === 'held'), JSON.stringify(r.verdicts)).toBe(true);
   });
 
   it.each(['AD = 2DB', '|AD| = 2|DB|', 'AD:DB = 2:1'])('a ratio that places a rider draws both halves: «%s»', (line) => {

@@ -13,13 +13,13 @@ function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
   useGeo3.temporal.getState().clear();
 }
-/** #2341 (ADR-3D-449): the lines answered «כבר קיים» — an answer the figure already holds adds no row and is not refused. */
+/** #2341 → #2790 (ADR-3D-484): the lines the figure already held — each its own row with the held notice, never refused. */
 let KNOWN: string[] = [];
 const submit = (u: string) => {
   const rows = useGeo3.getState().facts.length;
   useGeo3.getState().submit(u);
   const st = useGeo3.getState();
-  if (st.lastError === null && st.facts.length === rows && st.lastNotice?.code === 'already-stated') KNOWN.push(u);
+  if (st.lastError === null && st.facts.length === rows + 1 && st.lastNotice?.code === 'already-held') KNOWN.push(u);
 };
 const state = () => useGeo3.getState();
 const derived = () => derive3(state().facts, state().seed);
@@ -50,8 +50,8 @@ describe('GATE — 2023 קיץ מועד ב Q2 (tetra + scalar givens + injection
 
   it('Hebrew: the full chain builds; B, C, D and the volume verify', () => {
     HE.forEach(submit);
-    expect(state().facts).toHaveLength(8);
-    expect(KNOWN).toEqual(["u·v = 24","B = (4, 3, 0)","C = (0, 8, 0)","D = (0, 8, 12)","נפח הפירמידה ABCD = 64"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
+    expect(state().facts).toHaveLength(8 + KNOWN.length);
+    expect(KNOWN).toEqual(["u·v = 24","B = (4, 3, 0)","C = (0, 8, 0)","D = (0, 8, 12)","נפח הפירמידה ABCD = 64"]); // #2790 (ADR-3D-484): each answer the figure already holds is its own row, with the held notice
     expectAllOk();
     const pos = derived().positions;
     expect(pos.get('D')!.z).toBeCloseTo(12, 3);
@@ -64,8 +64,8 @@ describe('GATE — 2023 קיץ מועד ב Q2 (tetra + scalar givens + injection
   it('a wrong volume is refused', () => {
     HE.slice(0, 12).forEach(submit);
     submit('נפח הפירמידה ABCD = 60');
-    expect(state().facts).toHaveLength(8);
-    expect(KNOWN).toEqual(["u·v = 24","B = (4, 3, 0)","C = (0, 8, 0)","D = (0, 8, 12)"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
+    expect(state().facts).toHaveLength(8 + KNOWN.length);
+    expect(KNOWN).toEqual(["u·v = 24","B = (4, 3, 0)","C = (0, 8, 0)","D = (0, 8, 12)"]); // #2790 (ADR-3D-484): each answer the figure already holds is its own row, with the held notice
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 

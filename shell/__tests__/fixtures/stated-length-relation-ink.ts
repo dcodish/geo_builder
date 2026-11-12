@@ -13,12 +13,6 @@
 export interface InkRow {
   steps: readonly string[];
   drawn: readonly string[];
-  /**
-   * The builders where the last line is a statement the figure ALREADY HOLDS, answered «כבר קיים» with no row and so
-   * no ink: 3-D since ADR-3D-449 (#2341, operator 2026-11-06: *"In all cases it should say כבר קיים"*). 2-D and analytic
-   * still record it, a relation over segments not yet drawn being new ink there.
-   */
-  alreadyKnownIn?: readonly ('2d' | '3d' | 'analytic')[];
 }
 
 const QUAD = 'מרובע ABCD';
@@ -26,7 +20,8 @@ const ISO_TRAPEZOID = 'טרפז שווה שוקיים ABCD';
 const BOTH = ['AC', 'BD'];
 
 export const STATED_LENGTH_RELATION_INK: readonly InkRow[] = [
-  { steps: [ISO_TRAPEZOID, '|AC| = |BD|'], drawn: BOTH, alreadyKnownIn: ['3d'] }, // the operator's report
+  // the operator's report. #2790 (ADR-3D-484, ADR-W-200): 3-D's held row draws both diagonals again (ADR-3D-449 drew none)
+  { steps: [ISO_TRAPEZOID, '|AC| = |BD|'], drawn: BOTH },
   { steps: [QUAD, '|AC| = |BD|'], drawn: BOTH },
   { steps: [QUAD, '|AC| = 2|BD|'], drawn: BOTH },
   { steps: [QUAD, 'AC = 2BD'], drawn: BOTH },
