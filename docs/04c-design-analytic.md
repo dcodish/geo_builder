@@ -1062,6 +1062,13 @@ and «קודקודי ה<noun> XYZW נמצאים על <host>» (`VERTICES_ON_HE/E
 `conicInscribedFacts` on a conic. A conic takes no name or centre tail: the fact carries its kind as
 `host?: ConicHost` beside `circle?`, absent for the circle.
 
+**The host phrase's three spellings** ([ADR-AG-468](06c-decisions-analytic.md#adr-ag-468), #2502). After the chord or the diameter
+the host is «ב(ה)…», «של ה…» or the construct state «ה…» with no preposition: `CHORD_HOST_HE` for the one chord (the same
+three groups as `CHORD_CIRCLE_HE`, which the pair and list readers keep), and a `(?=ה)` alternative to the preposition
+group in `DIAM_HE` / `DIAM_NOUN_FIRST_HE` (no group added, so the define rule — «של מעגל» with no article — is unchanged).
+The host BEFORE the ends («קוטר האליפסה AB», «מיתר המעגל AB») is `hostBeforeEnds`, a rewrite to «קוטר AB של האליפסה» at
+the entry of `parseCircleThru` and `parseChord`, so the two orders cannot lower apart.
+
 **Apply: one resolver.** `curveHost(c, host, name, src)` is `circleNamed` with no host, and otherwise the figure's ONE
 curve of that kind (`noHost` for none or several). `tangent-of`, `tangent-line-at`, `tangent-eq` (through `tangent-of`),
 `tangent-through` and `diameter-of` read it. A chord's and an inscribed vertex's incidence is `on-kind { kind: host }`,

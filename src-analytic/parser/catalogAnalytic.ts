@@ -549,6 +549,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // #1430 (ADR-AG-233): the two tangents from a point, touches named by the tool (2-D's T, S) — the sentence «מהנקודה P העבירו משיקים למעגל» is taught onto.
   { category: 'circles', family: 'F5', he: 'מנקודה P יוצאים שני משיקים למעגל', en: 'from point P two tangents are drawn to the circle', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל', en: 'AB is a chord of the circle', needs: ['נתון מעגל x^2+y^2=25'] },
+  // #2502 (ADR-AG-468): the construct state, 2-D's reading — the definite noun is the drawn circle.
+  { category: 'circles', family: 'F5', he: 'AB קוטר המעגל', en: 'AB is the diameter of the circle', needs: ['נתון מעגל x^2+y^2=25'] },
   // Two chords of a circle not stated yet: the sentence states it on its centre letter, as 2-D does (#1670, ADR-AG-210).
   { category: 'circles', family: 'F5', he: 'AB ו-CD מיתרים במעגל O', en: 'AB and CD are chords of the circle O' },
   {
@@ -669,6 +671,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'conics', family: 'F6', he: 'AB מיתר באליפסה', en: 'AB is a chord of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
   { category: 'conics', family: 'F6', he: 'AB מיתר בפרבולה', en: 'AB is a chord of the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
   { category: 'conics', family: 'F6', he: 'AB קוטר באליפסה', en: 'AB is a diameter of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  // #2502 (ADR-AG-468): the construct state, no preposition — the operator's own spelling.
+  { category: 'conics', family: 'F6', he: 'AB קוטר האליפסה', en: 'AB is the diameter of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
   { category: 'conics', family: 'F6', he: 'הישר y=kx+5 משיק לאליפסה', en: 'the line y=kx+5 is tangent to the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
   { category: 'conics', family: 'F6', he: 'הישר y=kx+2 משיק לפרבולה', en: 'the line y=kx+2 is tangent to the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
   { category: 'conics', family: 'F6', he: 'הישר AB משיק לאליפסה בנקודה A', en: 'the line AB is tangent to the ellipse at A', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1', 'A על האליפסה'] },
