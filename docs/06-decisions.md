@@ -20902,3 +20902,37 @@ A display-only change (hiding a point, a measure toggle) is not a new figure: it
 **Locks.** Unit: `src/parser/__tests__/frame.test.ts` (every spelling × every statement → the bare sentence and the bare parse; the unrelated frame left as typed; `subjectFrameOf`). Parity rows `subject-frame-*-2062` and `satisfies-2391` (`shell/__tests__/fixtures/geo-input-parity.ts`), 2-D the reference.
 
 **Behaviour change for a student:** «הנקודה M מקיימת AM = 3» (and «נקודה M מקיימת: …», «M מקיים …», "the point M satisfies …") builds as «AM = 3» does, where it went to the AI.
+
+## ADR-824 — «הציגו תצורה אחרת» on a determined shape walks its solutions first: the axis assignments grouped by shape, round-robin (#2831)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2831](https://github.com/dcodish/geo_builder/issues/2831) (feature, `P2`, all four builders) · fix round #2855, PR branch `feat/2831-mirror-same-solution` · **builds** [ADR-W-206](06w-decisions-workspace.md#adr-w-206) in 2-D · **amends** [ADR-593](#adr-593)'s odometer order (on a determined shape only) · **LADDER stage:** none (the button's search, not a solve)
+**Requirements:** [02](02-requirements.md) FR-ALT-2 — new solutions first · **Design:** [04](04-design.md) § the configuration axes — the solution cycle
+**Operator:** 2026-11-10, Rulings Inbox Q-2731c (b): *"New solutions first, in every builder"*; 2026-11-12 on #2831: *"2831 - A"* — a mirror image of a drawing is the SAME solution placed differently.
+
+**Measured at pickup** (`c82d767c`, `searchAnotherView` deadline-free, the shape fingerprint of each drawing).
+- Every one of the 171 saved fixtures has `freeDofs` > 0, because 2-D samples the placement. So the plan's `!hasDofs` arm is reached by no figure, and the cycle keys on `freeDofCount` 0 (no SHAPE freedom), the choice the plan left to pickup (#2846's interlock comment).
+- No fixture's press order shows a mirror before a new solution. Of the two `freeDofCount`-0 fixtures with axes, one has only mirror alternatives (2022-summer-a) and the other has no other configuration (issue-1771).
+- Found by probe, through the real parse path:
+  - «נתון מעגל O שרדיוסו 5 · מנקודה A הוציאו משיק למעגל בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6» has axes branch2 (the tangent point, a mirror) × side2 (a mirror) × seat3 (the solution). Its press order by shape was 0,0,1,1,2,2: the three triangles came on presses 0, 2 and 4.
+  - «… · C על הקטע OA · BC = 4.8» went 0,0,1,1.
+  - Press times were about 250 ms, with a ~30 s press whenever the odometer stepped onto a seat the givens forbid.
+
+**Root cause.** `searchAnotherView`'s odometer turns the first axis fastest. An axis that only PLACES the figure (a mirror tangent point, a mirror side) therefore turns faster than one that changes the answer, and every new solution waited one press per such axis.
+
+**Decision.** On a figure with `freeDofCount` 0 and more than one axis assignment, `searchAnotherView` first calls `solutionCycleStep`:
+1. Every assignment, counted from the all-default one (at most 64), that meets every requirement at the seed of the press that began gathering. The shape is determined, so the seed only places it, and the cycle keeps that seed.
+2. They are grouped by `shapeFingerprint` within `SAME_SHAPE_TOL` (1e-3): one solution up to a turn, shift, scale or mirror. #942's separated drawings come first within a group.
+3. The groups are interleaved round-robin in order of first appearance. A press returns the successor of the assignment on the screen; a non-member starts the cycle at the anchor.
+4. The cycle is memoised per facts with every axis digit zeroed, for the last 8 figures, so only the first press pays for it. The gathering gets half the press's remaining budget, so a cut press still has the odometer's half to answer with. A cut gathering keeps what it found and the next press resumes it. An assignment whose solve the clock cuts on two presses running is not offered, which is how the odometer treats a candidate its deadline cuts. In tests (no deadline) the cycle is fully deterministic. In the app, on a figure whose forbidden choices solve slowly, the clock decides when the cycle takes over.
+5. A cycle with nothing but the drawing on the screen, and every figure with shape freedom, keep the odometer and the seed resample unchanged.
+
+**Measured after.**
+- The tangent and right-triangle figure goes 0,1,2,0,1,2. The first press gathers the cycle once: ~33 s with no deadline, under the round's load, because the four forbidden-seat assignments fail slowly, as on the odometer's own two ~30 s presses in ten. Every later press costs ~0 ms. Under the worker's 12 s budget the gathering takes half of each press and resumes on the next, with the odometer answering meanwhile.
+- «C על הקטע OA» goes 0,1,0,1.
+- Unchanged: the mirror-only tangent (every press is the other tangent point), «משולש ישר זווית ABC · AB = 6 · BC = 8» (alternates its two seats), and «sin∢ACB = 3/4 · AC = 5 · BC = 7» (alternates its two roots).
+
+**Locks.**
+- Unit: `src/replay/__tests__/issue-1005-fingerprint-extents.test.ts` › #2831: the placement-before-solution figure, a mirror-only figure still reaching its mirror, and the two-seat control.
+- Scenario `new-solutions-first-tangent-right-triangle-2831` (`scenarios-corpus-4.ts`): presses 0–2 are three shapes, no fourth, and presses 3–5 repeat them.
+
+**Behaviour change for a student:** on a figure the givens fix with several different solutions, «הציגו תצורה אחרת» shows each of them before a mirror image of one already shown. The figure keeps its placement while the button cycles, where it used to also resample the placement on every press.

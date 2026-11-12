@@ -3665,6 +3665,15 @@ export function searchAnotherView(
   const total = axes.reduce((p, a) => p * a.n, 1);
   const hasDofs = freeDofs(cur.construction).length > 0;
   const steps = Math.min(total - 1, SEARCH_AXIS_STEPS_MAX);
+  /*
+   * #2831 (ADR-824, ADR-W-206 — operator 2026-11-12, *"2831 - A"*): on a figure whose SHAPE is determined, the
+   * press walks the solution cycle — each new solution before another placement of one already shown.
+   */
+  if (total > 1 && freeDofCount(cur.construction) === 0) {
+    // The gathering gets half of what is left, so a press it cuts still has the odometer's half to answer with.
+    const next = solutionCycleStep(facts, seed, axes, Date.now() + Math.max(0, deadline - Date.now()) / 2);
+    if (next) return next;
+  }
   const candidates = Array.from({ length: Math.max(0, steps) }, (_, k) => withAssignment(facts, axes, advanceAssignment(axes, k + 1)));
 
   /**
@@ -3697,6 +3706,139 @@ export function searchAnotherView(
   // #942 (ADR-486): the coincident view is offered only now, with every separated option exhausted —
   // "only when there is no other config".
   return coincident;
+}
+
+/** The assignment at position `idx` of the odometer counted from the all-default assignment (the first axis fastest). */
+function assignmentAt(axes: readonly { n: number }[], idx: number): number[] {
+  let rest = idx;
+  return axes.map((a) => {
+    const d = rest % a.n;
+    rest = Math.floor(rest / a.n);
+    return d;
+  });
+}
+
+/** Two shape fingerprints within the solver's agreement: one shape, whatever the turn, shift or mirror. */
+const SAME_SHAPE_TOL = 1e-3;
+function sameShape(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((x, i) => Math.abs(x - b[i]) <= SAME_SHAPE_TOL * Math.max(1, Math.abs(x), Math.abs(b[i])));
+}
+
+/**
+ * THE SOLUTION CYCLE OF A DETERMINED SHAPE (#2831, [ADR-824](docs/06-decisions.md#adr-824), the workspace rule
+ * [ADR-W-206](docs/06w-decisions-workspace.md#adr-w-206); operator 2026-11-12, *"2831 - A"*: a mirror image of a drawing is
+ * the SAME solution placed differently, and «הציגו תצורה אחרת» shows new solutions first, Q-2731c (b)).
+ *
+ * The odometer ({@link advanceAssignment}) turns the first axis fastest, and an axis that only PLACES the figure — the
+ * tangent from A touching at either of two mirror points — turns faster than one that changes the answer (which vertex
+ * holds the right angle), so every new solution waited one press per placement axis: measured, «מנקודה A הוציאו משיק
+ * למעגל בנקודה B · … · משולש ישר זווית ABD · BD = 6» showed its three triangles on presses 0, 2 and 4.
+ *
+ * On a figure with no shape freedom left (`freeDofCount` 0; the placement may still be sampled) the axis space is
+ * finite, so it is gathered whole: every assignment, counted from the all-default one, that meets every requirement at
+ * the press's seed (the shape is determined, so the seed only places it; a press keeps its seed). They are grouped by shape ({@link shapeFingerprint}: the same
+ * drawing up to a turn, a shift, a scale or a mirror — one solution), #942's separated drawings first within a group,
+ * and the groups are interleaved round-robin in order of first appearance: g0#0, g1#0, g2#0, …, g0#1, g1#1, …. A press
+ * moves to the successor of the assignment on the screen; one that is not in the cycle starts it. The cycle depends
+ * only on the facts with their axis digits and the seed, so nothing new is stored and undo cannot desync.
+ *
+ * `null` — keep the odometer: the cycle has nothing but the drawing on the screen, or the deadline cut the gathering
+ * (the next press resumes it, so the clock decides only when the cycle takes over, never what it is).
+ */
+function solutionCycleStep(
+  facts: Fact[],
+  seed: number,
+  axes: ChoiceAxis[],
+  deadline: number,
+): { facts: Fact[]; seed: number } | null {
+  const here = axes.reduce((idx, a, k) => idx + a.cur * axes.slice(0, k).reduce((p, b) => p * b.n, 1), 0);
+  const zeroed = withAssignment(facts, axes, axes.map(() => 0));
+  const key = JSON.stringify(zeroed.map((f) => [f.enabled, f.cmd]));
+  let entry = solutionCycleMemo.get(key);
+  if (!entry) {
+    entry = { seed, members: [], next: 0, cycle: undefined, cut: 0 };
+    if (solutionCycleMemo.size >= SOLUTION_CYCLE_MEMO_SIZE) solutionCycleMemo.delete(solutionCycleMemo.keys().next().value!);
+    solutionCycleMemo.set(key, entry);
+  }
+  if (entry.cycle === undefined && !gatherSolutionCycle(entry, facts, axes, deadline)) return null;
+  const cycle = entry.cycle;
+  if (!cycle) return null;
+  const at = cycle.findIndex((m) => m.idx === here);
+  const next = at < 0 ? cycle[0] : cycle[(at + 1) % cycle.length];
+  if (next.idx === here) return null;
+  return { facts: withAssignment(facts, axes, assignmentAt(axes, next.idx)), seed: entry.seed };
+}
+
+/** One drawing of a solution cycle: its odometer position from the all-default assignment, its shape and whether it is separated. */
+interface CycleMember {
+  idx: number;
+  fp: number[];
+  separated: boolean;
+}
+/** A cycle being gathered (`members` so far, `next` the assignment to try) and, once complete, the cycle (`null`: none). */
+interface CycleEntry {
+  /** The seed the cycle is drawn at: the seed of the press that began gathering it. */
+  seed: number;
+  members: CycleMember[];
+  next: number;
+  cycle: CycleMember[] | null | undefined;
+  /** How many presses the clock cut while solving assignment `next`. */
+  cut: number;
+}
+/**
+ * The cycle per figure (docs/17 §7): keyed by the facts with every axis digit zeroed, for the last few figures, and
+ * drawn at the seed of the press that began gathering it (the shape is determined, so the seed only places it; every
+ * member and every press then keeps that seed). A press after the first pays nothing. A gathering the deadline cuts
+ * keeps what it found and the next press resumes it (the odometer answers meanwhile, and may move the seed: the
+ * cycle keeps its own), so on a figure whose solves are slow the clock decides when the cycle takes over.
+ */
+const solutionCycleMemo = new Map<string, CycleEntry>();
+const SOLUTION_CYCLE_MEMO_SIZE = 8;
+
+/** Gather (or resume gathering) the cycle into `entry`; `false` when the deadline cut it. */
+function gatherSolutionCycle(entry: CycleEntry, facts: Fact[], axes: ChoiceAxis[], deadline: number): boolean {
+  const seed = entry.seed;
+  const total = Math.min(
+    axes.reduce((p, a) => p * a.n, 1),
+    SEARCH_AXIS_STEPS_MAX + 1,
+  );
+  for (; entry.next < total; entry.next++) {
+    if (Date.now() > deadline) return false;
+    const idx = entry.next;
+    // The shape is determined, so the seed only places it: every member is drawn at the cycle's seed. The drawing on
+    // the screen is judged like every other: one that breaks a given is not a member (a press from it starts the cycle).
+    const fc = withAssignment(facts, axes, assignmentAt(axes, idx));
+    const aborts = solveBudget.aborts;
+    const ok = withSolveBudget(deadline, () => meetsRequirements(fc, seed));
+    if (solveBudget.aborts !== aborts || Date.now() > deadline) {
+      // Cut mid-solve: the next press retries this assignment once; cut again, it is read as the odometer reads a
+      // candidate its deadline cuts — not offered — so one pathological solve cannot keep the cycle from forming.
+      entry.cut += 1;
+      if (entry.cut < 2) return false;
+      entry.cut = 0;
+      continue;
+    }
+    entry.cut = 0;
+    if (!ok) continue;
+    const r = replay(fc, seed);
+    entry.members.push({ idx, fp: shapeFingerprint(r.construction, r.positions, r.circles), separated: separatedView(r) });
+  }
+  const members = entry.members;
+  if (members.length < 2) {
+    entry.cycle = null;
+    return true;
+  }
+  const groups: CycleMember[][] = [];
+  for (const m of members) {
+    const g = groups.find((x) => sameShape(x[0].fp, m.fp));
+    if (g) g.push(m);
+    else groups.push([m]);
+  }
+  for (const g of groups) g.sort((x, y) => Number(y.separated) - Number(x.separated)); // stable: found order within a tier
+  const cycle: CycleMember[] = [];
+  for (let round = 0; cycle.length < members.length; round++) for (const g of groups) if (round < g.length) cycle.push(g[round]);
+  entry.cycle = cycle;
+  return true;
 }
 
 /** #85 ([ADR-293](docs/06-decisions.md#adr-293)) — is this derived state DRAWABLE? Positions exist and

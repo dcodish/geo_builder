@@ -113,6 +113,15 @@ function twiceMet(kind: string | null): SecondCrossingCurve | null {
  */
 export type LineOutcome = 'created' | 'known' | 'narrowed' | 'faulted';
 
+/**
+ * THE CONSTRUCTION A DERIVATION'S FIGURE WAS DRAWN FROM (#2831, ADR-AG-473): `derive` draws `drawableAt(c, at, true)` of
+ * the folded construction, while `construction` carries the objects as the drawn configuration letters them. A caller
+ * that walks other configurations of the same lines («הציגו תצורה אחרת»'s solution cycle) draws them from this one, so
+ * each is exactly what `derive(lines, seed)` would draw, without folding the lines again per seed.
+ */
+const drawnFrom = new WeakMap<Derivation, Construction>();
+export const drawingConstructionOf = (d: Derivation): Construction | undefined => drawnFrom.get(d);
+
 export interface Derivation {
   construction: Construction;
   figure: Figure;
@@ -1124,7 +1133,9 @@ export function derive(
     drawnOption,
   );
   const selectorLine = construction.selectors.map((_, at) => (selectorFact[at] === undefined ? -1 : owner[selectorFact[at]]));
-  return { construction: shown, figure, box: viewBox(figure), seed, configuration: drawnConfiguration(construction, at, true), lines: [...lines], faults, outcomes, minted, created, createdCircles, hosts, pins: { ...pins }, notices, constraintLine, selectorLine, stated };
+  const derivation: Derivation = { construction: shown, figure, box: viewBox(figure), seed, configuration: drawnConfiguration(construction, at, true), lines: [...lines], faults, outcomes, minted, created, createdCircles, hosts, pins: { ...pins }, notices, constraintLine, selectorLine, stated };
+  drawnFrom.set(derivation, construction);
+  return derivation;
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */

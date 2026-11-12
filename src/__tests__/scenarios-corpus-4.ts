@@ -6729,6 +6729,39 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(A, D) + dist(D, B), 'D stays on AB').toBeCloseTo(dist(A, B), 6);
     },
   },
+  {
+    id: 'new-solutions-first-tangent-right-triangle-2831',
+    title:
+      '#2831 (ADR-824, ADR-W-206): «מעגל O · משיק מ-A בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6» — the three triangles (the right angle at A, B or D) are the first drawing and presses 1 and 2; the mirror images come after',
+    guards:
+      "Operator ruling 2026-11-12 on #2831 («2831 - A»): a mirror image of a drawing is the SAME solution placed differently, and «הציגו תצורה אחרת» shows new solutions first (Q-2731c (b)). Measured on c82d767c through searchAnotherView: the axes are branch2 (which tangent point B, a mirror) × side2 (which side of AB D sits, a mirror) × seat3 (which vertex holds the right angle, the solution), and the odometer turns the mirror axes first, so the three triangles came on presses 0, 2 and 4, each after a mirror of the one before. The determined-shape arm now walks the solution cycle: the assignments grouped by shape fingerprint, interleaved round-robin from the all-default one.",
+    steps: ['נתון מעגל O שרדיוסו 5', 'מנקודה A הוציאו משיק למעגל בנקודה B', 'OA = 13', 'משולש ישר זווית ABD', 'BD = 6'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['נתון מעגל O שרדיוסו 5', 'מנקודה A הוציאו משיק למעגל בנקודה B', 'OA = 13', 'משולש ישר זווית ABD', 'BD = 6']);
+      const sig = (f: ReturnType<typeof replay>) => {
+        const ids = [...f.positions.keys()].filter((id) => /^[A-Z]$/.test(id)).sort();
+        const ds: number[] = [];
+        for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) ds.push(dist(f.positions.get(ids[i])!, f.positions.get(ids[j])!));
+        const m = Math.max(...ds);
+        return ds.map((x) => (x / m).toFixed(3)).join(',');
+      };
+      // From the drawing the commit shows (the store settles each line through the config search), six presses.
+      let cur = findValidConfig(facts) ?? { facts, seed: 0 };
+      const shapes = [sig(replay(cur.facts, cur.seed))];
+      for (let k = 0; k < 6; k++) {
+        const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);
+        expect(next, `press ${k + 1} finds another configuration`).not.toBeNull();
+        expect(meetsRequirements(next!.facts, next!.seed), `press ${k + 1} meets every given`).toBe(true);
+        cur = next!;
+        shapes.push(sig(replay(cur.facts, cur.seed)));
+      }
+      expect(shapes, 'seven drawings: the first and six presses').toHaveLength(7);
+      expect(new Set(shapes.slice(0, 3)).size, 'the three triangles are presses 0, 1 and 2').toBe(3);
+      expect(new Set(shapes).size, 'there are three solutions, no fourth').toBe(3);
+      expect(shapes.slice(3, 6), 'presses 3–5 are the same three solutions placed differently').toEqual(shapes.slice(0, 3));
+    },
+  },
 ];
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
 function ringEnclosesCircle(f: ReturnType<typeof replay>, ids: string[]): boolean {

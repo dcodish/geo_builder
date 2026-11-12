@@ -1838,6 +1838,18 @@ press); `admissibleRewrites` enumerates every axis but `variant` (sampled by `va
 test) tries the `variant` and `side` axes, fewest changes first; `App.tsx` enables the button when any axis or free
 DOF exists.
 
+**The solution cycle ([ADR-824](06-decisions.md#adr-824), #2831).** On a figure with no shape freedom left
+(`freeDofCount` 0; its placement may still be sampled), `searchAnotherView` first calls `solutionCycleStep`: it gathers
+every axis assignment (counted from the all-default one, at most 64) that meets every requirement at the seed of the press that began
+gathering (the shape is determined, so the seed only places it; the cycle keeps that seed), groups them by `shapeFingerprint` within `SAME_SHAPE_TOL` (one solution up to a turn, shift, scale or mirror),
+puts #942's separated drawings first within a group, and interleaves the groups round-robin in order of first
+appearance. The press returns the successor of the assignment on the screen. A cycle with nothing but the drawing on
+the screen, or one the deadline cut, falls through to the odometer below, unchanged; so does every figure with shape
+freedom. The cycle is memoised per facts with every axis digit zeroed, the last 8 figures, so only the first press pays
+for the gathering. The gathering gets half the press's remaining budget; one the deadline cuts keeps what it found and
+the next press resumes it while the odometer answers, and an assignment whose solve the clock cuts twice is not
+offered, as the odometer treats a candidate its deadline cuts.
+
 The seat is **pinned** by the student's own right angle, read from one set, `explicitRightAngleVerts` (ADR-445), that the ADR-163 reseat pre-scan, `cyclableSeat` and `unpinnedSeats` all consult: a 90° `set-angle`, and since [ADR-658](06-decisions.md#adr-658) (#2082) a `set-perpendicular` whose two segments meet at one vertex V of an enabled right triangle with their other ends its other two vertices (every ⟂ spelling and every height that lowers to one; structure only, never positions). The set is in fact order, so of two right angles stated on one right triangle the earlier keeps the seat, and the later line meets the angle-sum prover's `no-room` verdict (LADDER stage 0f) and is refused at the door, naming the earlier statement through the fold's drop-one search ([ADR-508](06-decisions.md#adr-508)). A noun's default seat (`seat: true` ⟂ or perp-offset knee) is never read as a stated angle by that prover.
 
 **The crossing count is evaluate's own selection:** `crossingChoice` (`engine/evaluate.ts`) returns the roots and

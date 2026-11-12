@@ -40,7 +40,7 @@ reports what is open; the human judges which kind of openness it is.
 would teach a size the exam never gave.
 
 **P7 — Configuration choice belongs to the student.** «הציגו תצורה אחרת» substitutes for the exam's «כמתואר
-בציור»; the tool never silently picks a branch and presents it as the answer.
+בציור»; the tool never silently picks a branch and presents it as the answer. When a figure has several solutions, each press shows a solution not yet shown before another placement of one already shown; a mirror image, turn or shift of a drawing (with the same letter values and curve shapes) is the same solution placed differently: on the book's p2-15 the three ellipses are the first drawing and the first two presses ([ADR-AG-473](06c-decisions-analytic.md#adr-ag-473), [ADR-W-206](06w-decisions-workspace.md#adr-w-206), operator 2026-11-12).
 
 **P8 — Noticing under-specification is a skill worth teaching.** The tool makes a sloppy question visibly sloppy.
 

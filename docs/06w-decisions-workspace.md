@@ -7475,3 +7475,27 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 1. **One notice key** for a held row in every builder: `suite.notice.alreadyHeld` — «זה כבר קיים באיור — נוסף כנתון נפרד.» / "That's already on the figure — added as a separate given." (new text of the session's, ADR-W-174). `suite.notice.alreadyDrawn` retires when the last builder ports.
 2. **One shared table** of held sequences and controls (`held-row-2790.ts`), asserted by each tree through its own decision: one row appended, the notice, no point moves, the relation holding once the earlier row is unticked and deleted.
 3. **Split landing.** The round landed 2-D first (the reference, ADR-W-118 B1), then analytic and complex (ADR-AG-462, ADR-AG-463, ADR-CX-089), each asserting the shared table through its own decision; until 3-D's port lands it answers a held line with its old no-row note — a parity known gap naming #2790.
+
+## ADR-W-206 — «הציגו תצורה אחרת» shows each new solution before another placement of one already shown, in every builder; a mirror image is the same solution placed differently (#2831)
+
+**Status:** accepted · 2026-11-12 · feature, all four builders · fix round #2855, PR branch `feat/2831-mirror-same-solution` · **built in** 2-D ([ADR-824](06-decisions.md#adr-824)) and analytic ([ADR-AG-473](06c-decisions-analytic.md#adr-ag-473)); 3-D ([ADR-3D-461](06b-decisions-3d.md#adr-3d-461)) and complex already hold it, measured · LADDER stage: **none** (the button's search)
+**Requirements:** [02](02-requirements.md) FR-ALT-2, [02c](02c-requirements-analytic.md) P7, [02b](02b-requirements-3d.md) (the two-configuration requirement, #2814), [02d](02d-requirements-complex.md) FR-CN-3 — the same sentence · **Design:** [04](04-design.md) § the configuration axes (the solution cycle), [04c](04c-design-analytic.md) § "The configuration search"
+**Operator:** 2026-11-10, Rulings Inbox Q-2731c (b): *"New solutions first, in every builder"*; 2026-11-12 on #2831: *"2831 - A"* — a mirror image of a drawing is the SAME solution placed differently, so on the book's p2-15 all three ellipses appear within the first presses.
+
+**The rule.**
+1. **One solution** is a drawing up to a rigid motion of the figure, a mirror image included, with every letter the student declared at the same value and every curve the same shape. This is 3-D's ADR-3D-461 key (built under Q-2814a/b: SSA's two mirrors are one group), stated for every builder.
+2. **The order.** On a figure with finitely many configurations (no shape freedom left), the button walks a cycle:
+   - the configurations, exact repeats dropped;
+   - grouped by solution;
+   - groups in order of first appearance from the first drawing;
+   - interleaved round-robin: g0#0, g1#0, g2#0, …, g0#1, g1#1, ….
+   A press moves to the successor of the drawing on the screen. So every new solution comes before another placement of one already shown, a figure whose only alternatives are placements still reaches them, the first drawing never changes, and nothing new is stored.
+3. **A figure with freedom left** has infinitely many solutions, and every press already draws a new shape, so its walk is unchanged.
+
+**Per builder, measured at `c82d767c`.**
+- **2-D:** `searchAnotherView`'s odometer turned a placement axis faster than a solution axis. ADR-824 adds the cycle.
+- **Analytic:** the seed walk had no grouping (p2-15's third ellipse came on press 13). ADR-AG-473 adds the cycle.
+- **3-D:** `configurationOrder3` (ADR-3D-461) already interleaves its groups. Every one of the 11 fixed figures with more than one group reaches all G groups within G−1 presses through `resample`, so there is no code change, only a press-walk lock.
+- **Complex:** each configuration is its own value set. A conjugate is a different value, not a placement, and the complex plane has no rigid-motion gauge. None of the 6 multi-configuration fixtures holds a relabelled copy, and pressing from 0 visits every configuration before repeating, so there is no code change, only a lock.
+
+**Behaviour change for a student:** when the givens fix a figure with several different solutions, «הציגו תצורה אחרת» shows each of them before showing a mirror image or other placement of one already shown.

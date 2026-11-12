@@ -1517,6 +1517,16 @@ notice after the narrowing notes, per render.
 *Identifiers:* `crossings.apart()` · `a > 0`
 *ADRs:* ADR-486.
 
+**The solution cycle of a determined figure ([ADR-AG-473](06c-decisions-analytic.md#adr-ag-473), #2831).** When the
+drawing on the screen has `carrierDof` 0, `anotherConfiguration` (`app/another.ts`) walks a cycle instead of the next
+differing seed: the configurations `derive(lines, s)` draws for `s < TRIES` (drawn from the one folded construction,
+`drawingConstructionOf`, so the lines fold once), admitted ones only, a picture already gathered (`looksTheSame`)
+dropped; grouped by `sameSolution` (`engine/evaluate.ts`: the points and each curve's characteristic points in the
+figure's own frame, the mirror folded, plus the used letters' values); interleaved round-robin in order of first
+appearance. A press moves to the successor of the drawing on the screen; one outside the cycle starts it. Any admitted
+configuration with freedom left, or a cycle of one, keeps the seed walk. The cycle is memoised per (lines, seed
+names, pins) for the last few figures.
+
 ### A noun's exclusive condition is part of its ring ([ADR-AG-189](06c-decisions-analytic.md#adr-ag-189), #1627)
 
 Ring promises — simple, open, and not-a-parallelogram for the trapezoid family (`ONE_PARALLEL_PAIR_NOUNS`,

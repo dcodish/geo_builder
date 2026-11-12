@@ -6092,6 +6092,103 @@ export function looksTheSame(a: Figure, b: Figure): boolean {
   return true;
 }
 
+/**
+ * ARE THESE TWO CONFIGURATIONS ONE SOLUTION, PLACED DIFFERENTLY? (#2831, [ADR-AG-473](../../docs/06c-decisions-analytic.md#adr-ag-473),
+ * [ADR-W-206](../../docs/06w-decisions-workspace.md#adr-w-206); operator 2026-11-12, *"2831 - A"*: a mirror image of a drawing
+ * is the SAME solution placed differently).
+ *
+ * {@link looksTheSame} asks whether two drawings are one PICTURE; this asks whether they are one ANSWER. Two configurations
+ * are one solution when the drawing is the same up to a rigid motion of the plane (a turn, a shift or a mirror), every
+ * letter the figure uses has the same value, and every curve has the same shape — 3-D's ADR-3D-461 key, in the plane.
+ *
+ * The drawing is read in the figure's OWN frame: the origin at its first named point, the first axis toward the first
+ * named point apart from it, and the second axis signed so the first point off that line lies on its positive side (that
+ * sign is what folds a mirror). The coordinate axes are not part of the frame, so the x-axis mirror of the book's p2-15
+ * ellipse is the ellipse already shown. A curve contributes its characteristic points in that frame (a circle its centre
+ * and radius, a parabola its vertex and focus, an ellipse its four vertices as a set, a line its foot from the origin
+ * and its direction); a figure with fewer than two apart points has no frame and is one solution only with itself
+ * ({@link sameConfiguration}). Only «הציגו תצורה אחרת»'s ordering reads it (`app/another.ts`).
+ */
+export function sameSolution(a: Figure, b: Figure): boolean {
+  const ka = solutionParts(a);
+  const kb = solutionParts(b);
+  if (!ka || !kb) return sameConfiguration(a, b);
+  if (ka.length !== kb.length) return false;
+  const tol = 1e-3 * Math.max(1, ka.scale, kb.scale);
+  for (let i = 0; i < ka.length; i += 1) {
+    const x = ka.parts[i];
+    const y = kb.parts[i];
+    if (x.label !== y.label || x.pts.length !== y.pts.length || x.nums.length !== y.nums.length) return false;
+    for (let j = 0; j < x.nums.length; j += 1) if (!(Math.abs(x.nums[j] - y.nums[j]) <= SAME_VALUE_EPS * 10 * Math.max(1, Math.abs(x.nums[j]), Math.abs(y.nums[j])))) return false;
+    // A curve's points are a SET (an ellipse's ±a vertices swap under a mirror): every point of one meets one of the other.
+    const used = new Set<number>();
+    for (const p of x.pts) {
+      const k = y.pts.findIndex((q, n) => !used.has(n) && Math.hypot(p[0] - q[0], p[1] - q[1]) <= tol);
+      if (k < 0) return false;
+      used.add(k);
+    }
+  }
+  return true;
+}
+
+/** The figure in its own frame (see {@link sameSolution}): labelled point sets and plain numbers, plus the frame's scale. */
+function solutionParts(f: Figure): { parts: Array<{ label: string; pts: Array<[number, number]>; nums: number[] }>; length: number; scale: number } | null {
+  const pts = f.points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  if (pts.length < 2) return null;
+  const o = pts[0];
+  const far = Math.max(...pts.map((p) => Math.hypot(p.x - o.x, p.y - o.y)));
+  const apart = 1e-6 * Math.max(1, far);
+  const p1 = pts.find((p) => Math.hypot(p.x - o.x, p.y - o.y) > apart);
+  if (!p1) return null;
+  const len = Math.hypot(p1.x - o.x, p1.y - o.y);
+  const u: [number, number] = [(p1.x - o.x) / len, (p1.y - o.y) / len];
+  const v0 = (x: number, y: number) => -(x - o.x) * u[1] + (y - o.y) * u[0];
+  const off = pts.find((p) => Math.abs(v0(p.x, p.y)) > 1e-4 * Math.max(1, far));
+  const sign = off && v0(off.x, off.y) < 0 ? -1 : 1;
+  const frame = (x: number, y: number): [number, number] => [(x - o.x) * u[0] + (y - o.y) * u[1], sign * v0(x, y)];
+  const parts: Array<{ label: string; pts: Array<[number, number]>; nums: number[] }> = [];
+  for (const p of pts) parts.push({ label: `${p.id}:`, pts: [frame(p.x, p.y)], nums: [] });
+  for (const c of f.curves) {
+    const q = c.curve;
+    switch (q.kind) {
+      case 'circle':
+        parts.push({ label: `${c.id}:circle`, pts: [frame(q.cx, q.cy)], nums: [q.r] });
+        break;
+      case 'parabola': {
+        const h = q.h ?? 0;
+        const k = q.k ?? 0;
+        const focus: [number, number] = q.axis === 'y' ? [h, k + q.p / 2] : [h + q.p / 2, k];
+        parts.push({ label: `${c.id}:parabola`, pts: [frame(h, k)], nums: [] }, { label: `${c.id}:focus`, pts: [frame(...focus)], nums: [] });
+        break;
+      }
+      case 'ellipse': {
+        const h = q.h ?? 0;
+        const k = q.k ?? 0;
+        parts.push({ label: `${c.id}:ellipse`, pts: [frame(h - q.a, k), frame(h + q.a, k), frame(h, k - q.b), frame(h, k + q.b)], nums: [] });
+        break;
+      }
+      case 'line': {
+        const n = normalizedLine(q.a, q.b, q.c);
+        if (!n) break;
+        // The foot of the frame origin on the line, and the line's direction in the frame, folded to [0, π).
+        const d = n.a * o.x + n.b * o.y + n.c;
+        const foot = frame(o.x - d * n.a, o.y - d * n.b);
+        const dir = frame(o.x - n.b, o.y + n.a);
+        let ang = Math.atan2(dir[1], dir[0]);
+        if (ang < 0) ang += Math.PI;
+        if (ang >= Math.PI - 1e-9) ang -= Math.PI;
+        parts.push({ label: `${c.id}:line`, pts: [foot], nums: [Math.min(ang, Math.PI - ang) < 1e-6 ? 0 : ang] });
+        break;
+      }
+    }
+  }
+  for (const sym of f.usedSymbols) {
+    if (isDirectionSymbol(sym) || !Number.isFinite(f.env[sym])) continue;
+    parts.push({ label: `${sym}=`, pts: [], nums: [f.env[sym]] });
+  }
+  return { parts, length: parts.length, scale: far };
+}
+
 /** How many different pictures these configurations are. */
 function distinctCount(figs: readonly Figure[]): number {
   const reps: Figure[] = [];

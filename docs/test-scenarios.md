@@ -2348,3 +2348,7 @@ over all four (ADR-041).
 ### `restated-rider-reversed-stays-put-2795` — «משולש ABC · D על AB · D על BA»: the reversed rider moves nothing (#2795, ADR-821)
 
 **Guards against:** the reversed rider's `collinear-order` claiming D's own parameter and re-solving D from another start (moved up to 3.3). **Asserts** no point moves at seeds 0–4, and with «D על AB» unticked «D על BA» alone keeps D on AB.
+
+### `new-solutions-first-tangent-right-triangle-2831` — «משיק מ-A בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6»: the three triangles come on presses 0, 1 and 2 (#2831, ADR-824)
+
+**Guards against:** «הציגו תצורה אחרת» showing a mirror image of the drawing on the screen before a solution not yet shown (the odometer turned the tangent-point and side axes, both mirrors, faster than the right-angle seat: the triangles came on presses 0, 2 and 4). **Asserts** presses 0–2 are three different shapes, there is no fourth, and presses 3–5 repeat them in order, as other placements.

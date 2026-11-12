@@ -99,7 +99,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   (#2714); givens that fix one triangle keep showing that one. **The same holds for any solid the givens fix in two
   ways** (the exam pyramid with «D(3,p,0)» · «|u| = |v|», p = ±4; S above or below a plane): both configurations are
   always among the drawings, and **each press of «הציגו תצורה אחרת» shows the other one**, as 2-D does (#2814). Which
-  of them is drawn first may be either; every drawing is one the givens allow.
+  of them is drawn first may be either; every drawing is one the givens allow. When a figure has several solutions, each press shows a solution not yet shown before another placement of one already shown; a mirror image, turn or shift of a drawing (with the same letter values and curve shapes) is the same solution placed differently
+  (ADR-3D-461's grouping; [ADR-W-206](06w-decisions-workspace.md#adr-w-206), operator 2026-11-12; measured to hold with no 3-D change).
   - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour); ADR-3D-432 (#1816, 2-D's behaviour); ADR-3D-447 (#2714, 2-D's behaviour); [ADR-3D-461](06b-decisions-3d.md#adr-3d-461) (#2814, 2-D's behaviour; first drawing judged 2026-11-10, ADR-W-199).
 - **FR-SP-3 (Must)** — **Defaults yield to statements; nothing unstated is ever invented.** A prism not
   stated to be right is **oblique**. A recognised-but-dropped qualifier is a silent given.

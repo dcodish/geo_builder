@@ -13,6 +13,10 @@ import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
 import { cross3, dist3, dot3, lerp3, norm3, ringSelfCrossing3, sub3, v3 } from '../vec3';
 import { configurationOrder3, congruentShapes3, intrinsicShape3, sameConfiguration3, type PoolConfig3 } from '../configs3';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { deserializeFigure3 } from '../../store/figureFile3';
+import { derive3, useGeo3 } from '../../store/store3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
 const PRISM_IDS = ['A', 'B', 'C', "A'", "B'", "C'"];
@@ -843,5 +847,54 @@ describe('#2814 — the pivot pick is over DISTINCT configurations, in an order 
     expect(congruentShapes3(rect(1), rect(-1))).toBe(true);
     const par = (dx: number) => new Map([['A', v3(0, 0, 0)], ['B', v3(5, 0, 0)], ['C', v3(5 + dx, 4, 0)], ['D', v3(dx, 4, 0)]]);
     expect(congruentShapes3(par(3), par(-3))).toBe(false);
+  });
+});
+
+/**
+ * #2831 — «הציגו תצורה אחרת» shows every NEW solution before another placement of one already shown. Operator ruling
+ * 2026-11-12 "2831 - A": a mirror image (another placement of the drawing) is the SAME solution; new solutions first
+ * (ADR-W-206). 3-D needed no code change: measured at c82d767c, every fixture whose pool has more than one
+ * `configurationOrder3` group (or whose parameter has more than one branch) already reaches every group within G−1
+ * presses of the real `resample`, from its saved seed and from seed 0. This block locks that walk.
+ */
+describe('#2831 — new solutions first: a press reaches every configurationOrder3 group within G−1 presses', () => {
+  const FIXTURES = join(__dirname, '..', '..', '..', 'fixtures3');
+  const sameKey = (a: number[], b: number[]): boolean =>
+    a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 1e-3 * Math.max(1, Math.abs(v), Math.abs(b[i])));
+  /** The drawn configuration's group, by `configurationOrder3`'s own key: the intrinsic shape plus the letters' values. */
+  const drawnKey = (): number[] => {
+    const { facts, seed } = useGeo3.getState();
+    const d = derive3(facts, seed);
+    const symbols: Record<string, number> = { ...(d.resolved.pivot?.pinSymbols ?? {}), ...d.resolved.ratioSymbols };
+    if (d.resolved.param) symbols[`param:${d.resolved.param.name}`] = d.resolved.param.value;
+    return intrinsicShape3({ pos: d.positions, pinSymbols: symbols });
+  };
+  /** Load the fixture through the real path, press `resample` `presses` times; the group index of each drawing, by first appearance. */
+  const groupWalk = (file: string, presses: number): number[] => {
+    const r = deserializeFigure3(readFileSync(join(FIXTURES, file), 'utf8'));
+    if (!r.ok) throw new Error(`${file} did not load`);
+    useGeo3.getState().loadFigure(r.facts, r.seed);
+    const keys: number[][] = [];
+    const groupOf = (): number => {
+      const k = drawnKey();
+      const i = keys.findIndex((x) => sameKey(x, k));
+      if (i >= 0) return i;
+      keys.push(k);
+      return keys.length - 1;
+    };
+    const out = [groupOf()];
+    for (let p = 0; p < presses; p++) {
+      useGeo3.getState().resample();
+      out.push(groupOf());
+    }
+    return out;
+  };
+
+  it('SSA\'s two triangles (G = 2, each in two mirror placements): the presses alternate the two triangles', () => {
+    expect(groupWalk('ssa-two-triangles-2714.geo3.json', 4)).toEqual([0, 1, 0, 1, 0]);
+  });
+
+  it('a parameter with three branches (G = 3, outside the pivot pool): presses 0–2 are three solutions, press 3 returns to the first', () => {
+    expect(groupWalk('param-three-branches-1474.geo3.json', 3)).toEqual([0, 1, 2, 0]);
   });
 });

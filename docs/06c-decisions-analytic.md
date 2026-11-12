@@ -16442,3 +16442,34 @@ Each of those points moves along a curve.
 **Locks.** Unit: `src-analytic/__tests__/issue-1281-1495-incidence-orders.test.ts` (#2848 block: a later reference keeps the name, a later definition clashes, the same coordinates still yield). Fixture: `minted-name-referred-2848.analytic.json` (the operator's lines). `issue-2848-minted-name-reference.test.ts` (`pipeline-lock:`): ask k, ask P1, the other configuration, the subscript spelling, «P2» a new point, the clash refused as its own case.
 
 **Behaviour change for a student:** after «נתונה הנקודה (k-1, k-2)» says «הכלי קרא לנקודה P₁», «P1 על האליפסה» puts that point on the ellipse and its name stays P₁; k shows «1 או 13/5». A later «P1(2, 3)» at other coordinates is refused as a name clash, where it used to rename the earlier point to P₂.
+
+## ADR-AG-473 — «הציגו תצורה אחרת» on a determined figure walks its solutions first: a mirror image is the same solution placed differently (#2831)
+
+**Date:** 2026-11-12 · **Status:** accepted · feature (all four builders, P2) · fix round #2855, PR branch `feat/2831-mirror-same-solution` · **builds** [ADR-W-206](06w-decisions-workspace.md#adr-w-206) in analytic · **amends** the #1084 walk ([ADR-AG-379](#adr-ag-379)) and [ADR-AG-451](#adr-ag-451)'s "reached by seed" note on p2-15 · **LADDER stage:** none (the button's search, not a solve)
+**Requirements:** [02c](02c-requirements-analytic.md) P7 — new solutions first · **Design:** [04c](04c-design-analytic.md) § "The configuration search" — the solution cycle
+**Operator:** 2026-11-10, Rulings Inbox Q-2731c (b): *"New solutions first, in every builder"*; 2026-11-12 on #2831: *"2831 - A"* — a mirror image of a drawing is the SAME solution placed differently.
+
+**Measured at pickup** (`c82d767c`, the fixture `ellipse-book-p2-15-2621` recorded through `decideSubmit`, `anotherConfiguration` pressed from seed 0). Ellipses by press: 8.00/6.93 (the book's), the y-axis mirror, **7.65/8.00** (press 2), then ten mirror images or exact repeats of the first two, and **4.18/8.00** on press 13.
+
+**Root cause.** `anotherConfiguration` moved to the next seed whose picture differs from the one on the screen. It had no idea which configurations are one solution, and no memory of what was shown, so a root that one seed in 24 draws arrived whenever that seed came up.
+
+**Decision.**
+1. **`sameSolution(a, b)`** (`engine/evaluate.ts`, beside `looksTheSame`): the named points, and each curve's characteristic points (circle: centre and radius; parabola: vertex and focus; ellipse: its four vertices as a set; line: the foot from the origin and its direction), read in the figure's own frame. That frame has its origin at the first named point and its first axis toward the first point apart from it. The second axis is signed by the first point off that line, which is what folds a mirror. Every used letter's value must also agree; the tool's own `θ_` symbols are skipped, as in the signature. The coordinate axes are not part of the frame. With fewer than two apart points, the answer is `sameConfiguration`.
+2. **The cycle** (`app/another.ts` `solutionCycleStep`): runs when the drawing on the screen has `carrierDof` 0.
+   - It gathers the configurations `derive(lines, s)` draws for `s < TRIES` (24). They are drawn from the one folded construction (`drawingConstructionOf`, new in `derive.ts`), so the lines fold once.
+   - Only admitted configurations count, and a picture already gathered is dropped.
+   - It groups them by `sameSolution` and interleaves the groups round-robin in order of first appearance.
+   - A press moves to the successor of the drawing on the screen. A drawing outside the cycle starts it.
+   - Any admitted configuration with freedom left, or a cycle of one, keeps the seed walk, unchanged (`found: false` stays honest).
+   - The cycle is memoised per (lines, seed names, pins) for the last 8 figures.
+3. The first drawing never changes, and nothing new is stored: the press returns a canonical seed, as before.
+
+**Measured after** (same door). p2-15: presses 1 and 2 draw 7.65/8.00 and 4.18/8.00. Presses 3–6 are the mirror images (the book's ellipse with A at (−4, 6) and with l at y = −6, and the second ellipse's two mirrors). Press 7 comes back to the first drawing. The first press costs ~0.55 s (the 24 configurations, once); later presses cost ~0.1 s. «M(a,0) · N(13,0) · MN = 9» still alternates a = 4 / 22: a different letter value is a different solution, although the drawing is a mirror. «x² + y² = 25 · A על המעגל · x_A = 3» still reaches A = (3, 4) from (3, −4): a figure whose only alternative is a mirror still reaches it. The parabola's p = 18 is still press 1.
+
+**Locks.**
+- Unit: `src-analytic/__tests__/issue-1622-e5-another-never-repeats.test.ts`, #2831 blocks:
+  - `sameSolution`: x mirror, y mirror, another ellipse, a letter value, identity;
+  - the cycle: the mirror-only figure, the two-solution alternation, a press from outside the cycle, a free triangle's walk unchanged.
+- Bespoke: `issue-2731-determined-roots.test.ts` › p2-15, tightened from "all three within 20 presses" to "the three ellipses on presses 0, 1 and 2, then their mirror images, every press another drawing".
+
+**Behaviour change for a student:** on a figure the givens fix with several solutions, «הציגו תצורה אחרת» shows every different solution before a mirror image of one already shown. On the book's p2-15 the three ellipses are the first drawing and the first two presses, where the third used to come on press 13.
