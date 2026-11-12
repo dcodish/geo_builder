@@ -15,7 +15,7 @@ import { buildScene, segKey } from '../render/scene';
 import { Figure } from '../render/Figure';
 import { measurablesOf } from '../app/measurable';
 import { loadAnalyticSession } from '../app/loadSession';
-import { dispatchRename, dispatchSwap } from '../app/rename';
+import { decideRename, dispatchRename, dispatchSwap } from '../app/rename';
 import { segmentDisplayFaults, type InkSeen } from '../../shell/__tests__/fixtures/segment-display-rows';
 import { hiddenRowLines, lonePoints } from '../app/hideOwnership';
 
@@ -167,6 +167,25 @@ describe('#2852 — the analytic canvas: a hidden segment takes its value, its m
     build(['נתונה הנקודה A(2,6)', 'נתונה הנקודה B(8,2)', 'נתונה הנקודה C(4,10)', 'משולש ABC']);
     store().toggleSegHidden(segKey(['A', 'B']));
     expect(scene().points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C']);
+  });
+
+  /**
+   * The operator's ruling of 2026-11-12 on PR #2863 (question 1, option a): a rename makes the point the student's. The
+   * record is the one the rename already writes: the tool's letter is written into its sentence («… פוגש את הצלע בנקודה K»),
+   * so it is no longer `minted` and `lonePoints` never offers it. (The rhombus's «גובה המעוין 4.8» has no naming form, so its
+   * H cannot be renamed today — `rename-not-typed` — and the height of a triangle carries the lock.)
+   */
+  it('a tool-named foot the student RENAMED stays when its height is hidden (H → K, hide AK: K stays)', () => {
+    build(['נתונה הנקודה A(2,6)', 'נתונה הנקודה B(8,2)', 'נתונה הנקודה C(4,10)', 'משולש ABC', 'גובה מנקודה A במשולש ABC']);
+    expect(lonePoints(current().construction, current().minted).has('H')).toBe(true);
+    const s = store();
+    const v = decideRename('H', 'K', { lines: s.lines, disabled: s.disabled, queries: s.queries, spokenFor: s.spokenFor, seed: s.seed, seedNames: s.seedNames, segStyle: s.segStyle, hosts: s.hosts }, current());
+    expect(v.kind).toBe('apply');
+    if (v.kind === 'apply') store().applyRename(v);
+    expect(lonePoints(current().construction, current().minted).has('K')).toBe(false);
+    store().toggleSegHidden(segKey(['A', 'K']));
+    expect(scene().segments.find((g) => g.key === segKey(['A', 'K']))?.ink).toBe('ghost');
+    expect(scene().points.map((p) => p.id)).toContain('K');
   });
 
   it('a tool-named point another line uses stays', () => {
