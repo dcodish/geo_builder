@@ -1462,6 +1462,11 @@ export type PointDef =
   // parameter (LinExpr components; absolute, never gauge). Unpinned k = a sampled free
   // DOF; a recorded given referencing the point (paramGivens) root-finds it post-pivot.
   | { kind: 'coord-sym'; x: LinExpr; y: LinExpr; z: LinExpr; stated?: StatedComps } // #2077: the typed tuple
+  // #2563 (ADR-3D-489): «N(k,p,3)» — a NEW point whose coordinates carry letters of the PIN-SYMBOL POOL (`pinSymsOf`):
+  // two letters, or a letter another coordinate already wrote. Absolute, own DOF 0: it stands where its letters' values
+  // put it — the pivot's solved values, or where the pivot does not run, the letters read off the placed points
+  // (`readPinLetters3`) and the open ones at their seed anchor (`pinSymAnchor3`).
+  | { kind: 'sym-coord'; x: number | SymComp; y: number | SymComp; z: number | SymComp; stated?: StatedComps }
   // ADR-3D-080: the RIGHT-pyramid apex seated on its carrier plane — the ⊥ line through the
   // base's centre (triangle: circumcentre; quad: centroid) cut with the point-run plane.
   | { kind: 'right-apex'; base: Id[]; plane: string }
@@ -1910,7 +1915,7 @@ export function figureSymbolsOf(c: Construction3): string[] {
  */
 export function absolutePointCount(c: Construction3): number {
   let n = 0;
-  for (const def of c.points.values()) if (def.kind === 'coord' || def.kind === 'coord-sym') n++;
+  for (const def of c.points.values()) if (def.kind === 'coord' || def.kind === 'coord-sym' || def.kind === 'sym-coord') n++;
   return n;
 }
 
@@ -1948,7 +1953,7 @@ export function hasAbsoluteFrameObject(c: Construction3): boolean {
  * by the placement funnel's clearance. (Not {@link absolutePointCount}: that asks for a stated POSITION, and an axis point's
  * free magnitude is neither a position nor scale knowledge.)
  */
-export const positionedAbsolutePoint3 = (def: PointDef): boolean => def.kind === 'coord' || def.kind === 'coord-sym' || def.kind === 'partial';
+export const positionedAbsolutePoint3 = (def: PointDef): boolean => def.kind === 'coord' || def.kind === 'coord-sym' || def.kind === 'sym-coord' || def.kind === 'partial';
 
 /** #2789 (ADR-3D-457): one absolute-frame object and whether a uniform rescale about the origin maps it onto itself. */
 export interface AbsoluteFrameObject3 {
@@ -1995,7 +2000,7 @@ export function absoluteFrameObjects3(c: Construction3): AbsoluteFrameObject3[] 
   }
   for (const def of c.points.values()) {
     if (def.kind === 'coord') out.push({ kind: 'point', scaleInvariant: def.x === 0 && def.y === 0 && def.z === 0 });
-    else if (def.kind === 'coord-sym') out.push({ kind: 'point', scaleInvariant: false });
+    else if (def.kind === 'coord-sym' || def.kind === 'sym-coord') out.push({ kind: 'point', scaleInvariant: false });
     // a partial point is invariant iff every stated component is 0 (an axis point, whose free component scales and keeps
     // its sign); «שיעור ה-x של B הוא 3» states x = 3, a plane off the origin the rescale would detach
     else if (def.kind === 'partial') out.push({ kind: 'point', scaleInvariant: [def.x, def.y, def.z].every((v) => v === null || v === 0) });
@@ -2038,6 +2043,10 @@ export function pinSymsOf(c: Construction3): string[] {
       if (comp !== null && typeof comp === 'object') for (const sym of symsOfAffine(comp)) if (!out.includes(sym)) out.push(sym);
     }
   }
+  // #2563 (ADR-3D-489): a point DEFINED by pool letters («N(k,p,3)») writes them too — one pool, whatever the point's age
+  for (const def of c.points.values())
+    if (def.kind === 'sym-coord')
+      for (const comp of [def.x, def.y, def.z]) if (typeof comp === 'object') for (const sym of symsOfAffine(comp)) if (!out.includes(sym)) out.push(sym);
   // #815: an EQUATION written in a pin symbol carries that symbol too. After the re-homing (#801's
   // injection door, #815's membership door) the letter may live in no pin at all — only in the line or
   // plane whose numbers are in it — and it is a pivot unknown all the same: the membership residual
@@ -2061,6 +2070,20 @@ export const symbolValueOf = (c: Construction3, sym: string): number | undefined
  * symbol off from the others (the `pinSymsOf` discipline, one level up).
  */
 export const openPinSymsOf = (c: Construction3): string[] => pinSymsOf(c).filter((s) => symbolValueOf(c, s) === undefined);
+
+/**
+ * #325 (ADR-3D-079 Am. 2), lifted here by #2563 (ADR-3D-489) — AN OPEN PIN SYMBOL'S SEED ANCHOR: where an undetermined
+ * letter sits at this seed (it must VARY with the seed, ADR-052), sign-aware so a stated «k חיובי» parks on its side.
+ * The pivot's soft anchor and the no-pivot placement of a `sym-coord` point read this one sampler (M3).
+ */
+export function pinSymAnchor3(c: Construction3, seed: number, sym: string): number {
+  const i = openPinSymsOf(c).indexOf(sym);
+  const frac = (Math.abs(Math.sin((seed + 1) * 12.9898 + (i + 1) * 78.233)) * 43758.5453) % 1;
+  const raw = -1.6 + 3.2 * frac;
+  const sgn = c.paramSigns.find((ps) => ps.sym === sym);
+  if (!sgn) return raw;
+  return sgn.positive ? 0.4 + Math.abs(raw) : -(0.4 + Math.abs(raw));
+}
 
 /** #902 — the vec-def whose ratio symbol is `sym`, or −1. Derived where a vec-def is genuinely needed
  *  (the point it drives); the symbol, not the index, is a pin's identity. */

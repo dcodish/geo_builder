@@ -1943,7 +1943,7 @@ function statedTupleText(p: StatedPin, known: ReadonlyMap<string, number>): stri
 function statedLetterText(c: Construction3, id: Id, i: number): string | null {
   const def = c.points.get(id);
   const sources: (StatedComps | undefined)[] = [
-    def?.kind === 'coord-sym' ? def.stated : undefined,
+    def?.kind === 'coord-sym' || def?.kind === 'sym-coord' ? def.stated : undefined,
     ...c.pins.filter((p) => p.id === id).map((p) => p.stated),
   ];
   for (let k = sources.length - 1; k >= 0; k--) {
@@ -1961,7 +1961,7 @@ function statedCoordText(c: Construction3, id: Id, i: number, value: number): st
   const def = c.points.get(id);
   const typed: (string | undefined)[] = [
     def?.kind === 'coord' ? def.srcs?.[i] : undefined,
-    ...[def?.kind === 'coord-sym' ? def.stated : undefined, ...c.pins.filter((p) => p.id === id).map((p) => p.stated)].map((st) =>
+    ...[def?.kind === 'coord-sym' || def?.kind === 'sym-coord' ? def.stated : undefined, ...c.pins.filter((p) => p.id === id).map((p) => p.stated)].map((st) =>
       st && st.letters[i].length === 0 ? st.texts[i] : undefined,
     ),
   ].filter((t) => t !== undefined);

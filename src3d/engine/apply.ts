@@ -3537,7 +3537,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // free DOF until a recorded given pins it, ADR-052). Distinct letters stay the
         // honest under-determination refusal (#325 lifts this only for EXISTING points,
         // where the solid gives the symbols a figure to ride).
-        const letters = [...new Set((cmd.syms ?? []).flatMap((s) => (s !== null ? [s] : [])))];
+        // #2563 (ADR-3D-489): the tuple's letters, every one — a bare name or a term of an affine component («C(p+q,1,0)»
+        // writes p and q, which the name channel alone does not carry)
+        const lettered = coordLetterExprs3(cmd, () => true);
+        const letters = [...new Set(lettered.flatMap((e) => (e ? symsOfAffine(e) : [])))];
         // ADR-3D-094 (#276): NO letters at all means the nulls are simply UNSTATED numeric
         // components («D על החלק החיובי של ציר ה-x» → y=z=0, x free) — the M1 dual of the
         // existing-point partial PIN: a NEW id becomes a `partial` point whose null
@@ -3548,7 +3551,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           next.points.set(cmd.id, { kind: 'partial', x: cmd.x, y: cmd.y, z: cmd.z });
           return { ok: true, next };
         }
-        if (letters.length === 1) {
+        // #2563 (ADR-3D-489): ONE letter that no other place writes, or the figure parameter itself, keeps ADR-3D-032's
+        // coord-sym lane byte for byte (the exam's root-find). Every other lettered NEW point is a `sym-coord` point below.
+        if (letters.length === 1 && (letters[0] === c.param || (!c.param && !coordLetterShared3(c, letters[0])))) {
           const sym = letters[0];
           if (c.param && c.param !== sym) return { ok: false, error: { code: 'two-params' } };
           // #801: the third site of the one-owner-per-letter rule. A coord-sym point DEFINES its letter
@@ -3588,7 +3593,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           next.param = sym;
           return { ok: true, next };
         }
-        return { ok: false, error: { code: 'symbolic-new-point', id: cmd.id } }; // a NEW point needs numbers
+        // #2563 (ADR-3D-489) — ONE LETTER POOL AND ONE OWNER PER LETTER, WHATEVER THE POINT'S AGE. «N(k,p,3)» after
+        // «B(2t,t,k)»: every letter of the tuple is a pin symbol (`pinSymsOf` reads `sym-coord` points), so k is the SAME
+        // unknown as B's, p is a new open letter (sampled at its seed anchor, moved by «הציגו תצורה אחרת»), and the point
+        // stands where its letters put it. A letter the figure parameter owns re-homes to the pivot (#801) or is refused
+        // `two-params` where it cannot; a letter an earlier coordinate NAMED is promoted with it (ADR-3D-488).
+        const nums = [cmd.x, cmd.y, cmd.z];
+        if (lettered.some((e, i) => e === null && nums[i] === null)) return { ok: false, error: { code: 'symbolic-new-point', id: cmd.id } };
+        const adopted = adoptParamAsPinSym(c, lettered);
+        if (!adopted) return { ok: false, error: { code: 'two-params' } };
+        const next = clone(adopted);
+        promoteNamedComponents3(next, letters);
+        const at = (i: number): number | SymComp => nums[i] ?? lettered[i]!;
+        next.points.set(cmd.id, { kind: 'sym-coord', x: at(0), y: at(1), z: at(2), ...statedComps(c, cmd) });
+        return { ok: true, next };
       }
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'coord', x: cmd.x, y: cmd.y, z: cmd.z, ...(cmd.srcs ? { srcs: cmd.srcs } : {}) });

@@ -45,7 +45,7 @@ import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scaleP
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
-import { absolutePointCount, claimPointIds, scalarPinOrigin3, type ScalarPin, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, orientationStated3, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
+import { absolutePointCount, claimPointIds, evalAffine, scalarPinOrigin3, type ScalarPin, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, orientationStated3, pinSymAnchor3, pinSymsOf, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol, type SymComp } from './types';
 import { carrierParams3, determinationReach3, figureLanes3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
@@ -1392,7 +1392,11 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
     for (const p of [...c.pins, ...c.vectorPins, ...c.pairPins])
       pinCount += (p.x !== null ? 1 : 0) + (p.y !== null ? 1 : 0) + (p.z !== null ? 1 : 0);
     // #902: a value-pinned symbol is a number, not an unknown — only the OPEN ones count.
-    dims += openPinSymsOf(c).length;
+    // #2563 (ADR-3D-489): with a `sym-coord` point on a figure the pivot does not move (no solid, no free point), its
+    // letters are read off the placed points, so the open ones are those the coordinates leave undetermined
+    dims += !pivotRuns3(c) && [...c.points.values()].some((d) => d.kind === 'sym-coord')
+      ? readPinLetters3(c, seedNumber3(resolved.seed), resolved.positions).free
+      : openPinSymsOf(c).length;
     // #803 (ADR-3D-180): the absolute-membership drives consume placement DOF exactly like pins — a
     // plane pin is one residual per member, a pin-symbol line membership two (a line is two planes),
     // an equation-plane membership one. The count omitted all of them, so the exam's fully determined
@@ -1439,8 +1443,10 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
     // same measurement the drawing samples, so the count and the sampling share one source (ADR-3D-124).
     return Math.max(0, dims + placement - Math.max(0, pinCount - (7 - placement)) - consumed) + Math.max(0, freeT - blockConsumed) + param + leftoverPlacement3(c, resolved);
   }
+  // #2563 (ADR-3D-489): where the pivot does not run, the pool letters the coordinates leave open (a blank «N(k,p,3)»: 2)
+  const openLetters = resolved.pivot === null && [...c.points.values()].some((d) => d.kind === 'sym-coord') ? readPinLetters3(c, seedNumber3(resolved.seed), resolved.positions).free : 0;
   // #370: a floating figure beside an absolute object — its placement is sampled, and counted.
-  return dims + (placementSampled3(c) ? 6 : 0) + freeT + param;
+  return dims + (placementSampled3(c) ? 6 : 0) + freeT + param + openLetters;
 }
 
 // ---------------------------------------------------------------------------
@@ -2321,6 +2327,125 @@ export interface Resolve3Opts {
   solvedFrame?: boolean;
 }
 
+/** #2563 (ADR-3D-489): a `sym-coord` point at its letters' values. */
+export function symCoordAt3(def: Extract<PointDef, { kind: 'sym-coord' }>, valueOf: (sym: string) => number): Vec3 {
+  const at = (comp: number | SymComp): number => (typeof comp === 'number' ? comp : evalAffine(comp, valueOf));
+  return v3(at(def.x), at(def.y), at(def.z));
+}
+
+/**
+ * #2785 (ADR-3D-488), #2563 (ADR-3D-489) — THE COORDINATE LETTERS WHERE THE PIVOT DOES NOT RUN. Nothing moves, so the
+ * letters are READ from the figure: every point pin («B(2t,t,k)» on a placed B) and every pin on a `sym-coord` point
+ * («N(k,p,3)» then «N(1,2,3)») is an equation Σ kᵢ·letterᵢ + c = coordinate, solved jointly by least squares
+ * (Gauss–Newton from the seed anchors, so a letter no equation reaches stays at its anchor; a value-pinned letter is its
+ * number). A letter whose equations disagree takes the least-squares value, and the coordinate claims fail there.
+ * `free` is the number of open letters the equations leave undetermined (the DOF cue's count).
+ */
+export function readPinLetters3(c: Construction3, seed: number, pos: ReadonlyMap<Id, Vec3>): { values: Record<string, number>; free: number } {
+  const all = pinSymsOf(c);
+  const values: Record<string, number> = {};
+  for (const s of all) {
+    const v = symbolValueOf(c, s);
+    if (v !== undefined) values[s] = v;
+  }
+  const open = all.filter((s) => values[s] === undefined);
+  if (open.length === 0) return { values, free: 0 };
+  const AX = ['x', 'y', 'z'] as const;
+  const eqs: ((at: (s: string) => number) => number)[] = [];
+  const val = (comp: number | null | SymComp, at: (s: string) => number): number =>
+    comp === null ? NaN : typeof comp === 'number' ? comp : evalAffine(comp, at);
+  const reads = (comp: number | null | SymComp | undefined): boolean =>
+    comp !== null && comp !== undefined && typeof comp === 'object' && comp.terms.some((t) => open.includes(t.sym));
+  for (const pin of c.pins) {
+    const def = c.points.get(pin.id);
+    const sc = def?.kind === 'sym-coord' ? def : null;
+    const p = pos.get(pin.id);
+    for (const ax of AX) {
+      const comp = pin[ax];
+      if (comp === null) continue;
+      if (sc) {
+        if (!reads(comp) && !reads(sc[ax])) continue;
+        const own = sc[ax];
+        eqs.push((at) => val(comp, at) - val(own, at));
+      } else if (p && reads(comp)) {
+        const target = p[ax];
+        eqs.push((at) => val(comp, at) - target);
+      }
+    }
+  }
+  const anchors = open.map((s) => pinSymAnchor3(c, seed, s));
+  if (eqs.length === 0) {
+    open.forEach((s, j) => {
+      values[s] = anchors[j];
+    });
+    return { values, free: open.length };
+  }
+  const resid = (x: number[]): number[] => {
+    const at = (s: string) => {
+      const j = open.indexOf(s);
+      return j >= 0 ? x[j] : values[s];
+    };
+    return eqs.map((e) => e(at));
+  };
+  const jac = (x: number[], r0: number[]): number[][] =>
+    open.map((_, j) => {
+      const h = 1e-6 * Math.max(1, Math.abs(x[j]));
+      const xh = [...x];
+      xh[j] += h;
+      return resid(xh).map((v, i) => (v - r0[i]) / h);
+    });
+  const sq = (v: number[]) => v.reduce((a, b) => a + b * b, 0);
+  const n = open.length;
+  let best: { x: number[]; f: number } | null = null;
+  for (const shift of [0, 1, -1, 3, -3]) {
+    let x = anchors.map((a) => a + shift);
+    for (let it = 0; it < 40; it++) {
+      const r0 = resid(x);
+      const J = jac(x, r0);
+      // Levenberg damping: a direction no equation reaches has a zero gradient, so it never moves off its anchor
+      const M = Array.from({ length: n }, (_, a) => Array.from({ length: n }, (__, b) => J[a].reduce((acc, v, i) => acc + v * J[b][i], 0) + (a === b ? 1e-6 : 0)));
+      const g = Array.from({ length: n }, (_, a) => -J[a].reduce((acc, v, i) => acc + v * r0[i], 0));
+      const d = solveSmall(M, g);
+      if (!d) break;
+      x = x.map((v, j) => v + d[j]);
+      if (Math.max(...d.map(Math.abs)) <= 1e-13 * Math.max(1, ...x.map(Math.abs))) break;
+    }
+    const f = sq(resid(x));
+    if (x.every(Number.isFinite) && (!best || f < best.f - 1e-18)) best = { x, f };
+    if (best && best.f <= 1e-20) break;
+  }
+  if (best) {
+    const bx = best.x;
+    open.forEach((s, j) => {
+      values[s] = bx[j];
+    });
+  }
+  // the rank of the equations' response at the solution: the letters they determine
+  const xs = best ? best.x : anchors;
+  return { values, free: n - matrixRank3(jac(xs, resid(xs))) };
+}
+
+/** Numerical rank of the columns-by-equations Jacobian (Gaussian elimination, relative tolerance). */
+function matrixRank3(cols: number[][]): number {
+  const a = cols.map((r) => [...r]);
+  const m = a.length; // unknowns
+  const n = m > 0 ? a[0].length : 0; // equations
+  const scale = Math.max(1e-300, ...a.flat().map(Math.abs));
+  let rank = 0;
+  for (let row = 0; row < m && rank < n; row++) {
+    let piv = -1;
+    for (let i = rank; i < n; i++) if (Math.abs(a[row][i]) > 1e-8 * scale && (piv < 0 || Math.abs(a[row][i]) > Math.abs(a[row][piv]))) piv = i;
+    if (piv < 0) continue;
+    for (const r of a) [r[rank], r[piv]] = [r[piv], r[rank]];
+    for (let r = row + 1; r < m; r++) {
+      const f = a[r][rank] / a[row][rank];
+      for (let k = rank; k < n; k++) a[r][k] -= f * a[row][k];
+    }
+    rank++;
+  }
+  return rank;
+}
+
 function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): Resolved3 {
   if (opts.placementImage) resolveStats3.images++;
   else resolveStats3.uncached++;
@@ -2338,6 +2463,12 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   // (provisional) parameter value — re-placed post-pivot when a paramGiven pins k.
   for (const [id, def] of c.points) {
     if (def.kind === 'coord-sym') pos.set(id, v3(linVal(def.x, a), linVal(def.y, a), linVal(def.z, a)));
+  }
+  // #2563 (ADR-3D-489): where the pivot does not run, a `sym-coord` point stands at its letters read off the placed
+  // points (a letter another coordinate pins) or at its seed anchor (an open letter). Where it runs, the pivot places it.
+  if (!pivotRuns3(c) && [...c.points.values()].some((d) => d.kind === 'sym-coord')) {
+    const letters = readPinLetters3(c, seed, pos).values;
+    for (const [id, def] of c.points) if (def.kind === 'sym-coord') pos.set(id, symCoordAt3(def, (s) => letters[s] ?? pinSymAnchor3(c, seed, s)));
   }
 
   // #801 (ADR-3D-174): an object whose coefficients are in a PIN SYMBOL is resolved by the PIVOT, which
@@ -2389,7 +2520,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   // earlier position included); a solve probed from one state and applied over another would land elsewhere.
   let determined: ReadonlyMap<Id, Determined3> = new Map();
   if (c.determinations.length > 0 && !pivotRuns3(c)) {
-    const absolute = [...c.points].filter(([, def]) => def.kind === 'coord' || def.kind === 'coord-sym').map(([id]) => [id, pos.get(id)!] as const);
+    const absolute = [...c.points].filter(([, def]) => def.kind === 'coord' || def.kind === 'coord-sym' || def.kind === 'sym-coord').map(([id]) => [id, pos.get(id)!] as const);
     const solved = solveDeterminations(c, (ts) => {
       const p2: Positions3 = new Map(absolute);
       evaluateSolidsAndPoints(c, seed, p2, new Map(planes), new Map(lines), undefined, undefined, undefined, undefined, undefined, ts);
@@ -2542,8 +2673,15 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     // V8-c: a symbol pinned ⟂/∥ a plane is a candidate to co-solve with a free dim.
     const coupledPins = c.symbolPins.filter((p) => p.rel === 'perp' || p.rel === 'parallel');
     const coupledSyms = [...new Set(coupledPins.map((p) => p.sym))];
-    const overrideOf = (sol: PivotResult): Map<string, number> | undefined =>
-      sol.symbols ? new Map(coupledSyms.map((s, i) => [s, sol.symbols![i]])) : undefined;
+    const hasSymCoord = [...c.points.values()].some((d) => d.kind === 'sym-coord');
+    const overrideOf = (sol: PivotResult): Map<string, number> | undefined => {
+      const m = sol.symbols ? new Map(coupledSyms.map((s, i) => [s, sol.symbols![i]])) : undefined;
+      // #2563 (ADR-3D-489): a `sym-coord` point stands where the solution's pin symbols put it
+      if (!hasSymCoord || !sol.pinSymbols) return m;
+      const out = m ?? new Map<string, number>();
+      for (const [s, v] of Object.entries(sol.pinSymbols)) if (Number.isFinite(v)) out.set(s, v);
+      return out;
+    };
     /** #820: the rider twin of `overrideOf` — every re-evaluation of a solution must place a DRIVEN
      *  rider where the pivot put it, or the positions written back would contradict the residuals
      *  that accepted them. */
@@ -4123,6 +4261,10 @@ function evaluateSolidsAndPoints(
         return sgn * mag;
       };
       pos.set(id, v3(comp('x'), comp('y'), comp('z')));
+    } else if (def.kind === 'sym-coord') {
+      // #2563 (ADR-3D-489): absolute, at its letters' values — the pivot's (the override), a stated value, or the seed
+      // anchor. A placement the caller already made (the no-pivot read in `resolve3`) stands.
+      if (!pos.has(id)) pos.set(id, symCoordAt3(def, (s) => symbolOverride?.get(s) ?? symbolValueOf(c, s) ?? pinSymAnchor3(c, seed, s)));
     } else if (def.kind === 'circle-centre3') {
       // #2611 stage B (ADR-3D-420): the circle's members precede it (`pointParents3`), and it stands where they say
       const k = c.circles3.find((x) => x.id === def.circle);
