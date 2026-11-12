@@ -47,7 +47,8 @@ describe("#612 — the operator's exact sequence", () => {
     submit('ריבוע ABCD');
     expect(state().lastError, 'true and already known — not an error').toBeNull();
     const d = derived();
-    expect(d.notices.some((n) => n.kind === 'already-known' && n.rel === 'shape'), 'the student must be told it added nothing').toBe(true);
+    // #2790 (ADR-3D-484): told by the held notice — its own row, «זה כבר קיים באיור — נוסף כנתון נפרד.»
+    expect(state().lastNotice, 'the student must be told it is already on the figure').toEqual({ code: 'already-held' });
     // and it really did nothing: no pins accumulated, no point moved
     expect(d.construction.scalarPins.length).toBe(before.construction.scalarPins.length);
     for (const id of ['A', 'B', 'C', 'D', 'S']) expect(dist3(P(d, id), P(before, id))).toBeLessThan(1e-9);
@@ -63,7 +64,7 @@ describe("#612 — the operator's exact sequence", () => {
       submit(line);
       expect(state().lastError, 'a square IS all of these — nothing to refuse').toBeNull();
       const d = derived();
-      expect(d.notices.some((n) => n.kind === 'already-known' && n.rel === 'shape'), 'and the student is told it adds nothing').toBe(true);
+      expect(state().lastNotice, 'and the student is told it is already on the figure (#2790)').toEqual({ code: 'already-held' });
       expect(d.construction.scalarPins.length).toBe(before.construction.scalarPins.length);
       for (const id of ['A', 'B', 'C', 'D', 'S']) expect(dist3(P(d, id), P(before, id))).toBeLessThan(1e-9);
     },
@@ -95,7 +96,8 @@ describe('#612 — what a naming error is NOT: a statement that ADDS information
     const rows = state().facts.length;
     submit('מלבן ABCD');
     expect(state().lastError, 'a square IS a rectangle').toBeNull();
-    expect(state().facts.length, 'and it adds no row').toBe(rows);
+    expect(state().facts.length, 'held: its own row (#2790, ADR-3D-484)').toBe(rows + 1);
+    expect(state().lastNotice).toEqual({ code: 'already-held' });
   });
 
   it('a shape stated on a FRESH ring is not a naming error against itself', () => {
