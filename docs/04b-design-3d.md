@@ -396,7 +396,10 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   letters, with its riders and members; a `concyclic` claim or pin; a right quad pyramid's base): concyclic points are in
   convex position. When the circle is the proof, the facts that stated it (`commandStatesCircle3`) join the blame, so
   a circle or right-pyramid line that completed the contradiction is the one refused; a quad pyramid declares its base
-  ring for the blame too.
+  ring for the blame too. A third sufficient reason since #2813 ([ADR-3D-490](06b-decisions-3d.md#adr-3d-490)):
+  `anglesProveConvex3` — the ring's stated vertex angles (`statedRingCorners3`: a `vertex-angle-eq` claim or `vangle` pin at
+  a corner, below 180°) sum to at least (n − 3)·180°. The facts that state those angles join the blame, and the status
+  carries `angles` (the angle lines, the ring, the other order) so the refusal reads `err.ringContradictsAngles`.
 - **The IMPLIED re-declaration** (#1988, [ADR-3D-326](06b-decisions-3d.md#adr-3d-326)). The same split's other arm
   has ONE outcome: `quadImplies(known, cmd.base)` records the statement in `redundantShapes` and returns the figure
   untouched, so `buildNotices3` says it added nothing. `shape-less-specific` is gone from `EngineError3`. The store's
@@ -1234,7 +1237,9 @@ renderer orients faces of a solid that may be non-convex by a consistent winding
 (`statedConcyclic3`, #2810, [ADR-3D-467](06b-decisions-3d.md#adr-3d-467)) — a circle through the letters, a cyclic fix, a
 right pyramid's base: concyclic letters have no concave drawing, and the `concyclic` claim verifies in-order
 concyclicity — coplanar, diagonals crossing, opposite angles supplementary — so a dart can no longer verify the circle
-(the solver pin keeps its sign-crossing descent form). **The ring preference** — a seed whose
+(the solver pin keeps its sign-crossing descent form). Since #2813 ([ADR-3D-490](06b-decisions-3d.md#adr-3d-490)) a stated
+interior angle restricts the seat too: a vertex with a stated angle at its corner in any declared ring over the letters is never
+the reflex one, and letters whose stated angles prove convex position (`anglesProveConvex3`) get no concave seat. **The ring preference** — a seed whose
 declared rings (`declaredRings3`, the one enumeration this loop and the seed search share) are all simple joins
 `meetsShapePreferences3`'s tier in `firstSatisfyingSeed3`, so a forced crossing still resolves at today's fallback seed.
 **The reach** — an unpinned coordinate letter whose default draw crosses a declared ring over its point is re-drawn at

@@ -16413,3 +16413,15 @@ Each of those points moves along a curve.
 **Locks.** `src-analytic/__tests__/issue-1991-crossed-ring-specific-noun.test.ts` (#2812 block: R1, R3, R5, the rider, R9 refused naming the line; the two controls record; the reader's four cases; ABCD with its circle drawn simple at seeds 0–5). Parity: `crossed-ring-2810-01..03` and `crossed-ring-2811-01..02` lose their analytic cells.
 
 **Behaviour change for a student:** in the analytic builder, a second order of a ring's letters over a circle through them — or the circle line after two orders — is refused with the crossed-shape message instead of drawn crossed.
+
+## ADR-AG-471 — A stated polygon angle is the interior angle: a reflex-corner ring fault, and the angle proof joins ADR-AG-261 (#2813)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2813](https://github.com/dcodish/geo_builder/issues/2813) (bug, `P2`, wrong answer) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02c](02c-requirements-analytic.md) — the ring-order bullets (a stated corner angle is the interior angle) · **Design:** [04c](04c-design-analytic.md) — *A stated corner is the interior corner* · **LADDER stage:** none (ring validity and `derive`'s structural fault)
+**Amends** [ADR-AG-261](#adr-ag-261) · 2-D's [ADR-823](06-decisions.md#adr-823), the reference (ADR-W-157).
+
+**Decision.** `ringFaultsOf` adds the hard `reflex-corner` fault: a simple ring that seats a stated corner (`statedCornersAg`: an `angle` of any measure, or a corner `perpendicular`) against its orientation — `drawableAt` never draws it. `ringConvexityProofAg` (rings.ts, copied from 2-D) proves convex position from stated degrees summing to at least (n − 3)·180°; `ringOrderFault` reads it beside the noun: the angle lines join the blame, and the fault `ring-contradicts-angles` (`polygon`, `pair`, `declared`) reads `errRingContradictsAngles`, 2-D's text verbatim.
+
+**Locks.** `src-analytic/__tests__/issue-2813-stated-angle-interior.test.ts` (A1 and A2 refused with the message; no proof, no refusal; the view floor at seeds 0–5); unit block in `issue-1158-1166-polygon-noun-validity.test.ts`. Parity rows `stated-angle-interior-2813-01..03`.
+
+**Behaviour change for a student:** in the analytic builder the same lines refuse «מרובע ABDC» (or the completing angle line), naming the angle lines, where they were recorded with ABDC crossed.

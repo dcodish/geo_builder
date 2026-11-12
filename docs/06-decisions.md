@@ -20918,3 +20918,24 @@ A display-only change (hiding a point, a measure toggle) is not a new figure: it
 **Locks.** Unit `src/replay/__tests__/ring-convexity-proof-2811.test.ts`. Scenario `crossed-ring-circle-last-2811` (`scenarios-corpus-4.ts`). Parity: `crossed-ring-2810-03` loses its 2-D cell; rows `crossed-ring-2811-01..03`.
 
 **Behaviour change for a student:** «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» (and the other circle, and a point stated on the circle that completes it) refuses the line that completes it with the crossed-shape message, instead of drawing one order crossed.
+
+## ADR-823 — A stated polygon angle is the interior angle: the floor reads it, and stated angles that leave no room for a dent prove the ring convex (#2813)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2813](https://github.com/dcodish/geo_builder/issues/2813) (bug, `P2`, wrong answer; 2-D, 3-D, analytic) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02](02-requirements.md) — FR-EN-16 (a stated corner angle is the interior angle; the refusal) · **Design:** [04](04-design.md) § *A ring proved convex by its stated angles* · **LADDER stage:** none (the view floor and the pre-dry-run gate; no solve change)
+**Cites** the operator's rulings on #2813: 2026-11-10 (b) *"a stated polygon angle is always the interior angle … the last line is refused and the refusal names the lines that force it"*; 2026-11-12 *"B. a crossed quad is not a quad"*, the hint «שנו את אחת הזוויות או את סדר האותיות», 250° not built (#2854). **Amends** [ADR-613](#adr-613) and [ADR-622](#adr-622) (a yielding ring's simple floor, and its reflex seat, never take a stated corner reflex) · siblings [ADR-3D-490](06b-decisions-3d.md#adr-3d-490), [ADR-AG-471](06c-decisions-analytic.md#adr-ag-471).
+
+**Measured at pickup** (`caf619a5`, `driveThroughGate` + `findValidConfig`, seeds 0–5): «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110° · מרובע ABDC» committed, ABDC drawn crossed; with the angles last every view was a dart with C reflex (a "110°" corner 250° inside); «דלתון ABCD» with the same angles committed a dart; the fixture `hexagon-regular-by-angles-2797`'s lines drew a dented hexagon at seeds 2–3.
+
+**Class.** *Every reading of a stated corner angle was the UNSIGNED angle between its rays*, so where a ring was held only to simplicity (ADR-613's yielding ring, ADR-622's reflex axis, a stated-concave ring, a top-level `polygon`) a view could seat a stated corner as the reflex corner of a dent, and no reason ever proved convex position from angles.
+
+**Decision.**
+1. **The floor.** `polygonsConvex`'s simple-floor branch also requires each STATED corner (`statedRingCorners`: a `set-angle`, not an arc measure, or a non-implicit corner `set-perpendicular`, between the vertex's two ring neighbours, below 180°) to turn with the ring's orientation. «הציגו תצורה אחרת», ADR-622's seat and ADR-613's search never offer a stated corner reflex.
+2. **The proof — one more reason for ADR-826's reader.** `ringConvexityProofs` (reason `angles`): stated corners (the smallest value per corner) summing to at least (n − 3)·180° leave no corner room to be reflex, so a simple ring is convex. Equality included (A + C = 180° on a quadrilateral).
+3. **The refusal.** ADR-826's `ringOrderContradiction` refuses the line that completes it, unchanged; when the proof is `angles`, `app/ringOrder.ts` (`ringOrderVerdict`) gives the note `input.ringContradictsAngles` (new text of the session's, ADR-W-174) with the line, the angle lines as typed, the ring and the other order.
+
+**Not in this landing.** A dart with an UNSTATED corner reflex in a narrow window («∠DAB = 70° · ∠BCD = 100°», B ∈ (180°, 190°)) is not found by the search and the line is refused — the plan's found case, reported on #2813.
+
+**Locks.** Unit: `src/replay/__tests__/issue-443-macro-convexity.test.ts` (#2813 block: the floor on a dart, by angle and by right angle; the bound at n = 4, 5, 6, equality included; the blame in every order and never on an unrelated line); `src/engine/__tests__/adr028-driven.test.ts` (no view of the #2797 hexagon at seeds 0–7 seats a stated corner reflex). Scenario `stated-angle-interior-2813` (`scenarios-corpus-4.ts`). Parity rows `stated-angle-interior-2813-01..03`.
+
+**Behaviour change for a student:** «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110° · מרובע ABDC» refuses the last line, naming the two angle lines and saying «שנו את אחת הזוויות או את סדר האותיות», instead of drawing ABDC crossed; «הציגו תצורה אחרת» never shows a stated angle as the inside of a dent.

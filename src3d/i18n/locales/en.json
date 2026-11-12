@@ -183,6 +183,7 @@
     "componentSymbolic": "A single coordinate with a letter value («{{component}}») is not supported yet — give it a number, e.g. {{component}} = 3",
     "inscribedContradictsNoun": "A {{shape}} cannot be inscribed in a circle: «{{sentence}}». A circle through every vertex would make it a {{forced}}, and a {{forced}} is not a {{shape}}. If the shape is a {{forced}}, write «{{forced}}» instead of «{{shape}}».",
     "inscribedContradictsNounVs": "Can't do that: «{{sentence}}» contradicts «{{other}}» — they can't both hold. The reason: a circle through the four vertices would make a {{shape}} a {{forced}}, and a {{forced}} is not a {{shape}}.",
+    "ringContradictsAngles": "«{{detail}}» can't be added: by {{forcing}}, the shape {{ring}} is convex, and points in convex position have only one order in which the sides don't cross — so {{other}} would fold over itself. Change one of the angles or the order of the letters.",
     "ringContradictsNoun": "The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.",
     "radianAngle": "In solid geometry, angles are written in degrees — for example ∠ABC = 90",
     "unreadName": "«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.",

@@ -1494,6 +1494,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'crossed-ring-2811-01', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABCD'], expect: 'refused', note: 'R4: 2-D drew ABDC crossed before ADR-826' },
   { id: 'crossed-ring-2811-02', family: 'polygons', steps: ['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD', 'מרובע ABDC'], expect: 'refused', note: 'R12: a rider completes the circle' },
   { id: 'crossed-ring-2811-03', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC'], expect: 'builds', note: 'C1: two orders with no circle, a concave quadrilateral' },
+  // ── #2813 (ADR-823 / ADR-AG-471 / ADR-3D-490, operator rulings 2026-11-10 (b) and 2026-11-12 B): a stated polygon angle is the
+  // interior angle, so stated angles summing to (n − 3)·180° or more put the ring in convex position, and a second order crosses
+  { id: 'stated-angle-interior-2813-01', family: 'polygons', steps: ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°', 'מרובע ABDC'], expect: 'refused', note: 'the reported case: every builder drew ABDC crossed before #2813' },
+  { id: 'stated-angle-interior-2813-02', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', '∠DAB = 70°', '∠BCD = 110°'], expect: 'refused', note: 'the angle line completes it' },
+  { id: 'stated-angle-interior-2813-03', family: 'polygons', steps: ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°'], expect: 'builds', note: 'the control: convex at every view' },
 
   // #1987 (ADR-622) / #1986: four FREE points read in a second order. 2-D draws the CONCAVE quadrilateral — which
   // vertex is reflex is a configuration axis, not a fixed default — and analytic draws it too; since #1986 (ADR-3D-418)

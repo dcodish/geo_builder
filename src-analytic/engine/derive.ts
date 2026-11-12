@@ -407,6 +407,24 @@ export function derive(
       if (group.length < 2 || !group.some((g) => g.proof)) continue;
       const at = Math.max(...group.map((g) => declaredAt.get(g.id)!), ...group.flatMap((g) => (g.proof ? proofLines(g.proof) : [])));
       if (faults.some((f) => f.index === at)) return null; // a truer message is already on that line
+      /**
+       * #2813 ([ADR-AG-471](../../docs/06c-decisions-analytic.md#adr-ag-471)): proved by its STATED INTERIOR ANGLES only —
+       * the refusal names the angle lines (operator ruling 2026-11-10) with his next step of 2026-11-12, 2-D's text.
+       */
+      if (!group.some((g) => g.proof && g.proof.reason !== 'angles')) {
+        const proved = group.find((g) => g.proof)!;
+        const other = group.find((g) => g !== proved)!;
+        const ring = (id: string) => { const o = objectById(construction, id); return o && o.kind === 'polygon' ? o.vertices.join('') : ''; };
+        const angleLines = [...new Set(proofLines(proved.proof!))].sort((a, b) => a - b);
+        return {
+          index: at,
+          code: 'ring-contradicts-angles' as const,
+          detail: lines[at],
+          polygon: ring(proved.id),
+          pair: ring(other.id),
+          declared: angleLines.map((i) => `«${lines[i].trim()}»`).join(', '),
+        };
+      }
       return { index: at, code: 'ring-contradicts-noun' as const, detail: lines[at] };
     }
     return null;

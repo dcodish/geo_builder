@@ -17,7 +17,7 @@ import { indexedNameText, GLUED_NAME_G, GLUED_NAME_WHOLE } from '../../shell/ind
 import { givenText } from '../../shell/literal';
 import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GeoObject, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
-import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
+import { angleSumImpossibility, pinnedAngleWedges, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { reachImpossibility } from '@/engine/reachFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
@@ -5427,6 +5427,90 @@ function circleMemberships(cmd: AnyCommand): { circle: string; ids: Id[] }[] {
   }
 }
 
+/**
+ * #2813 ([ADR-823](docs/06-decisions.md#adr-823), operator ruling 2026-11-10 (b): *"a stated polygon angle is always the
+ * interior angle"*) — the angle WEDGES the student STATED, each with the fact that states it. Read off the fact list,
+ * never off the construction (a stated angle may have become a carrier's drive), in every spelling
+ * {@link pinnedAngleWedges} reads: a `set-angle` (not an arc measure) and a `set-perpendicular` whose two segments meet
+ * at one corner (90° there; a structurally implied one is not a statement). Only a wedge strictly between 0° and 180°
+ * is kept: that is the only value a wedge can name, and the one this reading constrains.
+ */
+export interface StatedCorner {
+  v: Id;
+  p: Id;
+  q: Id;
+  deg: number;
+  fact: Fact;
+}
+export function statedRingCorners(facts: Fact[]): StatedCorner[] {
+  const out: StatedCorner[] = [];
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    const c = f.cmd;
+    const con: Constraint | null =
+      c.type === 'set-angle' && !c.arcOf ? { type: 'angle', vertex: c.vertex, ray1: c.ray1, ray2: c.ray2, value: c.value }
+      : c.type === 'set-perpendicular' && !c.implicit ? { type: 'perpendicular', a: c.a, b: c.b, c: c.c, d: c.d }
+      : null;
+    if (!con) continue;
+    for (const w of pinnedAngleWedges([con])) if (w.deg > 0 && w.deg < 180 - 1e-6) out.push({ ...w, fact: f });
+  }
+  return out;
+}
+
+/** The stated corners of ring `ids` — a wedge at a vertex between its two ring neighbours, in either ray order. */
+function cornersOfRing(ids: Id[], corners: StatedCorner[]): { index: number; corner: StatedCorner }[] {
+  const n = ids.length;
+  const out: { index: number; corner: StatedCorner }[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = ids[(i + n - 1) % n], v = ids[i], next = ids[(i + 1) % n];
+    for (const w of corners)
+      if (w.v === v && ((w.p === prev && w.q === next) || (w.p === next && w.q === prev))) out.push({ index: i, corner: w });
+  }
+  return out;
+}
+
+/**
+ * #2813 (ADR-823): does every STATED corner of a simple ring turn the ring's way? A corner whose turn opposes the ring's
+ * orientation (its signed area) is the reflex corner of a dent — 360° minus the wedge inside — which the ruling says a
+ * stated angle never is. The view floor's half of the interior reading: a ring held only to simplicity (a yielding
+ * ring, a stated-concave ring, a top-level `polygon`) still never seats a stated corner reflex.
+ */
+function statedCornersTurnWithRing(ids: Id[], pts: Vec[], corners: StatedCorner[]): boolean {
+  if (corners.length === 0) return true;
+  const stated = cornersOfRing(ids, corners);
+  if (stated.length === 0) return true;
+  const n = ids.length;
+  let area = 0;
+  for (let i = 0; i < n; i++) area += pts[i].x * pts[(i + 1) % n].y - pts[(i + 1) % n].x * pts[i].y;
+  const orient = Math.sign(area);
+  if (orient === 0) return true; // a degenerate ring — the simple floor's concern, never this one's
+  for (const { index } of stated) {
+    const o = pts[(index + n - 1) % n], a = pts[index], b = pts[(index + 1) % n];
+    const turn = (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    if (Math.sign(turn) === -orient) return false;
+  }
+  return true;
+}
+
+/**
+ * #2813 (ADR-823) — the STATED INTERIOR ANGLES LEAVE NO ROOM: a simple n-gon's interior angles sum to (n − 2)·180°, so
+ * a reflex corner leaves the others less than (n − 3)·180°. Stated corners (each below 180°, by the ruling and the floor
+ * above) that already sum to at least that prove the ring convex. The twin of the angle-sum prover (ADR-538/658), which
+ * reads the same wedges against the same bound. The smallest stated value at a corner is read, so the proof stays sound.
+ * @returns the facts that prove it, or null.
+ */
+function anglesLeaveNoRoom(ids: Id[], corners: StatedCorner[], facts: Fact[]): Fact[] | null {
+  const best = new Map<number, StatedCorner>();
+  for (const { index, corner } of cornersOfRing(ids, corners)) {
+    const had = best.get(index);
+    if (!had || corner.deg < had.deg) best.set(index, corner);
+  }
+  const sum = [...best.values()].reduce((s, w) => s + w.deg, 0);
+  if (best.size === 0 || sum < (ids.length - 3) * 180 - 1e-6) return null;
+  const proving = new Set([...best.values()].map((w) => w.fact));
+  return facts.filter((x) => proving.has(x));
+}
+
 /** A ring's convex position, proved structurally by stated facts (#2811 ADR-826; #2813 ADR-823). */
 export interface RingConvexityProof {
   ring: Id[];
@@ -5446,7 +5530,9 @@ const ringProofsMemo = new WeakMap<Fact[], RingConvexityProof[]>();
  * - a stated `set-polygon-convexity` convex («המרובע ABCD קמור»);
  * - **one circle through every letter** ({@link circleMemberships}): a circle the ring is inscribed in, or one circle
  *   whose memberships — its circumcircle points, riders, crossings — cover all the letters. Four points on one circle are
- *   in convex position, so «מעגל חוסם את ABDC» after «מרובע ABCD · מרובע ABDC» leaves one of the two orders crossed.
+ *   in convex position, so «מעגל חוסם את ABDC» after «מרובע ABCD · מרובע ABDC» leaves one of the two orders crossed;
+ * - #2813 ([ADR-823](docs/06-decisions.md#adr-823)): **stated interior angles that leave no room for a reflex corner**
+ *   ({@link anglesLeaveNoRoom}: Σ ≥ (n − 3)·180°) — «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°» is convex.
  * A noun that is convex whenever simple keeps its existing path (ADR-608/613), unchanged. Memoized on the fact list.
  */
 export function ringConvexityProofs(facts: Fact[]): RingConvexityProof[] {
@@ -5468,6 +5554,7 @@ export function ringConvexityProofs(facts: Fact[]): RingConvexityProof[] {
     }
   }
   const seen = new Set<string>();
+  const corners = statedRingCorners(facts);
   for (const f of facts) {
     if (!f.enabled) continue;
     for (const { ids } of declaredRings(f.cmd)) {
@@ -5476,6 +5563,11 @@ export function ringConvexityProofs(facts: Fact[]): RingConvexityProof[] {
       const key = ringKey(ids);
       if (seen.has(key)) continue;
       seen.add(key);
+      const byAngles = corners.length ? anglesLeaveNoRoom(ids, corners, facts) : null;
+      if (byAngles) {
+        out.push({ ring: ids, reason: 'angles', facts: byAngles });
+        continue;
+      }
       const convex = statedConvex.get(key);
       if (convex) {
         out.push({ ring: ids, reason: 'stated-convex', facts: [convex] });
@@ -5563,6 +5655,7 @@ export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean 
     if (!c.convex) statedConcave.add(ringKey(c.ids));
   }
   const yields = convexityYields(facts);
+  let corners: StatedCorner[] | undefined;
   for (const f of facts) {
     if (!f.enabled) continue;
     // #443: the rings the fact DECLARES — directly, or through the macro it expands into.
@@ -5573,6 +5666,9 @@ export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean 
       const pts0 = ids.map((id) => positions.get(id));
       if (pts0.some((p) => !p)) continue;
       if (!ringSimple(pts0 as Vec[])) return false;
+      // #2813 (ADR-823, operator ruling 2026-11-10 (b)): a stated angle at a ring corner is its INTERIOR angle, so that
+      // corner turns with the ring — a view that seats it as the reflex corner of a dent is not a drawing of it
+      if (!statedCornersTurnWithRing(ids, pts0 as Vec[], corners ??= statedRingCorners(facts))) return false;
       continue;
     }
     const pts = ids.map((id) => positions.get(id));

@@ -85,7 +85,7 @@ export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVer
   // #1927 (ADR-608): the app refuses a ring over placed points that crosses in every configuration before the dry run.
   // #2811 (ADR-826): the app's own verdict, called — a ring a statement proves convex and another order of its letters
   const byProof = ringOrderVerdict(utterance, r.commands, facts);
-  if (byProof) return { kind: 'refused', reason: 'crossed-ring', detail: byProof.other };
+  if (byProof) return { kind: 'refused', reason: 'crossed-ring', detail: byProof.messageKey === 'input.ringContradictsAngles' ? byProof.messageKey : byProof.other };
   const crossed = forcedCrossedRing(facts, r.commands, seed);
   if (crossed) return { kind: 'refused', reason: 'crossed-ring', detail: crossed.join('') };
   // #2518 (ADR-784): the app's own verdict, called

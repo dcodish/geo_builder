@@ -152,6 +152,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // student's own statement and what the figure actually holds, never internal state.
     // #1923 (ADR-3D-314): analytic's `errRingContradictsNoun`, word for word — the line that completed the crossing.
     case 'ring-crossed':
+      // #2813 (ADR-3D-490): proved by stated angles — 2-D's input.ringContradictsAngles, word for word
+      if (err.angles) return t('err.ringContradictsAngles', { detail: err.stated, ...err.angles });
       return t('err.ringContradictsNoun', { detail: err.stated });
     // #1918 (ADR-3D-313): a noun no quadrilateral can carry together with the one already known — what the ring
     // is known to be, and the name it does not take. The key keeps the `shapeLessSpecific` name it was written

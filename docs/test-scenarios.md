@@ -2352,3 +2352,7 @@ over all four (ADR-041).
 ### `restated-rider-reversed-stays-put-2795` — «משולש ABC · D על AB · D על BA»: the reversed rider moves nothing (#2795, ADR-821)
 
 **Guards against:** the reversed rider's `collinear-order` claiming D's own parameter and re-solving D from another start (moved up to 3.3). **Asserts** no point moves at seeds 0–4, and with «D על AB» unticked «D על BA» alone keeps D on AB.
+
+### `stated-angle-interior-2813` — «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°»: a stated angle is the interior angle, so a second order of the letters is refused (#2813, ADR-823)
+
+**Guards against:** a stated corner read as the unsigned ray angle — «מרובע ABDC» committed and drawn crossed, or ABCD seated as a dart with the "110°" corner 250° inside. **Asserts** the three lines build convex at every view (seeds 0–5); «מרובע ABDC» (A1) and, with the angles last, «∠BCD = 110°» (A2) are refused `crossed-ring` with `input.ringContradictsAngles`, the Hebrew text naming both angle lines and «שנו את אחת הזוויות או את סדר האותיות»; the kite with the same angles refused; «מרובע ABCD · מרובע ABDC» still commits.
