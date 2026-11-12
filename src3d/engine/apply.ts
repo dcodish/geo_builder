@@ -1245,6 +1245,69 @@ function statedComps(
   return { stated: { texts: cmd.srcs, letters: [lettersAt(0), lettersAt(1), lettersAt(2)], ord } };
 }
 
+/**
+ * #2785 (ADR-3D-488) — IS A LETTER WRITTEN IN A COORDINATE ALREADY WRITTEN ELSEWHERE? A letter is one unknown wherever
+ * it is written: a pin symbol (`pinSymsOf`, «B(2t,t,k)»), the figure parameter, or a point component an earlier
+ * coordinate statement named (#814, «B(k,1,2)»). A letter written for the FIRST time, bare, is still only the name of
+ * a free component (ADR-3D-175): it adds nothing the point does not already have, and it keeps that representation
+ * (the exam gates ADR-3D-175 measured). The second place it is written makes it one unknown in every place.
+ */
+export function coordLetterShared3(c: Construction3, sym: string): boolean {
+  return pinSymsOf(c).includes(sym) || c.param === sym || c.partialNames.some((b) => b.sym === sym && b.target.kind === 'point');
+}
+
+/**
+ * #2785 (ADR-3D-488) — THE LETTERS OF A COORDINATE TUPLE, AS UNKNOWNS. The parser attaches `symExprs` only when the tuple
+ * carries structure (`2t`, a repeated letter); a bare distinct letter comes through as a NAME (`syms`) beside a null
+ * component. A bare letter that is shared ({@link coordLetterShared3}) is the affine form 1·k, the same `SymComp` the
+ * parser emits for `2t`, so it joins the pin-symbol pool under its name.
+ */
+export function coordLetterExprs3(
+  cmd: {
+    x: number | null; y: number | null; z: number | null;
+    syms?: [string | null, string | null, string | null];
+    symExprs?: [SymComp | null, SymComp | null, SymComp | null];
+  },
+  shared: (sym: string) => boolean,
+): [SymComp | null, SymComp | null, SymComp | null] {
+  const nums = [cmd.x, cmd.y, cmd.z];
+  return [0, 1, 2].map((i) => {
+    const e = cmd.symExprs?.[i];
+    if (e) return e;
+    const s = cmd.syms?.[i];
+    return nums[i] === null && s && shared(s) ? { terms: [{ sym: s, k: 1 }], c: 0 } : null;
+  }) as [SymComp | null, SymComp | null, SymComp | null];
+}
+
+/**
+ * #2785 (ADR-3D-488) — A NAMED POINT COMPONENT BECOMES THE POOL'S UNKNOWN when its letter is written a second time: the
+ * earlier pin's free component is re-written as 1·k (and its claim judges it), and the name binding is released. The
+ * M2 re-homing of #801, one owner over: whichever statement came first, the letter ends in one place, the pivot's
+ * pin-symbol pool, so the figure does not depend on the order the lines were typed in.
+ */
+function promoteNamedComponents3(next: Construction3, syms: readonly string[]): void {
+  const AX = ['x', 'y', 'z'] as const;
+  for (const sym of syms) {
+    const bound = next.partialNames.filter((b) => b.sym === sym && b.target.kind === 'point');
+    if (bound.length === 0) continue;
+    const one = (): SymComp => ({ terms: [{ sym, k: 1 }], c: 0 });
+    for (const b of bound) {
+      if (b.target.kind !== 'point') continue;
+      const id = b.target.id;
+      const i = AX.indexOf(b.axis);
+      const named = (st: StatedComps | undefined) => !st || st.letters[i].includes(sym);
+      next.pins = next.pins.map((p) => (p.id === id && p[b.axis] === null && named(p.stated) ? { ...p, [b.axis]: one() } : p));
+      next.claims = next.claims.map((cl) => {
+        if (cl.type !== 'coords-eq' || cl.id !== id || !cl.given || cl[b.axis] !== null || cl.sym?.[i]) return cl;
+        const sym3 = [...(cl.sym ?? [null, null, null])] as [SymComp | null, SymComp | null, SymComp | null];
+        sym3[i] = one();
+        return { ...cl, sym: sym3 };
+      });
+    }
+    next.partialNames = next.partialNames.filter((b) => !(b.sym === sym && b.target.kind === 'point'));
+  }
+}
+
 /** #902 (ADR-3D-219) — a stated number for ONE component of an injection target, as the injection
  *  command that lane already lowers (the two other components unstated — null does not constrain).
  *  How a value reaches a NAMED free component (#814): the name was bound in an injection lane, and the
@@ -3422,7 +3485,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // distinct symbol joins the pivot as an extra unknown, OPEN until data pins it.
         // The letters share one namespace per role: a pin symbol that is ALSO the figure's
         // coord-sym parameter would be resolved by two different mechanisms — refused.
-        const exprs = cmd.symExprs ?? [null, null, null];
+        // #2785 (ADR-3D-488): a BARE letter already written elsewhere («B(k,1,2)» then «C(k,3,4)», or after
+        // «B(2t,t,k)») is the affine form 1·k: one pin symbol per name, wherever it is written.
+        const exprs = coordLetterExprs3(cmd, (sym) => coordLetterShared3(c, sym));
         // #1561/#1615 (ADR-3D-292, ADR-3D-293): a coord-sym point's letter is the FIGURE parameter, not a carrier
         // parameter, so a coordinate given that fixes it («B(1,t,2)» then «B(n,4,p)») first values the letter —
         // the `symbol-value` of «t = 4». Every carrier point is placed by the generic determination below.
@@ -3436,6 +3501,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const adopted = adoptParamAsPinSym(base, exprs); // #801: the letter re-homes to the pivot when it can
         if (!adopted) return { ok: false, error: { code: 'two-params' } };
         const next = clone(adopted);
+        promoteNamedComponents3(next, [...new Set(exprs.flatMap((e) => (e ? symsOfAffine(e) : [])))]); // #2785
         const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
         const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
           [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
@@ -3444,10 +3510,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // pattern its siblings — plane pins, coord-plane-rel, on-line, the `A = (…)` twin — already follow).
         // A pin acts only where the pivot owns something that moves the point (a solid's gauge and dims, a
         // pin symbol); on a coordinate, coord-sym or derived point nothing moves, and without the claim a
-        // false restatement read green over a figure that contradicts it. The claim carries the NUMERIC
-        // components only — a symbolic one («B(2t, t, k)») is the pivot's to satisfy, and null is unchecked.
-        if (cmd.x !== null || cmd.y !== null || cmd.z !== null)
-          recordClaim3(next, c, { type: 'coords-eq', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z, given: true });
+        // false restatement read green over a figure that contradicts it. Null is unchecked.
+        // #2785 (ADR-3D-488): the claim carries the SYMBOLIC components too («B(2t, t, k)»), judged at the letters'
+        // resolved values, so a letter whose equations disagree («B(2,15,-8)» then «B(2t,t,k)») is refuted.
+        const symClaim = exprs.some((e) => e !== null) ? { sym: exprs } : {};
+        if (cmd.x !== null || cmd.y !== null || cmd.z !== null || exprs.some((e) => e !== null))
+          recordClaim3(next, c, { type: 'coords-eq', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z, ...symClaim, given: true });
         // #1615 (ADR-3D-293): ONE mechanism for every point that sits on something. If the point's position
         // carries drivable parameters in the sampled-carrier table — a segment's `t`, a line's or a plane's
         // offset, a partial point's missing coordinate, … — the STATED components are recorded, and `resolve3`
@@ -4367,6 +4435,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const next = clone(c);
         next.symbolPins = next.symbolPins.filter((p) => p.sym !== cmd.symbol);
         next.symbolPins.push({ rel: 'value', value: cmd.value, sym: cmd.symbol });
+        // #2785 (ADR-3D-488): the value is a statement about every coordinate written with the letter, so this line
+        // carries those coordinate claims too, judged at the value: on a figure the pivot does not move («B(2,1,-8)» ·
+        // «B(2t,t,k)» · «k = 3») the line that contradicts them is refused, not the earlier row turned red.
+        for (const cl of c.claims)
+          if (cl.type === 'coords-eq' && cl.given && cl.sym?.some((e) => e !== null && symsOfAffine(e).includes(cmd.symbol))) next.claims.push({ ...cl });
         r = { ok: true, next };
       }
       for (const owner of owners) {

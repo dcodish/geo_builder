@@ -539,8 +539,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   («C(p²,1,0)»), in a vector or pair injection, in a line or plane equation, as the algebraic lane's
   parameter, as an angle label («∠SAB = α») or as the name of a free component («C(p,1,0)», #814). A value
   the figure cannot satisfy is refused naming the statement, an unknown letter as unknown; a stated sign
-  («k חיובי») is honoured the same way.
-  - Sources: ADR-052, ADR-3D-219, ADR-3D-236, ADR-3D-433 (the coordinate parameter's value against the givens that pin it, in either order); #814, #902, #922, #930, #1896.
+  («k חיובי») is honoured the same way. **A letter written in several coordinates is ONE number**: «B(k,1,2)» ·
+  «C(k,3,4)» draws B and C at the same x at every configuration, the value reaches every place the letter is written,
+  and coordinates that give it two values («B(2,15,-8)» then «B(2t,t,k)») are refused naming the line.
+  - Sources: ADR-052, ADR-3D-219, ADR-3D-236, ADR-3D-433 (the coordinate parameter's value against the givens that pin it, in either order), ADR-3D-488; #814, #902, #922, #930, #1896, #2785.
 - **FR-VC-2c (Must)** — **A value whose letter is no longer defined is a fact in error, and the change that
   undefined it says so.** When the row that introduced the letter («∠SAB = α», «C(p²,1,0)», «SN = k·SC»)
   is deleted, muted or edited away, the value row («α = 70», «p = 3», «k = 1/2») stays in the list, is

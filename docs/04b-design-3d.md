@@ -172,6 +172,12 @@ every pin family that can land elsewhere records its claim: `coords-eq` for the 
 `vec-val` for `inject-vector` and `inject-pair` (one `VecAtom` form), `dot-val` for `dot-given`
 (ADR-3D-284, #1560); and (ADR-3D-285, #1567) `length` → `length-eq`, `seg-angle` → `angle-seg-eq`,
 `vangle` → `vertex-angle-eq`, `length-rel` → `length-rel`, `seg-perp/par-plane` → `perp-plane`/`par-plane`.
+**A coordinate letter is one pin symbol, and the claim judges it** (#2785, [ADR-3D-488](06b-decisions-3d.md#adr-3d-488)). A bare
+letter written for the first time names a free component (ADR-3D-175); written a second time (`coordLetterShared3`: a pin
+symbol, the figure parameter, or a named point component) it is lowered to 1·k (`coordLetterExprs3`) and the earlier
+statement's named component is promoted to the same pin symbol (`promoteNamedComponents3`). The `coords-eq` claim carries
+the symbolic components (`sym`), read at `pinLettersAt3`: the pivot's `pinSymbols`, or, where the pivot does not run, a
+least-squares read of the letters off the placed points over every point pin.
 A given's claim carries `given: true`; **the placed-figure rule is claim-level**, at the head of
 `holdsAt`: a `given` claim is judged on a placed figure only, and at the displayed seed the pin-owner guard
 answers (`injection-unsatisfiable` for a coordinate pin, `givens-contradict` otherwise). So

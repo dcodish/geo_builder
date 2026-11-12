@@ -136,7 +136,9 @@ export type Claim3 =
   // always carries all three. `given` marks the ARBITER of a coordinate GIVEN («B(3,7,8)» on an existing B),
   // as opposed to the student's ANSWER («K = (-3,4,6)»): only the given defers to the pivot's
   // no-placement verdict; an answer keeps its verify-your-answer register (ADR-3D-075).
-  | { type: 'coords-eq'; id: Id; x: number | null; y: number | null; z: number | null; given?: true } // A = (2, 0, -10)
+  // #2785 (ADR-3D-488): `sym` holds the components written with letters («B(2t, t, k)»), judged at the letters' resolved
+  // values (`pinLettersAt3`); a component is numeric (x/y/z) or symbolic (sym[i]) or neither, never both.
+  | { type: 'coords-eq'; id: Id; x: number | null; y: number | null; z: number | null; sym?: [SymComp | null, SymComp | null, SymComp | null]; given?: true } // A = (2, 0, -10)
   | { type: 'never-parallel'; line: string; plane: string } // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
   | { type: 'plane-eq'; ids: Id[]; cx: number; cy: number; cz: number; d: number } // המישור KBC: x+2y+3z-26=0
   | { type: 'angle-seg-eq'; a1: Id; b1: Id; a2: Id; b2: Id; deg: number; given?: true } // הזווית בין A'C לבין BC' היא 90 (between lines, ≤90°)
