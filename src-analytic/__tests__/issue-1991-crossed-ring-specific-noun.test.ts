@@ -20,6 +20,8 @@ import { errorText } from '../app/errorText';
 import { derive } from '../engine/derive';
 import { analyticI18n } from '../i18n';
 import { SHAPES, convexWhenSimple } from '../engine/shapes';
+import { ringConvexityProofAg } from '../engine/rings';
+import { drawableAt } from '../engine/evaluate';
 import type { InputError } from '../store/useAnalyticStore';
 
 const SEEDS = [0, 1, 2, 3, 4, 5];
@@ -108,5 +110,50 @@ describe('#1991 — the mechanism: convex whenever simple, derived from the SHAP
   it('a triangle noun is not a quadrilateral answer', () => {
     for (const noun of ['משולש', 'משולש ישר זווית']) expect(convexWhenSimple(noun), noun).toBe(false);
     expect(convexWhenSimple(undefined)).toBe(false);
+  });
+});
+
+/**
+ * #2812 (ADR-AG-475) — A SECOND SUFFICIENT REASON: one circle through every letter. Measured at caf619a5 through
+ * `decideSubmit`: R1, R3 and R5 recorded every line, the second order drawn crossed. Four points on one circle have one
+ * simple order, so the line that completes the contradiction — the ring, or the circle line — is refused with the same
+ * message; one ring with its circle, and two orders with no circle, still record.
+ */
+describe('#2812 — a circle through the letters proves convex position', () => {
+  it.each([
+    [['מרובע ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC']], // R1
+    [['מרובע ABCD', 'המרובע ABCD חסום במעגל', 'מרובע ABDC']], // R3
+    [['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABDC']], // R5, the issue's lines: the circle line completes it
+    [['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD', 'מרובע ABDC']], // a rider completes the circle
+    [['דלתון ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC']], // R9, unchanged
+  ])('%j', (lines) => {
+    const line = lines[lines.length - 1];
+    const v = last(lines, 0);
+    expect(v.kind).toBe('refused');
+    if (v.kind === 'refused') expect(v.error).toMatchObject({ key: 'ring-contradicts-noun', detail: line });
+  });
+
+  it.each([[['מרובע ABCD', 'מעגל חוסם את ABCD']], [['מרובע ABCD', 'מרובע ABDC']]])('%j records', (lines) => {
+    expect(last(lines, 0).kind).toBe('record');
+  });
+
+  it('ringConvexityProofAg: a circle through all four, a rider completing it, the noun — and nothing for three of four', () => {
+    const proof = (lines: string[]) => {
+      const c = derive(lines, 0).construction;
+      const o = c.objects.find((x) => x.kind === 'polygon' && x.vertices.length === 4);
+      return o && o.kind === 'polygon' ? ringConvexityProofAg(c, o)?.reason ?? null : 'no ring';
+    };
+    expect(proof(['מרובע ABCD', 'מעגל חוסם את ABCD'])).toBe('circle');
+    expect(proof(['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD'])).toBe('circle');
+    expect(proof(['ריבוע ABCD'])).toBe('noun');
+    expect(proof(['משולש ABC', 'מעגל חוסם את ABC', 'נקודה D', 'מרובע ABCD'])).toBeNull();
+  });
+
+  it('R1: once refused, ABCD alone draws simple at seeds 0–5 (FR-RD-7 equivalent)', () => {
+    for (let seed = 0; seed < 6; seed++) {
+      const d = derive(['מרובע ABCD', 'מעגל חוסם את ABCD'], seed);
+      expect(d.faults, `seed ${seed}`).toEqual([]);
+      expect(drawableAt(d.construction, seed).ringFaults, `seed ${seed}`).toEqual([]);
+    }
   });
 });

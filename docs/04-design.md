@@ -1460,6 +1460,28 @@ is sound because the line's own constraints only narrow the configurations. A hi
 helper `gateVerdict` mirrors it (reason `crossed-ring`). The predicate is 2-D's own: `BOUNDARIES.json` keeps engine
 layers `copied-never-shared`.
 
+**A ring proved convex by its stated angles: one more reason for the same reader** ([ADR-823](06-decisions.md#adr-823),
+#2813). A stated corner angle is the INTERIOR angle. Two halves, both in `replay/core.ts`: (1) the view floor —
+`polygonsConvex`'s simple-floor branch (a yielding, stated-concave or top-level ring) also requires every STATED corner
+(`statedRingCorners`: a `set-angle` or a corner `set-perpendicular` fact between the vertex's two ring neighbours, below
+180°) to turn with the ring's orientation, so no view seats it reflex; (2) the proof — reason `angles` of
+`ringConvexityProofs` (ADR-826, above; `anglesLeaveNoRoom`): a declared ring whose stated corners sum to at least
+(n − 3)·180° is in convex position (a reflex corner would leave the rest less). `ringOrderContradiction` refuses it
+unchanged; for an `angles` proof `ringOrderVerdict` gives `input.ringContradictsAngles` (the line, the angle lines as
+typed, the ring, the other order).
+
+**A ring a statement proves convex is refused structurally, from any line** ([ADR-826](06-decisions.md#adr-826), #2811).
+`forcedCrossedRing` reads only the rings the current line declares, so a line that declares none but proves the letters
+in convex position was never asked. `ringConvexityProofs(facts)` (`replay/core.ts`, beside `convexityYields`, memoized
+on the fact list) returns, per declared ring of four or more, the facts that prove it convex: a stated «קמור», or one
+circle through every letter — read off the COMMANDS (`circleMemberships`: a circumcircle's three points, a circle
+through a point, a rider, a crossing, an arc midpoint, a diameter's ends, a `set-concyclic`), never positions; a letter on
+the circle only through a derived point fails open. `ringOrderContradiction(facts, commands)` asks it of the TRIAL facts:
+a proved ring and another declared ring over its letters in another order is a contradiction, blamed on the LATEST of the
+declarations and the proof facts, refused only when that is a fact the line adds (a saved figure is never refused on an
+unrelated line). `app/ringOrder.ts`'s `ringOrderVerdict` is called by both seams before `forcedCrossedRing`
+(ADR-W-006), note `input.ringContradictsNoun`; `gateVerdict` mirrors it. `convexityYields` never yields a proved ring.
+
 **Search first, refuse last** ([ADR-613](06-decisions.md#adr-613), the operator's ruling of 2026-10-09). The prior pool
 is filtered by `meetsRequirements`, and so by FR-EN-16's convexity DEFAULT. A second declared ring over some of a
 ring's points in another order is a statement that default yields to (points in convex position have one simple

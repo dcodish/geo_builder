@@ -384,6 +384,9 @@ const he = {
   errPolygonCollapsed:
     '«{{detail}}» משטיח את {{polygon}}: יחד עם הנתונים הקודמים הוא מחייב שהקודקודים ייפלו על ישר אחד, ' +
     'וצורה שטוחה אינה {{shapeHe}} — כפי שקובע «{{declared}}». «{{detail}}» לא נוסף.',
+  // #2813 (ADR-AG-471): 2-D's input.ringContradictsAngles, verbatim
+  errRingContradictsAngles:
+    'לא ניתן להוסיף את «{{detail}}»: לפי {{declared}} הצורה {{polygon}} קמורה, ולנקודות במצב קמור יש רק סדר אחד שבו הצלעות לא נחתכות — לכן {{pair}} מתקפלת על עצמה. שנו את אחת הזוויות או את סדר האותיות.',
   errRingContradictsNoun:
     'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «{{detail}}». אפשר לשנות את סדר האותיות ' +
     'כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
@@ -990,6 +993,8 @@ const en: typeof he = {
   errPolygonCollapsed:
     '«{{detail}}» flattens {{polygon}}: together with the earlier givens it forces the vertices onto one line, ' +
     'and a flat figure is not the {{shapeEn}} that «{{declared}}» declares. «{{detail}}» was not added.',
+  errRingContradictsAngles:
+    "«{{detail}}» can't be added: by {{declared}}, the shape {{polygon}} is convex, and points in convex position have only one order in which the sides don't cross — so {{pair}} would fold over itself. Change one of the angles or the order of the letters.",
   errRingContradictsNoun:
     'The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so ' +
     'the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.',

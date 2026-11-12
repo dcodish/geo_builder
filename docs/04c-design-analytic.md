@@ -1615,7 +1615,18 @@ the constraints' tangent space, tolerance relative to the read's own scale — a
 freedom). An affine map keeps every proper crossing, so 0 proves it. The arm adds those `crossed` faults; `decideSubmit`
 re-attributes a fault that appeared to the submitted line, so the ring-first order refuses the shape line.
 
-**…or STRUCTURALLY, with no figure at all** ([ADR-AG-261](06c-decisions-analytic.md#adr-ag-261), #1991). The walk's evidence
+**A stated corner is the interior corner** ([ADR-AG-471](06c-decisions-analytic.md#adr-ag-471), #2813). `ringFaultsOf`
+reports a simple ring that seats a STATED corner (`statedCornersAg`: an `angle` constraint of any measure, or a corner
+`perpendicular`, between the vertex's two ring neighbours) against the ring's orientation as the hard `reflex-corner` fault,
+so `drawableAt` never draws it. `ringConvexityProofAg` (rings.ts, 2-D's `ringConvexityProofs` copied) returns the
+constraints whose stated degrees sum to at least (n − 3)·180°, a proof of convex position that `ringOrderFault` reads beside
+the noun (below): the angle lines join the blame and the fault is `ring-contradicts-angles` (`polygon`, `pair`, `declared`).
+
+**…or STRUCTURALLY, with no figure at all** ([ADR-AG-261](06c-decisions-analytic.md#adr-ag-261), #1991; the proof is
+`ringConvexityProofAg` in rings.ts since #2812, [ADR-AG-475](06c-decisions-analytic.md#adr-ag-475): the noun, or ONE CIRCLE
+through every letter — a `circle-thru`'s through points, or an `on-curve` constraint on a circle object for each other letter,
+which is what «מעגל חוסם את ABCD» and a rider «D על המעגל» lower to; rings of four or more; the lines that made the circle
+and its riders join the blame, so the circle line that completes it is the one refused). The walk's evidence
 needs a candidate whose GIVENS hold, and a second ring's own noun can be exactly what cannot hold — «ריבוע ABCD» ·
 «מקבילית ACBD» leaves `forcedCrossed` empty and the crossed ring's `ringDof` at 4, so both arms above are silent and
 «לא נמצאה תצורה» spoke for an order mistake. `derive`'s `ringOrderFault`, computed before the drop-one probe's arms,

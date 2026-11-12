@@ -42,7 +42,7 @@ import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableCircle3, mintabl
 import { definiteCircle3 } from '../engine/definiteCircle';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
-import { commandStatesCircle3, convexWhenSimple, statedConcyclic3, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
+import { anglesProveConvex3, commandStatesCircle3, convexWhenSimple, statedConcyclic3, statedRingCorners3, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
@@ -1607,16 +1607,35 @@ function deriveCore3(
         // #2810 (ADR-3D-467): a quad pyramid declares its BASE ring (base ids first) — a bound one over existing letters
         ((k.ids.length === ring.length && ringKeyIds3(k.ids) === ringKeyIds3(ring)) ||
           (k.type === 'solid' && ring.length === 4 && QUAD_PYRAMIDS[k.kind] !== undefined && ringKeyIds3(k.ids.slice(0, 4)) === ringKeyIds3(ring))));
+    /**
+     * #2813 ([ADR-3D-490](../../docs/06b-decisions-3d.md#adr-3d-490), 2-D's ADR-823) — A THIRD SUFFICIENT REASON: the
+     * ring's STATED INTERIOR ANGLES leave no room for a reflex corner (`anglesProveConvex3`: Σ ≥ (n − 3)·180°). The lines
+     * that state those angles join the blame — «∠BCD = 110°» after the second ring is the line refused — and the
+     * refusal names them (operator ruling 2026-11-10: *"the refusal names the lines that force it"*).
+     */
     for (const list of ringsByLetters.values()) {
       if (list.length < 2) continue;
       const byCircle = cyclicLetters.has(letterKey(list[0].ids));
+      const byNoun = list.some((o) => o.convex);
+      const proved = byNoun || byCircle ? undefined : list.find((r) => anglesProveConvex3(c, r.ids));
+      if (!byNoun && !byCircle && !proved) continue;
+      const corners = proved ? [...statedRingCorners3(c, proved.ids).values()] : [];
+      const statesCorner = (f: Fact3) => f.cmds.some((k) => {
+        if (k.type !== 'claim' || k.claim.type !== 'vertex-angle-eq') return false;
+        const { vertex, p, q } = k.claim;
+        return corners.some((w) => w.vertex === vertex && ((w.p === p && w.q === q) || (w.p === q && w.q === p)));
+      });
       for (const crossed of list) {
-        if (!byCircle && !list.some((other) => other !== crossed && other.convex)) continue;
-        const involved = facts.filter((f) => f.enabled && list.some((r) => declaresRingOrdered(f, r.ids) ||
-          (byCircle && !list.some((o) => o.convex) && f.cmds.some((k) => commandStatesCircle3(k, r.ids)))));
+        if (!byCircle && !proved && !list.some((other) => other !== crossed && other.convex)) continue;
+        const involved = facts.filter((f) => f.enabled && (list.some((r) => declaresRingOrdered(f, r.ids) ||
+          (byCircle && !byNoun && f.cmds.some((k) => commandStatesCircle3(k, r.ids)))) || (proved !== undefined && statesCorner(f))));
         const blamed = involved[involved.length - 1];
         if (!blamed || status[blamed.id] !== 'ok') continue;
-        status[blamed.id] = { code: 'ring-crossed', stated: blamed.utterance };
+        if (proved) {
+          const forcing = involved.filter(statesCorner).map((f) => `«${f.utterance.trim()}»`).join(', ');
+          const other = list.find((r) => r !== proved)!;
+          status[blamed.id] = { code: 'ring-crossed', stated: blamed.utterance, angles: { forcing, ring: proved.ids.join(''), other: other.ids.join('') } };
+        } else status[blamed.id] = { code: 'ring-crossed', stated: blamed.utterance };
         break;
       }
     }

@@ -49,6 +49,7 @@ import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
 import { ctxOf } from './scenario-pipeline';
 import { gateVerdict, heldKind } from './submit-gate';
+import { ringOrderVerdict } from '@/app/ringOrder';
 import i18n from '@/i18n';
 import { circleResolver, humanizeError } from '@/i18n/humanizeError';
 import { circleMenuTitle } from '@/i18n/circleText';
@@ -6727,6 +6728,68 @@ export const SCENARIOS_4: Scenario[] = [
       expect(m.lastError).toBeNull();
       const [A, B, D] = ['A', 'B', 'D'].map((id) => m.positions.get(id)!);
       expect(dist(A, D) + dist(D, B), 'D stays on AB').toBeCloseTo(dist(A, B), 6);
+    },
+  },
+  {
+    id: 'crossed-ring-circle-last-2811',
+    title:
+      '#2811 (ADR-826): «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» — the circle line is refused (four points on one circle have one simple order), in every order; one ring with its circle, and two orders with no circle, still build',
+    guards:
+      "Plan of #2811 (armed 2026-11-11 on ADR-W-199 §2 and #2810's review): 2-D refused the circle-FIRST order (the prior pool was all-concyclic) but accepted the circle LAST and drew ABDC crossed at 6/6 seeds (re-measured at pickup on caf619a5: accepted, `findValidConfig` null). Root cause: `forcedCrossedRing` reads only the rings the current line DECLARES, so a line that proves the letters convex — a circle through them, or a rider that completes the circle — was never asked whether it leaves the standing rings a simple drawing. Fix: `ringConvexityProofs` (a circle through every letter, «קמור») and `ringOrderContradiction`, structural and pool-free, blamed on the latest line; a proved ring no longer yields its convexity (`convexityYields`).",
+    steps: ['מרובע ABCD', 'מרובע ABDC'],
+    check(fig) {
+      allStepsOk(fig);
+      // R5, the issue's exact lines, and R4: the circle line is refused
+      for (const circle of ['מעגל חוסם את ABDC', 'מעגל חוסם את ABCD'])
+        expect(gateVerdict(factsOf(['מרובע ABCD', 'מרובע ABDC']), circle), circle).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      // R12: a rider that completes the circle, then the second order
+      expect(gateVerdict(factsOf(['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD']), 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      // R1 and R5b still refuse
+      expect(gateVerdict(factsOf(['מרובע ABCD', 'מעגל חוסם את ABCD']), 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      expect(gateVerdict(factsOf(['מרובע ABCD', 'מרובע ABDC']), 'המרובע ABCD חסום במעגל')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      // C1 and one ring with its circle commit, every ring simple
+      for (const [before, line] of [[['מרובע ABCD'], 'מרובע ABDC'], [['מרובע ABCD'], 'מעגל חוסם את ABCD']] as const) {
+        expect(gateVerdict(factsOf([...before]), line).kind, line).toBe('commit');
+        const found = findValidConfig(factsOf([...before, line]), 0);
+        expect(found, `${line}: a view exists`).not.toBeNull();
+        const pos = replay(found!.facts, found!.seed).positions;
+        for (const r of line === 'מרובע ABDC' ? [['A', 'B', 'C', 'D'], ['A', 'B', 'D', 'C']] : [['A', 'B', 'C', 'D']])
+          expect(ringSimple(r.map((id) => pos.get(id as Id) as Vec)), `${line}: ${r.join('')} simple`).toBe(true);
+      }
+    },
+  },  {
+    id: 'stated-angle-interior-2813',
+    title:
+      '#2813 (ADR-823): a stated polygon angle is the INTERIOR angle — «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°» is convex at every view, and a second order of its letters is refused on the line that completes it, naming the angle lines',
+    guards:
+      "Operator rulings on #2813: 2026-11-10 (b) *\"a stated polygon angle is always the interior angle … the last line is refused and the refusal names the lines that force it\"*; 2026-11-12 *\"B. a crossed quad is not a quad\"*, with the hint «שנו את אחת הזוויות או את סדר האותיות». Re-measured at pickup on caf619a5 through the gate: A1 «מרובע ABDC» committed and the config search drew ABDC crossed (6/6); A2 (angles last) committed with C seated reflex, a '110°' corner 250° inside; «דלתון ABCD» with the same angles committed a dart. Root cause: every reading of a stated corner was the UNSIGNED ray angle, so a view floor held only to simplicity (ADR-613's yielding ring, ADR-622's reflex seat) could seat a stated corner reflex. Fix: the floor reads the corner's turn against the ring's orientation, and Σ stated interior angles ≥ (n − 3)·180° proves convex position (`ringConvexityProofs`), refused structurally by `ringOrderContradiction` before any pool.",
+    steps: ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      // A1 — the issue's exact lines: «מרובע ABDC» is refused, naming both angle lines
+      const a1 = factsOf(['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°']);
+      expect(gateVerdict(a1, 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring', detail: 'input.ringContradictsAngles' });
+      const pr = parse('מרובע ABDC', ctxOf(a1));
+      const v = ringOrderVerdict('מרובע ABDC', pr.ok ? pr.commands : [], a1)!;
+      expect(stripFormatControls(he(v.messageKey, v.params) as string)).toBe(
+        'לא ניתן להוסיף את «מרובע ABDC»: לפי «∠DAB = 70°», «∠BCD = 110°» הצורה ABCD קמורה, ולנקודות במצב קמור יש רק סדר אחד שבו הצלעות לא נחתכות — לכן ABDC מתקפלת על עצמה. שנו את אחת הזוויות או את סדר האותיות.',
+      );
+      // A2 — the angles last: the angle that completes it is the line refused
+      expect(gateVerdict(factsOf(['מרובע ABCD', 'מרובע ABDC', '∠DAB = 70°']), '∠BCD = 110°')).toMatchObject({ kind: 'refused', detail: 'input.ringContradictsAngles' });
+      // the kite with the same angles is refused the same way (a dart would seat a stated corner reflex)
+      expect(gateVerdict(factsOf(['דלתון ABCD', '∠DAB = 70°', '∠BCD = 110°']), 'מרובע ABDC').kind).toBe('refused');
+      // unchanged: two orders with no angle build a concave quadrilateral (ADR-622); one ring with its angles builds
+      expect(gateVerdict(factsOf(['מרובע ABCD']), 'מרובע ABDC').kind).toBe('commit');
+      // the angle-only quadrilateral is convex at every view the search offers
+      for (let seed = 0; seed < 6; seed++) {
+        const found = findValidConfig(a1, seed);
+        expect(found, `seed ${seed}: a view exists`).not.toBeNull();
+        const pos = replay(found!.facts, found!.seed).positions;
+        const q = ['A', 'B', 'C', 'D'].map((id) => pos.get(id as Id)!);
+        const turns = q.map((o, i) => Math.sign((q[(i + 1) % 4].x - o.x) * (q[(i + 2) % 4].y - o.y) - (q[(i + 1) % 4].y - o.y) * (q[(i + 2) % 4].x - o.x)));
+        expect(turns.every((t) => t !== 0 && t === turns[0]), `seed ${seed}: ABCD convex`).toBe(true);
+      }
     },
   },
 ];

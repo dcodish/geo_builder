@@ -22,7 +22,8 @@ import { SOLVE_RESOLUTION, sameConstraint, type Constraint } from './solve';
 import { assignmentAt, flattenPicked } from './discreteAxes';
 import { followObjects } from './roles';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
-import { convexWhenSimple, shapeRow } from './shapes';
+import { shapeRow } from './shapes';
+import { ringConvexityProofAg } from './rings';
 import { POINT_NAME } from './pointName';
 import type { CevianHost } from '../../shell/cevianHost';
 
@@ -377,22 +378,53 @@ export function derive(
    * Blamed on the LATEST of the two declarations — the line that completed the contradiction — and it SILENCES the
    * given-attribution arms below, on ADR-AG-240's rule: when one statement is named, the givens that fail in the
    * compromise configuration are that contradiction read twice, not a second culprit.
+   *
+   * #2812 ([ADR-AG-475](../../docs/06c-decisions-analytic.md#adr-ag-475)) — the proof is `ringConvexityProofAg`, with a
+   * second sufficient reason: ONE CIRCLE THROUGH EVERY LETTER (a circumscribed circle, or points stated on one circle).
+   * Rings of four letters or more. The lines that stated the circle join the blame, so the circle line that completes the
+   * contradiction («מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC») is the one refused.
    */
   const ringOrderFault: LineFault | null = (() => {
     const declaredAt = new Map<string, number>();
     facts.forEach((f, i) => {
       if (f.t === 'polygon' && !errors[i] && !declaredAt.has(f.id)) declaredAt.set(f.id, owner[i]);
     });
-    const byLetters = new Map<string, { id: string; convex: boolean }[]>();
+    const byLetters = new Map<string, { id: string; proof: ReturnType<typeof ringConvexityProofAg> }[]>();
     for (const o of construction.objects) {
-      if (o.kind !== 'polygon' || o.vertices.length !== 4 || !declaredAt.has(o.id)) continue;
+      if (o.kind !== 'polygon' || o.vertices.length < 4 || !declaredAt.has(o.id)) continue;
       const key = [...o.vertices].sort().join('');
-      byLetters.set(key, [...(byLetters.get(key) ?? []), { id: o.id, convex: convexWhenSimple(o.noun) }]);
+      byLetters.set(key, [...(byLetters.get(key) ?? []), { id: o.id, proof: ringConvexityProofAg(construction, o) }]);
     }
+    /** The lines a proof rests on: the line that made each circle, and the owner of each constraint it reads. */
+    const proofLines = (p: NonNullable<ReturnType<typeof ringConvexityProofAg>>): number[] => [
+      ...p.objects.flatMap((id) => {
+        const i = facts.findIndex((top) => factsWithin(top).some((g) => namesObject(g) && g.id === id));
+        return i >= 0 ? [owner[i]] : [];
+      }),
+      ...p.constraints.flatMap((k) => (constraintFact[k] === undefined ? [] : [owner[constraintFact[k]]])),
+    ];
     for (const group of byLetters.values()) {
-      if (group.length < 2 || !group.some((g) => g.convex)) continue;
-      const at = Math.max(...group.map((g) => declaredAt.get(g.id)!));
+      if (group.length < 2 || !group.some((g) => g.proof)) continue;
+      const at = Math.max(...group.map((g) => declaredAt.get(g.id)!), ...group.flatMap((g) => (g.proof ? proofLines(g.proof) : [])));
       if (faults.some((f) => f.index === at)) return null; // a truer message is already on that line
+      /**
+       * #2813 ([ADR-AG-471](../../docs/06c-decisions-analytic.md#adr-ag-471)): proved by its STATED INTERIOR ANGLES only —
+       * the refusal names the angle lines (operator ruling 2026-11-10) with his next step of 2026-11-12, 2-D's text.
+       */
+      if (!group.some((g) => g.proof && g.proof.reason !== 'angles')) {
+        const proved = group.find((g) => g.proof)!;
+        const other = group.find((g) => g !== proved)!;
+        const ring = (id: string) => { const o = objectById(construction, id); return o && o.kind === 'polygon' ? o.vertices.join('') : ''; };
+        const angleLines = [...new Set(proofLines(proved.proof!))].sort((a, b) => a - b);
+        return {
+          index: at,
+          code: 'ring-contradicts-angles' as const,
+          detail: lines[at],
+          polygon: ring(proved.id),
+          pair: ring(other.id),
+          declared: angleLines.map((i) => `«${lines[i].trim()}»`).join(', '),
+        };
+      }
       return { index: at, code: 'ring-contradicts-noun' as const, detail: lines[at] };
     }
     return null;

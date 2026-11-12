@@ -2318,7 +2318,13 @@ export type EngineError3 =
   /** #1923 (ADR-3D-314): a polygon DECLARED over points fixed by coordinates whose ring, in the order named, crosses
    *  itself — not that shape. `stated` is the line that completed it (the declaration, or the coordinate that came
    *  last). Analytic's `ring-contradicts-noun` (ADR-AG-129), worded as analytic's. */
-  | { code: 'ring-crossed'; stated: string }
+  | {
+      code: 'ring-crossed';
+      stated: string;
+      /** #2813 (ADR-3D-490): the ring was proved convex by its STATED INTERIOR ANGLES — the angle lines as typed (each in
+       *  guillemets), the proved ring and the other order; the refusal names them (2-D's `input.ringContradictsAngles`) */
+      angles?: { forcing: string; ring: string; other: string };
+    }
   /** #1978 (ADR-3D-325): a polygon DECLARED over placed points that no configuration makes coplanar (ADR-3D-319's
    *  skew arm). Same verdict and the same `stated`/`others` as the `givens-contradict` it used to reuse, plus the
    *  reason: `sides` names the shape (its noun by vertex count) and `vertices` the corners off one plane. */

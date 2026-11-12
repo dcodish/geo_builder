@@ -927,6 +927,30 @@ describe('SCENARIO — crossed-ring-concyclic-2810: a second order over a cyclic
       if (circle) expect(ptolemy(), `seed ${seed}`).toBeLessThan(1e-6);
     }
   });
+
+  // #2813 (ADR-3D-490, operator rulings 2026-11-10 (b) and 2026-11-12 B): a stated polygon angle is the INTERIOR angle, so
+  // ∠A + ∠C = 180° puts ABCD in convex position (a third sufficient reason): the line that completes the second order is
+  // refused, naming the angle lines. Measured at caf619a5: accepted, ABDC crossed 5/6 and C seated reflex at seed 2.
+  it.each([
+    [['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°', 'מרובע ABDC']], // A1, the reported case
+    [['מרובע ABCD', 'מרובע ABDC', '∠DAB = 70°', '∠BCD = 110°']], // A2: the angle line completes it
+  ])('#2813 %j', (lines) => {
+    lines.forEach(submit);
+    const last = lines[lines.length - 1];
+    expect(state().lastError).toEqual({ code: 'ring-crossed', stated: last, angles: { forcing: '«∠DAB = 70°», «∠BCD = 110°»', ring: 'ABCD', other: 'ABDC' } });
+    expect((errorText3((k, o) => i18n3d.t(k, { ...o, lng: 'he' }) as string, state().lastError as never) ?? '').replace(/[⁦-⁩]/g, '')).toBe(
+      `לא ניתן להוסיף את «${last}»: לפי «∠DAB = 70°», «∠BCD = 110°» הצורה ABCD קמורה, ולנקודות במצב קמור יש רק סדר אחד שבו הצלעות לא נחתכות — לכן ABDC מתקפלת על עצמה. שנו את אחת הזוויות או את סדר האותיות.`,
+    );
+  });
+
+  it('#2813: the angle-only quadrilateral builds, never seated as a dart at a stated corner', () => {
+    ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°'].forEach(submit);
+    for (let seed = 0; seed < 6; seed++) {
+      useGeo3.setState({ seed });
+      expectAllOk();
+      expect(ringSelfCrossing3(['A', 'B', 'C', 'D'].map(pos)), `seed ${seed}`).toBe(false);
+    }
+  });
 });
 
 // right-pyramid-existing-quad-2490 (#2490, ADR-3D-468) — the operator's lines and the ruling of 2026-11-09 (ADR-W-199:

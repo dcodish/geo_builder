@@ -976,6 +976,16 @@ a sentence the tool parsed.
   every configuration and is refused with the same message, on the line that completed the pair: «ריבוע ABCD» ·
   «מקבילית ACBD» / «טרפז ACBD» / «מלבן ACBD» and «מלבן ABCD» · «מקבילית ACBD» → the second line refused
   (`errRingContradictsNoun`), never «לא נמצאה תצורה»; and only that line — the earlier shape line stays green
+- A stated angle at a polygon's corner is its INTERIOR angle (#2813, [ADR-AG-471](06c-decisions-analytic.md#adr-ag-471);
+  2-D's FR-EN-16): no configuration draws a stated corner as the reflex corner of a dent, and stated interior angles summing to
+  at least (n − 3)·180° put the ring in convex position: «מרובע ABCD» · «∠DAB = 70°» · «∠BCD = 110°» · «מרובע ABDC» → the last
+  line refused (`errRingContradictsAngles`), naming «∠DAB = 70°» and «∠BCD = 110°», with «שנו את אחת הזוויות או את סדר
+  האותיות»; with the angles last, «∠BCD = 110°» is the line refused
+- …or a circle through its letters (a circumscribed circle, or points stated on one circle; #2812,
+  [ADR-AG-475](06c-decisions-analytic.md#adr-ag-475)): four points on one circle have one simple order, so another order is
+  refused on the line that completes it — «מרובע ABCD» · «מעגל חוסם את ABCD» · «מרובע ABDC» → «מרובע ABDC» refused;
+  «מרובע ABCD» · «מרובע ABDC» · «מעגל חוסם את ABDC» → the circle line refused; one ring with its circle, and two orders with
+  no circle, are drawn
 - Sources: #1158, #1166, ADR-052, ADR-AG-129, #1929, #1927, #1939.
 
 **R92 — among the configurations it MAY show, the tool opens on one that is not a sliver**. A preference, never a requirement; coordinates that force a bad ring refuse the line (operator ruling), never «לא נמצאה תצורה».

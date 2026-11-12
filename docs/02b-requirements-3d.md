@@ -799,7 +799,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   over a ring with a circumcircle («מעגל חוסם את ABCD», «המרובע ABCD חסום במעגל»), a cyclic fix, a right pyramid's base
   or points stated on one circle, another order of the same letters («מרובע ABDC») is refused in the same words on the
   line that completes it — the ring, the circle line or the right pyramid line — and a circle through a ring is never
-  drawn green over points that are not on it (no dart under a circle). **Nor is one drawn off one plane:** a flat polygon
+  drawn green over points that are not on it (no dart under a circle). **A stated angle at a polygon's corner is its interior
+  angle** (#2813, ADR-3D-490; 2-D's FR-EN-16): a corner stated «∠BCD = 110°» is never seated as the reflex corner of a dent, and
+  stated interior angles summing to at least (n − 3)·180° («מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°») put the letters in convex
+  position, so another order («מרובע ABDC») is refused on the line that completes it — the ring or the angle line — naming the
+  angle lines, with «שנו את אחת הזוויות או את סדר האותיות». **Nor is one drawn off one plane:** a flat polygon
   declared over points the figure has already PLACED — typed coordinates, a coordinate given, a derived point over
   those, or a solid's vertex — whose vertices do not lie in one plane («A(0,0,0) · B(4,0,0) · C(4,3,0) · D(0,3,5) ·
   מרובע ABCD», «קובייה ABCDA'B'C'D' · מרובע ABCA'») is refused on the line that completed it, naming the

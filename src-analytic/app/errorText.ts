@@ -266,6 +266,8 @@ export function errorText(error: InputError, t: Translate): string {
     'not-canonical': 'errNotCanonical',
     'does-not-exist': 'errDoesNotExist',
     'ring-contradicts-noun': 'errRingContradictsNoun',
+    // #2813 (ADR-AG-471) — 2-D's input.ringContradictsAngles, verbatim
+    'ring-contradicts-angles': 'errRingContradictsAngles',
     // #1849 (ADR-AG-247) — the givens flatten a declared polygon: the polygon and both statements named
     'polygon-collapsed': 'errPolygonCollapsed',
     'inscribed-contradicts-noun': 'errInscribedContradictsNoun',

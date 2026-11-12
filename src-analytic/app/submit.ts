@@ -216,6 +216,9 @@ const subjectIdsOf = (parsed: { facts: readonly Fact[] }): string[] => {
 const collapseFields = (f: Derivation['faults'][number]) =>
   f.code === 'polygon-collapsed'
     ? { polygon: f.polygon, shape: f.shape, declared: f.declared }
+    : // #2813 (ADR-AG-471) — a ring proved convex by its stated angles: the ring, the other order, the angle lines.
+      f.code === 'ring-contradicts-angles'
+      ? { polygon: f.polygon, pair: f.pair, declared: f.declared }
     : // #1918 (ADR-AG-252) — a circle through a ring its noun forbids, in two sentences: both nouns and the other sentence.
       f.code === 'inscribed-contradicts-declared'
       ? { shape: f.shape, forced: f.forced, declared: f.declared }

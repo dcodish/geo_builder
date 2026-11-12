@@ -710,6 +710,46 @@ export function commandStatesCircle3(k: Command3, letters: readonly Id[]): boole
 }
 
 /**
+ * #2813 ([ADR-3D-490](../../docs/06b-decisions-3d.md#adr-3d-490), 2-D's ADR-823; operator ruling 2026-11-10 (b): *"a
+ * stated polygon angle is always the interior angle"*) — the stated VERTEX angles of a ring, by corner index: a stated
+ * «∠DAB = 70°» (its `vertex-angle-eq` claim, or the `vangle` pin it drives) at a vertex between its two ring
+ * neighbours, in either ray order, below 180°. Where a corner carries several values the smallest is kept, so the
+ * convexity proof below stays sound. Structural: read off the statements, never positions.
+ */
+export function statedRingCorners3(c: Pick<Construction3, 'claims' | 'scalarPins'>, ids: readonly Id[]): Map<number, { vertex: Id; p: Id; q: Id; deg: number }> {
+  const stated: { vertex: Id; p: Id; q: Id; deg: number }[] = [
+    ...c.claims.flatMap((k) => (k.type === 'vertex-angle-eq' ? [{ vertex: k.vertex, p: k.p, q: k.q, deg: k.deg }] : [])),
+    ...c.scalarPins.flatMap((k) => (k.kind === 'vangle' ? [{ vertex: k.vertex, p: k.p, q: k.q, deg: k.deg }] : [])),
+  ];
+  const out = new Map<number, { vertex: Id; p: Id; q: Id; deg: number }>();
+  const n = ids.length;
+  for (let i = 0; i < n; i++) {
+    const prev = ids[(i + n - 1) % n], v = ids[i], next = ids[(i + 1) % n];
+    for (const w of stated) {
+      if (w.vertex !== v || !(w.deg > 0 && w.deg < 180 - 1e-6)) continue;
+      if (!((w.p === prev && w.q === next) || (w.p === next && w.q === prev))) continue;
+      const had = out.get(i);
+      if (!had || w.deg < had.deg) out.set(i, w);
+    }
+  }
+  return out;
+}
+
+/**
+ * #2813 (ADR-3D-490) — DO THE STATED INTERIOR ANGLES PUT THIS RING IN CONVEX POSITION? A reflex corner leaves the others
+ * less than (n − 3)·180°, so stated corners (each below 180°) summing to at least that leave no room for one: the ring,
+ * simple, is convex — the third sufficient reason of ADR-3D-327's structural pass, beside `convexWhenSimple` and a
+ * stated circle (ADR-3D-467). 2-D's `ringConvexityProofs`, copied (product trees never import each other).
+ */
+export function anglesProveConvex3(c: Pick<Construction3, 'claims' | 'scalarPins'>, ids: readonly Id[]): boolean {
+  if (ids.length < 4) return false;
+  const corners = statedRingCorners3(c, ids);
+  if (corners.size === 0) return false;
+  const sum = [...corners.values()].reduce((s, w) => s + w.deg, 0);
+  return sum >= (ids.length - 3) * 180 - 1e-6;
+}
+
+/**
  * #1986 (ADR-3D-418) — WHICH VERTICES of a reordered flat quadrilateral may be its reflex corner, as indices into
  * `ids`; null when no concave seat is registered. Read off the shapes stated over the same letters, never off a list
  * of inputs: a shape CONVEX WHENEVER SIMPLE (`convexWhenSimple`: the parallelogram family, the trapezoid) has no
@@ -721,8 +761,16 @@ export function concaveSeatVertices3(c: StatedConcyclicCtx3 & Pick<Construction3
   if (ids.length !== 4 || !ringReordered3(c, ids)) return null;
   // #2810 (ADR-3D-467): four points a stated circle passes through are in convex position — no concave drawing
   if (statedConcyclic3(c, ids)) return null;
+  // #2813 (ADR-3D-490): nor four whose stated interior angles leave no room for a reflex corner (below)
   const letters = [...ids].sort().join();
-  let allowed = [0, 1, 2, 3];
+  const sameLetters = declaredRings3(c).filter((r) => r.length === 4 && [...r].sort().join() === letters);
+  if (sameLetters.some((r) => anglesProveConvex3(c, r))) return null;
+  // #2813 (ADR-3D-490): a stated corner is the interior angle, never the reflex corner of the dent. The dent's corner is
+  // the point inside the other three — the same point in every simple order of the letters — so a corner stated in ANY
+  // declared ring over them rules its vertex out
+  const statedAt = new Set<Id>();
+  for (const r of sameLetters) for (const w of statedRingCorners3(c, r).values()) statedAt.add(w.vertex);
+  let allowed = [0, 1, 2, 3].filter((i) => !statedAt.has(ids[i]));
   // #2702 (ADR-3D-469): every quad DECLARED over the letters, a pyramid's base among them (`declaredQuads3`) — so a kite
   // base is a dart only about its axis, as a flat kite is. A RIGHT pyramid's base is cyclic: the stated-circle reader
   // above answers it (#2810, ADR-3D-467), with every other statement of a circle, so no list of kinds is kept here.

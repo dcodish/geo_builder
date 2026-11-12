@@ -2345,6 +2345,14 @@ over all four (ADR-041).
 
 **Guards against:** a fact the figure is forced to hold re-seating it through ADR-623's holes — the twin row thrown away as evidence (H1), an order row never released (H2), a re-sampled seed counted where the prior is the trapezoid's parallelogram root (H3); it moved 0.46 / 0.20 / 0.42 / 0.10 at the displayable seeds. **Asserts** AC = BD on the drawn figure, no point moves at seeds 0, 2, 3, 4 (each displayable before the line), the free-DOF count unchanged, and on «טרפז ABCD» · «AD = BC» · «AC = BD» unticking «AD = BC» leaves AC = BD holding.
 
+### `crossed-ring-circle-last-2811` — «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC»: the circle line is refused (#2811, ADR-826)
+
+**Guards against:** a line that puts four letters on one circle after two orders of them were declared, committed with one order drawn crossed. **Asserts** R5 and R4 refuse the circle line `crossed-ring`; a rider that completes the circle refuses the second order; the circle-first order and «המרובע ABCD חסום במעגל» still refuse; «מרובע ABDC» alone and one ring with its circle commit with every ring simple.
+
 ### `restated-rider-reversed-stays-put-2795` — «משולש ABC · D על AB · D על BA»: the reversed rider moves nothing (#2795, ADR-821)
 
 **Guards against:** the reversed rider's `collinear-order` claiming D's own parameter and re-solving D from another start (moved up to 3.3). **Asserts** no point moves at seeds 0–4, and with «D על AB» unticked «D על BA» alone keeps D on AB.
+
+### `stated-angle-interior-2813` — «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°»: a stated angle is the interior angle, so a second order of the letters is refused (#2813, ADR-823)
+
+**Guards against:** a stated corner read as the unsigned ray angle — «מרובע ABDC» committed and drawn crossed, or ABCD seated as a dart with the "110°" corner 250° inside. **Asserts** the three lines build convex at every view (seeds 0–5); «מרובע ABDC» (A1) and, with the angles last, «∠BCD = 110°» (A2) are refused `crossed-ring` with `input.ringContradictsAngles`, the Hebrew text naming both angle lines and «שנו את אחת הזוויות או את סדר האותיות»; the kite with the same angles refused; «מרובע ABCD · מרובע ABDC» still commits.

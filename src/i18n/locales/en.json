@@ -161,6 +161,7 @@
       "int-tangent": "«{{detail}}»: two circles with equal radii cannot be internally tangent, because two such circles are the same circle. State only one of the two: «internally tangent» or «with equal radii».",
       "concentric": "«{{detail}}»: two circles with equal radii and a common centre are the same circle. State only one of the two: «concentric» or «with equal radii»."
     },
+    "ringContradictsAngles": "«{{detail}}» can't be added: by {{forcing}}, the shape {{ring}} is convex, and points in convex position have only one order in which the sides don't cross — so {{other}} would fold over itself. Change one of the angles or the order of the letters.",
     "ringContradictsNoun": "The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.",
     "shapeNoun": {
       "right-trapezoid": "right trapezoid",

@@ -15847,3 +15847,17 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 - **Locks.** `src3d/__tests__/already-drawn-1990.test.ts`: the escalation's rows, each typed after its twin — one row, the notice, never refused, the seed kept, nothing moves; untick, then delete, the twin and the held row holds the same drawing; «מעוין» · «מעויין» draws two rhombi with no notice. Regression: `fixtures3/held-definition-2790.geo3.json` (both earlier rows unticked). Re-based: `issue-1988-implied-shape-noun` (a ring twin appended to the list now stands aside, so the apply-time `redundantShapes` flag is not set for it; the figure and the pins are unchanged, as asserted), and the four `decide-submit3-parity-1394` goldens.
 - **Requirements:** [02b](02b-requirements-3d.md) FR-SP-19a, FR-CL-1, FR-CL-8 · **Design:** [04b](04b-design-3d.md) § "A statement the figure already holds".
 - **Behaviour change for a student:** a plane's equation or «D על המעגל» typed a second time, in any wording, is its own row with «זה כבר קיים באיור — נוסף כנתון נפרד.» instead of an error, and unticking or deleting the first row leaves the figure as it was.
+
+## ADR-3D-490 — A stated polygon angle is the interior angle: no reflex seat at a stated corner, and a third sufficient reason for ADR-3D-327's pass (#2813)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2813](https://github.com/dcodish/geo_builder/issues/2813) (bug, `P2`, wrong answer) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02b](02b-requirements-3d.md) — FR-RD-7 (a stated corner angle is the interior angle) · **Design:** [04b](04b-design-3d.md) — the concave seat and the crossing-order pass · **LADDER stage:** none (configuration seat and the structural pass)
+**Amends** [ADR-3D-418](#adr-3d-418) (the concave seat) and [ADR-3D-467](#adr-3d-467) (one more sufficient reason) · 2-D's [ADR-823](06-decisions.md#adr-823), the reference.
+
+**Measured at pickup** (`caf619a5`, `useGeo3.submit` → `derive3`, seeds 0–5): A1 «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110° · מרובע ABDC» and A2 (the angles last) accepted; ABDC crossed at 5/6 seeds, and at seed 2 a dart with C reflex.
+
+**Decision.** `statedRingCorners3` (baseShapes.ts) reads a ring's stated vertex angles (`vertex-angle-eq` claims, `vangle` pins) at its corners, below 180°. `concaveSeatVertices3` never seats a vertex with a stated corner in any declared ring over the letters, and none when `anglesProveConvex3` holds (Σ ≥ (n − 3)·180°). In `derive3`'s ADR-3D-327 pass the proof is a third reason beside the noun and the circle: the facts stating the angles join the blame, and the `ring-crossed` status carries `angles` (the angle lines, the ring, the other order), read as `err.ringContradictsAngles` — 2-D's text.
+
+**Locks.** `src3d/__tests__/scenarios3.test.ts` `crossed-ring-concyclic-2810`: A1 and A2 refused naming the angle lines; the angle-only quadrilateral builds simple at seeds 0–5. Parity rows `stated-angle-interior-2813-01..03`.
+
+**Behaviour change for a student:** in 3-D, «מרובע ABDC» after «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°» (or «∠BCD = 110°» after the second ring) is refused, naming the angle lines, instead of drawing ABDC crossed or ABCD as a dart.

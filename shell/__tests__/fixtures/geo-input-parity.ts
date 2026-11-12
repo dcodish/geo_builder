@@ -275,8 +275,6 @@ export function gapState(g: KnownGap): GapState {
  */
 export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>> = {
   '#2458': 'open', // 3-D reading «A_1» and the glyph (#2075's sibling half)
-  '#2811': 'open', // #2810 (ADR-3D-467): 2-D accepts the circle-last order «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» crossed
-  '#2812': 'open', // #2810 (ADR-3D-467): analytic accepts a second order over a cyclic quadrilateral's letters, drawn crossed
   '#2226': 'open', // was #1171, merged into #2226 by the #2654 family sweep 2026-11-01
   '#1448': 'closed',
   '#1677': 'icebox',
@@ -1486,12 +1484,21 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #2810 (ADR-3D-467): letters a stated circle passes through have ONE simple order, so a second order over them is
   // refused on the line that completes it — the ring, or the circle. 2-D refuses the circle-first spellings; 3-D now
   // refuses all of them (it drew the second ring crossed, or a dart under a circle that missed a vertex).
-  { id: 'crossed-ring-2810-01', family: 'polygons', steps: ['מרובע ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2812' }], note: 'the reported case' },
-  { id: 'crossed-ring-2810-02', family: 'polygons', steps: ['מרובע ABCD', 'המרובע ABCD חסום במעגל', 'מרובע ABDC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2812' }] },
-  { id: 'crossed-ring-2810-03', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABDC'], expect: 'refused', knownGap: [{ product: '2d', issue: '#2811' }, { product: 'analytic', issue: '#2812' }], note: 'the circle line completes the contradiction' },
+  { id: 'crossed-ring-2810-01', family: 'polygons', steps: ['מרובע ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC'], expect: 'refused', note: 'the reported case' },
+  { id: 'crossed-ring-2810-02', family: 'polygons', steps: ['מרובע ABCD', 'המרובע ABCD חסום במעגל', 'מרובע ABDC'], expect: 'refused' },
+  { id: 'crossed-ring-2810-03', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABDC'], expect: 'refused', note: 'the circle line completes the contradiction' },
   { id: 'crossed-ring-2810-04', family: 'polygons', steps: ['דלתון ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC'], expect: 'refused', note: 'a kite with its circle is a right kite: no dart' },
   { id: 'crossed-ring-2810-05', family: 'polygons', steps: ['מחומש ABCDE', 'מעגל חוסם את ABCDE', 'מחומש ABDCE'], expect: 'refused', knownGap: [{ product: 'analytic' }], note: 'analytic does not read a circle through a pentagon (its context line is not-handled): an unscheduled cell' },
   { id: 'crossed-ring-2810-06', family: 'polygons', steps: ['מרובע ABCD', 'מעגל חוסם את ABCD'], expect: 'builds', note: 'one ring and its circle — the control' },
+  // ── #2811 (ADR-826): a later line that puts the letters on one circle completes the contradiction (four points on one circle have one simple order)
+  { id: 'crossed-ring-2811-01', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABCD'], expect: 'refused', note: 'R4: 2-D drew ABDC crossed before ADR-826' },
+  { id: 'crossed-ring-2811-02', family: 'polygons', steps: ['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD', 'מרובע ABDC'], expect: 'refused', note: 'R12: a rider completes the circle' },
+  { id: 'crossed-ring-2811-03', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC'], expect: 'builds', note: 'C1: two orders with no circle, a concave quadrilateral' },
+  // ── #2813 (ADR-823 / ADR-AG-471 / ADR-3D-490, operator rulings 2026-11-10 (b) and 2026-11-12 B): a stated polygon angle is the
+  // interior angle, so stated angles summing to (n − 3)·180° or more put the ring in convex position, and a second order crosses
+  { id: 'stated-angle-interior-2813-01', family: 'polygons', steps: ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°', 'מרובע ABDC'], expect: 'refused', note: 'the reported case: every builder drew ABDC crossed before #2813' },
+  { id: 'stated-angle-interior-2813-02', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', '∠DAB = 70°', '∠BCD = 110°'], expect: 'refused', note: 'the angle line completes it' },
+  { id: 'stated-angle-interior-2813-03', family: 'polygons', steps: ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°'], expect: 'builds', note: 'the control: convex at every view' },
 
   // #1987 (ADR-622) / #1986: four FREE points read in a second order. 2-D draws the CONCAVE quadrilateral — which
   // vertex is reflex is a configuration axis, not a fixed default — and analytic draws it too; since #1986 (ADR-3D-418)
