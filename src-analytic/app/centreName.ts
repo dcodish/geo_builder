@@ -16,7 +16,8 @@
  * #2851 (ADR-AG-465) — THE SAME FLOW ON A SHOWN FOCUS. Operator, 2026-11-12: *"make the focus points clickable so he
  * can nail them on the diagram"*. A focus mark that carries the book's letter is an offer; its popover opens on that
  * letter, and the letter confirmed records `focusSentenceOf`'s sentence («F1 מוקד ימני של האליפסה», «F מוקד הפרבולה»)
- * through the same gate. A taken letter is refused with its holder quoted; no swap is offered (the plan's ruling).
+ * through the same gate. A taken letter quotes its holder and offers the swap, as the centre's does (operator ruling
+ * 2026-11-12 on PR #2856, after his 2026-09-18 «always allow switching names of nodes»): the same `decideOfferSwap`.
  */
 import { decideSubmit, type SubmitVerdict } from './submit';
 import { activeOf, activePins } from './active';
@@ -92,9 +93,28 @@ export function decideCentreSwap(
   state: RenameState,
   current: Derivation = currentOf(state),
 ): { kind: 'apply'; commit: RelabelCommit } | { kind: 'refused'; error: InputError } {
+  return decideOfferSwap(centreSentence(offerId), taken, state, current);
+}
+
+/** #2851 — THE SWAP on a focus offer: the focus takes `taken`, its holder the automatic letter. The centre's swap. */
+export function decideFocusSwap(
+  offerId: string,
+  taken: string,
+  state: RenameState,
+  current: Derivation = currentOf(state),
+): { kind: 'apply'; commit: RelabelCommit } | { kind: 'refused'; error: InputError } {
+  return decideOfferSwap((letter, cur) => focusSentenceOf(cur, offerId, letter), taken, state, current);
+}
+
+function decideOfferSwap(
+  sentenceOf: SentenceOf,
+  taken: string,
+  state: RenameState,
+  current: Derivation,
+): { kind: 'apply'; commit: RelabelCommit } | { kind: 'refused'; error: InputError } {
   const auto = centreLabelOf(current);
   if (nameInUse(state, current, auto)) return { kind: 'refused', error: { key: 'rename-taken', detail: auto } };
-  const first = recordable(centreSentence(offerId), auto, state, current);
+  const first = recordable(sentenceOf, auto, state, current);
   if (first.kind !== 'record') return { kind: 'refused', error: first.error };
   const named: RenameState = { ...state, lines: [...state.lines, first.verdict.line] };
   const sv = decideSwap(auto, taken, named);
@@ -114,17 +134,30 @@ function renameAnswer(v: CentreNameVerdict, actions: Pick<CentreActions, 'record
   return { ok: false, reason: v.error.key };
 }
 
+/** A swap verdict in the popover's vocabulary: applied as one commit, or the error line. */
+function swapAnswer(v: ReturnType<typeof decideOfferSwap>, actions: Pick<CentreActions, 'applySwap' | 'setError'>): LetterSwapResult {
+  if (v.kind === 'refused') {
+    actions.setError(v.error);
+    return { ok: false };
+  }
+  actions.applySwap(v.commit);
+  return { ok: true };
+}
+
 /**
- * #2851 (ADR-AG-465) — the popover's callback for one focus offer: the centre's `onRename`, the focus's sentence. No
- * `onSwap`: a taken letter quotes its holder and is refused.
+ * #2851 (ADR-AG-465) — the popover's callbacks for one focus offer: the centre's two, with the focus's sentence. A taken
+ * letter quotes its holder and offers the swap (operator ruling 2026-11-12 on PR #2856).
  */
 export function focusPopoverOps(
   offerId: string,
   state: RenameState,
-  actions: Pick<CentreActions, 'record' | 'setError'>,
+  actions: CentreActions,
   current: Derivation = currentOf(state),
-): { onRename: (from: string, to: string) => LetterRenameResult } {
-  return { onRename: (_from, to) => renameAnswer(decideFocusName(offerId, to, state, current), actions) };
+): { onRename: (from: string, to: string) => LetterRenameResult; onSwap: (a: string, b: string) => LetterSwapResult } {
+  return {
+    onRename: (_from, to) => renameAnswer(decideFocusName(offerId, to, state, current), actions),
+    onSwap: (_a, b) => swapAnswer(decideFocusSwap(offerId, b, state, current), actions),
+  };
 }
 
 /** The store actions the dispatch writes through — the real ones, so the locks drive what App drives. */
@@ -148,14 +181,6 @@ export function centrePopoverOps(
 ): { onRename: (from: string, to: string) => LetterRenameResult; onSwap: (a: string, b: string) => LetterSwapResult } {
   return {
     onRename: (_from, to) => renameAnswer(decideCentreName(offerId, to, state, current), actions),
-    onSwap: (_a, b) => {
-      const v = decideCentreSwap(offerId, b, state, current);
-      if (v.kind === 'refused') {
-        actions.setError(v.error);
-        return { ok: false };
-      }
-      actions.applySwap(v.commit);
-      return { ok: true };
-    },
+    onSwap: (_a, b) => swapAnswer(decideCentreSwap(offerId, b, state, current), actions),
   };
 }

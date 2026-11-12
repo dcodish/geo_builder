@@ -353,3 +353,20 @@ describe('#1631 — the store commits a swap as ONE step; one undo restores ever
     expect(store().error?.key).toBe('swap-unknown');
   });
 });
+
+describe('#2851 (found in round #2855) — an indexed letter TYPED as «F1» swaps and renames like its glyph', () => {
+  it('every spelling the grammar reads as F₁ is rewritten, and the swap is applied', () => {
+    for (const spelt of ['F1', 'F₁', 'F_1']) {
+      const lines = [`${spelt}(1,1)`, 'P(2,2)', `משולש ${spelt}PQ`];
+      const v = decideSwap('P', 'F1', session(lines));
+      expect(v.kind).toBe('apply');
+      if (v.kind === 'apply') expect(v.lines).toEqual(['P(1,1)', 'F₁(2,2)', 'משולש PF₁Q']);
+    }
+  });
+
+  it('a bare F beside an F1 is a different token, untouched', () => {
+    const v = decideSwap('P', 'F', session(['F(0,0)', 'F1(1,1)', 'P(2,2)']));
+    expect(v.kind).toBe('apply');
+    if (v.kind === 'apply') expect(v.lines).toEqual(['P(0,0)', 'F1(1,1)', 'F(2,2)']);
+  });
+});

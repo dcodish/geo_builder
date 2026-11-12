@@ -2472,11 +2472,11 @@ export function App() {
       {/*
         NAME A SHOWN FOCUS (#2851, ADR-AG-465) — the centre's popover on a focus mark, opened on the book's letter. The
         letter confirmed records the sentence a student could type («F1 מוקד ימני של האליפסה», `focusSentenceOf`); a taken
-        letter quotes its holder and is refused (no swap).
+        letter quotes its holder and offers the swap, as the centre's does (`label` is the letter the holder would take).
       */}
       {focusPick && (() => {
         const state = { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations };
-        const ops = focusPopoverOps(focusPick.offerId, state, { record: (v) => commitRecord(v, recordLine, t), setError }, d);
+        const ops = focusPopoverOps(focusPick.offerId, state, { record: (v) => commitRecord(v, recordLine, t), applySwap, setError }, d);
         return (
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
             <LetterPopover
@@ -2485,9 +2485,10 @@ export function App() {
               y={focusPick.y}
               bounds={{ width: window.innerWidth, height: window.innerHeight }}
               title={t('focusTitle')}
-              label={focusPick.letter}
+              label={centreLabelOf(d)}
               initialValue={focusPick.letter}
               onRename={ops.onRename}
+              onSwap={ops.onSwap}
               strings={{
                 placeholder: t('letterPlaceholder'),
                 apply: t('letterApply'),

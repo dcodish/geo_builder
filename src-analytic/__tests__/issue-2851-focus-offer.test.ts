@@ -20,10 +20,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { useAnalyticStore } from '../store/useAnalyticStore';
 import { derive } from '../engine/derive';
 import { knownCurve } from '../engine/evaluate';
+import { offersOf } from '../engine/crossings';
 import { conicMarksOf, focusSentenceOf } from '../app/conicMarks';
 import { withConic } from '../app/annotations';
 import { focusPopoverOps } from '../app/centreName';
-import { commitRecord } from '../app/submit';
+import { commitRecord, decideSubmit } from '../app/submit';
+import { swapOffered } from '../../shell/frame/letterOffer';
 import { buildScene } from '../render/scene';
 import { Figure } from '../render/Figure';
 
@@ -60,12 +62,20 @@ function offers() {
   return { scene, offers: scene.roles.foci.flatMap((f) => (f.offer ? [f.offer] : [])) };
 }
 
-/** Click the offer whose letter is `book`, confirm the popover with `typed` (default: the letter it opens on). */
-function click(book: string, typed?: string) {
+/** What App hands the popover for the focus offer whose book letter is `book`. */
+function popover(book: string) {
   const o = offers().offers.find((x) => x.letter === book);
   if (!o) throw new Error(`no focus offer ${book} on the canvas`);
-  const ops = focusPopoverOps(o.id, state(), { record: (v) => commitRecord(v, store().recordLine, t), setError: store().setError }, current());
-  return ops.onRename(o.letter, typed ?? o.letter);
+  return {
+    offer: o,
+    ...focusPopoverOps(o.id, state(), { record: (v) => commitRecord(v, store().recordLine, t), applySwap: store().applySwap, setError: store().setError }, current()),
+  };
+}
+
+/** Click the offer whose letter is `book`, confirm the popover with `typed` (default: the letter it opens on). */
+function click(book: string, typed?: string) {
+  const { offer, onRename } = popover(book);
+  return onRename(offer.letter, typed ?? offer.letter);
 }
 
 const at = (id: string) => current().figure.points.find((p) => p.id === id);
@@ -84,6 +94,22 @@ describe('#2851 — a shown focus is clickable, and the click records the typed 
     const markup = renderToStaticMarkup(createElement(Figure, { scene, onFocus: () => {} }));
     expect(markup.match(/data-focus-offer=/g)?.length).toBe(2);
     expect(markup).toContain('F1 מוקד ימני של האליפסה');
+    // operator, 2026-11-12 (T30): "make the focuses round like we have for points that we want users to click" — the
+    // focus offer is drawn with the crossing / centre offer's dashed ring, attribute for attribute
+    const ringOf = (html: string, attr: string) => {
+      const tag = new RegExp(`<circle[^>]*${attr}[^>]*>`).exec(html)?.[0] ?? '';
+      return ['r', 'fill', 'fill-opacity', 'stroke', 'stroke-opacity', 'stroke-width', 'stroke-dasharray'].map((a) => new RegExp(` ${a}="([^"]*)"`).exec(tag)?.[1]);
+    };
+    const centreScene = (() => {
+      build(['O(5,5)', 'x^2+y^2=16']); // O taken: the circle's centre is an offer (#1598's figure)
+      const dc = current();
+      return buildScene(dc.figure, { minX: -8, minY: -8, maxX: 8, maxY: 8 }, 600, 600, { crossings: offersOf(dc.figure, dc.construction) });
+    })();
+    const centreRing = ringOf(renderToStaticMarkup(createElement(Figure, { scene: centreScene, onCentre: () => {} })), 'data-centre-offer=');
+    expect(centreRing).toEqual(['6', '#fff', '0.01', '#0f172a', '0.55', '1.25', '3 2']);
+    expect(ringOf(markup, 'data-focus-offer=')).toEqual(centreRing);
+    build(['7x^2+9y^2=63']);
+    showFoci();
     expect(renderToStaticMarkup(createElement(Figure, { scene }))).not.toContain('data-focus-offer');
 
     expect(click('F1')).toEqual({ ok: true });
@@ -141,10 +167,31 @@ describe('#2851 — a shown focus is clickable, and the click records the typed 
     expect(store().lines).toEqual(['7x^2+9y^2=63', 'D(1,1)']);
   });
 
-  it('a book letter the student already used: the mark has no letter, so no offer (sr-07)', () => {
-    build(['7x^2+9y^2=63', 'F1(5,5)']);
+  it('the book letter held by a student point: the mark writes no letter (sr-07) but is clickable, and the popover offers the swap (operator ruling 2026-11-12)', () => {
+    build(['7x^2+9y^2=63', 'F1(1,1)']);
     showFoci();
-    expect(offers().offers.map((o) => o.letter)).toEqual(['F2']);
+    expect(offers().offers.map((o) => o.letter)).toEqual(['F1', 'F2']);
+    const { offer, onRename, onSwap } = popover('F1');
+    // the letter is taken: its holder is quoted, so the shared popover shows the swap (swapOffered)
+    const out = onRename(offer.letter, offer.letter);
+    expect(out).toMatchObject({ ok: false, reason: 'taken', holder: { text: 'F1(1,1)' } });
+    expect(swapOffered(out.ok ? null : out.holder)).toBe(true);
+    // accepting it: the focus takes F₁, the old point the automatic letter; every row a typed-form sentence
+    expect(onSwap('A', 'F1')).toEqual({ ok: true });
+    const auto = store().lines[1].slice(0, -'(1,1)'.length);
+    expect(auto).not.toBe('F1');
+    expect(store().lines).toEqual(['7x^2+9y^2=63', `${auto}(1,1)`, 'F₁ מוקד ימני של האליפסה']);
+    expect(at('F₁')!.x).toBeCloseTo(SQRT2, 9);
+    expect(at(auto)!.x).toBeCloseTo(1, 9);
+    // typed in that order, every row records: the rows are sentences a student could type
+    const typed: string[] = [];
+    for (const l of store().lines) {
+      expect(decideSubmit(l, typed, 0, derive(typed, 0)).kind).toBe('record');
+      typed.push(l);
+    }
+    // one «בטל» takes the whole swap back
+    store().undo();
+    expect(store().lines).toEqual(['7x^2+9y^2=63', 'F1(1,1)']);
   });
 
   it('two ellipses: the sentence cannot bind «האליפסה», so neither offers', () => {

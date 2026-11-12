@@ -1988,14 +1988,17 @@ as `SceneKnowledge.roleMarks` and returns `scene.roles`: foci as dots, directric
 `polylines`, their labels as requests in the ONE `placeSceneLabels` call (priority 2, after angles and lengths),
 through `lbl`. The frame takes them in: `markAnchors` feeds `drawnBox`'s extra points (a focus; where a directrix crosses its axis). `Figure.tsx` paints them in `analytic-roles`: dashed 1.25px directrices, blue dots, ink labels.
 
-**The focus offer** ([ADR-AG-465](06c-decisions-analytic.md#adr-ag-465), #2851). A focus mark that carries its book letter
+**The focus offer** ([ADR-AG-465](06c-decisions-analytic.md#adr-ag-465), #2851). A shown focus mark no student point stands on
 carries `offer: { id: 'focus:<k>:<curve>', letter, title }`; `focusSentenceOf(d, id, letter)` composes its sentence
 («<letter> מוקד הפרבולה», «<letter> מוקד <side> של האליפסה», words from `parser/conicRoleWords.ts`, the side read against
 the ellipse's centre), null when stale or when two curves of that kind make «האליפסה» ambiguous. `buildScene` passes the
-offer through `roles.foci`; `Figure.tsx` draws a transparent r=8 hit target per offer (`analytic-focus-offers`,
+offer through `roles.foci`; `Figure.tsx` draws the `OFFER_RING` (the crossing / centre offer's dashed ring, one constant) around each offered focus (`analytic-focus-offers`,
 `data-noexport`, under the points) when `onFocus` is given. `App.tsx` opens `LetterPopover` with `initialValue` =
 the letter; `focusPopoverOps` (`app/centreName.ts`) runs the centre's decision with this composer — `normalizePointName`,
-`nameInUse` + holder, `decideSubmit`, `commitRecord` — and offers no swap.
+`nameInUse` + holder, `decideSubmit`, `commitRecord` — and its swap is the centre's (`decideOfferSwap`: record under the
+automatic letter, then `decideSwap`), with `label` = that automatic letter. `rename.ts`'s `tokenRe` matches an indexed
+id in every spelling (`F₁` · `F1` · `F_1` · `F_{1}`) and `keyOf` maps the occurrence back to the id, so a letter typed «F1»
+renames and swaps (found in round #2855).
 
 **The circle case.** `isCircleShaped(c, id)` — `(a − b)/max(1, a, b)` read through `isKnowledge`, zero in every
 configuration. Such an ellipse has no chip and no marks; `SceneKnowledge.circleShaped` gives it a circle's centre cross

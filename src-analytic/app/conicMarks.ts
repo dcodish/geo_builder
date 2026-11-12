@@ -64,7 +64,8 @@ export type ConicMark =
       /**
        * #2851 (ADR-AG-465) — the focus is clickable: `id` names it to `focusSentenceOf`, `letter` is the book's letter
        * the popover opens with (plain digits, as typed: «F1»), `title` the sentence a click would record with it (the
-       * hover, as a centre ring's). Present only on a focus that carries its letter, on the figure's one conic of its kind.
+       * hover, as a centre ring's). Present on every shown focus no student point stands on, on the figure's one conic of its
+       * kind — also when the book letter is held elsewhere (the mark then writes no letter; the popover offers the swap).
        */
       offer?: { id: string; letter: string; title: string };
     }
@@ -152,8 +153,10 @@ export function conicMarksOf(d: Derivation, annotations: AnnotationMap, hidden: 
         const letter = taken.has(plain(bookLetter(c.kind, k))) ? '' : bookLetter(c.kind, k);
         const label = known ? `${letter}(${v(f.x)}, ${v(f.y)})` : letter;
         const id = focusOfferId(c.id, k);
-        const sentence = letter ? focusSentenceOf(d, id, letter) : null;
-        const offer = sentence ? { id, letter: plain(letter), title: sentence } : undefined;
+        // the offer opens on the BOOK letter even when a student's point holds it: the popover then offers the swap (#2851)
+        const book = bookLetter(c.kind, k);
+        const sentence = focusSentenceOf(d, id, book);
+        const offer = sentence ? { id, letter: plain(book), title: sentence } : undefined;
         out.push({ kind: 'focus', curve: c.id, x: f.x, y: f.y, ...(label ? { label } : {}), ...(letter ? { labelNoValues: letter } : {}), ...(offer ? { offer } : {}) });
       });
     }

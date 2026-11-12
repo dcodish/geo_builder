@@ -23,6 +23,20 @@ const SCAFFOLD_TEXT = '#475569';
 const GHOST = '#cbd5e1';
 /** The stated-measure layer (#1714) — 2-D's measure blue, so a student reads the same marks in both tools. */
 const MEASURE = '#1d4ed8';
+/**
+ * THE OFFER RING (#1025) — how the canvas says "click here to name a point": a dashed ring, deliberately unlike a real
+ * point's filled dot. ONE style for every offer: a crossing, a circle's centre, and a shown focus (#2851, operator
+ * 2026-11-12: "we should make the focuses round like we have for points that we want users to click").
+ */
+const OFFER_RING = {
+  r: 6,
+  fill: '#fff',
+  fillOpacity: 0.01,
+  stroke: INK,
+  strokeOpacity: 0.55,
+  strokeWidth: 1.25,
+  strokeDasharray: '3 2',
+} as const;
 
 export function Figure({
   scene,
@@ -472,13 +486,7 @@ export function Figure({
             <circle
               cx={k.cx}
               cy={k.cy}
-              r={6}
-              fill="#fff"
-              fillOpacity={0.01}
-              stroke={INK}
-              strokeOpacity={0.55}
-              strokeWidth={1.25}
-              strokeDasharray="3 2"
+              {...OFFER_RING}
               style={{ cursor: onCrossing || (k.centreOf && onCentre) ? 'pointer' : 'default' }}
               data-centre-offer={k.centreOf}
               onClick={onCrossing || (k.centreOf && onCentre) ? (e) => ringClick(k, e) : undefined}
@@ -488,9 +496,10 @@ export function Figure({
       </g>
 
       {/*
-        #2851 (ADR-AG-465) — A SHOWN FOCUS IS AN OFFER. The mark itself stays decoration (`analytic-roles`); its hit
-        target is here, the centre ring's size, with the sentence a click records as the hover. Before the points, so a
-        real point at the same place covers it. Not exported: an offer is not part of the figure.
+        #2851 (ADR-AG-465) — A SHOWN FOCUS IS AN OFFER, drawn as every offer is: the OFFER_RING around the focus dot
+        (operator 2026-11-12, playing T30: "its not clear from the gui that they are clickable"), the pointer cursor, and
+        the sentence a click records as the hover. The dot itself stays decoration (`analytic-roles`). Before the points,
+        so a real point at the same place covers it. Not exported: an offer is not part of the figure.
       */}
       {onFocus && (
         <g data-noexport="1" data-testid="analytic-focus-offers">
@@ -501,8 +510,7 @@ export function Figure({
                 data-focus-offer={p.offer.id}
                 cx={p.cx}
                 cy={p.cy}
-                r={8}
-                fill="transparent"
+                {...OFFER_RING}
                 style={{ cursor: 'pointer' }}
                 onClick={(e) => onFocus(p.offer!, { x: e.clientX, y: e.clientY })}
               >
