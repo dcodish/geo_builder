@@ -129,6 +129,39 @@ export function vecEqLetters3(
   vecOf: (atom: VecAtom) => Vec3 | null,
   known: (sym: string) => number | undefined,
 ): { residual: Vec3; letters: Map<string, number> | null; scale: number } | null {
+  const sys = vecEqSystem3(lhs, rhs, vecOf, known);
+  if (!sys) return null;
+  const { R, D } = sys;
+  const scale = sys.scale;
+  const syms = [...D.keys()];
+  const dirs = syms.map((s) => D.get(s)!);
+  // Gram–Schmidt for the residual (robust when the directions are dependent), normal equations for the letters
+  const basis: Vec3[] = [];
+  for (const d of dirs) {
+    let e = d;
+    for (const b of basis) e = sub3(e, v3(b.x * dot3(e, b), b.y * dot3(e, b), b.z * dot3(e, b)));
+    const n = Math.hypot(e.x, e.y, e.z);
+    if (n > 1e-9 * Math.max(1, scale)) basis.push(v3(e.x / n, e.y / n, e.z / n));
+  }
+  let residual = R;
+  for (const b of basis) residual = sub3(residual, v3(b.x * dot3(residual, b), b.y * dot3(residual, b), b.z * dot3(residual, b)));
+  if (basis.length < dirs.length) return { residual, letters: null, scale: Math.max(scale, 1e-12) };
+  const solved = solveNormal3(dirs.map((d) => [d]), [R]);
+  const letters = new Map(syms.map((s, i) => [s, solved![i]] as const));
+  return { residual, letters, scale: Math.max(scale, 1e-12) };
+}
+
+/**
+ * #1551 + #2785 (ADR-3D-472 Am. 1) — ONE VECTOR EQUATION AS A LINEAR SYSTEM IN ITS OPEN LETTERS, at one drawing:
+ * R = Σₛ s·Dₛ (R and every Dₛ numbers). A letter `known` gives is a number. Shared by the one-equation reader above
+ * and the figure's joint letter reader (`lettersAt3`), so both read the same equation. Null when an atom is missing.
+ */
+export function vecEqSystem3(
+  lhs: VecExpr,
+  rhs: VecExpr,
+  vecOf: (atom: VecAtom) => Vec3 | null,
+  known: (sym: string) => number | undefined,
+): { R: Vec3; D: Map<string, Vec3>; scale: number } | null {
   let R = v3(0, 0, 0);
   const D = new Map<string, Vec3>();
   let scale = 0;
@@ -151,33 +184,30 @@ export function vecEqLetters3(
       R = v3(R.x + sign * c * w.x, R.y + sign * c * w.y, R.z + sign * c * w.z);
     }
   }
-  const syms = [...D.keys()];
-  const dirs = syms.map((s) => D.get(s)!);
-  // Gram–Schmidt for the residual (robust when the directions are dependent), normal equations for the letters
-  const basis: Vec3[] = [];
-  for (const d of dirs) {
-    let e = d;
-    for (const b of basis) e = sub3(e, v3(b.x * dot3(e, b), b.y * dot3(e, b), b.z * dot3(e, b)));
-    const n = Math.hypot(e.x, e.y, e.z);
-    if (n > 1e-9 * Math.max(1, scale)) basis.push(v3(e.x / n, e.y / n, e.z / n));
-  }
-  let residual = R;
-  for (const b of basis) residual = sub3(residual, v3(b.x * dot3(residual, b), b.y * dot3(residual, b), b.z * dot3(residual, b)));
-  if (basis.length < dirs.length) return { residual, letters: null, scale: Math.max(scale, 1e-12) };
-  const n = dirs.length;
-  const M = dirs.map((di) => [...dirs.map((dj) => dot3(di, dj)), dot3(di, R)]);
+  return { R, D, scale };
+}
+
+/**
+ * The least-squares solution of Σₛ xₛ·Dₛ,ₑ = Rₑ over several equations e: `cols[s][e]` is letter s's direction in
+ * equation e, `rhs[e]` the equation's R. Normal equations with partial pivoting; null when they are singular (the
+ * drawing does not determine the letters).
+ */
+export function solveNormal3(cols: readonly (readonly Vec3[])[], rhs: readonly Vec3[]): number[] | null {
+  const n = cols.length;
+  const dotCols = (a: readonly Vec3[], b: readonly Vec3[]) => a.reduce((s, v, e) => s + dot3(v, b[e]), 0);
+  const M = cols.map((ci) => [...cols.map((cj) => dotCols(ci, cj)), dotCols(ci, rhs)]);
   for (let col = 0; col < n; col++) {
     let piv = col;
     for (let r = col + 1; r < n; r++) if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
     [M[col], M[piv]] = [M[piv], M[col]];
+    if (Math.abs(M[col][col]) < 1e-18) return null;
     for (let r = 0; r < n; r++) {
       if (r === col) continue;
       const f = M[r][col] / M[col][col];
       for (let k = col; k <= n; k++) M[r][k] -= f * M[col][k];
     }
   }
-  const letters = new Map(syms.map((s, i) => [s, M[i][n] / M[i][i]] as const));
-  return { residual, letters, scale: Math.max(scale, 1e-12) };
+  return M.map((row, i) => row[n] / row[i]);
 }
 
 /** #1551: does a vector expression carry a letter? */

@@ -1253,7 +1253,11 @@ function statedComps(
  * (the exam gates ADR-3D-175 measured). The second place it is written makes it one unknown in every place.
  */
 export function coordLetterShared3(c: Construction3, sym: string): boolean {
-  return pinSymsOf(c).includes(sym) || c.param === sym || c.partialNames.some((b) => b.sym === sym && b.target.kind === 'point');
+  return (
+    pinSymsOf(c).includes(sym) || c.param === sym || c.partialNames.some((b) => b.sym === sym && b.target.kind === 'point') ||
+    // #1551 (ADR-3D-472 Am. 1): a letter a vector equation's coefficient already carries is the same unknown
+    symbolOwnersOf(c, sym).some((o) => o.kind === 'vec-letter')
+  );
 }
 
 /**
@@ -4188,7 +4192,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
          * coordinate) keeps the old path — one letter, one number.
          */
         const letters = exprLetters3(cmd);
-        const fresh = letters.length > 0 && letters.every((l) => symbolOwnersOf(c, l).every((o) => o.kind === 'vec-letter'));
+        // #1551 + #2785 (ADR-3D-472 Am. 1): a letter is one unknown wherever it is written — one a coordinate already
+        // carries (a pin symbol, or a point component an earlier coordinate named, promoted below) is the same letter
+        const shareable = (o: SymbolOwner) => o.kind === 'vec-letter' || o.kind === 'pin-sym' || (o.kind === 'component' && o.target.kind === 'point');
+        const fresh = letters.length > 0 && letters.every((l) => symbolOwnersOf(c, l).every(shareable));
         const cevian = cmd.symbol !== undefined && relPointIds(c, cmd.from, cmd.to, cmd.terms).some((id) => {
           const d = c.points.get(id);
           if (d?.kind !== 'vec-defined') return false;
@@ -4196,7 +4203,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           return sym !== undefined && !c.symbolPins.some((p) => p.sym === sym);
         });
         if (fresh && !cevian) {
-          const asClaim = applyCommand3(c, {
+          // a point component the letter names becomes the pool's unknown, as a second coordinate use promotes it (#2785)
+          const named = letters.filter((l) => symbolOwnersOf(c, l).some((o) => o.kind === 'component'));
+          const base = named.length > 0 ? clone(c) : c;
+          if (named.length > 0) promoteNamedComponents3(base, named);
+          const asClaim = applyCommand3(base, {
             type: 'claim',
             claim: {
               type: 'vec-eq',

@@ -16,6 +16,7 @@ import { derive3, useGeo3 } from '../store/store3';
 import { dataView } from '../engine/dataView';
 import { answerQuery } from '../engine/queries';
 import { resolve3 } from '../engine/evaluate';
+import { lettersAt3 } from '../engine/claims';
 import type { Construction3 } from '../engine/types';
 
 const reset = () => {
@@ -156,4 +157,30 @@ describe('#1551 — a new point: each letter a free number', () => {
       expect(useGeo3.getState().lastError, line).not.toBeNull();
     }
   });
+});
+
+// ADR-3D-472 Am. 1 (#1551 + #2785, round #2855): a letter is one number wherever it is written — one reader (`lettersAt3`)
+describe('#1551 — a letter written twice is one unknown', () => {
+  it('two vector relations that give a letter two values: the second is refused naming it', () => {
+    submitAll([...EXAM, 'EM = a·EA + b·EC']);
+    useGeo3.getState().submit('EM = b·EA + a·EC');
+    expect(useGeo3.getState().lastError).toEqual({ code: 'givens-contradict', stated: 'EM = b·EA + a·EC', others: [] });
+  });
+
+  it('the same letter restated consistently is held, and the panel still reads a = 2/3, b = 1/6', () => {
+    expect(params(submitAll([...EXAM, 'EM = a·EA + b·EC', 'EM = a·EA + 1/6EC']))).toEqual({ a: '2/3', b: '1/6' });
+  });
+
+  for (const order of [['AC = a·AB + b·AD', 'B(a,1,2)'], ['B(a,1,2)', 'AC = a·AB + b·AD']]) {
+    it(`a coordinate and a vector relation share the letter («${order.join('» · «')}»)`, () => {
+      submitAll(['פירמידה SABCD', ...order]);
+      const st = useGeo3.getState();
+      for (const seed of [0, 1, 2, 3]) {
+        const d = derive3(st.facts, seed);
+        for (const f of st.facts) expect(d.status[f.id], `seed ${seed} «${f.utterance}»`).toBe('ok');
+        const a = lettersAt3(d.construction, resolve3(d.construction, seed)).a;
+        expect(d.resolved.positions.get('B')!.x, `seed ${seed}: B.x is a`).toBeCloseTo(a, 6);
+      }
+    });
+  }
 });

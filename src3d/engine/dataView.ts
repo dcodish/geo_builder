@@ -29,7 +29,7 @@ import { spellingOf } from './types';
 import type { Construction3, FreeVec3, FreeVecMetric3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';
 import { applyCommand3 } from './apply';
 import { vecEqLetters3 } from './vecExpr';
-import { vecEqLetterAt3 } from './claims';
+import { lettersAt3 } from './claims';
 
 export interface VecEntry {
   /** Display label, e.g. `EN` or a declared name like `w`. */
@@ -1052,8 +1052,8 @@ export function paramRows3(c: Construction3, resolved: readonly Resolved3[]): { 
             }
             if (o.kind === 'vec-letter') {
               // #1551 (ADR-3D-472): a vector equation's letter, read off this drawing by least squares
-              const v = vecEqLetterAt3(c, sym, r.positions);
-              if (v !== null) return v;
+              const v = lettersAt3(c, r)[sym];
+              if (v !== undefined) return v;
             }
             if (o.kind === 'free-sym') {
               // #1188 step 2 (ADR-3D-390): a free vector's letter — the free-vector system's value at this drawing

@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { applyCommand3, coordLetterExprs3, freeDims, freeSolidRun3, renameIds3, resolveUnletteredSolid3, unstatedPyramidReading3 } from '../apply';
-import { claimResidual3, pinLettersAt3, residualHolds3, verifyClaim } from '../claims';
+import { claimResidual3, lettersAt3, residualHolds3, verifyClaim } from '../claims';
 import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, type QuadPreference3 } from '../evaluate';
 import { commandStatesCircle3, concaveSeatVertices3, quadDrawnDegenerate, statedConcyclic3 } from '../baseShapes';
 import { pointParents3 } from '../carriers';
@@ -904,7 +904,7 @@ describe('#2785 (ADR-3D-488) — a coordinate letter written twice is one pin sy
     expect(claims.every((cl) => cl.type === 'coords-eq' && cl.sym?.[0]?.terms[0].sym === 'k')).toBe(true);
     // k = 2 (off B) and k = 4 (off C) cannot both hold: the least-squares k fails both claims
     const res = resolve3(r.next, 0);
-    expect(pinLettersAt3(r.next, res).k).toBeCloseTo(3, 9);
+    expect(lettersAt3(r.next, res).k).toBeCloseTo(3, 9);
     expect(verifyClaim(claims[claims.length - 1], r.next, 0)).toBe(false);
   });
 
@@ -914,8 +914,8 @@ describe('#2785 (ADR-3D-488) — a coordinate letter written twice is one pin sy
       { type: 'point3', id: 'B', x: null, y: null, z: null, syms: ['t', 't', 'k'], symExprs: [{ terms: [{ sym: 't', k: 2 }], c: 0 }, { terms: [{ sym: 't', k: 1 }], c: 0 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }] },
     );
     const res = resolve3(c, 0);
-    expect(pinLettersAt3(c, res).t).toBeCloseTo(1, 9);
-    expect(pinLettersAt3(c, res).k).toBeCloseTo(-8, 9);
+    expect(lettersAt3(c, res).t).toBeCloseTo(1, 9);
+    expect(lettersAt3(c, res).k).toBeCloseTo(-8, 9);
     expect(c.claims.filter((cl) => cl.type === 'coords-eq').every((cl) => verifyClaim(cl, c, 0))).toBe(true);
   });
 });

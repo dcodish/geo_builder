@@ -15533,6 +15533,26 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 
 **Behaviour change for a student:** «EM = a·EA + b·EC» (and «aEA + bEC», Greek letters, one letter beside a number) builds; the data panel shows the letters' values when the givens fix them, the box takes a shape for which the relation holds when only some shapes do, a relation no shape satisfies is refused naming it, and a new point defined with two letters lies free in their plane.
 
+**Amendment 1 (2026-11-12, fix round #2855, stream E) — one letter reader with [ADR-3D-488](#adr-3d-488).** Rebasing this PR on `main` met #2785's shared coordinate letter. Both state one rule (*a letter is one unknown wherever it is written*), but each had its own reader: `pinLettersAt3` for coordinates and `vecEqLetterAt3` (the first equation alone) for coefficients. The coefficient arbiter also solved each `vec-eq` for its own letters.
+- **Measured before** (`58368d26`, this PR on `main`, `useGeo3.submit`):
+  - On the exam, «EM = a·EA + b·EC» then «EM = b·EA + a·EC» was accepted as a held row. Each equation held at its own a and b, but the panel printed a = 2/3, so the second line's a was a different 1/6.
+  - «פירמידה SABCD» · «AC = a·AB + b·AD» · «B(a,1,2)» drew B.x = −0.976 beside a = 1, so one letter had two values.
+  - «פירמידה SABCD» · «B(k,1,2)» · «AC = k·AB + b·AD» was refused `claim-refuted`, because a coordinate letter was not "fresh".
+- **Decision.**
+  - **One reader.** `lettersAt3` (claims.ts) reads every letter in one configuration. It takes the coordinate letters as ADR-3D-488 read them, then every remaining coefficient letter jointly over every lettered `vec-eq` (`vecEqSystem3` assembles each equation, `solveNormal3` solves them together).
+  - **Its readers.** The `vec-eq` claim is judged at those values; a letter the drawing leaves open falls back to the span residual. The panel, the ask and `letterNumbersAt3` read the same function. `pinLettersAt3` and `vecEqLetterAt3` are gone.
+  - **One pool.** `coordLetterShared3` counts a `vec-letter` owner. The vector relation's lowering (arm B) admits a letter a coordinate carries: a pin symbol, or a named point component, promoted by `promoteNamedComponents3` as a second coordinate use promotes it. The `vec-eq` pin reads such a letter at the pivot's own `symAt`, so the drive and the arbiter see one unknown.
+- **Measured after.**
+  - The exam rows and the play case are unchanged (a = 2/3, b = 1/6; the restated «EM = a·EA + 1/6EC» is still a held row).
+  - The swapped relation is refused `givens-contradict` naming it.
+  - «… · B(a,1,2)» draws B.x = 1 = a.
+  - «B(k,1,2)» · «AC = k·AB + b·AD» builds with k = 1, b = 1.
+  - «a = 2» on that figure is refused `givens-contradict` naming the two lines that fix a. Before, it was refused `injection-unsatisfiable`.
+- **Not changed.** A letter in a NEW point's coordinates («M(k,1,0)») is the figure parameter (another lane), and ADR-3D-488 does not pool it either. «M(k,1,0)» · «AM = k·AB + b·AC» stays refused `claim-refuted`; «AM = a·AB + b·AC» · «N(a,3,0)» keeps N.x free.
+- **Locks.** `src3d/engine/__tests__/vecExpr3.test.ts` (`solveNormal3` over two equations; `vecEqSystem3`). `src3d/__tests__/issue-1551-two-letter-vec-rel.test.ts` (the swapped relation refused; the coordinate letter shared in either order; the exam unchanged).
+- **Requirements:** [02b](02b-requirements-3d.md) FR-VC-2 · **Design:** [04b](04b-design-3d.md) § the coordinate letter, § letters in a vector equation.
+- **Behaviour change for a student:** a letter written in two vector relations, or in a vector relation and a placed point's coordinates, has one value. Two relations that give it two values are refused naming the second.
+
 ## ADR-3D-468 — A right pyramid over an existing ring fits the ring to its cyclic member with the ring's own DOF (#2490)
 
 **Status:** accepted · 2026-11-10 · bug (3d) · [ADR-W-199](06w-decisions-workspace.md#adr-w-199) and the operator's rulings of 2026-11-09 on #2490 · Q-2490d judged 2026-11-09 (ADR-W-173) · fix round #2808 (drafted as ADR-3D-437 on `fix/2490-right-pyramid-existing-ring-r2808` from `main` @ `4f9fdfac`; held because it exposed #2810), landed in fix round #2822 on `fix/2490-2702-r2822`, stacked on [ADR-3D-467](#adr-3d-467) · amends [ADR-3D-436](#adr-3d-436) ("the right pyramid is unchanged") · supersedes the round-#2783 draft of this number (a refusal, merged and reverted on `main`, `3715e516`)

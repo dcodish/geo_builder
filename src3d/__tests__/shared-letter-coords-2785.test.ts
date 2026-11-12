@@ -8,7 +8,7 @@
  * point written with k («C(k,3,4)») pinned nothing, «k = 1» reached one place only, and a restatement of a point
  * fixed by coordinates («B(2,15,-8)» then «B(2t,t,k)») read as already held. Now every coordinate letter is a pin
  * symbol (`coordLetterExprs3`) and the `coords-eq` claim judges its symbolic components at the letters' values
- * (`pinLettersAt3`). Through the store (`submit` → `derive3`), seeds 0–5.
+ * (`lettersAt3`, the one reader since ADR-3D-472 Am. 1). Through the store (`submit` → `derive3`), seeds 0–5.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';

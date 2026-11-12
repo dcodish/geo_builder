@@ -176,8 +176,12 @@ every pin family that can land elsewhere records its claim: `coords-eq` for the 
 letter written for the first time names a free component (ADR-3D-175); written a second time (`coordLetterShared3`: a pin
 symbol, the figure parameter, or a named point component) it is lowered to 1·k (`coordLetterExprs3`) and the earlier
 statement's named component is promoted to the same pin symbol (`promoteNamedComponents3`). The `coords-eq` claim carries
-the symbolic components (`sym`), read at `pinLettersAt3`: the pivot's `pinSymbols`, or, where the pivot does not run, a
-least-squares read of the letters off the placed points over every point pin.
+the symbolic components (`sym`), read at `lettersAt3` — the ONE letter reader ([ADR-3D-472](06b-decisions-3d.md#adr-3d-472) Am. 1): the pivot's
+`pinSymbols`, or, where the pivot does not run, a least-squares read of the letters off the placed points over every
+point pin; then every remaining vector-coefficient letter, read jointly over every lettered `vec-eq` (`vecEqSystem3`,
+`solveNormal3`) with the coordinate letters as numbers. A letter a coordinate and a vector relation both carry is one
+pin symbol: `coordLetterShared3` counts a `vec-letter` owner, the vector relation's lowering promotes a named point
+component (`promoteNamedComponents3`), and the `vec-eq` pin reads it at the pivot's `symAt`.
 A given's claim carries `given: true`; **the placed-figure rule is claim-level**, at the head of
 `holdsAt`: a `given` claim is judged on a placed figure only, and at the displayed seed the pin-owner guard
 answers (`injection-unsatisfiable` for a coordinate pin, `givens-contradict` otherwise). So
@@ -1314,8 +1318,10 @@ never pivot unknowns. At any drawing the equation is `R = Σₛ s·Dₛ` with nu
 (`vecExpr.ts`) solves the letters by linear least squares and returns the residual no letter can absorb. That residual
 is the pin's three rows in the pivot (the free shape moves until the relation can hold; scale-covariant like the
 numeric `vec-eq`, so the `invariantOnly` lane and the rank probe need no change, and the probe charges the box only
-for the residual's rank), the verifier's measure, and `vecEqLetterAt3` (the panel's `vec-letter` owner, the claims'
-number reader) reads the letters off the same call. A value given to a letter («a = 1/2») substitutes; dependent letter
+for the residual's rank), the drive's measure. The verifier, the panel's `vec-letter` owner and the claims' number reader read the letters
+through `lettersAt3` (ADR-3D-472 Am. 1): jointly over every lettered equation, so one letter has one value in every
+relation that writes it; the `vec-eq` claim is judged at those values (the span residual for a letter the drawing
+leaves open). A value given to a letter («a = 1/2») substitutes; dependent letter
 directions leave the letters undetermined (`a = ?`). A definition with several letters (`vecDefs[].symbols`, each term
 naming its letter in `SymTerm.sym`) samples each letter as a one-letter ratio is sampled, and `vecDefLetterAt3` reads
 the letters back through the same least squares.

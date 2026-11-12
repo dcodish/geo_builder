@@ -850,7 +850,9 @@ export function scalarPinRows3(
       // the part no letter can absorb — the shape moves until the relation can hold, and no new pivot unknown exists.
       // Over the atoms' size like the numeric row (#2806): scale-free, so a shrinking figure cannot zero it.
       if (hasLetters3(pin.lhs) || hasLetters3(pin.rhs)) {
-        const sol = vecEqLetters3(pin.lhs, pin.rhs, dirOf, (sym) => symbolValueOf(c, sym));
+        // #1551 + #2785 (ADR-3D-472 Am. 1): a letter a coordinate also carries is the pivot's own unknown (`symAt`), so
+        // the relation and the coordinate read one value; a letter only coefficients carry is solved here
+        const sol = vecEqLetters3(pin.lhs, pin.rhs, dirOf, (sym) => env.symAt(sym) ?? symbolValueOf(c, sym));
         if (!sol) {
           out.push(10, 10, 10);
           continue;

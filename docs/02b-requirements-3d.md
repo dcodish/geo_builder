@@ -534,8 +534,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   holds, the rest staying free for «הציגו תצורה אחרת»; one that no shape satisfies is refused by name, «הנתונים סותרים זה
   את זה — אין גוף שמקיים את «EB' = a·EA + b·EC» יחד עם שאר הנתונים». Over a new point («EN = a·EA + b·EC») each letter is
   a free number: N lies free in the plane EAC, the panel reads «a = ?», «b = ?» and writes EN in a and b. A letter
-  carried by one term only («EM = aEA + 1/6EC») is the same case. «ab·EA», «a²EA» stay refused (FR-VC-3).
-  - Sources: #301, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472), #1551 (operator rulings 2026-08-16, 2026-09-29, 2026-10-05, 2026-10-13).
+  carried by one term only («EM = aEA + 1/6EC») is the same case. «ab·EA», «a²EA» stay refused (FR-VC-3). **A letter is
+  one number wherever it is written**: two vector relations that give a letter two values («EM = a·EA + b·EC» then
+  «EM = b·EA + a·EC» on the exam) are refused naming the second; a letter written in a vector relation and in a placed
+  point's coordinates («AC = a·AB + b·AD» · «B(a,1,2)», in either order) has the same value in both (FR-VC-2b).
+  - Sources: #301, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472) (Am. 1: one reader with ADR-3D-488), #1551 (operator rulings 2026-08-16, 2026-09-29, 2026-10-05, 2026-10-13).
 - **FR-VC-2a (Must)** — **A POWER in a coordinate component is supported where the solver can pin it,
   and refused BY NAME where it cannot.** On a figure carrying a solid, `C(p², p, 0)` builds and the
   relation `x = y²` holds. With no solid it is refused by name, never accepted with the power discarded.

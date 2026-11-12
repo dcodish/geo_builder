@@ -153,7 +153,7 @@ export type Claim3 =
   // as opposed to the student's ANSWER («K = (-3,4,6)»): only the given defers to the pivot's
   // no-placement verdict; an answer keeps its verify-your-answer register (ADR-3D-075).
   // #2785 (ADR-3D-488): `sym` holds the components written with letters («B(2t, t, k)»), judged at the letters' resolved
-  // values (`pinLettersAt3`); a component is numeric (x/y/z) or symbolic (sym[i]) or neither, never both.
+  // values (`lettersAt3`); a component is numeric (x/y/z) or symbolic (sym[i]) or neither, never both.
   | { type: 'coords-eq'; id: Id; x: number | null; y: number | null; z: number | null; sym?: [SymComp | null, SymComp | null, SymComp | null]; given?: true } // A = (2, 0, -10)
   | { type: 'never-parallel'; line: string; plane: string } // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
   | { type: 'plane-eq'; ids: Id[]; cx: number; cy: number; cz: number; d: number } // המישור KBC: x+2y+3z-26=0
