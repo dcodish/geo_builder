@@ -1,4 +1,7 @@
 /**
+ * pipeline-lock: the feature is a store verdict across sequences and seeds (the shared letter at seeds 0–5, the DOF cue before
+ * and after, stability at a fixed seed, the order permutation, the refusals) that the fixture's build + drift net cannot assert.
+ *
  * #2563 (ADR-3D-489) — A NEW POINT WITH LETTER COORDINATES. «N(k,p,3)» after «B(2t, t, k)» was refused
  * `symbolic-new-point`: the coordinate lowering admitted letters on an EXISTING point only. Now every lettered new point
  * that is not ADR-3D-032's one-letter coord-sym is a `sym-coord` point over the pin-symbol pool: k is the same unknown as
