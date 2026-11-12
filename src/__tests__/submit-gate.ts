@@ -33,6 +33,7 @@ import { ctxOf } from './scenario-pipeline';
 import { vertexPairVerdict } from '@/app/vertexPairCevian';
 import { ROLE_READING_WORK_CAP } from '@/app/decideDeterministic';
 import { extensionSideVerdict } from '@/app/extensionSide';
+import { ringOrderVerdict } from '@/app/ringOrder';
 
 /** Why the deterministic path did not commit — the app's own branch, named. */
 export type GateRefusal =
@@ -82,6 +83,9 @@ export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVer
     return { kind: 'refused', reason: 'honesty-gate' };
   }
   // #1927 (ADR-608): the app refuses a ring over placed points that crosses in every configuration before the dry run.
+  // #2811 (ADR-826): the app's own verdict, called — a ring a statement proves convex and another order of its letters
+  const byProof = ringOrderVerdict(utterance, r.commands, facts);
+  if (byProof) return { kind: 'refused', reason: 'crossed-ring', detail: byProof.other };
   const crossed = forcedCrossedRing(facts, r.commands, seed);
   if (crossed) return { kind: 'refused', reason: 'crossed-ring', detail: crossed.join('') };
   // #2518 (ADR-784): the app's own verdict, called

@@ -5368,7 +5368,9 @@ export { ringKey };
  * Not a carve-out by shape: a square, rectangle, rhombus, parallelogram or trapezoid is convex whenever it is
  * simple, so yielding lets nothing new through for them and the crossed ring stays crossed in every
  * configuration (ADR-608 still refuses it); the kite and the general quadrilateral can be darts, and now are
- * when the student's own rings ask for it. A ring STATED convex («קמור») never yields: the statement wins.
+ * when the student's own rings ask for it. A ring STATED convex («קמור») never yields: the statement wins. Nor, since #2811
+ * ([ADR-826](docs/06-decisions.md#adr-826)), does a ring any other statement PROVES convex ({@link ringConvexityProofs}: a
+ * circle through its letters) — the partner order is then held to the simple floor against a convex ring, so no view draws it.
  *
  * @returns the `ringKey`s of the rings that yield.
  */
@@ -5387,6 +5389,7 @@ function convexityYields(facts: Fact[], extra: Id[][] = []): Set<string> {
     rings.push(...declaredRings(f.cmd).filter((r) => r.convex).map((r) => r.ids));
   }
   rings.push(...extra);
+  for (const p of ringConvexityProofs(facts)) statedConvex.add(ringKey(p.ring)); // #2811 (ADR-826): a proof is a statement too
   const out = new Set<string>();
   for (const r of rings) {
     const key = ringKey(r);
@@ -5399,6 +5402,148 @@ function convexityYields(facts: Fact[], extra: Id[][] = []): Set<string> {
     }
   }
   return out;
+}
+
+/**
+ * #2811 ([ADR-826](docs/06-decisions.md#adr-826)) — the ONE-CIRCLE memberships a fact STATES: which letters it puts on
+ * which circle. Read off the commands (structural, never positions): a circumcircle's three points, a circle through a
+ * point, a rider on a circle, a point a line or another circle crosses it at, an arc's midpoint, an extension's far end,
+ * a diameter's ends; and a `set-concyclic` (a cyclic statement with no circle object) is a circle of its own. A circle
+ * that covers a letter only through a DERIVED point fails open (no membership read), as the plan accepted.
+ */
+function circleMemberships(cmd: AnyCommand): { circle: string; ids: Id[] }[] {
+  switch (cmd.type) {
+    case 'circumcircle': return [{ circle: cmd.id, ids: [cmd.a, cmd.b, cmd.c] }];
+    case 'circle-through': return [{ circle: cmd.id, ids: [cmd.through] }];
+    case 'point-on-circle':
+    case 'line-circle-intersection':
+    case 'arc-midpoint':
+    case 'extend-onto-circle':
+      return [{ circle: cmd.circle, ids: [cmd.id] }];
+    case 'circle-circle-intersection': return [{ circle: cmd.circle1, ids: [cmd.id] }, { circle: cmd.circle2, ids: [cmd.id] }];
+    case 'diameter': return [{ circle: cmd.circle, ids: [cmd.id1, cmd.id2] }];
+    case 'set-concyclic': return [{ circle: `~concyclic:${[...cmd.points].sort().join('')}`, ids: [...cmd.points] }];
+    default: return [];
+  }
+}
+
+/** A ring's convex position, proved structurally by stated facts (#2811 ADR-826; #2813 ADR-823). */
+export interface RingConvexityProof {
+  ring: Id[];
+  /** what proves it: a stated «קמור», one circle through every letter (#2811), or stated interior angles (#2813) */
+  reason: 'stated-convex' | 'circle' | 'angles';
+  /** the facts that prove it, in fact-list order */
+  facts: Fact[];
+}
+
+const ringProofsMemo = new WeakMap<Fact[], RingConvexityProof[]>();
+
+/**
+ * #2811 ([ADR-826](docs/06-decisions.md#adr-826)) — WHICH DECLARED RINGS ARE PROVED TO BE IN CONVEX POSITION, by the
+ * student's own statements, with no figure. Points in convex position have exactly ONE simple cyclic order, so a proved
+ * ring is convex whenever it is simple, and any other declared order of its letters crosses in every configuration. The
+ * sufficient reasons, each a fact the student stated:
+ * - a stated `set-polygon-convexity` convex («המרובע ABCD קמור»);
+ * - **one circle through every letter** ({@link circleMemberships}): a circle the ring is inscribed in, or one circle
+ *   whose memberships — its circumcircle points, riders, crossings — cover all the letters. Four points on one circle are
+ *   in convex position, so «מעגל חוסם את ABDC» after «מרובע ABCD · מרובע ABDC» leaves one of the two orders crossed.
+ * A noun that is convex whenever simple keeps its existing path (ADR-608/613), unchanged. Memoized on the fact list.
+ */
+export function ringConvexityProofs(facts: Fact[]): RingConvexityProof[] {
+  const memo = ringProofsMemo.get(facts);
+  if (memo) return memo;
+  const out: RingConvexityProof[] = [];
+  const statedConvex = new Map<string, Fact>();
+  const onCircle = new Map<string, Map<Id, Fact>>(); // circle → letter → the first fact that put it there
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    if (f.cmd.type === 'set-polygon-convexity' && (f.cmd as { convex: boolean }).convex) {
+      const key = ringKey((f.cmd as { ids: Id[] }).ids);
+      if (!statedConvex.has(key)) statedConvex.set(key, f);
+    }
+    for (const { circle, ids } of circleMemberships(f.cmd)) {
+      const members = onCircle.get(circle) ?? new Map<Id, Fact>();
+      for (const id of ids) if (!members.has(id)) members.set(id, f);
+      onCircle.set(circle, members);
+    }
+  }
+  const seen = new Set<string>();
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    for (const { ids } of declaredRings(f.cmd)) {
+      const n = ids.length;
+      if (n < 4 || new Set(ids).size !== n) continue;
+      const key = ringKey(ids);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const convex = statedConvex.get(key);
+      if (convex) {
+        out.push({ ring: ids, reason: 'stated-convex', facts: [convex] });
+        continue;
+      }
+      for (const members of onCircle.values()) {
+        if (!ids.every((id) => members.has(id))) continue;
+        const proving = new Set(ids.map((id) => members.get(id)!));
+        out.push({ ring: ids, reason: 'circle', facts: facts.filter((x) => proving.has(x)) });
+        break;
+      }
+    }
+  }
+  ringProofsMemo.set(facts, out);
+  return out;
+}
+
+/** A second declared order over a proved ring's letters (#2811, ADR-826): what {@link ringOrderContradiction} returns. */
+export interface RingOrderContradiction {
+  /** the ring proved convex */
+  ring: Id[];
+  /** the other declared order, which must cross */
+  other: Id[];
+  /** why the ring is convex, and the facts that say so */
+  proof: RingConvexityProof;
+}
+
+/**
+ * #2811 ([ADR-826](docs/06-decisions.md#adr-826)) — A RING PROVED CONVEX AND ANOTHER DECLARED ORDER OF ITS LETTERS:
+ * structural, pool-free, asked of the TRIAL figure. A declared ring over some of a proved ring's letters (four or more)
+ * that orders them differently — `convexityYields`' relation — crosses in every configuration. Blamed on the LATEST of the
+ * two declarations and the proof facts (ADR-3D-322's rule, as ADR-3D-467 does in 3-D): only when that is a fact this line
+ * adds is the line refused, so a figure that already holds the contradiction (a saved one) is never refused on an
+ * unrelated line. «מעגל חוסם את ABDC» after the two orders, and «מרובע ABDC» after the circle, are the same contradiction.
+ *
+ * **Fails open**: any throw → `null`.
+ */
+export function ringOrderContradiction(facts: Fact[], commands: AnyCommand[]): RingOrderContradiction | null {
+  try {
+    if (commands.length === 0) return null;
+    const trial = trialFacts(facts, commands);
+    const added = new Set(trialChanges(facts, trial));
+    if (added.size === 0) return null;
+    const proofs = ringConvexityProofs(trial);
+    if (proofs.length === 0) return null;
+    const at = new Map(trial.map((f, i) => [f, i] as const));
+    const rings: { ids: Id[]; fact: Fact }[] = [];
+    for (const f of trial) {
+      if (!f.enabled) continue;
+      for (const { ids } of declaredRings(f.cmd)) if (ids.length >= 4 && new Set(ids).size === ids.length) rings.push({ ids, fact: f });
+    }
+    for (const proof of proofs) {
+      const own = new Set(proof.ring);
+      const declaring = rings.filter((r) => ringKey(r.ids) === ringKey(proof.ring)).map((r) => r.fact);
+      for (const q of rings) {
+        if (!q.ids.every((id) => own.has(id))) continue;
+        const sub = new Set(q.ids);
+        if (ringKey(proof.ring.filter((id) => sub.has(id))) === ringKey(q.ids)) continue; // the ring's own order
+        const involved = [q.fact, ...declaring, ...proof.facts];
+        const latest = involved.reduce((a, b) => ((at.get(b) ?? -1) > (at.get(a) ?? -1) ? b : a));
+        if (!added.has(latest)) continue;
+        return { ring: proof.ring, other: q.ids, proof };
+      }
+    }
+    return null;
+  } catch {
+    return null; // fails open, always
+  }
 }
 
 export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean {

@@ -6729,6 +6729,34 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(A, D) + dist(D, B), 'D stays on AB').toBeCloseTo(dist(A, B), 6);
     },
   },
+  {
+    id: 'crossed-ring-circle-last-2811',
+    title:
+      '#2811 (ADR-826): «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» — the circle line is refused (four points on one circle have one simple order), in every order; one ring with its circle, and two orders with no circle, still build',
+    guards:
+      "Plan of #2811 (armed 2026-11-11 on ADR-W-199 §2 and #2810's review): 2-D refused the circle-FIRST order (the prior pool was all-concyclic) but accepted the circle LAST and drew ABDC crossed at 6/6 seeds (re-measured at pickup on caf619a5: accepted, `findValidConfig` null). Root cause: `forcedCrossedRing` reads only the rings the current line DECLARES, so a line that proves the letters convex — a circle through them, or a rider that completes the circle — was never asked whether it leaves the standing rings a simple drawing. Fix: `ringConvexityProofs` (a circle through every letter, «קמור») and `ringOrderContradiction`, structural and pool-free, blamed on the latest line; a proved ring no longer yields its convexity (`convexityYields`).",
+    steps: ['מרובע ABCD', 'מרובע ABDC'],
+    check(fig) {
+      allStepsOk(fig);
+      // R5, the issue's exact lines, and R4: the circle line is refused
+      for (const circle of ['מעגל חוסם את ABDC', 'מעגל חוסם את ABCD'])
+        expect(gateVerdict(factsOf(['מרובע ABCD', 'מרובע ABDC']), circle), circle).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      // R12: a rider that completes the circle, then the second order
+      expect(gateVerdict(factsOf(['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD']), 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      // R1 and R5b still refuse
+      expect(gateVerdict(factsOf(['מרובע ABCD', 'מעגל חוסם את ABCD']), 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      expect(gateVerdict(factsOf(['מרובע ABCD', 'מרובע ABDC']), 'המרובע ABCD חסום במעגל')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      // C1 and one ring with its circle commit, every ring simple
+      for (const [before, line] of [[['מרובע ABCD'], 'מרובע ABDC'], [['מרובע ABCD'], 'מעגל חוסם את ABCD']] as const) {
+        expect(gateVerdict(factsOf([...before]), line).kind, line).toBe('commit');
+        const found = findValidConfig(factsOf([...before, line]), 0);
+        expect(found, `${line}: a view exists`).not.toBeNull();
+        const pos = replay(found!.facts, found!.seed).positions;
+        for (const r of line === 'מרובע ABDC' ? [['A', 'B', 'C', 'D'], ['A', 'B', 'D', 'C']] : [['A', 'B', 'C', 'D']])
+          expect(ringSimple(r.map((id) => pos.get(id as Id) as Vec)), `${line}: ${r.join('')} simple`).toBe(true);
+      }
+    },
+  },
 ];
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
 function ringEnclosesCircle(f: ReturnType<typeof replay>, ids: string[]): boolean {

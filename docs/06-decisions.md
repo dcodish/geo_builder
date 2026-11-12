@@ -20902,3 +20902,19 @@ A display-only change (hiding a point, a measure toggle) is not a new figure: it
 **Locks.** Unit: `src/parser/__tests__/frame.test.ts` (every spelling × every statement → the bare sentence and the bare parse; the unrelated frame left as typed; `subjectFrameOf`). Parity rows `subject-frame-*-2062` and `satisfies-2391` (`shell/__tests__/fixtures/geo-input-parity.ts`), 2-D the reference.
 
 **Behaviour change for a student:** «הנקודה M מקיימת AM = 3» (and «נקודה M מקיימת: …», «M מקיים …», "the point M satisfies …") builds as «AM = 3» does, where it went to the AI.
+
+## ADR-826 — A ring a statement proves convex: one structural reader, and the line that completes another order is refused (#2811)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2811](https://github.com/dcodish/geo_builder/issues/2811) (bug, `P2`, wrong answer) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02](02-requirements.md) — FR-EN-16 (a later line that puts the letters on one circle) · **Design:** [04](04-design.md) § *A ring a statement proves convex is refused structurally, from any line* · **LADDER stage:** none (the pre-dry-run gate; no solve change)
+**Amends** [ADR-608](#adr-608) (a proof of convex position, from any line) and [ADR-613](#adr-613) (a proved ring does not yield) · **Rests on** [ADR-W-199](06w-decisions-workspace.md#adr-w-199) §2 and the recorded ADR-W-174 text choice `text-2810-circle-line-crossed` · siblings [ADR-3D-467](06b-decisions-3d.md#adr-3d-467) (3-D ships it); the analytic port is #2812.
+
+**Measured at pickup** (`caf619a5`, `driveThroughGate`): R4 «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABCD», R5 (… ABDC) and R12 («משולש ABC · מעגל חוסם את ABC · D על המעגל · מרובע ABCD · מרובע ABDC») committed every line, with no view meeting the requirements (`findValidConfig` null at seeds 0–5); R1, R5b and the pentagon refused.
+
+**Class.** *2-D decided that a second order over the same letters is impossible only by SAMPLING, and only for a ring the current line DECLARES.* A line that declares no ring but proves the letters in convex position — a circle through them, a rider completing the circle — was never asked.
+
+**Decision.** `ringConvexityProofs` (one reader; reasons: a stated «קמור», one circle through every letter read off the commands) and `ringOrderContradiction` (structural, on the trial facts, blamed on the latest line; refused only when that is the line's own fact) in `replay/core.ts`; `app/ringOrder.ts` gives both seams one verdict, before `forcedCrossedRing`, with the shared `input.ringContradictsNoun` naming the line. `convexityYields` does not yield a proved ring.
+
+**Locks.** Unit `src/replay/__tests__/ring-convexity-proof-2811.test.ts`. Scenario `crossed-ring-circle-last-2811` (`scenarios-corpus-4.ts`). Parity: `crossed-ring-2810-03` loses its 2-D cell; rows `crossed-ring-2811-01..03`.
+
+**Behaviour change for a student:** «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» (and the other circle, and a point stated on the circle that completes it) refuses the line that completes it with the crossed-shape message, instead of drawing one order crossed.
