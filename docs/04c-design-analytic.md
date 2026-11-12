@@ -36,6 +36,14 @@ source of givens** ([02c](02c-requirements-analytic.md) P2/P3).
 (`y = mx + 8`), with no symbolic algebra. **`conic.ts` — equation → curve, plus the canonicity gate.** **`curves.ts` —
 curve geometry**: resolution, membership residuals and the renderer's polylines, pure.
 
+**A free conic's direction** ([ADR-AG-467](06c-decisions-analytic.md#adr-ag-467), #2853). A bare «פרבולה» is a curve fact
+with a `turn` (`CurveTurn`: the same parabola opening along the other axis, its own equation and text). M1 keeps the turn
+on the curve object and opens a region `choice` of two `opens-along` selectors (x first). `resolvedAt` reads the
+assignment like every other discrete axis (`discreteAxes.ts`), and `turnedObjects` puts the turn in the curve's place
+when the configuration took `y`, so every consumer of the resolved construction sees ONE curve. The selector holds by
+construction. The sign of the free `p` is the direction along the axis, so four directions are two digits' worth.
+`freshLetters` renames the turn's letters with the curve's.
+
 **The conic's frame** ([ADR-AG-455](06c-decisions-analytic.md#adr-ag-455), #2664). `classify` completes the square, so a
 parabola or an ellipse with axes parallel to the coordinate axes is read anywhere: `NumCurve` carries `h`, `k` (the
 centre or vertex) and, for a parabola opening along y, `axis: 'y'`. The fields are ABSENT on a curve at the origin

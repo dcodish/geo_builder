@@ -60,6 +60,7 @@ import {
   type Construction,
   type Curve,
   type CurveObject,
+  type CurveTurn,
   type Domain,
   type EqOperand,
   type Fact,
@@ -3250,6 +3251,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // A curve whose letters are the tool's (#2619, ADR-AG-354): a letter the figure already uses is renamed to the next
       // free one, in the equation and in the label that shows it, before anything else reads the curve.
       if (f.fresh) return applyFact(c, freshLetters(c, f));
+      // A curve free in its direction too (#2853, ADR-AG-467): the object keeps its turn, and its direction is a discrete axis.
+      if (f.turn) return withTurn(applyFact(c, { ...f, turn: undefined }), f.id, f.turn);
       /*
        * THE DRAWN LINE BC GETS ITS EQUATION (#1639, ADR-AG-198): «הישר BC» drew the line through B and C (a
        * `line-at` along B→C, `line-2pt`); «משוואת הישר BC היא …» is a statement about THAT line, so the stated
@@ -6150,7 +6153,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         // A choice («משולש קהה זווית», #1708) names every point of every option.
         sel.kind === 'choice'
           ? sel.options.flatMap(refsOf)
-          : sel.kind === 'distinct-curves' || sel.kind === 'major-axis'
+          : sel.kind === 'distinct-curves' || sel.kind === 'major-axis' || sel.kind === 'opens-along'
           ? [] // #2395: names curves only, checked below (#2616: the major axis names its ellipse)
           : sel.kind === 'axis-side' || sel.kind === 'crossing-distinct' || sel.kind === 'crossing-nth'
           ? [sel.id]
@@ -6577,6 +6580,19 @@ function withOpenOrientation(out: Extract<ApplyOutcome, { ok: true }>, curve: Id
   return { ...out, next: { ...c, selectors: [...c.selectors, choice] } };
 }
 
+/**
+ * A FREE PARABOLA'S DIRECTION (#2853, ADR-AG-467): the created curve keeps its `turn`, and its axis is a region `choice` of the
+ * two `opens-along` options, x first — so the first drawing opens along x and «הציגו תצורה אחרת» reaches y (02c R14). A curve
+ * the line did not create (a restatement) is left as it is.
+ */
+function withTurn(out: ApplyOutcome, curve: Id, turn: CurveTurn): ApplyOutcome {
+  if (!out.ok || out.effect !== 'created') return out;
+  const c = out.next;
+  const objects = c.objects.map((o) => (o.id === curve && o.kind === 'curve' ? { ...o, turn } : o));
+  const choice: Selector = { kind: 'choice', options: [{ kind: 'opens-along', curve, axis: 'x' }, { kind: 'opens-along', curve, axis: 'y' }] };
+  return { ...out, next: { ...c, objects, selectors: [...c.selectors, choice] } };
+}
+
 /** The letters a fresh curve may take, in order — the plane's x, y and the constant e excluded. */
 const FRESH_LETTERS = 'abcdghkmnpqrstuvw'.split('');
 
@@ -6594,10 +6610,13 @@ function freshLetters(c: Construction, f: Extract<Fact, { t: 'curve' }>): Extrac
     const next = FRESH_LETTERS.find((l) => !taken.has(l) && !symbolsOf(f.curve.eq).includes(l));
     if (!next) continue;
     taken.add(next);
+    const word = new RegExp(`(?<![A-Za-z])${sym}(?![A-Za-z])`, 'g');
     out = {
       ...out,
       curve: { ...out.curve, eq: renameSym(out.curve.eq, sym, next) },
-      label: out.label.eqSrc ? { ...out.label, eqSrc: out.label.eqSrc.replace(new RegExp(`(?<![A-Za-z])${sym}(?![A-Za-z])`, 'g'), next) } : out.label,
+      label: out.label.eqSrc ? { ...out.label, eqSrc: out.label.eqSrc.replace(word, next) } : out.label,
+      // The turned definition shares the letters (#2853): renamed with them.
+      ...(out.turn ? { turn: { curve: { ...out.turn.curve, eq: renameSym(out.turn.curve.eq, sym, next) }, eqSrc: out.turn.eqSrc.replace(word, next) } } : {}),
     };
   }
   return out;

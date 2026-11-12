@@ -652,6 +652,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // #2616/#2617/#2619 (ADR-AG-353/354) — the ellipse's roles and sizes, and the canonical curve with no equation. Not
   // featured: the section's six featured rows are the six it showed before these were added, so the guide is unchanged.
   { category: 'conics', family: 'F6', he: 'נתונה אליפסה קנונית שהציר הגדול שלה על ציר ה-x', en: 'a canonical ellipse whose major axis is on the x-axis' },
+  // #2853 (ADR-AG-467): a bare noun is a FREE conic — the ellipse's centre and semi-axes, the parabola's vertex, p and direction.
+  { category: 'conics', family: 'F6', he: 'נתונה אליפסה', en: 'an ellipse' },
+  { category: 'conics', family: 'F6', he: 'נתונה פרבולה', en: 'a parabola' },
   { category: 'conics', family: 'F6', he: 'נתון מעגל קנוני', en: 'a canonical circle' },
   { category: 'conics', family: 'F6', he: 'F1 הוא המוקד הימני של האליפסה', en: 'F1 is the right focus of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },
   { category: 'conics', family: 'F6', he: 'F1 ו-F2 מוקדי האליפסה', en: 'F1 and F2 are the foci of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },

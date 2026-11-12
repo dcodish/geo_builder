@@ -3033,6 +3033,17 @@ const CANON_CIRCLE_HE = new RegExp(`^${HE_GIVEN}ה?מעגל(?:\\s+ה?קנוני|
 const CANON_CIRCLE_EN = /^(?:given\s+)?(?:a|the)\s+(?:canonical\s+circle|circle\s+(?:centred|centered)\s+at\s+the\s+origin)$/i;
 /** The book's letters for an equation-less canonical ellipse (ruling 2026-10-30, Q1 → A). */
 const CANONICAL_ELLIPSE_EQ = 'x^2/a^2+y^2/b^2=1';
+/**
+ * A BARE CONIC NOUN IS A FREE CONIC (#2853, ADR-AG-467; operator ruling 2026-11-12: *"It should be a free ellipse"*, and for
+ * the parabola *"2853 - A"*, any of the four directions). The letters are the tool's, as the canonical one's are: h, k for
+ * the centre or the vertex (ADR-AG-455's frame), a, b the semi-axes, p the parabola's parameter.
+ */
+const FREE_ELLIPSE_EQ = '(x-h)^2/a^2+(y-k)^2/b^2=1';
+/** The free parabola opening along x, and the same parabola TURNED to open along y (the axis swap of `conicFrame`). */
+const FREE_PARABOLA_EQ = '(y-k)^2=2p(x-h)';
+const FREE_PARABOLA_TURNED_EQ = '(x-h)^2=2p(y-k)';
+const BARE_PARABOLA_HE = new RegExp(`^${HE_GIVEN}ה?פרבולה$`);
+const BARE_PARABOLA_EN = /^(?:given\s+)?(?:a|the)\s+parabola$/i;
 
 function parseCanonicalConic(line: string): RuleOutcome {
   const alone = AXIS_ALONE_HE.exec(line) ?? AXIS_ALONE_EN.exec(line);
@@ -3052,11 +3063,35 @@ function parseCanonicalConic(line: string): RuleOutcome {
     const facts = r.facts.map((f): Fact => (f.t === 'curve' ? { ...f, fresh: true, src: line } : { ...f, src: line }));
     return made([...facts, ...axisFacts]);
   }
-  if (!clause) return null;
+  if (!clause) return freeConic(line);
   // An ellipse declared WITH its equation and the clause: the declaration as the curve reader reads it, then the clause.
   const r = parseClause(head);
   if (!r.ok || !r.facts.some((f) => f.t === 'curve' && f.curve.kind === 'ellipse')) return null;
   return made([...r.facts.map((f) => ({ ...f, src: line })), ...axisFacts]);
+}
+
+/**
+ * «אליפסה» · «נתונה אליפסה» · "an ellipse" — (x−h)²/a² + (y−k)²/b² = 1, all four letters free (#2853, ADR-AG-467). «פרבולה» ·
+ * «נתונה פרבולה» · "a parabola" — (y−k)² = 2p(x−h) with its `turn`, (x−h)² = 2p(y−k): which of the two is drawn is a discrete
+ * axis M1 opens (`opens-along`), and the sign of p the direction along it, so «הציגו תצורה אחרת» reaches all four. `null` when
+ * the line is no bare conic noun.
+ */
+function freeConic(line: string): RuleOutcome {
+  const ellipse = BARE_ELLIPSE_HE.test(line) || BARE_ELLIPSE_EN.test(line);
+  const parabola = !ellipse && (BARE_PARABOLA_HE.test(line) || BARE_PARABOLA_EN.test(line));
+  if (!ellipse && !parabola) return null;
+  const r = parseClause(ellipse ? `נתונה אליפסה שמשוואתה ${FREE_ELLIPSE_EQ}` : `נתונה פרבולה שמשוואתה ${FREE_PARABOLA_EQ}`);
+  if (!r.ok) return null;
+  const turned = parabola ? parseClause(`נתונה פרבולה שמשוואתה ${FREE_PARABOLA_TURNED_EQ}`) : null;
+  const turn = turned?.ok ? turned.facts.find((f) => f.t === 'curve') : undefined;
+  if (parabola && (!turn || turn.t !== 'curve')) return null;
+  return made(
+    r.facts.map((f): Fact =>
+      f.t === 'curve'
+        ? { ...f, fresh: true, ...(turn && turn.t === 'curve' ? { turn: { curve: turn.curve, eqSrc: turn.label.eqSrc ?? FREE_PARABOLA_TURNED_EQ } } : {}), src: line }
+        : { ...f, src: line },
+    ),
+  );
 }
 
 /** «הציר הגדול … על ציר ה-y» → y; «הציר הקטן … על ציר ה-y» → x (the major axis is the other one). */

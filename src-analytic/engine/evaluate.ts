@@ -1871,6 +1871,8 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      * WHICH AXIS IS THE ELLIPSE'S MAJOR ONE (#2616/#2619, ADR-AG-353/354) — the RESOLVED semi-axes, never the signed
      * letters: x holds when a > b, y when b > a, strictly at the figure's resolution (a circle, a = b, has no major axis).
      */
+    // A free parabola's axis (#2853, ADR-AG-467) is a definition the resolution already applied: it holds on its curve.
+    if (s.kind === 'opens-along') return true;
     if (s.kind === 'major-axis') {
       const atFn = (id: Id) => at.get(id) ?? null;
       const k = curveAtOf(c, env, atFn)(s.curve);
@@ -2647,8 +2649,21 @@ export function resolvedAt(raw: Construction, seed: number, choiceSeed = seed): 
     selectors,
     // #2018 (ADR-AG-298): an object bound to a role («תיכון לבסיס»'s foot and segment) is lettered by the option this
     // configuration took — resolved here with the constraints, so nothing downstream reads another option's letters.
-    objects: followObjects(raw.objects, constraints),
+    objects: turnedObjects(followObjects(raw.objects, constraints), selectors),
   };
+}
+
+/**
+ * A FREE PARABOLA DRAWN ALONG THE AXIS ITS CONFIGURATION TOOK (#2853, [ADR-AG-467](../../docs/06c-decisions-analytic.md#adr-ag-467)):
+ * an `opens-along y` selector puts the curve's `turn` in its place, equation and text, so every reader of the resolved
+ * construction — the residuals, the focus, the frame, the panel — sees one curve. Along x the object is as stated.
+ */
+export function turnedObjects(objects: readonly GeoObject[], selectors: readonly Selector[]): GeoObject[] {
+  const turned = new Set(selectors.flatMap((s) => (s.kind === 'opens-along' && s.axis === 'y' ? [s.curve] : [])));
+  if (turned.size === 0) return objects as GeoObject[];
+  return objects.map((o) =>
+    o.kind === 'curve' && o.turn && turned.has(o.id) ? { ...o, curve: o.turn.curve, label: { ...o.label, eqSrc: o.turn.eqSrc } } : o,
+  );
 }
 
 /** Do the (resolved) selectors of `c` all hold at these positions? The one reading of a region given. */

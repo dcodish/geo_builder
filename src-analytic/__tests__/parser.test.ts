@@ -738,5 +738,27 @@ describe('#2502 (ADR-AG-468) — the construct state «קוטר/מיתר המע�
     expect(parseLine('AB מיתר של מעגל').ok).toBe(false);
     expect(parseLine('AB קוטר המעגל M').ok).toBe(true);
     expect(parseLine('קוטר מעגל O היוצא מנקודה F').ok).toBe(true);
+describe('#2853 (ADR-AG-467) — a bare conic noun is a FREE conic', () => {
+  const curveOf = (line: string) => {
+    const r = parseLine(line);
+    const f = r.ok ? r.facts.find((x) => x.t === 'curve') : undefined;
+    return f && f.t === 'curve' ? f : null;
+  };
+  it.each([['אליפסה'], ['נתונה אליפסה'], ['an ellipse'], ['the ellipse']])('«%s» → (x-h)^2/a^2+(y-k)^2/b^2=1, the letters the tool’s', (line) => {
+    const f = curveOf(line);
+    expect(f?.label.eqSrc).toBe('(x-h)^2/a^2+(y-k)^2/b^2=1');
+    expect(f?.fresh).toBe(true);
+    expect(f?.turn).toBeUndefined();
+  });
+  it.each([['פרבולה'], ['נתונה פרבולה'], ['a parabola']])('«%s» → (y-k)^2=2p(x-h), with its turn (x-h)^2=2p(y-k)', (line) => {
+    const f = curveOf(line);
+    expect(f?.label.eqSrc).toBe('(y-k)^2=2p(x-h)');
+    expect(f?.fresh).toBe(true);
+    expect(f?.turn?.eqSrc).toBe('(x-h)^2=2p(y-k)');
+  });
+  it('«אליפסה קנונית» and the major-axis clause are unchanged (ADR-AG-354); «פרבולה קנונית» is still not read (#2842)', () => {
+    expect(curveOf('אליפסה קנונית')?.label.eqSrc).toBe('x^2/a^2+y^2/b^2=1');
+    expect(curveOf('נתונה אליפסה שהציר הגדול שלה הוא על ציר ה-y')?.label.eqSrc).toBe('x^2/a^2+y^2/b^2=1');
+    expect(parseLine('פרבולה קנונית').ok).toBe(false);
   });
 });
