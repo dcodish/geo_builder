@@ -52,6 +52,11 @@ export interface LetterPopoverProps {
   onClose: () => void;
   /** the longest label the product can type (2-D 3 — `C12`; 3-D 4 — `C12'`) */
   maxLength?: number;
+  /**
+   * the letter the input OPENS with, selected so typing replaces it (analytic #2851: a focus offer opens on the book's
+   * «F1»); absent = an empty input, as every popover opened before it
+   */
+  initialValue?: string;
   /** the product's own extra menu items, below the letter block (2-D: hide/show label) */
   children?: ReactNode;
   testId?: string;
@@ -76,8 +81,8 @@ export const letterPopoverBtn: CSSProperties = {
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
 
-export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, strings, onClose, maxLength = 3, children, testId }: LetterPopoverProps) {
-  const [value, setValue] = useState('');
+export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, strings, onClose, maxLength = 3, initialValue, children, testId }: LetterPopoverProps) {
+  const [value, setValue] = useState(initialValue ?? '');
   const [note, setNote] = useState<'taken' | 'bad' | null>(null);
   const [takenBy, setTakenBy] = useState<{ holder: LetterHolderView; to: string } | null>(null);
 
@@ -139,6 +144,7 @@ export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, st
               value={value}
               maxLength={maxLength}
               placeholder={strings.placeholder}
+              onFocus={initialValue ? (e) => e.currentTarget.select() : undefined}
               onChange={(e) => {
                 setValue(e.target.value);
                 if (note) setNote(null);

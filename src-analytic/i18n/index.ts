@@ -271,6 +271,8 @@ const he = {
   segSolid: 'רציף',
   // #1598 — the letter popover opened on an unnamed circle's centre
   centreTitle: 'מרכז המעגל',
+  // #2851 — the letter popover opened on a shown focus of a parabola or an ellipse
+  focusTitle: 'מוקד',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: «{{detail}}»',
   // #1423 — the letter is the problem, named with the student's own defining sentence and the remedy
   errUnsatisfiableReused: '{{reusedId}} כבר מוגדרת: «{{definedBy}}». המשפט «{{detail}}» סותר את ההגדרה הקיימת — לנקודה חדשה בחרו אות אחרת.',
@@ -896,6 +898,7 @@ const en: typeof he = {
   segDashed: 'Dashed',
   segSolid: 'Solid',
   centreTitle: 'Circle centre',
+  focusTitle: 'Focus',
   errUnsatisfiable: 'No configuration satisfies: «{{detail}}»',
   errUnsatisfiableReused: '{{reusedId}} is already defined: «{{definedBy}}». «{{detail}}» contradicts that definition — pick another letter for a new point.',
   'locus.line': 'line',

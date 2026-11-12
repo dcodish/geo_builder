@@ -16,8 +16,14 @@
  * - 2026-11-03 card d2: an ellipse whose givens make a = b is a circle — no chip, its centre shown as a circle's centre,
  *   and a notice says so.
  *
- * Pure over the derivation and the annotation map. A click writes the map (`withConic`); it never goes through
- * `decideSubmit`, because it states nothing.
+ * - #2851 (2026-11-12, ADR-AG-465): *"make the focus points clickable so he can nail them on the diagram. if he doesnt,
+ *   the behavior is like today."* A shown focus that carries the book's letter is an OFFER (`offer` on its mark), the
+ *   circle centre's: a click opens the shared letter popover, and the letter confirmed records the sentence a student
+ *   could type («F1 מוקד ימני של האליפסה», «F מוקד הפרבולה», `focusSentenceOf`) through `decideSubmit`
+ *   (`app/centreName.ts` `focusPopoverOps`).
+ *
+ * Pure over the derivation and the annotation map. A CHIP press writes the map (`withConic`); it never goes through
+ * `decideSubmit`, because it states nothing. Naming a focus (the click on its mark) is a sentence, and does.
  */
 import type { Derivation } from '../engine/derive';
 import { ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves';
@@ -26,6 +32,8 @@ import type { NumCurve } from '../engine/types';
 import { fmtAnalytic } from '../format';
 import { CONIC_CYCLE, ELLIPSE_CYCLE, conicStateOf, nextConic, showsDirectrix, showsFocus, type AnnotationMap, type ConicState } from './annotations';
 import { roleLineOf } from './curveText';
+import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
+import type { EllipseSide } from '../engine/derived';
 
 type ConicKind = 'parabola' | 'ellipse';
 
@@ -46,7 +54,20 @@ export interface ConicChip {
  * may be written with the values switch off (#2688, ADR-AG-388): a focus's letter alone, a directrix nothing.
  */
 export type ConicMark =
-  | { kind: 'focus'; curve: string; x: number; y: number; label?: string; labelNoValues?: string }
+  | {
+      kind: 'focus';
+      curve: string;
+      x: number;
+      y: number;
+      label?: string;
+      labelNoValues?: string;
+      /**
+       * #2851 (ADR-AG-465) — the focus is clickable: `id` names it to `focusSentenceOf`, `letter` is the book's letter
+       * the popover opens with (plain digits, as typed: «F1»), `title` the sentence a click would record with it (the
+       * hover, as a centre ring's). Present only on a focus that carries its letter, on the figure's one conic of its kind.
+       */
+      offer?: { id: string; letter: string; title: string };
+    }
   | { kind: 'directrix'; curve: string; line: NumCurve & { kind: 'line' }; label?: string };
 
 /** The locale key of a chip's label: what the NEXT press does, in the curve's number (one focus, or two). */
@@ -130,7 +151,10 @@ export function conicMarksOf(d: Derivation, annotations: AnnotationMap, hidden: 
         }
         const letter = taken.has(plain(bookLetter(c.kind, k))) ? '' : bookLetter(c.kind, k);
         const label = known ? `${letter}(${v(f.x)}, ${v(f.y)})` : letter;
-        out.push({ kind: 'focus', curve: c.id, x: f.x, y: f.y, ...(label ? { label } : {}), ...(letter ? { labelNoValues: letter } : {}) });
+        const id = focusOfferId(c.id, k);
+        const sentence = letter ? focusSentenceOf(d, id, letter) : null;
+        const offer = sentence ? { id, letter: plain(letter), title: sentence } : undefined;
+        out.push({ kind: 'focus', curve: c.id, x: f.x, y: f.y, ...(label ? { label } : {}), ...(letter ? { labelNoValues: letter } : {}), ...(offer ? { offer } : {}) });
       });
     }
     // only a parabola's cycle reaches a directrix state (#2709): an ellipse draws none
@@ -140,6 +164,38 @@ export function conicMarksOf(d: Derivation, annotations: AnnotationMap, hidden: 
     }
   }
   return out;
+}
+
+/** A focus offer's id: the curve and which of its foci (`ellipseFoci`'s order — 0 the right / upper end). */
+const focusOfferId = (curve: string, k: number): string => `focus:${k}:${curve}`;
+
+/** The side word a focus at (x, y) of this ellipse takes — the end of the major axis it sits on (#2616's side reader). */
+function focusSide(e: NumCurve & { kind: 'ellipse' }, x: number, y: number): EllipseSide {
+  const dx = x - (e.h ?? 0);
+  const dy = y - (e.k ?? 0);
+  return Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'top' : 'bottom';
+}
+
+/**
+ * THE SENTENCE A CLICK ON A FOCUS RECORDS (#2851, ADR-AG-465) — the one composer for the focus offer, as
+ * `centreSentenceOf` is the centre's: «<letter> מוקד הפרבולה» for a parabola, «<letter> מוקד <side> של האליפסה» for an
+ * ellipse, the side the focus sits on (`ימני`/`שמאלי` on an x-major ellipse, `עליון`/`תחתון` on a y-major one). The
+ * letter is written in plain digits, as a student types it («F1»). Null when the offer is stale (no such stated conic,
+ * no such focus) or the sentence could not bind: the grammar names THE parabola / THE ellipse, so a figure with two of
+ * that kind offers nothing.
+ */
+export function focusSentenceOf(d: Derivation, offerId: string, letter: string): string | null {
+  const m = /^focus:([01]):(.+)$/.exec(offerId);
+  if (!m) return null;
+  const k = Number(m[1]);
+  const c = stated(d).find((s) => s.id === m[2]);
+  if (!c) return null;
+  if (d.figure.curves.filter((q) => q.curve.kind === c.kind).length !== 1) return null;
+  const name = plain(letter);
+  if (c.curve.kind === 'parabola') return k === 0 ? `${name} ${CONIC_ROLE_WORDS.parabolaFocus}` : null;
+  if (c.curve.kind !== 'ellipse') return null;
+  const f = ellipseFoci(c.curve)[k];
+  return `${name} ${CONIC_ROLE_WORDS.focus} ${CONIC_ROLE_WORDS.side[focusSide(c.curve, f.x, f.y)]} ${CONIC_ROLE_WORDS.ofEllipse}`;
 }
 
 /**

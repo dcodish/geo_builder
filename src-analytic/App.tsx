@@ -78,7 +78,7 @@ import { measurablesOf, type Measurable } from './app/measurable';
 import { dispatchRename, dispatchSwap, letterRenameOf, letterTargetOf } from './app/rename';
 import { LetterPopover } from '../shell/frame/LetterPopover';
 import { SegmentMenu } from '../shell/frame/SegmentMenu';
-import { centreLabelOf, centrePopoverOps } from './app/centreName';
+import { centreLabelOf, centrePopoverOps, focusPopoverOps } from './app/centreName';
 import { segKey } from './render/scene';
 import { segmentName } from './app/lines';
 import { curveMenuOf, type CurveMenuTarget } from './app/curveDisplay';
@@ -541,6 +541,8 @@ export function App() {
   const [pick, setPick] = useState<{ items: Measurable[]; letter: string | null; segment?: { key: string; name: string }; curve?: CurveMenuTarget; x: number; y: number; seq: number } | null>(null);
   /** #1598: a clicked unnamed circle CENTRE — the offer it is, and where (viewport px) to open the letter popover. */
   const [centrePick, setCentrePick] = useState<{ offerId: string; x: number; y: number; seq: number } | null>(null);
+  /** #2851 (ADR-AG-465): the shown focus whose letter popover is open — the offer id and the book letter it opens on. */
+  const [focusPick, setFocusPick] = useState<{ offerId: string; letter: string; x: number; y: number; seq: number } | null>(null);
   /** The input zone — «שנה אות» focuses its box after filling it (the shared InputArea takes no ref). */
   const inputZoneRef = useRef<HTMLDivElement | null>(null);
 
@@ -1750,6 +1752,8 @@ export function App() {
               }}
               /* #1598 — an unnamed circle's centre opens the letter popover: the student picks the letter. */
               onCentre={(offerId, screen) => setCentrePick({ offerId, x: screen.x, y: screen.y, seq: Date.now() })}
+              /* #2851 — a shown focus opens the same popover, on the book's letter: the student nails it as a point. */
+              onFocus={(offer, screen) => setFocusPick({ offerId: offer.id, letter: offer.letter, x: screen.x, y: screen.y, seq: Date.now() })}
               onCrossing={(sentence) => {
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
                 // and what the student is told. This only asks whether jumping the configuration
@@ -2460,6 +2464,40 @@ export function App() {
               }}
               onClose={() => setCentrePick(null)}
               testId="centre-popover"
+            />
+          </div>
+        );
+      })()}
+
+      {/*
+        NAME A SHOWN FOCUS (#2851, ADR-AG-465) — the centre's popover on a focus mark, opened on the book's letter. The
+        letter confirmed records the sentence a student could type («F1 מוקד ימני של האליפסה», `focusSentenceOf`); a taken
+        letter quotes its holder and is refused (no swap).
+      */}
+      {focusPick && (() => {
+        const state = { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations };
+        const ops = focusPopoverOps(focusPick.offerId, state, { record: (v) => commitRecord(v, recordLine, t), setError }, d);
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
+            <LetterPopover
+              key={focusPick.seq}
+              x={focusPick.x}
+              y={focusPick.y}
+              bounds={{ width: window.innerWidth, height: window.innerHeight }}
+              title={t('focusTitle')}
+              label={focusPick.letter}
+              initialValue={focusPick.letter}
+              onRename={ops.onRename}
+              strings={{
+                placeholder: t('letterPlaceholder'),
+                apply: t('letterApply'),
+                taken: t('letterTaken'),
+                bad: t('letterBad'),
+                takenBy: t('letterTakenBy'),
+                swapLetters: t('letterSwap'),
+              }}
+              onClose={() => setFocusPick(null)}
+              testId="focus-popover"
             />
           </div>
         );
