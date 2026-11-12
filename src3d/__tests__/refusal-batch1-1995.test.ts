@@ -95,11 +95,11 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
     expect(submit('הישר k מאונך למישור ABC')).toBeNull();
   });
 
-  it('symbolic new point: the taught «N(1,2,3)» is taken', () => {
+  // ⚠ REWRITTEN by #2563 (ADR-3D-489; the operator passed PR #2862's T35/T36, 2026-11-12): a new point with letter
+  // coordinates is read (k shared with B, p a new free letter), so the "numeric coordinates" refusal is no longer reached.
+  it('symbolic new point: «N(k,p,3)» is taken', () => {
     setUp([PYRAMID, 'B(2t, t, k)']);
-    const s = submit('N(k,p,3)')!;
-    expect(s).toBe('נקודה חדשה «N» צריכה שיעורים מספריים, למשל «N(1,2,3)». אותיות מותרות רק בשיעורים של נקודה שכבר קיימת בציור.');
-    expect(submit(taught(s)!)).toBeNull();
+    expect(submit('N(k,p,3)')).toBeNull();
   });
 
   it('sign unsatisfiable: says plainly the givens already fix it', () => {
@@ -167,10 +167,9 @@ describe('#1995 batch 1 — 3-D: the English twins take the same shape, and teac
     expect(submit('הישר k מאונך למישור ABC', 'en')).toBeNull();
   });
 
+  // ⚠ REWRITTEN by #2563 (ADR-3D-489): the symbolic new point is read, in English too.
   it('symbolic new point', () => {
     setUp([PYRAMID, 'B(2t, t, k)']);
-    const s = submit('N(k,p,3)', 'en')!;
-    expect(s).toBe('A new point «N» needs numeric coordinates, for example «N(1,2,3)». Letters are only allowed in the coordinates of a point already in the figure.');
-    expect(submit(taught(s)!)).toBeNull();
+    expect(submit('N(k,p,3)', 'en')).toBeNull();
   });
 });
