@@ -121,6 +121,21 @@ per fact against the figure before that fact (so `droppedSoft` / `seated` see re
 crossing, collapse and narrowing passes). `decideCommands3` resolves the line the same way before the honesty gates
 and the twin rule, and words the refusal with the sentence and its taught remedy (`definiteShapeExample3`).
 
+**An unlettered SOLID noun** (#2838, [ADR-3D-486](06b-decisions-3d.md#adr-3d-486)) keeps the parser's default run in
+the fact (the parser stays context-free and the stored commands are unchanged) and is read against the figure by the
+fold: `unletteredSolidRow3` (`store3.ts`) finds a `solid` command whose run the row's text does not type
+(`typesSolidRun3`: the whole run, or its unprimed letters), reads the solid noun's article (`solidNounArticle3`,
+`lexicon/shapePhrase3.ts`, the `shapeNounSpan3` rule over the solid nouns), and asks `resolveUnletteredSolid3`
+(`engine/apply.ts`): definite → the one drawn solid the noun admits (`nounAdmits`, same vertex count), whose kind and
+letters the row takes, or `ambiguous-definite-shape` with `solid` set; indefinite, or definite with none → unchanged
+while no letter of the run is a point, else `freeSolidRun3` (`freeVertexRun3` per letter root, primes following).
+The one letter map renames the WHOLE row (`renameIds3`), so the noun's own relations follow. `expandFact` runs it
+first, before the pyramid readings of ADR-3D-434/436, and records the renamed typed commands in
+`Derived3.relettered`; `decideCommands3` resolves the new line with the same function against the figure as it
+stands and compares it with `relettered` rows, so the twin rule sees «קובייה» · «קובייה» as two cubes. The fold's twin
+pairing (`standingTwins3`) asks the same question through `newShapeEachTime3` — an indefinite flat noun or an
+unlettered, non-definite solid noun is a new shape each time, never a row that stands aside for its twin.
+
 ### Relations as a disposition map
 
 `relationTable.ts` maps each `relation × operand-kind` pair to a status and the actions it licenses

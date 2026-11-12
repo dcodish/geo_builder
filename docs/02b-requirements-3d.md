@@ -417,7 +417,17 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «ריבוע») draws a NEW shape on the first free letters — the letters 2-D gives («משולש ABC» · «משולש ישר זווית» → DEF).
   A solid's faces are not declared polygons here (a definite triangle on a bare pyramid is unchanged). The twin of
   2-D FR-IN-11's definite / indefinite sentences.
-  - Sources: ADR-3D-351; #2235 (operator ruling 2026-10-16, card `g2235-3d`); 2-D ADR-654, ADR-685 (#2205).
+  **The same reading holds for a SOLID noun with no letters** («קובייה», «תיבה», «מנסרה משולשת», «פירמידה ישרה שבסיסה
+  משולש שווה שוקיים»): an indefinite one draws a NEW solid, on its usual letters while the figure holds none of them and
+  otherwise on the first free letters, each primed vertex following its letter («משולש ABC» · «קובייה» → a cube on D, E,
+  F, G, D', E', F', G'; «משולש ABC» · «פירמידה ישרה שבסיסה משולש שווה שוקיים» → a pyramid on D, E, F with apex G, the
+  equal pair on the new base), and typed again it draws another one («קובייה» · «קובייה» → two cubes). A definite one
+  («הקובייה», «התיבה») with ONE drawn solid of that noun is that solid (typed alone it is a held row with the «זה כבר קיים באיור» notice, as any restated line); with two or
+  more it is refused with the same sentence, naming them («… בשרטוט יש כמה קוביות (…) …», «הקובייה ABCDA'B'C'D'» as the
+  next step); with none it draws a new one. A solid named by its letters («קובייה ABCDA'B'C'D'», «קובייה ABCD») keeps
+  them: typed twice it is the same solid (a held row with the notice). A cylinder, cone or sphere carries no letters to clash and is unchanged.
+  - Sources: ADR-3D-351; #2235 (operator ruling 2026-10-16, card `g2235-3d`); 2-D ADR-654, ADR-685 (#2205);
+    [ADR-3D-486](06b-decisions-3d.md#adr-3d-486) (#2838, operator rulings 2026-11-10 and 2026-11-12).
 - **FR-SP-20 (Must)** — **A crossing ORDER of a ring's letters is refused for its order, whatever noun it carries.**
   When two declared rings spell the same four letters in different cyclic orders and either noun is convex whenever
   simple (every quad noun but «דלתון» and the bare «מרובע»), the other order crosses in every configuration — four
