@@ -847,7 +847,7 @@ const NAMING_TAIL_EN = '(?:\\s*,)?(?:\\s+[-–](?=\\s))?\\s*:?\\s*(?:is\\s+|whos
  * copula or a colon after «המעגל». Without one («משוואת המעגל x²+y²=25», the catalog's naming form) the phrase
  * names a circle by its equation and keeps creating it.
  */
-const CONTEXTUAL_CIRCLE_EQ_HE = new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+המעגל(?:\\s+הנתון)?\\s*(?::|\\s(?:היא|הוא)(?=[\\s:]))`);
+const CONTEXTUAL_CIRCLE_EQ_HE = new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+(?:המעגל(?:\\s+הנתון)?|האליפסה(?:\\s+הנתונה)?|הפרבולה(?:\\s+הנתונה)?)\\s*(?::|\\s(?:היא|הוא)(?=[\\s:]))`);
 
 function matchCurve(line: string): CurveHit | null {
   // --- line: «נתון הישר ℓ1: 4y-3x-20=0» · «משוואת הישר AC היא y=-2x+8» · «הישר x=-4» ---
@@ -1038,7 +1038,8 @@ function matchCurve(line: string): CurveHit | null {
       kind,
       eqSrc: heNamed[4],
       ...(heNamed[2] ? { canonical: true as const } : {}),
-      ...(kind === 'circle' && !numeral && CONTEXTUAL_CIRCLE_EQ_HE.test(line) ? { contextual: true } : {}),
+      // The conics too (#2853, ADR-AG-467): «משוואת האליפסה היא …» is about THE ellipse, as «משוואת המעגל היא …» is.
+      ...(!heNamed[2] && !numeral && CONTEXTUAL_CIRCLE_EQ_HE.test(line) ? { contextual: true } : {}),
     };
   }
 
@@ -10579,6 +10580,10 @@ function parseClauseRules(raw: string): ParseResult {
      * described by its centre letter («נתון מעגל M שמשוואתו …», «משוואת המעגל M היא …») is the circle the figure
      * already has on that centre when it has one — the same statement, matched by the centre.
      */
+    // THE conic (#2853, ADR-AG-467): about the figure's one ellipse / parabola when it has one, created only with none.
+    if (curve.contextual && (curve.kind === 'ellipse' || curve.kind === 'parabola')) {
+      return made([{ t: 'the-conic', kind: curve.kind, create: curveFacts, eq, eqSrc: trim(curve.eqSrc), src: line }]);
+    }
     if (curve.contextual || curve.centre) {
       const about: Fact[] = [{ t: 'circle-eq', circleId: CIRCLE_SENTINEL, eq, src: line }];
       return made([{ t: 'the-circle', create: curveFacts, about, ...(curve.centre ? { match: { centre: curve.centre } } : {}), src: line }]);

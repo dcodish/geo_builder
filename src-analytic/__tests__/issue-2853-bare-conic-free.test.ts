@@ -138,3 +138,46 @@ describe('#2853 — a bare parabola: vertex, p and the opening direction all fre
     expect(v.kind === 'refused' && v.error.key).toBe('parabola-no-diameter');
   });
 });
+
+/**
+ * Operator ruling 2026-11-12 (Rulings Inbox, (c) *"only when the line names it"*): «משוואת האליפסה היא …» after a bare
+ * «אליפסה» fixes THAT ellipse; a bare equation line stays a new curve. The same for «משוואת הפרבולה היא …».
+ */
+describe('#2853 — «משוואת ה<conic> היא …» names the drawn free conic and fixes it', () => {
+  const curves = (lines: readonly string[], seed = 0) => {
+    const d = derive(lines, seed);
+    expect(d.faults, `seed ${seed}`).toEqual([]);
+    return d.figure.curves.map((c) => c.curve);
+  };
+  it('after «אליפסה»: one ellipse, centred (2, −1), semi-axes 5 and 3, at every seed — its points kept', () => {
+    const lines = recorded(['אליפסה', 'A על האליפסה', 'משוואת האליפסה היא (x-2)^2/25+(y+1)^2/9=1']);
+    for (const seed of [0, 1, 2, 3]) {
+      const cs = curves(lines, seed);
+      expect(cs).toHaveLength(1);
+      const e = cs[0];
+      expect(e.kind === 'ellipse' && [e.h, e.k, e.a, e.b].map((n) => Number((n ?? 0).toFixed(6))), `seed ${seed}`).toEqual([2, -1, 5, 3]);
+      const a = derive(lines, seed).figure.points.find((p) => p.id === 'A')!;
+      expect(Math.abs((a.x - 2) ** 2 / 25 + (a.y + 1) ** 2 / 9 - 1), `seed ${seed}`).toBeLessThan(1e-6);
+    }
+    expect(paramRegister(derive(lines, 0).construction).map((p) => p.sym)).toEqual([]);
+  });
+  it('after «פרבולה»: one parabola, the stated one, opening along y — no direction left to cycle', () => {
+    const lines = recorded(['פרבולה', 'משוואת הפרבולה היא (x-1)^2=8(y-2)']);
+    for (const seed of SEEDS) {
+      const cs = curves(lines, seed);
+      expect(cs).toHaveLength(1);
+      const c = cs[0];
+      expect(c.kind === 'parabola' && [c.axis, c.p, c.h, c.k], `seed ${seed}`).toEqual(['y', 4, 1, 2]);
+    }
+  });
+  it('a bare equation line after «אליפסה» is still a second curve', () => {
+    expect(curves(recorded(['אליפסה', '(x-2)^2/25+(y+1)^2/9=1']))).toHaveLength(2);
+  });
+  it('two ellipses: the definite «האליפסה» asks which one', () => {
+    const v = decideSubmit('משוואת האליפסה היא (x-2)^2/25+(y+1)^2/9=1', recorded(['אליפסה', 'x^2/16+y^2/4=1']), 0);
+    expect(v.kind === 'refused' && v.error.key).toBe('ambiguous-shape');
+  });
+  it('with no ellipse drawn the line draws it, as before', () => {
+    expect(curves(recorded(['משוואת האליפסה היא (x-2)^2/25+(y+1)^2/9=1']))).toHaveLength(1);
+  });
+});

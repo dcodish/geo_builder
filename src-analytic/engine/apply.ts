@@ -3250,7 +3250,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     case 'curve': {
       // A curve whose letters are the tool's (#2619, ADR-AG-354): a letter the figure already uses is renamed to the next
       // free one, in the equation and in the label that shows it, before anything else reads the curve.
-      if (f.fresh) return applyFact(c, freshLetters(c, f));
+      // `toolLetters` (#2853): the conic stays the tool's to describe, so «משוואת האליפסה היא …» can say what it is.
+      if (f.fresh) return applyFact(c, { ...freshLetters(c, f), toolLetters: true });
       // A curve free in its direction too (#2853, ADR-AG-467): the object keeps its turn, and its direction is a discrete axis.
       if (f.turn) return withTurn(applyFact(c, { ...f, turn: undefined }), f.id, f.turn);
       /*
@@ -3462,7 +3463,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const holder = curveByName(c, f.label.name);
         if (holder && holder.id !== f.id) return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
       }
-      const made = toolNamed(c, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: inheritedStated });
+      const made = toolNamed(c, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: inheritedStated, ...(f.toolLetters ? { toolLetters: true as const } : {}) });
       return {
         ok: true,
         effect: 'created',
@@ -4577,6 +4578,32 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       const out = applyAll(cur, about);
       return out.ok && cur !== c ? { ...out, effect: 'created' } : out;
+    }
+
+    /**
+     * «משוואת האליפסה היא …» / «משוואת הפרבולה היא …» (#2853, ADR-AG-467; operator ruling 2026-11-12 (c): *only when the line
+     * names it*). The definite noun binds the figure's one conic of that kind: two are asked about, none is created as the
+     * line always created it. A conic whose letters are the TOOL's (a bare «אליפסה», «פרבולה», «אליפסה קנונית») takes the
+     * stated equation under the same id — every point and role already on it keeps its referent, and its letters, its
+     * turn and its direction choice leave the figure (the `circle-eq` treatment of a circle the tool drew, ADR-AG-204).
+     * A conic the student gave by its equation IS that equation: the same one is known, another a contradiction.
+     */
+    case 'the-conic': {
+      const hosts = c.objects.filter((o) => curveKindOf(o) === f.kind);
+      if (hosts.length === 0) return applyAll(c, f.create);
+      if (hosts.length > 1) return { ok: false, error: noHost(f.src, f.kind, hosts) };
+      const host = hosts[0];
+      if (resolveCurveByEq(c, f.eq) === host.id) return { ok: true, next: c, effect: 'known' };
+      if (host.kind !== 'curve' || !host.toolLetters) return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      const gone = new Set(symbolsOf(host.curve.eq).concat(host.turn ? symbolsOf(host.turn.curve.eq) : []));
+      const { turn: _turn, toolLetters: _tool, ...plain } = host;
+      void _turn;
+      void _tool;
+      const described: CurveObject = { ...plain, curve: { ...host.curve, eq: f.eq }, label: { ...host.label, eqSrc: f.eqSrc } };
+      const directs = (s: Selector): boolean => (s.kind === 'choice' ? s.options.some(directs) : s.kind === 'opens-along' && s.curve === host.id);
+      const next: Construction = { ...c, objects: c.objects.map((o) => (o === host ? described : o)), selectors: c.selectors.filter((s) => !directs(s)) };
+      const still = new Set(paramRegister({ ...next, params: [] }).map((p) => p.sym));
+      return { ok: true, effect: 'narrowed', next: { ...next, params: next.params.filter((p) => !gone.has(p.sym) || still.has(p.sym)) } };
     }
 
     case 'the-circle': {

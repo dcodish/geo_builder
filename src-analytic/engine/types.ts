@@ -238,7 +238,12 @@ export type Fact =
    * `turn` (#2853, ADR-AG-467): the same curve opening along the OTHER axis — a bare «פרבולה» is free in its direction too,
    * so M1 keeps both definitions on the object and opens a discrete axis (`opens-along`) choosing which one is drawn.
    */
-  | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean; inheritExtent?: true; fresh?: true; turn?: CurveTurn })
+  | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean; inheritExtent?: true; fresh?: true; turn?: CurveTurn; toolLetters?: true })
+  /**
+   * «משוואת האליפסה היא …» / «משוואת הפרבולה היא …» — the equation of THE conic, definite and unnamed (#2853, ADR-AG-467,
+   * operator ruling 2026-11-12 (c)): about the figure's one conic of that kind when it has one; `create` only with none.
+   */
+  | (FactBase & { t: 'the-conic'; kind: 'ellipse' | 'parabola'; create: Fact[]; eq: Expr; eqSrc: string })
   /**
    * `auto` (#1270, ADR-AG-184) — a name the TOOL gave, never the student: a canonical circle's centre
    * called `O` by default. It yields to anything already holding the id (the fold absorbs it as
@@ -1039,7 +1044,7 @@ export type GeoObject =
   /** Stated by coordinates — `A(2,6)`. Its expressions may carry parameters. */
   | { kind: 'point'; id: Id; x: Expr; y: Expr }
   /** Stated by equation — the four-member curve family. `stated` is #1076's carrier flag. */
-  | { kind: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean; turn?: CurveTurn }
+  | { kind: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean; turn?: CurveTurn; toolLetters?: true }
   /**
    * DERIVED from points already stated — a midpoint, a centroid, an incentre (#1028). 0-DOF and
    * solver-free: given its parents there is exactly one answer, in closed form. This is the kind

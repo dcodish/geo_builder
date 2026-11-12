@@ -42,7 +42,9 @@ on the curve object and opens a region `choice` of two `opens-along` selectors (
 assignment like every other discrete axis (`discreteAxes.ts`), and `turnedObjects` puts the turn in the curve's place
 when the configuration took `y`, so every consumer of the resolved construction sees ONE curve. The selector holds by
 construction. The sign of the free `p` is the direction along the axis, so four directions are two digits' worth.
-`freshLetters` renames the turn's letters with the curve's.
+`freshLetters` renames the turn's letters with the curve's. «משוואת ה(אליפסה|פרבולה) היא …» is `contextual` like the circle's and lowers to
+`the-conic`. M1 binds the one conic of that kind, and a `toolLetters` conic takes the stated equation under its id. The
+letters, the turn and the direction choice are then dropped.
 
 **The conic's frame** ([ADR-AG-455](06c-decisions-analytic.md#adr-ag-455), #2664). `classify` completes the square, so a
 parabola or an ellipse with axes parallel to the coordinate axes is read anywhere: `NumCurve` carries `h`, `k` (the

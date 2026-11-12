@@ -738,6 +738,9 @@ describe('#2502 (ADR-AG-468) — the construct state «קוטר/מיתר המע�
     expect(parseLine('AB מיתר של מעגל').ok).toBe(false);
     expect(parseLine('AB קוטר המעגל M').ok).toBe(true);
     expect(parseLine('קוטר מעגל O היוצא מנקודה F').ok).toBe(true);
+  });
+});
+
 describe('#2853 (ADR-AG-467) — a bare conic noun is a FREE conic', () => {
   const curveOf = (line: string) => {
     const r = parseLine(line);
