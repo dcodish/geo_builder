@@ -810,7 +810,9 @@ constraint records.
 #### Incidence in every order ([ADR-AG-164](06c-decisions-analytic.md#adr-ag-164), #1281, #1495)
 
 `parseIncidence` normalises any order into the canonical sentence (`viaCanonical`); a coordinate point is a
-`MINT_PREFIX` placeholder named by `derive.resolveMints` (`Derivation.minted`). `incidenceOn` is the one operand
+`MINT_PREFIX` placeholder named by `derive.resolveMints` (`Derivation.minted`). The letters it treats as taken are
+those of the lines up to the mint's own, never a later line's ([ADR-AG-464](06c-decisions-analytic.md#adr-ag-464), #2848): a later
+line that types the minted name refers to that point, and one that defines another point under it is a name clash. `incidenceOn` is the one operand
 resolver ([ADR-AG-168](06c-decisions-analytic.md#adr-ag-168)); an equation operand (`eqSrc`/`eq`) resolves by
 `resolveCurveByEq`, so `curve-anon` ids never reach a refusal. Crossing spellings go through
 `intersectionSpellings` and `meetingSpelling` ([ADR-AG-230](06c-decisions-analytic.md#adr-ag-230); `CONCURRENCY_HE`);

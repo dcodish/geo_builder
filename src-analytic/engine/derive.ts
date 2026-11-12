@@ -1138,7 +1138,8 @@ const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => Stri
  * the whole list and in order, because only the list knows what is taken: the SAME coordinates are one point;
  * a point the student already stated at exactly those coordinates keeps THEIR letter (the #1270 rule — a
  * student's letter wins); otherwise the next free reserved name, P₁, P₂, … — subscripted, so it is a letter a
- * student does not reach for first, and `NAME` reads it back. Earlier names never move when a line is added, so
+ * student does not reach for first, and `NAME` reads it back — a LATER line typing that name refers to this point, since
+ * the letters taken are read from the lines up to the mint's own (#2848, ADR-AG-464). Earlier names never move when a line is added, so
  * the figure stays stable — but for one: the tool's reserved letter yields to a student's FRESH letter stated later at
  * those coordinates (#2674, ADR-AG-404; operator ruling 2026-11-03, card d3 A: *"Rename the tool's letter to the
  * student's, no message (2-D's way, in every builder)"*), unless a line in between typed it, which makes it the
@@ -1148,7 +1149,18 @@ const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => Stri
 function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[]; minted: Array<{ index: number; id: string }> } {
   const text = JSON.stringify(facts);
   if (!text.includes(MINT_PREFIX)) return { facts, minted: [] };
-  const used = new Set<string>(text.match(new RegExp(`"${POINT_NAME}"`, 'g'))?.map((q) => q.slice(1, -1)) ?? []);
+  /*
+   * The letters TAKEN when a placeholder is named (#2848, ADR-AG-464): those of the lines up to and including its own —
+   * never a later one. A later line that only REFERS to the name («P1 על האליפסה», «P₁B = 5») binds to this point, so
+   * the name the row announced can be typed back; a later line that DEFINES a different point under it is the fold's
+   * name clash, as for any letter. So adding a line never renames an earlier one (ADR-AG-164 §3).
+   */
+  const namesOf = (f: Fact): string[] => JSON.stringify(f).match(new RegExp(`"${POINT_NAME}"`, 'g'))?.map((q) => q.slice(1, -1)) ?? [];
+  const used = new Set<string>();
+  let seen = 0;
+  const takeUpTo = (line: number) => {
+    for (; seen < facts.length && owner[seen] <= line; seen++) for (const q of namesOf(facts[seen])) used.add(q);
+  };
   const numeric = (f: Fact): [number, number] | null => {
     if (f.t !== 'point') return null;
     const x = evalExpr(f.x, {});
@@ -1160,6 +1172,7 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   let n = 0;
   facts.forEach((f, i) => {
     if (f.t !== 'point' || !f.id.startsWith(MINT_PREFIX) || names.has(f.id)) return;
+    takeUpTo(owner[i]);
     const at = numeric(f);
     const stated = (g: Fact): g is Extract<Fact, { t: 'point' }> => {
       if (!at || g.t !== 'point' || g.id.startsWith(MINT_PREFIX)) return false;
