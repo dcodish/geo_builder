@@ -1,0 +1,332 @@
+{
+ "name": "prod-2026-11-12-3",
+ "title": "Prod smoke — deploy prod/2026-11-12-3 (round #2855 waves 2+3)",
+ "cases": [
+  {
+   "id": "P1",
+   "title": "2-D (refusal): a crossed quadrilateral made by the stated angles is refused",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "∠DAB = 70°",
+    "∠BCD = 110°",
+    "מרובע ABDC"
+   ],
+   "expectRefusal": "שנו את אחת הזוויות או את סדר האותיות",
+   "lookFor": "The last line is refused, naming «∠DAB = 70°» and «∠BCD = 110°», and ends «שנו את אחת הזוויות או את סדר האותיות».",
+   "before": "ABDC was drawn crossed, every row green."
+  },
+  {
+   "id": "P2",
+   "title": "2-D (refusal): the same, with the angles typed after the second quadrilateral",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "מרובע ABDC",
+    "∠DAB = 70°",
+    "∠BCD = 110°"
+   ],
+   "expectRefusal": "שנו את אחת הזוויות או את סדר האותיות",
+   "lookFor": "«∠BCD = 110°» is refused the same way.",
+   "before": "Accepted; ABDC drawn crossed."
+  },
+  {
+   "id": "P3",
+   "title": "2-D: the quadrilateral with the two angles still builds, convex",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "∠DAB = 70°",
+    "∠BCD = 110°"
+   ],
+   "cycles": 2,
+   "expectAbsent": [
+    "שנו את אחת הזוויות"
+   ],
+   "lookFor": "A convex quadrilateral at each «הציגו תצורה אחרת»; never a dent at A or C.",
+   "before": "Some configurations drew a dent at C."
+  },
+  {
+   "id": "P4",
+   "title": "2-D (refusal): a circle through a crossed quadrilateral is refused",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "מרובע ABDC",
+    "מעגל חוסם את ABDC"
+   ],
+   "expectRefusal": "ABDC",
+   "lookFor": "The circle line is refused with the crossed-shape message.",
+   "before": "Accepted; ABDC drawn crossed under a circle."
+  },
+  {
+   "id": "P5",
+   "title": "Analytic (refusal): the crossed quadrilateral is refused here too",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "∠DAB = 70°",
+    "∠BCD = 110°",
+    "מרובע ABDC"
+   ],
+   "expectRefusal": "שנו את אחת הזוויות או את סדר האותיות",
+   "lookFor": "Refused with the same sentence as 2-D.",
+   "before": "Accepted and drawn crossed."
+  },
+  {
+   "id": "P6",
+   "title": "3-D (refusal): the crossed quadrilateral is refused here too",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "∠DAB = 70°",
+    "∠BCD = 110°",
+    "מרובע ABDC"
+   ],
+   "expectRefusal": "שנו את אחת הזוויות או את סדר האותיות",
+   "lookFor": "Refused with the same sentence as 2-D.",
+   "before": "Accepted; drawn crossed at most configurations."
+  },
+  {
+   "id": "P7",
+   "title": "Analytic: «AB קוטר האליפסה» is understood",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "x^2/25+y^2/9=1",
+    "AB קוטר האליפסה"
+   ],
+   "expectRows": [
+    "AB קוטר האליפסה"
+   ],
+   "lookFor": "A and B on the ellipse, opposite each other through its centre.",
+   "before": "Not understood (only «AB קוטר באליפסה» was)."
+  },
+  {
+   "id": "P8",
+   "title": "Analytic: «קוטר האליפסה AB» and «AB מיתר האליפסה» are understood",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "x^2/25+y^2/9=1",
+    "קוטר האליפסה AB",
+    "CD מיתר האליפסה"
+   ],
+   "expectRows": [
+    "קוטר האליפסה AB",
+    "CD מיתר האליפסה"
+   ],
+   "lookFor": "Both rows built: AB a diameter, CD a chord, all four points on the ellipse.",
+   "before": "Both not understood."
+  },
+  {
+   "id": "P9",
+   "title": "Analytic: «AB הוא קוטר המעגל» is understood",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "נתון מעגל O שמשוואתו x^2+y^2=25",
+    "AB הוא קוטר המעגל"
+   ],
+   "expectRows": [
+    "AB הוא קוטר המעגל"
+   ],
+   "lookFor": "A and B on circle O, through its centre.",
+   "before": "Not understood (2-D read it)."
+  },
+  {
+   "id": "P10",
+   "title": "Analytic (refusal): a parabola has no diameter",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "y^2=8x",
+    "AB קוטר הפרבולה"
+   ],
+   "expectRefusal": "לפרבולה אין מרכז",
+   "lookFor": "Refused with «לפרבולה אין מרכז, ולכן אין לה קוטר…».",
+   "before": "Not understood."
+  },
+  {
+   "id": "P11",
+   "title": "Analytic: an ellipse's chip shows the foci only",
+   "class": "look",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1"
+   ],
+   "expect": [
+    "הצג מוקדים"
+   ],
+   "expectAbsent": [
+    "הצג מדריכים"
+   ],
+   "lookFor": "The ellipse row's chip reads «הצג מוקדים»; no directrix option, no dashed directrix drawn.",
+   "before": "The chip offered «הצג מדריכים» and drew two directrices."
+  },
+  {
+   "id": "P12",
+   "title": "Analytic (unchanged): a parabola's chip still has its directrix",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=54x"
+   ],
+   "expect": [
+    "הצג מדריך"
+   ],
+   "lookFor": "The parabola row's chip reads «הצג מדריך».",
+   "before": "unchanged"
+  },
+  {
+   "id": "P13",
+   "title": "3-D: an unlettered cube after a triangle takes new letters",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "משולש ABC",
+    "קובייה"
+   ],
+   "lookFor": "A cube labelled D, E, F, G (with primes) beside triangle ABC; no error. (The cube row reads «קובייה»; the letters are on the canvas.)",
+   "before": "Refused «A כבר מוגדר».",
+   "expectAbsent": [
+    "כבר קיים",
+    "כבר מוגדר"
+   ]
+  },
+  {
+   "id": "P14",
+   "title": "3-D: «קובייה» typed twice draws two cubes",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה",
+    "קובייה"
+   ],
+   "lookFor": "Two cubes, one on A–D′ and one on E–H′; no «כבר קיים».",
+   "before": "The second answered «כבר קיים».",
+   "expectAbsent": [
+    "כבר קיים",
+    "כבר מוגדר"
+   ]
+  },
+  {
+   "id": "P15",
+   "title": "3-D: an unlettered pyramid after a triangle takes new letters",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "משולש ABC",
+    "פירמידה ישרה שבסיסה משולש שווה שוקיים"
+   ],
+   "expectAbsent": [
+    "כבר מוגדר"
+   ],
+   "lookFor": "A pyramid on DEF with apex G beside ABC, DE = DF.",
+   "before": "Refused «A כבר מוגדר»."
+  },
+  {
+   "id": "P16",
+   "title": "3-D (refusal): «הקובייה» with two cubes asks which one",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה",
+    "קובייה",
+    "הקובייה"
+   ],
+   "expectRefusal": "הקובייה ABCDA'B'C'D'",
+   "lookFor": "Refused: the drawing has several cubes, naming both, with «הקובייה ABCDA'B'C'D'» as the example.",
+   "before": "The second cube was never drawn."
+  },
+  {
+   "id": "P17",
+   "title": "3-D: a letter in two points' coordinates has one value",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "פירמידה SABCD",
+    "B(k,1,2)",
+    "C(k,3,4)",
+    "k = 1"
+   ],
+   "expectAbsent": [
+    "הטענה לא מתקיימת"
+   ],
+   "lookFor": "B and C at the same x, and «k = 1» puts both at x = 1.",
+   "before": "B and C drew k with two different values."
+  },
+  {
+   "id": "P18",
+   "title": "3-D (refusal): a letter that cannot hold a stated point is refused",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "A(0,0,0)",
+    "B(2,15,-8)",
+    "B(2t,t,k)"
+   ],
+   "expectRefusal": "הטענה לא מתקיימת בציור",
+   "lookFor": "«B(2t,t,k)» refused «הטענה לא מתקיימת בציור — בדקו את החישוב».",
+   "before": "Answered «כבר קיים»."
+  },
+  {
+   "id": "P19",
+   "title": "Complex loads and builds",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z1 = 3+4i"
+   ],
+   "expect": [
+    "3+4i"
+   ],
+   "lookFor": "z₁ drawn.",
+   "before": "unchanged"
+  }
+ ]
+}
