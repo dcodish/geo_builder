@@ -976,6 +976,11 @@ a sentence the tool parsed.
   every configuration and is refused with the same message, on the line that completed the pair: «ריבוע ABCD» ·
   «מקבילית ACBD» / «טרפז ACBD» / «מלבן ACBD» and «מלבן ABCD» · «מקבילית ACBD» → the second line refused
   (`errRingContradictsNoun`), never «לא נמצאה תצורה»; and only that line — the earlier shape line stays green
+- …or a circle through its letters (a circumscribed circle, or points stated on one circle; #2812,
+  [ADR-AG-475](06c-decisions-analytic.md#adr-ag-475)): four points on one circle have one simple order, so another order is
+  refused on the line that completes it — «מרובע ABCD» · «מעגל חוסם את ABCD» · «מרובע ABDC» → «מרובע ABDC» refused;
+  «מרובע ABCD» · «מרובע ABDC» · «מעגל חוסם את ABDC» → the circle line refused; one ring with its circle, and two orders with
+  no circle, are drawn
 - Sources: #1158, #1166, ADR-052, ADR-AG-129, #1929, #1927, #1939.
 
 **R92 — among the configurations it MAY show, the tool opens on one that is not a sliver**. A preference, never a requirement; coordinates that force a bad ring refuse the line (operator ruling), never «לא נמצאה תצורה».

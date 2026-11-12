@@ -16397,3 +16397,19 @@ Each of those points moves along a curve.
 **Locks.** Unit: `src-analytic/__tests__/issue-1618-sentence-frame.test.ts` (#2062 block). Parity rows `subject-frame-*-2062`.
 
 **Behaviour change for a student:** «הנקודה M מקיימת: AM = MB» and «M מקיים AM = MB» build, where they went to the AI.
+
+## ADR-AG-475 — A circle through a ring's letters proves convex position: ADR-AG-261's proof reads one more reason (#2812)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2812](https://github.com/dcodish/geo_builder/issues/2812) (bug, `P2`, wrong answer) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02c](02c-requirements-analytic.md) — the ring-order bullets (a circle through the letters) · **Design:** [04c](04c-design-analytic.md) — `ringOrderFault`'s structural arm · **LADDER stage:** none (`derive`'s structural fault)
+**Amends** [ADR-AG-261](#adr-ag-261) · 2-D's [ADR-826](06-decisions.md#adr-826), the reference (ADR-W-157) · rests on [ADR-W-199](06w-decisions-workspace.md#adr-w-199) §2.
+
+**Measured at pickup** (`caf619a5`, `decideSubmit` line by line): R1 «מרובע ABCD · מעגל חוסם את ABCD · מרובע ABDC», R3 (the «חסום במעגל» spelling), R5 «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» and the rider order recorded every line. «מעגל חוסם את ABCD» lowers to a `circle-thru` through A, B, C and one `on-curve` rider for D — not an `on-curve` per vertex as the plan read it; the reader takes both.
+
+**Class.** *Analytic's structural ring-order proof read only the NOUN.* A circle through the letters proves convex position just as a square noun does, and was never read.
+
+**Decision.** `ringConvexityProofAg(construction, polygon)` (rings.ts, the copy of 2-D's reader): the noun (`convexWhenSimple`), or one circle object (`circle-thru`, `circle-at`, a circle `curve`) whose through points and `on-curve` riders cover every letter. `ringOrderFault` uses it for every declared ring of four or more letters, and blames the latest of the declarations and the proof lines (the circle's line, each rider's line). The refusal is `ring-contradicts-noun` → `errRingContradictsNoun`, unchanged.
+
+**Locks.** `src-analytic/__tests__/issue-1991-crossed-ring-specific-noun.test.ts` (#2812 block: R1, R3, R5, the rider, R9 refused naming the line; the two controls record; the reader's four cases; ABCD with its circle drawn simple at seeds 0–5). Parity: `crossed-ring-2810-01..03` and `crossed-ring-2811-01..02` lose their analytic cells.
+
+**Behaviour change for a student:** in the analytic builder, a second order of a ring's letters over a circle through them — or the circle line after two orders — is refused with the crossed-shape message instead of drawn crossed.

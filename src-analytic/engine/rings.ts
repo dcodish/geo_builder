@@ -54,7 +54,8 @@
 import type { Construction, Id } from './types';
 import type { AngleRef, Constraint, Direction } from './solve';
 import type { LengthExpr } from './lengths';
-import { promisesOneParallelPair } from './shapes';
+import { convexWhenSimple, promisesOneParallelPair } from './shapes';
+import { circleDefPoints } from './types';
 
 /** A position, as `evaluate` has already resolved it. */
 export interface RingPt {
@@ -490,4 +491,47 @@ export function closePairsOf(
     }
   }
   return out;
+}
+
+/** Why a ring's letters are in convex position, and the statements that say so (#2812, ADR-AG-475). */
+export interface RingConvexityProofAg {
+  /** a noun convex whenever simple (ADR-AG-261), one circle through every letter (#2812), stated interior angles (#2813) */
+  reason: 'noun' | 'circle' | 'angles';
+  /** circle objects whose DEFINITION puts letters on them — their owning line is a proof line */
+  objects: Id[];
+  /** indices into `construction.constraints` (an `on-curve` rider, a stated angle) — their owning line is a proof line */
+  constraints: number[];
+}
+
+/**
+ * #2812 ([ADR-AG-475](../../docs/06c-decisions-analytic.md#adr-ag-475)) — the analytic copy of 2-D's `ringConvexityProofs`
+ * (ADR-826; copied, never imported): does a statement prove the declared polygon `o`'s letters in convex position? Four
+ * or more points in convex position have ONE simple cyclic order, so another declared order of them crosses. Reasons:
+ * - its noun is convex whenever simple (`convexWhenSimple`, ADR-AG-261's reason, unchanged);
+ * - **one circle through every letter**: a circle through three points (`circle-thru`, its `through` points or a
+ *   diameter's ends) or a stated circle (`circle-at`, a circle `curve`), with an `on-curve` constraint for every other
+ *   letter. `cyclicFacts` lowers «מעגל חוסם את ABCD» / «המרובע ABCD חסום במעגל» to exactly that, and a rider
+ *   «D על המעגל» is the same constraint, so riders are read with no extra case. Structural, never positions.
+ */
+export function ringConvexityProofAg(c: Construction, o: { vertices: readonly Id[]; noun?: string }): RingConvexityProofAg | null {
+  const ids = o.vertices;
+  if (ids.length < 4 || new Set(ids).size !== ids.length) return null;
+  if (convexWhenSimple(o.noun)) return { reason: 'noun', objects: [], constraints: [] };
+  for (const circle of c.objects) {
+    const isCircle = circle.kind === 'circle-thru' || circle.kind === 'circle-at' || (circle.kind === 'curve' && circle.curve.kind === 'circle');
+    if (!isCircle) continue;
+    const through = circle.kind === 'circle-thru' ? circleDefPoints(circle.def).filter(() => circle.def.t !== 'incircle') : [];
+    const riders = new Map<Id, number>();
+    c.constraints.forEach((k, at) => {
+      if (k.t === 'on-curve' && k.curve === circle.id && !riders.has(k.id)) riders.set(k.id, at);
+    });
+    if (!ids.every((id) => through.includes(id) || riders.has(id))) continue;
+    const usesThrough = ids.some((id) => through.includes(id));
+    return {
+      reason: 'circle',
+      objects: usesThrough ? [circle.id] : [],
+      constraints: ids.flatMap((id) => (!through.includes(id) && riders.has(id) ? [riders.get(id)!] : [])),
+    };
+  }
+  return null;
 }
