@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-12T13:22:46.795Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה SABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid4gr",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "B(2t, t, k)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": null,
+          "y": null,
+          "z": null,
+          "syms": [
+            "t",
+            "t",
+            "k"
+          ],
+          "symExprs": [
+            {
+              "terms": [
+                {
+                  "sym": "t",
+                  "k": 2
+                }
+              ],
+              "c": 0
+            },
+            {
+              "terms": [
+                {
+                  "sym": "t",
+                  "k": 1
+                }
+              ],
+              "c": 0
+            },
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": 0
+            }
+          ],
+          "srcs": [
+            "2t",
+            "t",
+            "k"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "N(k,p,3)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "N",
+          "x": null,
+          "y": null,
+          "z": 3,
+          "syms": [
+            "k",
+            "p",
+            null
+          ],
+          "srcs": [
+            "k",
+            "p",
+            "3"
+          ]
+        }
+      ]
+    }
+  ]
+}

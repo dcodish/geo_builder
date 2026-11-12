@@ -15890,3 +15890,31 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 **Locks.** `src3d/__tests__/shared-letter-coords-2785.test.ts` (R1–R5, C1–C3, the t/k control, the order permutation, the single-use cue, a sign on a single-use letter, the value line); fixture `fixtures3/shared-letter-coords-2785.geo3.json` (R2).
 
 **Behaviour change for a student:** a letter written in two points' coordinates has one value at every «הציגו תצורה אחרת»; «k = 1» reaches every coordinate written with k; «B(2t,t,k)» or «B(k,15,k)» after «B(2,15,-8)» is refused «הטענה לא מתקיימת בציור — בדקו את החישוב» instead of being accepted.
+
+## ADR-3D-489 — A new point with letter coordinates joins the letter pool: «N(k,p,3)» (#2563)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2563](https://github.com/dcodish/geo_builder/issues/2563) (feature, `P2`; #2489 Part C) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855) · stacks on [ADR-3D-488](#adr-3d-488)
+**Requirements:** [02b](02b-requirements-3d.md) — FR-VC-2b (a new point may be written with letters; they are the figure's letters) · **Design:** [04b](04b-design-3d.md) — "A coordinate letter is one pin symbol" (the `sym-coord` point) · **LADDER stage:** none (pivot unknown layout, point placement)
+**Amends** [ADR-3D-032](#adr-3d-032) (a new lettered point that is not its one-letter case is no longer refused) and [ADR-3D-079](#adr-3d-079) (#325 lifted letters for existing points only).
+
+**Measured at pickup** (`fix/2785-shared-letter-one-value` @ `8f3c8c7a`, `useGeo3.submit`): «פירמידה SABCD · B(2t, t, k) · N(k,p,3)» → `symbolic-new-point N`; the plan's 2026-11-09/11 table (blank «N(k,p,3)», blank «B(2t, t, k)» → `symbolic-new-point`; «N(k,2,3)» after «B(2t,t,k)» → `two-params`) is unchanged.
+
+**The class.** *A coordinate statement carrying letters was lowered according to whether its point already existed, so a NEW point was refused for any letter set the existing-point lane accepts.*
+
+**Decision.** One letter pool and one owner per letter, whatever the point's age (`case 'point3'`, new-id branch, `apply.ts`):
+1. A new point with exactly ONE letter that no other place writes (or that is the figure parameter) keeps ADR-3D-032's `coord-sym` lane byte for byte.
+2. Every other lettered new point is a `sym-coord` point: three components, each a number or an affine form over the pin-symbol pool (`pinSymsOf` reads `sym-coord` points). Absolute, own DOF 0. A letter already in the pool (k from «B(2t,t,k)», or a bare k an earlier coordinate named, promoted by ADR-3D-488) is the same unknown; a letter the figure parameter owns re-homes (`adoptParamAsPinSym`, #801) or is refused `two-params` where it cannot (a coord-sym point owns it).
+3. Placement: where the pivot runs, the canonical evaluation places the point from the solution's pin symbols (`overrideAt` in `solvePivot`, `overrideOf` in `resolve3`, `symCoordAt3`). Where it does not, the letters are read off the placed points (`readPinLetters3`, ADR-3D-488's reader, now in `evaluate.ts`) and an open letter stands at its seed anchor (`pinSymAnchor3`, the pivot's own soft-anchor formula lifted out of `solve3.ts`: one sampler, M3).
+4. A letter written only in `sym-coord` points that no pivot driver reads (`detachedPinLetters3`, carriers.ts) holds no pivot slot and stands at its anchor: #820's rider rule. So adding «N(k,p,3)» moves nothing already drawn (measured: B and the pyramid identical at seed 0 before and after).
+5. The DOF cue counts the open letters: the pivot's existing `openPinSymsOf` term (the operator's sequence: 10 → 11), and where the pivot does not run, the letters the coordinates leave undetermined (a blank «N(k,p,3)»: 2).
+6. No notice for the point: it is the student's own declaration (ruling 2026-10-24, card e20 = A).
+
+**Deviations from the plan, recorded.** `symbolic-new-point` is kept for a command the parser does not produce (a lettered tuple with an empty component); its sentence is now unreachable from typed input. «C(p+q,1,0)» on a new point (a component naming two letters, which the name channel did not carry) was read as a `partial` point with the letters dropped; it is now a `sym-coord` point (found in round, same chokepoint).
+
+**Known gap.** With no solid, a length given naming the new point («A(0,0,0) · N(k,p,3) · אורך NA = 5») is judged against the sampled letters (`claim-refuted`) instead of driving them: the pivot runs only on a solid or a never-positioned point (`pivotRuns3`). On a solid it drives («אורך NS = 5»).
+
+**Sibling audit.** 3-D only (#2489 C.2): 2-D and analytic take numeric coordinates plus analytic's own parameter lane; complex has no coordinate points.
+
+**Locks.** `src3d/__tests__/letter-coords-new-point-2563.test.ts`; fixture `fixtures3/letter-coords-new-point-2563.geo3.json`. Rewritten, citing this issue: `book-coordinate-givens.test.ts` (blank «B(2t,t,k)» builds) and `partial-point-axis.test.ts` (blank «N(k,p,3)» builds).
+
+**Behaviour change for a student:** «N(k,p,3)» after «B(2t, t, k)» builds N at height 3 with k shared and p a new free letter; a blank «N(k,p,3)», a blank «B(2t, t, k)» and «N(k,2,3)» after «B(2t,t,k)» build too; «הציגו תצורה אחרת» moves the open letters.

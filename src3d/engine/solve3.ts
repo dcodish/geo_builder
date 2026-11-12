@@ -18,9 +18,9 @@
 
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
-import { carrierParams3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
+import { carrierParams3, detachedPinLetters3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { congruentShapes3 } from './configs3';
-import { evalAffine, openPinSymsOf, pinSymsOf, scalarPinOrigin3, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
+import { evalAffine, openPinSymsOf, pinSymAnchor3, pinSymsOf, scalarPinOrigin3, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
 import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -1180,18 +1180,37 @@ export function solvePivot(
     const v = symbolValueOf(c, sym);
     if (v !== undefined) pinnedSyms.set(sym, v);
   }
-  const pinSyms: string[] = openPinSymsOf(c);
+  // #2563 (ADR-3D-489): a pool letter no driver reads stands at its seed anchor and holds no slot (#820's rider rule)
+  const detached = detachedPinLetters3(c);
+  const pinSyms: string[] = openPinSymsOf(c).filter((s) => !detached.has(s));
   const nPinSym = pinSyms.length;
   /** A pin symbol's value at the trial unknowns: its stated value, or its slot; null for a stranger. */
   const symAt = (x: number[], sym: string): number | null => {
     const pinned = pinnedSyms.get(sym);
     if (pinned !== undefined) return pinned;
     const i = pinSyms.indexOf(sym);
-    return i < 0 ? null : x[7 + nDims + nSym + i];
+    if (i < 0) return detached.has(sym) ? pinSymAnchor3(c, seed, sym) : null;
+    return x[7 + nDims + nSym + i];
   };
   /** The solved symbol record: every pin symbol, the open ones at their slot, the pinned at their value. */
   const pinSymbolsAt = (x: number[]): Record<string, number> | undefined =>
     pinSymsAll.length > 0 ? Object.fromEntries(pinSymsAll.map((sym) => [sym, symAt(x, sym) ?? NaN])) : undefined;
+  /**
+   * #2563 (ADR-3D-489): the symbol values the canonical evaluation places by. A `sym-coord` point («N(k,p,3)») stands
+   * where its pool letters put it, so with one in the figure every pin symbol rides the override beside the coupled
+   * symbols; without one the map is exactly the coupled symbols', as before.
+   */
+  const hasSymCoord = [...c.points.values()].some((d) => d.kind === 'sym-coord');
+  const overrideAt = (x: number[]): Map<string, number> | undefined => {
+    const m = coupled ? new Map(coupled.syms.map((s, i): [string, number] => [s, x[7 + nDims + i]])) : undefined;
+    if (!hasSymCoord) return m;
+    const out = m ?? new Map<string, number>();
+    for (const s of pinSymsAll) {
+      const v = symAt(x, s);
+      if (v !== null) out.set(s, v);
+    }
+    return out;
+  };
   /**
    * #820 (ADR-3D-204) — A FREE RIDER'S PARAMETER IS A PIVOT UNKNOWN, NOT A SAMPLE.
    *
@@ -1282,13 +1301,7 @@ export function solvePivot(
   // panel would print an invented `t = 6/5`). Each open symbol gets a SEED-DEPENDENT soft
   // anchor (the dims0 mechanism), sign-aware so a stated «t חיובי» parks on the stated side;
   // a genuinely determining given overrides the 1e-4 pull exactly like it overrides dims0.
-  const symAnchorTargets = pinSyms.map((sym, i) => {
-    const frac = (Math.abs(Math.sin((seed + 1) * 12.9898 + (i + 1) * 78.233)) * 43758.5453) % 1;
-    const raw = -1.6 + 3.2 * frac;
-    const sgn = c.paramSigns.find((ps) => ps.sym === sym);
-    if (!sgn) return raw;
-    return sgn.positive ? 0.4 + Math.abs(raw) : -(0.4 + Math.abs(raw));
-  });
+  const symAnchorTargets = pinSyms.map((sym) => pinSymAnchor3(c, seed, sym)); // #2563: the one sampler, shared
 
   // When EVERY pin is similarity-INVARIANT (angles, ⟂/∥-to-plane — no coordinate,
   // length or dot given anywhere), the gauge is pure null-space: solving it invites
@@ -1489,7 +1502,7 @@ export function solvePivot(
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
     const g = { ...unpack(x), mirror };
     const dims = x.slice(7, 7 + nDims);
-    const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
+    const override = overrideAt(x);
     const riderTs = riderMap(x);
     const pos = evalCanonical(dims, override, riderTs);
     /**
@@ -1803,7 +1816,7 @@ export function solvePivot(
     const s = Math.exp(x[6]);
     if (!(s < Infinity)) return null;
     const dims = x.slice(7, 7 + nDims);
-    const override = coupled ? new Map(coupled.syms.map((sy, i) => [sy, x[7 + nDims + i]])) : undefined;
+    const override = overrideAt(x);
     const pos = evalCanonical(dims, override, riderMap(x));
     for (const solid of c.solids) {
       const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
@@ -1826,7 +1839,7 @@ export function solvePivot(
     // coincide. The threshold is a hard collapse (1e-4 of the solid's own span), so a figure with
     // legitimately close vertices is untouched.
     const dims = x.slice(7, 7 + nDims);
-    const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
+    const override = overrideAt(x);
     const pos = evalCanonical(dims, override, riderMap(x));
     for (const solid of c.solids) {
       const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
@@ -2533,7 +2546,7 @@ export function solvePivot(
   /** A candidate's FINAL positions (gauge applied to gauge points; absolute points verbatim). */
   const atFor = (mirror: boolean, x: number[]): ((id: Id) => Vec3 | undefined) => {
     const g = { ...unpack(x), mirror };
-    const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
+    const override = overrideAt(x);
     const riders = riderMap(x);
     const pos = evalCanonical(x.slice(7, 7 + nDims), override, riders);
     // #1498, #2798: the one lane rule — see `frameOf`

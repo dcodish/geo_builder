@@ -162,7 +162,12 @@ letter written for the first time names a free component (ADR-3D-175); written a
 symbol, the figure parameter, or a named point component) it is lowered to 1·k (`coordLetterExprs3`) and the earlier
 statement's named component is promoted to the same pin symbol (`promoteNamedComponents3`). The `coords-eq` claim carries
 the symbolic components (`sym`), read at `pinLettersAt3`: the pivot's `pinSymbols`, or, where the pivot does not run, a
-least-squares read of the letters off the placed points over every point pin.
+least-squares read of the letters off the placed points over every point pin (`readPinLetters3`, `evaluate.ts`).
+A NEW point written with letters (#2563, [ADR-3D-489](06b-decisions-3d.md#adr-3d-489)) is a `sym-coord` point unless it is
+ADR-3D-032's one-letter coord-sym: components over the same pool, absolute, own DOF 0, placed from the pivot's pin symbols
+(the override `solvePivot`/`resolve3` thread to `evaluateSolidsAndPoints`) or, where the pivot does not run, from
+`readPinLetters3` with open letters at `pinSymAnchor3` (the pivot's soft-anchor formula, one sampler). A letter only a
+`sym-coord` point writes and no driver reads (`detachedPinLetters3`) holds no pivot slot, so adding the point moves nothing.
 A given's claim carries `given: true`; **the placed-figure rule is claim-level**, at the head of
 `holdsAt`: a `given` claim is judged on a placed figure only, and at the displayed seed the pin-owner guard
 answers (`injection-unsatisfiable` for a coordinate pin, `givens-contradict` otherwise). So

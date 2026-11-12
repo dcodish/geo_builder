@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2563 (ADR-3D-489) — the operator's sequence: a NEW point with letter coordinates, k shared with B and p a new letter.
+  // The class is asserted in letter-coords-new-point-2563.test.ts; this is the build + drift + load net.
+  'letter-coords-new-point-2563.geo3.json': ['פירמידה SABCD', 'B(2t, t, k)', 'N(k,p,3)'],
   // #2785 (ADR-3D-488) — the triage's sequence: a letter written in two points' coordinates is one unknown (C.x = B.z).
   // The class is asserted in shared-letter-coords-2785.test.ts; this is the build + drift + load net.
   'shared-letter-coords-2785.geo3.json': ['פירמידה SABCD', 'B(2t, t, k)', 'C(k,1,2)'],
