@@ -21,6 +21,7 @@ import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { builtFrom3, carrierParams3, determinationReach3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, FreeVecMetric3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecExpr, VecRelCommand } from './types';
 import { freeMetricOperands3, scalarPinOrigin3, spellingOf, symbolValueOf } from './types';
+import { signBound3, type Bound3 } from './bound3';
 import { FLAT_SOLID_KINDS } from './solve3';
 import { hasClaimResidual3, verifyClaim } from './claims';
 
@@ -3793,7 +3794,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next: c };
     }
 
-    case 'param-sign': {
+    case 'param-sign':
+    case 'param-bound': {
       // #325: the sign given also applies to a PIN symbol (`t פרמטר חיובי` after `B(2t,t,k)`) —
       // it selects among pivot solutions the way it selects among root branches for c.param.
       // #814 (ADR-3D-175): the THIRD thing a letter can be. Beside the figure parameter and a pin
@@ -3819,17 +3821,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // claiming the figure never defined k); this makes it selectable, so the given is honoured rather
       // than honestly declined. The sign rides the SAME `paramSigns` list every other lane uses —
       // {@link firstNonDegenerateRoot} reads it, filtered to this symbol.
+      // #1524 (ADR-3D-477): a RANGE («k ≥ 2», «t ≥ 0») is the sign's sibling — the same owners, the same lists, as an
+      // interval. A strict end at 0 alone IS the sign, so both lower to one shape here and every reader reads one thing.
+      const bound: Bound3 = cmd.type === 'param-sign' ? signBound3(cmd.positive) : { lo: cmd.lo, hi: cmd.hi, loStrict: cmd.loStrict, hiStrict: cmd.hiStrict };
       const owners = symbolOwnersOf(c, cmd.sym);
       // #1188 step 2 (ADR-3D-390): a free vector's letter — its sampled half-range follows the sign
       const solverOwned = owners.some((o) => o.kind === 'pin-sym' || o.kind === 'param' || o.kind === 'vec-def' || o.kind === 'free-sym');
       const components = owners.filter((o): o is Extract<SymbolOwner, { kind: 'component' }> => o.kind === 'component');
       if (!solverOwned && components.length === 0) {
-        const code = owners.length ? ('sign-not-selectable' as const) : ('unknown-symbol' as const);
+        const code = !owners.length ? ('unknown-symbol' as const) : cmd.type === 'param-sign' ? ('sign-not-selectable' as const) : ('param-bound-not-selectable' as const);
         return { ok: false, error: { code, id: cmd.sym } };
       }
       const next = clone(c);
-      if (solverOwned) next.paramSigns.push(cmd);
-      for (const b of components) next.componentSigns.push({ target: b.target, axis: b.axis, positive: cmd.positive });
+      if (solverOwned) next.paramSigns.push({ sym: cmd.sym, bound });
+      for (const b of components) next.componentSigns.push({ target: b.target, axis: b.axis, bound });
       return { ok: true, next };
     }
 
