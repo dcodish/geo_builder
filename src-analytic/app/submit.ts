@@ -33,6 +33,7 @@ import { namesOfKind, nearMissOf, withName } from './nearMiss';
 import { declinedPart, declinedPointProperty, declinedThrough, unreadPart, type LostPart } from './lostPart';
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
 import { pointSpelling } from './pointOrder';
+import { LABEL_CASE_NOTICE, askCandidate, certainLabelFold, lowercaseNamesIn, type LabelFold } from '../../shell/labelCase';
 import type { SentenceOutcome } from '../../shell/sentences';
 import type { CevianHost } from '../../shell/cevianHost';
 import { isPointName, splitPointNames } from '../engine/pointName';
@@ -116,7 +117,8 @@ export type SubmitVerdict =
    * one on the screen, and the session records where it landed in the same set as the line.
    */
   /** `host` (#1973, ADR-AG-430): the shape the line's cevian was resolved in — recorded with the line, shown beside its row. */
-  | { kind: 'record'; line: string; notice?: RecordNotice; created?: string[]; createdCircle?: string; configuration?: Seed; host?: CevianHost }
+  /** `cased` (#2823, ADR-AG-478): the student's lowercase point labels were read in capitals — `line` is the capitalised text, said with the notice. */
+  | { kind: 'record'; line: string; notice?: RecordNotice; created?: string[]; createdCircle?: string; configuration?: Seed; host?: CevianHost; cased?: true }
   /**
    * #1353 / ADR-W-030 — the line is an IMPERATIVE WRAPPER over a sentence the tool does understand.
    *
@@ -128,7 +130,7 @@ export type SubmitVerdict =
    * tool would reject.
    */
   /** `note` picks the teaching line; with none, the imperative wrapper's, which names `verb`. */
-  | { kind: 'teach'; verb: string; canonical: string; note?: 'point-order' | 'point-equals' | 'point-bare' | 'point-case' }
+  | { kind: 'teach'; verb: string; canonical: string; note?: 'point-order' | 'point-equals' | 'point-bare' }
   /**
    * #1154 — a RENAME request («שנה שם A ל-G»). It edits the SESSION, not the figure: nothing is
    * recorded as a line. The caller hands it to `dispatchRename` (`app/rename.ts`), which needs the
@@ -311,7 +313,24 @@ export function decideSubmit(
   seed: Seed,
   current: Derivation = derive(lines, seed),
 ): SubmitVerdict {
-  return withNearMiss(raw.trim(), decideOnce(raw, lines, seed, current), (l) => decideOnce(l, lines, seed, current), current);
+  // #2823 (ADR-AG-478, ADR-W-208): a line whose every lowercase label can only be a point is decided — and recorded —
+  // in capitals, and says so; any other lowercase line that would record in capitals is asked to be typed so.
+  const cased = labelCaseFoldAnalytic(raw.trim(), lines);
+  const line = cased?.text ?? raw.trim();
+  const v = withNearMiss(line, decideOnce(line, lines, seed, current), (l) => decideOnce(l, lines, seed, current), current);
+  if (cased) return v.kind === 'record' ? { ...v, cased: true } : v;
+  if (v.kind !== 'refused' || v.error.key !== 'not-handled') return v;
+  const used = lowercaseNamesIn(lines);
+  const ask = askCandidate(line, (run) => /^[xy]$/.test(run) || /^l\d*$/.test(run) || [...run.toLowerCase()].some((ch) => used.has(ch)));
+  return ask && decideOnce(ask, lines, seed, current).kind === 'record' ? { kind: 'refused', error: { key: 'lowercase-labels', detail: line, corrected: ask } } : v;
+}
+
+/**
+ * #2823 (ADR-AG-478) — the shared certain-slot reading (`shell/labelCase`) with analytic's own letters: the plane's axes,
+ * and every lowercase name a held line already uses (a parameter, a line's name, a radius) — ADR-AG-423's `usesLetter`.
+ */
+export function labelCaseFoldAnalytic(line: string, lines: readonly string[]): LabelFold | null {
+  return certainLabelFold(line, { used: lowercaseNamesIn(lines), axes: ['x', 'y'] });
 }
 
 /**
@@ -739,7 +758,10 @@ export function commitRecord(
   t: NoticeT,
 ): void {
   // #2039 (ADR-AG-358): the configuration the decision drew rides in the same commit — and #1973 (ADR-AG-430) the host
-  recordLine(verdict.line, noticeText(verdict.notice, t), verdict.configuration, verdict.host?.ring);
+  // #2823 (ADR-AG-478): a capitalised line says so first, beside any other notice it carries
+  const cased = verdict.cased ? t(LABEL_CASE_NOTICE, { corrected: verdict.line }) : null;
+  const notice = noticeText(verdict.notice, t);
+  recordLine(verdict.line, cased && notice ? `${cased} ${notice}` : (cased ?? notice), verdict.configuration, verdict.host?.ring);
 }
 
 /** The translate function a notice is worded with — `i18next`'s `t`, narrowed to what is used here. */
@@ -847,7 +869,13 @@ export function decideEditHost(
   seed: Seed,
   seedNames: Readonly<Record<string, string>> = {},
   hosts: Readonly<Record<number, readonly string[]>> = {},
-): { ok: boolean; host?: CevianHost } {
+): { ok: boolean; host?: CevianHost; text?: string } {
+  // #2823 (ADR-AG-478): a certain lowercase label is read in capitals here exactly as at submit (ADR-W-006: both seams)
+  const cased = labelCaseFoldAnalytic(next.trim(), lines.filter((_, j) => j !== index));
+  if (cased) {
+    const r = decideEditHost(index, cased.text, lines, disabled, seed, seedNames, hosts);
+    return r.ok ? { ...r, text: cased.text } : r;
+  }
   // #1888 / #1889 (ADR-AG-251): an edit that loses a part is refused, as the typed line is (ADR-W-006: one gate, both seams).
   const parsed = parseLine(next.trim());
   if (!parsed.ok) return { ok: false };

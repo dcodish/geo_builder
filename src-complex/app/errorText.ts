@@ -10,7 +10,8 @@ import type { ReservedConstant } from '../model/naming';
 import { proofTargetPanelText } from '../../shell/proofTarget';
 import type { Translate } from '../model/why';
 import { whyText } from '../replay/scene2';
-import type { InputError } from '../store/useComplexStore';
+import type { InputError, InputNote } from '../store/useComplexStore';
+import { LABEL_CASE_NOTICE } from '../../shell/labelCase';
 
 /** A refusal worded by one key: every refusal but the reserved constants and the mixed number (two sentences each, below)
  *  and the claim to prove (two sentences, `errorText`). */
@@ -35,6 +36,8 @@ const ERROR_KEY: Record<Exclude<InputError['key'], 'reserved-constant' | 'mixed-
   'complex-as-real': 'errComplexAsReal',
   refused: 'errRefused',
   'word-root': 'errWordRoot',
+  // #2823 (ADR-CX-092) — the suite's ask, 2-D's sentence, with the line in capitals
+  'lowercase-labels': 'suite.refusal.lowercaseLabels',
   'glued-i': 'errGluedI',
   // #2247 (ADR-CX-081) — «2 3» asks the glued-`i` question, in its sentence: is this a product? write it explicitly
   'juxtaposed-numbers': 'errGluedI',
@@ -73,6 +76,8 @@ const errParams = (e: InputError, t: Translate): Record<string, string> =>
     ? { detail: e.detail, decimal: e.decimal ?? '', sum: e.sum, product: e.product }
     : 'cos' in e
     ? { detail: e.detail, cos: e.cos, sin: e.sin }
+    : 'corrected' in e
+    ? { detail: e.detail, corrected: e.corrected }
     : 'suggestion' in e
     ? { detail: e.detail, suggestion: e.suggestion }
     : 'letter' in e
@@ -87,3 +92,13 @@ const errParams = (e: InputError, t: Translate): Record<string, string> =>
  */
 export const errorText = (e: InputError, t: Translate): string =>
   e.key === 'proof-target' ? proofTargetPanelText(t, e.detail, { panel: t('dataTitle'), ask: t('askAdd') }) : t(keyOf(e), errParams(e, t));
+
+/**
+ * #2790 / #2823 ([ADR-CX-092](../../docs/06d-decisions-complex.md#adr-cx-092)) — a recorded line's notice, worded: the held
+ * row's suite sentence, or the capitalised line's (with the held sentence after it when it was held too).
+ */
+export function noteText(n: InputNote, t: Translate): string {
+  if (n.key === 'already-held') return t('suite.notice.alreadyHeld');
+  const cased = t(LABEL_CASE_NOTICE, { corrected: n.detail });
+  return n.held ? `${cased} ${t('suite.notice.alreadyHeld')}` : cased;
+}

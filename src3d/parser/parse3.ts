@@ -36,6 +36,7 @@ import { isTriangleNoun3, POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhra
 export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
 import { cyclicFixCommands, cyclicFixRelations, shapeInternal3, type QuadBase, type ShapeRelation3 } from '../engine/baseShapes';
 import { riderPairsT, riderWholeSide, riderWholeT } from '../engine/onSegmentRatio';
+import { MID_EN, MID_HE } from '../../shell/labelCase';
 
 export type ParseResult3 =
   // #1902 (ADR-3D-312): `unread` — words of the sentence the answering rule did not read (the inscription rule
@@ -93,62 +94,9 @@ const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
 // Tokenisation
 // ---------------------------------------------------------------------------
 
-/**
- * Lowercase point labels in LABEL POSITION → uppercase (#181, the 2-D `up()` discipline copied per
- * docs/20 §12 — never imported). 3-D has CASE-SIGNIFICANT tokens 2-D lacks (axes x/y/z, parameters
- * k/m/t, vector names u/v/w, R vs r, ℓ), so a blanket `/i` is impossible; instead a lowercase run is
- * uplifted only where an ANCHOR proves it is a label — after the angle glyph/word («∠sdb», «זווית sdb»)
- * or after an explicit point/vertex noun («הקודקוד c», «הנקודות a ו-b»). The lone axis letters x/y/z
- * are never uplifted (a student's «נקודה x» stays theirs to disambiguate), and after an ENGLISH anchor
- * a run is uplifted only when it isn't an English function word ("angle of …", "point of intersection").
- * New label-demanding anchors join HERE — the one chokepoint — never per-rule.
- */
-/**
- * #1523 (ADR-3D-287) — the MIDPOINT frame, spelled ONCE for its two readers: the `midpoint` rule and the
- * subject anchor below. `(?!י)` keeps «אנך אמצעי» / «קטע אמצעים» out (#330).
- *  - `MID_COPULA_HE` / `MID_HE`: «X [היא|הוא] [נקודת] [ה]אמצע …»
- *  - `MID_EN`: "X is the midpoint of …" / "X is the middle (point) of …"
- */
-const MID_COPULA_HE = String.raw`(?:(?:הוא|היא)\s+)?`;
-const MID_HE = String.raw`(?:ה?נקודת\s+)?ה?אמצע(?!י)`;
-const MID_EN = String.raw`[Mm]id(?:dle(?:\s+point)?|point)`;
+// #1523 (ADR-3D-287) → #2823 (ADR-3D-492): the MIDPOINT frame is the shared one (`shell/labelCase`), which the certain
+// lowercase-label slot reads too.
 export const EN_STOP = new Set(['of', 'at', 'in', 'on', 'is', 'to', 'the', 'and', 'are', 'for', 'its', 'was', 'has', 'be', 'by', 'a', 'an', 'no', 'not', 'it', 'all', 'any', 'one', 'two']);
-function upliftLowercaseLabels(s: string): string {
-  const LIST = String.raw`[A-Za-z][A-Za-z0-9']{0,5}(?:\s*(?:,|ו-?|\band\b)\s*[A-Za-z][A-Za-z0-9']{0,5})*(?![A-Za-z])`;
-  const upTokens = (list: string, en: boolean) =>
-    list.replace(/\b[a-z][a-z0-9']*/g, (t) => (/^[xyz]$/.test(t) || (en && EN_STOP.has(t)) ? t : t.toUpperCase()));
-  // #924 (ADR-3D-223): one more POSITION where only a label can stand, joining the chokepoint rather
-  // than a second rule — the coordinate definition: a run at the START of the sentence followed by a
-  // 3-tuple, «c(p²,0,1)». Anchored to the sentence start on purpose: a parametric line carries
-  // `t(m-2,m,m+2)` mid-sentence, and that `t` is the parameter. It is the anchor criterion #181 set (the
-  // anchor PROVES the run is a label), so it uplifts silently like «∠sdb». A single letter is exactly what
-  // the #353 convention nudge deliberately leaves alone ("far likelier a vector/parameter/coordinate"),
-  // which is why this row escaped both mechanisms and reached the paid LLM lane. The un-anchored
-  // remainder («ab = 5», «ac ⊥ bd») stays with that nudge, which already teaches it; a lowercase run after
-  // a SOLID noun («תיבה abcd») is likewise taught, not lifted — that is a standing lock
-  // (lowercase-nudge.test.ts, #498/#353), and whether a solid noun should become an anchor is the
-  // operator's call, escalated from #924. The lone axis letters stay theirs to disambiguate, as ever.
-  return s
-    .replace(new RegExp(String.raw`((?:[∠∡∢]|זו?וית|ה?קודקוד(?:ים)?|ה?נקוד(?:ה|ות))\s*)(${LIST})`, 'g'), (_m, pre: string, list: string) => `${pre}${upTokens(list, false)}`)
-    .replace(new RegExp(String.raw`(\b(?:angle|points?|vert(?:ex|ices))\s+)(${LIST})`, 'gi'), (_m, pre: string, list: string) => `${pre}${upTokens(list, true)}`)
-    .replace(/^((?:נתונה\s+)?)([a-z]\d*'?)(?=\s*\([^()]*,[^()]*,[^()]*\))/, (m: string, pre: string, id: string) => (/^[xyz]$/.test(id) ? m : `${pre}${id.toUpperCase()}`))
-    // #1523 (ADR-3D-287): the SUBJECT of a midpoint statement. «x אמצע SA» — a single letter before the
-    // midpoint frame — can only be the point being named: an axis, a parameter or a vector is never "the
-    // midpoint of SA". So this position is an anchor in #181's sense and the letter folds to its label,
-    // INCLUDING x/y/z (the lone-axis exemption exists for positions where an axis could stand; this is
-    // not one). Before this anchor the subject-less auto-name arm read the tail and silently threw the
-    // letter away, drawing the point under a letter the student never typed. (`HE_SUBJ` is declared
-    // further down; it is read only when this runs, after module init.)
-    .replace(
-      new RegExp(String.raw`^(${HE_SUBJ})([a-z]\d*'?)(?=\s+${MID_COPULA_HE}${MID_HE}\s)`),
-      (_m: string, pre: string, id: string) => `${pre}${id.toUpperCase()}`,
-    )
-    .replace(
-      new RegExp(String.raw`^((?:[Tt]he\s+)?(?:[Pp]oint\s+)?)([a-z]\d*'?)(?=\s+is\s+the\s+${MID_EN}\b)`),
-      (_m: string, pre: string, id: string) => `${pre}${id.toUpperCase()}`,
-    );
-}
-
 /** Normalise an utterance: strip invisible bidi/format controls, unify primes to `'`, strip vector
  *  arrows (AB→ ≡ AB), unify minus/maqaf to `-`, collapse whitespace, uplift anchored lowercase
  *  labels (#181). */
@@ -177,15 +125,17 @@ export function subjectFrameOf3(raw: string): { subject: string; rest: string } 
 
 function normalizeText3(s: string): string {
   // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
-  return (upliftLowercaseLabels(
+  // #2823 (ADR-3D-492): #181's anchored lowercase uplift no longer runs here — a certain lowercase label is read in
+  // capitals at the store's submit seam (`labelCaseFold3`, `shell/labelCase`), which writes the capital into the row.
+  return (
     // #1545 (ADR-3D-300): every prime glyph → `'` through the ONE fold (lexicon/marks3), which the ask
     // lane and the LLM sequence gate also call — it used to be spelled here and twice more, narrower.
     // #1691 (ADR-AG-239): «AB ו- CD», «ו -CD», «ו - CD» are «ו-CD» — the shared fold every builder's boundary calls.
     // #1912 ([ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329)): a LOOK-ALIKE GLYPH is the symbol it
     // renders as — ⟂ ≡ ⊥, ∡/∢ ≡ ∠, the guarded `<` ≡ ∠, ⁰/º/˚ ≡ °, «שורש N» ≡ √. 3-D folded none of them,
     // so «AC ⟂ AB» was "not understood" while «AC ⊥ AB» built; the table is the shared `shell/glyphFold`,
-    // which 2-D's boundary calls too. It runs BEFORE `upliftLowercaseLabels` (whose anchor set reads
-    // `[∠∡∢]`) and before every rule, and the stored fact row keeps the glyph the student typed.
+    // which 2-D's boundary calls too. It runs before every rule
+    // (the angle rules read `[∠∡∢]`), and the stored fact row keeps the glyph the student typed.
     // #2255 (ADR-3D-374): `spellVulgarFractions` wraps the folds below — see where it closes.
     spellVulgarFractions(
     foldConjunctionSpacing(foldGlyphs(foldPrimes3(stripFormatControls(s))))
@@ -285,8 +235,8 @@ function normalizeText3(s: string): string {
       .trim()
       // ADR-3D-079 Am. 2: a trailing sentence period is decoration (book lines end with «.» —
       // «t פרמטר חיובי.» used to dead-end); a decimal never ends in a bare dot, so this is safe
-      .replace(/\s*\.+$/, ''),
-  ));
+      .replace(/\s*\.+$/, '')
+  );
 }
 
 const TOKEN = /[A-Z]\d*'?/g;
@@ -1257,6 +1207,14 @@ export function polygonDeclaration3(ids: readonly Id[]): Command3[] | null {
   return declared.join(',') === ids.join(',') ? r.commands : null;
 }
 const NOUN_HE = SOLID_NOUNS_HE.map(([src]) => src).join('|');
+/**
+ * #2823 (ADR-3D-492): the solid nouns whose vertex run is a certain label slot (`shell/labelCase` S2) — the table above,
+ * without «גוף» / "solid", which name no vertex list. The shared reader adds the article and the clitics itself.
+ */
+export const SOLID_FOLD_NOUNS3 = [...SOLID_NOUNS_HE, ...SOLID_NOUNS_EN]
+  .filter(([, noun]) => noun !== 'any')
+  .map(([src]) => src.replace(/^ה\?/, ''))
+  .join('|');
 export const NOUN_EN = SOLID_NOUNS_EN.map(([src]) => src).join('|');
 
 const volumePolyClaim: Rule = (s) => {

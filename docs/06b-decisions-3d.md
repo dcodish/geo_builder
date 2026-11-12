@@ -15921,3 +15921,19 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 **Locks.** `src3d/__tests__/shared-letter-coords-2785.test.ts` (R1–R5, C1–C3, the t/k control, the order permutation, the single-use cue, a sign on a single-use letter, the value line); fixture `fixtures3/shared-letter-coords-2785.geo3.json` (R2).
 
 **Behaviour change for a student:** a letter written in two points' coordinates has one value at every «הציגו תצורה אחרת»; «k = 1» reaches every coordinate written with k; «B(2t,t,k)» or «B(k,15,k)» after «B(2,15,-8)» is refused «הטענה לא מתקיימת בציור — בדקו את החישוב» instead of being accepted.
+
+## ADR-3D-492 — A certain lowercase label is read in capitals at the store's seam, written into the row and said; #181's silent anchors leave `normalize3`, and the ask lifts single letters (#2823)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2823](https://github.com/dcodish/geo_builder/issues/2823) (P2, all four builders; folds #2159's 3-D half) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02b](02b-requirements-3d.md) — FR-SP-8 · **Design:** [04b](04b-design-3d.md) § *The submit decision* · **LADDER stage:** none
+**Amends** [ADR-3D-039](#adr-3d-039) (#181's anchors), [ADR-3D-092](#adr-3d-092) (#353's nudge), [ADR-3D-223](#adr-3d-223), [ADR-3D-226](#adr-3d-226) (a solid's run, ruled taught on 2026-09-07, is accepted under ADR-W-203) and [ADR-3D-287](#adr-3d-287) (the midpoint frame moves to `shell/labelCase`) · **Builds** [ADR-W-208](06w-decisions-workspace.md#adr-w-208).
+
+**Measured at pickup** (`b9f8b916`, `decideDeterministic3`): «m אמצע AB», «x אמצע AB», «∠abc = 40», «c(1,2,3)» recorded with the lowercase text in the row and no word; «משולש abc», «נקודה d על ab» were asked; «נקודה j», «נקודה x», «d על AB» went to the model.
+
+**Class.** *3-D read a few anchors silently inside the parser and kept the student's lowercase text in the row; every other single letter reached the model.*
+
+**Decision.** `decideSubmit3` folds first (`labelCaseFold3`: the shared reader with the axes x, y, z, the solid nouns `SOLID_FOLD_NOUNS3`, and every lowercase name the figure's commands carry), decides on the capitalised text, and marks the record `cased`; App3 says `suite.notice.labelCase` when the line commits. `upliftLowercaseLabels` is deleted from `normalize3`: the grammar reads only capitals, and a letter the figure already uses (a parameter, a vector, a line) is never folded. The ask (`labelAskCandidate3`) is every builder's lift, single letters included, keeping the letters #353's convention reserves (u, v, w, t, k, m, x, y, z), the names the figure uses, English prose, and a symbolic plane equation whole; it speaks `suite.refusal.lowercaseLabels`. 3-D's own `scope.lowercase-labels` text retires.
+
+**Locks.** Re-based to the ruling: `src3d/__tests__/lowercase-labels.test.ts`, `lowercase-nudge.test.ts`, `issue-924.test.ts`, `issue-924-nudge-run.test.ts`, `issue-1523-autoname-whole-utterance.test.ts` (each reads through `labelCaseFold3` now), `issue-1692-triage-replay3.test.ts` (the ask row is «ab = 5»). New: the #2823 block of `src3d/__tests__/lowercase-labels.test.ts` (the rows show the capitals with the notice flag, a used parameter keeps the ask).
+
+**Behaviour change for a student:** «תיבה abcda'b'c'd'», «פירמידה sabcd», «∠sdb», «m אמצע AB», «c(1,2,3)», «נקודה x» are read with the capitals in the row and a note says so; «d על AB» is asked in capitals instead of going to the AI; the ask reads «שמות נקודות נכתבים באות לטינית גדולה. נסו: …» (2-D's sentence).

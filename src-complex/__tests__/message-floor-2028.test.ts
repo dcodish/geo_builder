@@ -58,6 +58,7 @@ const COMPLEX: Record<ComplexError['key'], Payload[]> = {
   impossible: [{}],
   'complex-as-real': [{ letter: 'u' }],
   'word-root': [{ detail: 'שורש של 3', suggestion: '√3' }],
+  'lowercase-labels': [{ detail: 'נקודה a', corrected: 'נקודה A' }], // #2823 (ADR-CX-092)
   'glued-i': [{ detail: 'zi', suggestion: 'z*i' }],
   // #2247 (ADR-CX-081) — analytic's two mixed-number sentences, and the «2 3» product question
   'mixed-number': [{ detail: '2 1/2', decimal: '2.5', sum: '2+1/2', product: '2*1/2' }, { detail: '2 1/3', sum: '2+1/3', product: '2*1/3' }],

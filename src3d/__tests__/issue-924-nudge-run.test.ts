@@ -10,11 +10,16 @@
  *
  * The guards below matter more than the new rows: every spelling that parses today must still parse as
  * typed, and the prod-log lowercase names (`l`, `ℓ`, `π1`, `u`, `k`, `t`) must keep their meaning.
+ *
+ * #2823 (ADR-3D-492): the operator's ruling ADR-W-203 (2026-11-10) replaced "we should not accept this" for a solid's
+ * vertex run: a run after a solid noun can only be the solid's vertices, so it is ACCEPTED in capitals at the store's
+ * seam, with the notice — the grammar itself still never reads it as typed. The nudge is every builder's ask now.
  */
 import { describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from '../parser/scope3';
 import { decideDeterministic3 } from '../app/decideDeterministic3';
+import { labelCaseFold3 } from '../store/store3';
 
 /** The App3 decision itself (#1692): `decideDeterministic3` is what App3 dispatches — nudge iff a candidate
  *  exists AND it parses, after the store's own decision said not-understood. Called, never re-implemented. */
@@ -22,23 +27,26 @@ const nudges = (u: string): boolean => {
   const v = decideDeterministic3({ facts: [], seed: 0 }, u);
   return v.kind === 'guided' && v.register === 'lowercase-labels';
 };
+/** #2823: the row a line records, and whether it was read in capitals. */
+const recorded = (u: string): { row: string; cased: boolean } | null => {
+  const v = decideDeterministic3({ facts: [], seed: 0 }, u);
+  return v.kind === 'record' ? { row: v.fact.utterance, cased: v.cased === true } : null;
+};
 
-describe('#924 arm 2 — a long or primed vertex run is taught, not escalated', () => {
-  it("«תיבה abcda'b'c'd'» — the operator's row — is taught with the corrected spelling", () => {
-    expect(parse3("תיבה abcda'b'c'd'").ok, 'still not accepted as typed — the #353 ruling stands').toBe(false);
-    expect(upperCasedLabelCandidate3("תיבה abcda'b'c'd'")).toBe("תיבה ABCDA'B'C'D'");
-    expect(nudges("תיבה abcda'b'c'd'"), 'taught for free, never a paid LLM call').toBe(true);
+describe('#924 arm 2 → #2823 — a long or primed vertex run is accepted in capitals, never escalated', () => {
+  it("«תיבה abcda'b'c'd'» — the operator's row — records as «תיבה ABCDA'B'C'D'»", () => {
+    expect(parse3("תיבה abcda'b'c'd'").ok, 'the grammar never reads it as typed').toBe(false);
+    expect(recorded("תיבה abcda'b'c'd'")).toEqual({ row: "תיבה ABCDA'B'C'D'", cased: true });
   });
 
   it('«פירמידה sabcd» — the 5-letter run the old cap could not lift at all', () => {
     expect(parse3('פירמידה sabcd').ok).toBe(false);
-    expect(upperCasedLabelCandidate3('פירמידה sabcd')).toBe('פירמידה SABCD');
-    expect(nudges('פירמידה sabcd')).toBe(true);
+    expect(recorded('פירמידה sabcd')).toEqual({ row: 'פירמידה SABCD', cased: true });
   });
 
-  it('«box abcd» — the English NOUN is prose and stays put; only the vertex run is corrected', () => {
+  it('«box abcd» — the English NOUN is prose and stays put; only the vertex run is written in capitals', () => {
     expect(upperCasedLabelCandidate3('box abcd')).toBe('box ABCD');
-    expect(nudges('box abcd')).toBe(true);
+    expect(recorded('box abcd')).toEqual({ row: 'box ABCD', cased: true });
   });
 
   it('the solid noun is still NOT an uplift anchor — nothing is silently auto-lettered', () => {
@@ -49,10 +57,9 @@ describe('#924 arm 2 — a long or primed vertex run is taught, not escalated', 
 });
 
 describe('#924 arm 2 — the standing locks are untouched', () => {
-  it('#498: «תיבה abcd» still gets the nudge, with the same candidate', () => {
+  it('#498 → #2823: «תיבה abcd» records in capitals — never auto-lettered, never a paid call', () => {
     expect(parse3('תיבה abcd').ok).toBe(false);
-    expect(upperCasedLabelCandidate3('תיבה abcd')).toBe('תיבה ABCD');
-    expect(nudges('תיבה abcd')).toBe(true);
+    expect(recorded('תיבה abcd')).toEqual({ row: 'תיבה ABCD', cased: true });
   });
 
   it('#353: the reported case «as=w» is unchanged — `w` stays the VECTOR', () => {
@@ -72,7 +79,7 @@ describe('#924 arm 2 — the standing locks are untouched', () => {
   });
 
   it('a genuine gap is still not masked as a case problem', () => {
-    for (const u of ['נתון מעגל שמרכזו o', 'the orthoscheme abcd']) expect(nudges(u), u).toBe(false);
+    for (const u of ['the orthoscheme abcd']) expect(nudges(u), u).toBe(false);
   });
 
   it('the pattern-based guidance register is untouched', () => {
@@ -91,9 +98,10 @@ describe('#924 arm 2 — the prod-log guards: lowercase names that MEAN somethin
       'ישר l x=(1,2,3)+t(m-2,m,m+2)',
       'u = (k-1,k,3)',
       'k = 2',
-      'c(p²,0,1)', // #924 arm 1's uplift (ADR-3D-223) — untouched by this change
     ]) {
       expect(parse3(u).ok, u).toBe(true);
     }
+    // #924 arm 1's coordinate head (ADR-3D-223) is read at the store's seam since #2823
+    expect(labelCaseFold3('c(p²,0,1)', [])?.text).toBe('C(p²,0,1)');
   });
 });

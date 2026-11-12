@@ -59,7 +59,8 @@ import { partsOf3, sameSeed3, seedKey3, seedNumber3, type Seed3 } from '../engin
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
-import { isBareAltitude3, membershipQuestion3, namesQuadBase3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
+import { SOLID_FOLD_NOUNS3, isBareAltitude3, membershipQuestion3, namesQuadBase3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
+import { certainLabelFold, lowercaseNamesInCommands, type LabelFold } from '../../shell/labelCase';
 import { dataView, pointPlaneRow3 } from '../engine/dataView';
 
 export interface Fact3 {
@@ -3020,14 +3021,19 @@ export type Verdict3 =
   | { readonly kind: 'retick'; readonly twin: Fact3; readonly facts: Fact3[] }
   /** `readAs` (#1942): the polygon angle a lone vertex was read as — said aloud on the committed step, 2-D's note.
    *  `held` (#2790, ADR-3D-484, ADR-W-200): the figure already holds the line — it is its own row, with the notice. */
-  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: Seed3; readonly readAs?: readonly string[]; readonly held?: true };
+  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: Seed3; readonly readAs?: readonly string[]; readonly held?: true; readonly cased?: true };
 
 export function decideSubmit3(
   st: { facts: Fact3[]; seed: Seed3 },
   raw: string,
   newId: () => string = () => nanoid(8),
 ): Verdict3 {
-  const utterance = ingestTypedText(raw); // #751 (ADR-W-029) — the store-side ingest invariant
+  const typed = ingestTypedText(raw); // #751 (ADR-W-029) — the store-side ingest invariant
+  // #2823 (ADR-3D-492, ADR-W-208): a line whose every lowercase label can only be a point is read, stored and shown in
+  // capitals from here on («∠sdb» → «∠SDB», «תיבה abcda'b'c'd'»); every other lowercase line keeps the ask
+  // (`decideDeterministic3`). This replaced #181's silent anchors inside `normalize3`, which kept the lowercase row.
+  const cased = labelCaseFold3(typed, st.facts);
+  const utterance = cased?.text ?? typed;
   // #578 (ADR-3D-211): «שנה שם E ל-O» is a rewrite of HISTORY, not a statement about the figure,
   // so it is read BEFORE the grammar and never becomes a fact. Intercepted here rather than in
   // App3 because this is where the fact list lives — and because a refusal must carry its own
@@ -3041,7 +3047,18 @@ export function decideSubmit3(
   const read = readStatement3(st, utterance);
   if (!read.ok) return read.error.code === 'not-understood' ? { kind: 'not-understood' } : { kind: 'refused', error: read.error };
   const v = decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true, unread: read.unread, readExtent: true }, newId);
-  return v.kind === 'record' && read.readAs ? { ...v, readAs: read.readAs } : v;
+  if (v.kind !== 'record') return v;
+  return { ...v, ...(read.readAs ? { readAs: read.readAs } : {}), ...(cased ? { cased: true as const } : {}) };
+}
+
+/**
+ * #2823 ([ADR-3D-492](../../docs/06b-decisions-3d.md#adr-3d-492)) — the shared certain-slot reading (`shell/labelCase`)
+ * with 3-D's own letters: the axes x, y, z (folded only after a point noun or as a midpoint's subject), the solid nouns
+ * (a solid's vertex run is any length), and every lowercase name the figure's commands already carry — a parameter, a
+ * vector, a line.
+ */
+export function labelCaseFold3(line: string, facts: readonly Fact3[]): LabelFold | null {
+  return certainLabelFold(line, { used: lowercaseNamesInCommands(facts.flatMap((f) => f.cmds)), axes: ['x', 'y', 'z'], solidNouns: SOLID_FOLD_NOUNS3 });
 }
 
 /**

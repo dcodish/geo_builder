@@ -20,7 +20,7 @@
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
 import { autoNamedLabels, groupKey, impliedIdentityBinding, mergeFacts, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
-import { HELD_NOTICE, ambiguousDefiniteShapeNote, juxtaposedPairNote, lettersOnScreen, proofTargetNote, roleReadingConfig, type DecideBind } from './decideDeterministic';
+import { HELD_NOTICE, ambiguousDefiniteShapeNote, labelCaseFold2D, juxtaposedPairNote, lettersOnScreen, proofTargetNote, roleReadingConfig, type DecideBind } from './decideDeterministic';
 import { renderNote } from './renderNote';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
@@ -31,6 +31,7 @@ import { ringOrderVerdict } from './ringOrder';
 import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
 import { findProofTarget } from '../../shell/proofTarget';
+import { LABEL_CASE_ASK, LABEL_CASE_NOTICE } from '../../shell/labelCase';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
 import { findNumberPair } from '../../shell/juxtaposedNumbers';
@@ -85,6 +86,9 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   const prefixRaw = start >= 0 ? raw.slice(0, start) : raw;
   const afterRaw = start >= 0 ? raw.slice(end) : [];
   const afterIds = new Set(afterRaw.map((f) => f.id));
+  // #2823 (ADR-828): a certain lowercase label is read in capitals here exactly as at submit, against the PREFIX facts
+  const cased = labelCaseFold2D(editText, prefixRaw);
+  if (cased) editText = cased.text;
   let work: Fact[] = [...resolveBinds(prefixRaw), ...afterRaw];
   const binds: DecideBind[] = [];
   let identityBound = false; // #2122 (ADR-653): a naming by the identity criterion — the statement holds by it
@@ -203,7 +207,7 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   // an edited step whose parse read a lowercase label refuses with the corrected sentence.
   const fold = lowercaseLabelFold(editText, r.commands, ectx.points ?? []);
   if (fold) {
-    setInputNote(t('input.scope.lowercase-labels', { corrected: fold.corrected }));
+    setInputNote(t(LABEL_CASE_ASK, { corrected: fold.corrected }));
     return false;
   }
   // #782 (ADR-461) — THE HONESTY-GATE BATTERY, on this seam too. Until now the ✎ path ran none of the
@@ -278,7 +282,9 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   logDebug({ kind: 'action', action: 'edit', detail: `${key} → ${editText.trim()}` }); // #84: so a reported session replays edits
   const after = replay(store().facts, store().seed).status;
   const orphaned = store().facts.filter((f) => wasOk[f.id] === 'ok' && after[f.id] !== 'ok' && after[f.id] !== 'disabled');
-  setInputNote(orphaned.length > 0 ? t('steps.editBrokeDependents', { items: orphaned.map((f) => `«${f.utterance ?? f.cmd.type}»`).join(', ') }) : held ? t(HELD_NOTICE) : '');
+  const caseNote = cased ? t(LABEL_CASE_NOTICE, { corrected: cased.text }) : ''; // #2823: said first, beside any other note
+  const restNote = orphaned.length > 0 ? t('steps.editBrokeDependents', { items: orphaned.map((f) => `«${f.utterance ?? f.cmd.type}»`).join(', ') }) : held ? t(HELD_NOTICE) : '';
+  setInputNote([caseNote, restNote].filter(Boolean).join(' '));
   /**
    * The edit is committed — now search for a configuration that honours it (#1041).
    *

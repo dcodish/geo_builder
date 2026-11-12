@@ -1220,6 +1220,10 @@ perpendicular bisector. A restated construction then re-lowers to identical comm
 
 ## The submit gate and `decideDeterministic`
 
+### A certain lowercase label is read in capitals before the parse ([ADR-828](06-decisions.md#adr-828), #2823)
+
+`runSentence`, `decideDeterministic2D` and the edit seam call `labelCaseFold2D` first (`shell/labelCase` `certainLabelFold`, with the figure's lowercase names from `lowercaseNamesInCommands` and the axes x, y) and carry the capitalised text through every later step, the model's lane included, so the row and every gate see capitals. `withLabelCase` puts `suite.notice.labelCase` first on a committed step's note. The ask (the commit-seam `lowercaseLabelFold` and the failed-parse lift, now `shell/labelCase` `askCandidate`) is unchanged and speaks `suite.refusal.lowercaseLabels`.
+
 ### Points a statement names and the figure lacks ([ADR-769](06-decisions.md#adr-769), #1467)
 
 The outermost `parse` runs `withImpliedPoints(commands, ctx.points)` whenever the context carries `points` (a figure) (`src/parser/impliedPoints.ts`): the batch is

@@ -170,7 +170,9 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   type. A real-parameter letter in a quadrant, argument, conjugates or pure-imaginary sentence is refused
   (the not-understood sentence, «לא הבנתי את הבקשה…», [ADR-W-151](06w-decisions-workspace.md#adr-w-151)); each reads once the letter is declared complex.
   **And only a name the figure reads as a number may be a sentence's SUBJECT at all**
-  ([ADR-CX-062](06d-decisions-complex.md#adr-cx-062), #1948): a z/w name, a point label, or a
+  ([ADR-CX-062](06d-decisions-complex.md#adr-cx-062), #1948): a z/w name, a point label (a lowercase point letter where
+  only a point can stand, «משולש abc», is accepted in capitals with a note, and any other is asked for in capitals —
+  never a z/w name, `i`, `o` or a declared name: [ADR-CX-092](06d-decisions-complex.md#adr-cx-092), #2823), or a
   one-letter (optionally indexed) parameter that is not `i` or `o` — the same floor the declaration
   itself applies. Length is not the question: «A1 ממשי», «z12 ממשי» and «a12 ממשי» read, and so does
   «u2 ממשי» once the u family is declared, while a word that is not a name («foo ממשי» / «foo is

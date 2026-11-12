@@ -1373,6 +1373,8 @@ change to LM start noise cannot move which configuration a seed draws.
 
 ### The submit decision (#1394, [ADR-3D-258](06b-decisions-3d.md#adr-3d-258))
 
+**A certain lowercase label** ([ADR-3D-492](06b-decisions-3d.md#adr-3d-492), #2823): `decideSubmit3` first calls `labelCaseFold3` (`shell/labelCase` with the axes x, y, z, `SOLID_FOLD_NOUNS3` and the figure's lowercase names) and decides on the capitalised text; the record carries `cased` and App3 shows `suite.notice.labelCase`. `normalize3` no longer uplifts anything; `decideDeterministic3`'s ask is `labelAskCandidate3` (the shared lift, keeping u v w t k m x y z and the used names).
+
 `store3.submit` decides nothing: `decideSubmit3(state, utterance)` returns a `Verdict3` (rename ·
 not-understood · refused · retick · record, a record carrying `held` for a line the figure already holds) and `submit` dispatches it. The decision is pure, so
 #1358's register can ask "would you accept this line?". The statement seams share `readStatement3` (the

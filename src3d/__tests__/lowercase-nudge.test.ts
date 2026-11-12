@@ -14,6 +14,11 @@
  *
  * The nudge is PROOF-BASED: it fires only when upper-casing the lowercase runs actually makes the utterance
  * parse, so a genuine gap fails either way and is never masked as a style complaint.
+ *
+ * #2823 (ADR-3D-492, ADR-W-203 / ADR-W-208) re-based this lock: a lowercase run in a CERTAIN slot (a point or angle
+ * noun, a polygon or SOLID noun's vertex run, a midpoint's subject, a coordinate head) is accepted in capitals at the
+ * store's seam, with the notice; the nudge is every builder's ask now, and lifts a single letter too — except the ones
+ * #353's convention reserves (u, v, w, t, k, m, x, y, z).
  */
 import { describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
@@ -25,6 +30,11 @@ import { decideDeterministic3 } from '../app/decideDeterministic3';
 const nudges = (u: string): boolean => {
   const v = decideDeterministic3({ facts: [], seed: 0 }, u);
   return v.kind === 'guided' && v.register === 'lowercase-labels';
+};
+/** #2823: the row a line records, and whether it was read in capitals. */
+const recorded = (u: string): { row: string; cased: boolean } | null => {
+  const v = decideDeterministic3({ facts: [], seed: 0 }, u);
+  return v.kind === 'record' ? { row: v.fact.utterance, cased: v.cased === true } : null;
 };
 
 describe('#353 — the reported case', () => {
@@ -40,10 +50,11 @@ describe('#353 — the reported case', () => {
   }
 });
 
-describe('#353 — a single lowercase letter is left alone (it is a vector / parameter / coordinate)', () => {
-  it('only runs of 2+ characters are lifted', () => {
-    expect(upperCasedLabelCandidate3('AS=w')).toBeNull(); // `w` is one letter — nothing liftable
+describe('#353 → #2823 — a reserved single letter is left alone (a vector / parameter / coordinate); any other is asked', () => {
+  it('the reserved letters stay; another single letter is lifted', () => {
+    expect(upperCasedLabelCandidate3('AS=w')).toBeNull(); // `w` is reserved — nothing liftable
     expect(upperCasedLabelCandidate3('AB=5')).toBeNull();
+    expect(upperCasedLabelCandidate3('d על AB')).toBe('D על AB'); // #2823: singles are asked too
   });
 });
 
@@ -56,14 +67,15 @@ describe('#353 — the boundaries', () => {
   });
 
   it('a genuine gap is NOT masked as a case problem (it fails in either case)', () => {
-    for (const u of ['נתון מעגל שמרכזו o', 'the orthoscheme abcd']) {
+    for (const u of ['the orthoscheme abcd']) {
       expect(nudges(u), u).toBe(false);
     }
   });
 
-  it('#181 uplift still wins where it applies — those inputs PARSE, so no nudge is ever shown', () => {
-    for (const u of ['∠sdb', 'זווית sdb', 'זוית abc = 90']) {
-      expect(parse3(u).ok, u).toBe(true);
+  it('#2823: a certain slot is read in capitals at the store — the line records, so no nudge is ever shown', () => {
+    for (const [u, row] of [['∠sdb', '∠SDB'], ['זווית sdb', 'זווית SDB'], ['זוית abc = 90', 'זוית ABC = 90']]) {
+      expect(recorded(u), u).toEqual({ row, cased: true });
+      expect(nudges(u), u).toBe(false);
     }
   });
 
@@ -73,10 +85,10 @@ describe('#353 — the boundaries', () => {
   // here only because abcd ≡ ABCD; «תיבה klmn» would have drawn ABCD). The fail-closed declaration
   // gate now declines it, which routes it to precisely the mechanism #353 built for this: the nudge
   // fires with the corrected spelling, free and instant, instead of a paid LLM call or a wrong figure.
-  it('a lowercase run with NO uplift anchor gets the nudge, not a silently auto-lettered solid', () => {
-    expect(parse3('תיבה abcd').ok).toBe(false);
-    expect(upperCasedLabelCandidate3('תיבה abcd')).toBe('תיבה ABCD');
-    expect(nudges('תיבה abcd')).toBe(true);
+  it('a lowercase run is never a silently auto-lettered solid — #2823: a solid noun’s run is accepted in capitals', () => {
+    expect(parse3('תיבה abcd').ok).toBe(false); // the grammar still declines it as typed
+    expect(recorded('תיבה abcd')).toEqual({ row: 'תיבה ABCD', cased: true });
+    expect(recorded('תיבה klmn')).toEqual({ row: 'תיבה KLMN', cased: true }); // its own letters, never A, B, C, D
   });
 
   it('the pattern-based guidance register is untouched by this addition', () => {

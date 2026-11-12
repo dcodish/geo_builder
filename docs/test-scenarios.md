@@ -2356,3 +2356,7 @@ over all four (ADR-041).
 ### `stated-angle-interior-2813` — «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°»: a stated angle is the interior angle, so a second order of the letters is refused (#2813, ADR-823)
 
 **Guards against:** a stated corner read as the unsigned ray angle — «מרובע ABDC» committed and drawn crossed, or ABCD seated as a dart with the "110°" corner 250° inside. **Asserts** the three lines build convex at every view (seeds 0–5); «מרובע ABDC» (A1) and, with the angles last, «∠BCD = 110°» (A2) are refused `crossed-ring` with `input.ringContradictsAngles`, the Hebrew text naming both angle lines and «שנו את אחת הזוויות או את סדר האותיות»; the kite with the same angles refused; «מרובע ABCD · מרובע ABDC» still commits.
+
+### `lowercase-certain-2823` — «נקודה j» · «משולש abc»: a lowercase letter that can only be a point is read in capitals, with a note (#2823, ADR-828)
+
+**Guards against:** every lowercase point letter answered with the ask, the certain ones included («נקודה j», «משולש abc»). **Asserts** the operator's two lines fold to the rows «נקודה J» and «משולש ABC» (and «נקודה x» to «נקודה X», the 2026-11-12 ruling), which build, with the note «שמות נקודות נכתבים באותיות גדולות, ולכן נרשם: …»; «d על AB» after the triangle is not folded and keeps the ask «שמות נקודות נכתבים באות לטינית גדולה. נסו: D על AB».

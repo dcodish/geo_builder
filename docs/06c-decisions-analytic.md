@@ -16518,3 +16518,17 @@ This also settles the open card about the «both» state zooming out to keep an 
 **Ports (ADR-W-157).** 2-D is the reference and is unchanged. 3-D's circles are a different construct, so no port.
 
 **Behaviour change for a student:** in analytic, «AB קוטר האליפסה», «AB הוא קוטר האליפסה», «קוטר האליפסה AB» and «AB מיתר האליפסה» draw the diameter or chord of the drawn ellipse. «AB הוא קוטר המעגל», «קוטר המעגל AB», «CD הוא מיתר של המעגל» and «מיתר המעגל AB» draw on the drawn circle. With two curves of that kind the tool asks which. «AB קוטר הפרבולה» gets the parabola's «לפרבולה אין מרכז…» sentence. Before, each went to the AI.
+
+## ADR-AG-478 — A certain lowercase label is decided and recorded in capitals with a notice; «c(4,7)»'s teach retires into it; the not-handled exit gains the ask (#2823)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2823](https://github.com/dcodish/geo_builder/issues/2823) (P2, all four builders; folds #1594 and #2159's analytic half) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02c](02c-requirements-analytic.md) — R8 · **Design:** [04c](04c-design-analytic.md) § *The submit path's three answers* · **LADDER stage:** none
+**Amends** [ADR-AG-423](#adr-ag-423) (the `point-case` teach is retired into the shared slot S5) · **Builds** [ADR-W-208](06w-decisions-workspace.md#adr-w-208).
+
+**Measured at pickup** (`b9f8b916`, `decideSubmit`): «נקודה j», «משולש abc», «m אמצע AB», «d על AB», «נקודה x» were `not-handled` (to the model, no hint); «∠abc = 40» was refused `unknown-reference`; «c(4,7)» was taught as «C(4,7)»; "point j" recorded a point named j.
+
+**Decision.** `decideSubmit` folds first (`labelCaseFoldAnalytic`: the shared reader with the axes x, y and every lowercase name a held line uses — ADR-AG-423's `usesLetter` reading, now `lowercaseNamesIn`), decides on the capitalised text, and marks the record `cased`; `commitRecord` says `suite.notice.labelCase` first, beside any other notice. `decideEditHost` folds the edit the same way and returns the text the App stores. At a `not-handled` exit of an unfolded line, the ask: the shared lift keeping x, y, a line name `l…` and every used letter, proved by this same decision, refused `lowercase-labels` with `suite.refusal.lowercaseLabels`. `pointSpelling`'s `point-case` and `noticeTeachPointCase` retire.
+
+**Locks.** `src-analytic/__tests__/issue-2823-lowercase.test.ts` (the slots record with the notice and the capital row, «k אמצע AB» after «k הוא פרמטר» is not folded, «c(4,7)» after a line using c is not folded, the ask, the edit seam); `point-order-1774.test.ts` re-based (the point-case rows record in capitals).
+
+**Behaviour change for a student:** «נקודה j», «משולש abc», «m אמצע AB», «∠abc = 40», «c(4,7)» record with the capitals and a note; «d על AB» is asked in capitals instead of going to the AI.

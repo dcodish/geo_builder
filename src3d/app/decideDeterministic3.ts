@@ -22,7 +22,7 @@
 
 import type { Seed3 } from '../engine/components3';
 import { parse3 } from '../parser/parse3';
-import { classifyGuidance3, upperCasedLabelCandidate3, type ScopeMatch3 } from '../parser/scope3';
+import { classifyGuidance3, labelAskCandidate3, type ScopeMatch3 } from '../parser/scope3';
 import { decideSubmit3, type StoreError3, type Fact3, type Verdict3 } from '../store/store3';
 import type { EngineError3 } from '../engine/types';
 
@@ -39,7 +39,10 @@ export function decideDeterministic3(
 ): DeterministicVerdict3 {
   const v = decideSubmit3(st, raw, newId);
   if (v.kind !== 'not-understood') return v;
-  const upper = upperCasedLabelCandidate3(raw);
+  // #2823 (ADR-3D-492, ADR-W-208): the ASK — a line the store could not read in capitals by certainty (`labelCaseFold3`)
+  // is offered in capitals when that line parses. Every builder's lift (`shell/labelCase` askCandidate), singles included,
+  // leaving what 3-D gives a lowercase meaning: the axes, a name the figure already uses, an English prose word.
+  const upper = labelAskCandidate3(raw, st.facts);
   if (upper && parse3(upper).ok) return { kind: 'guided', register: 'lowercase-labels', corrected: upper, tag: 'scope:lowercase-labels' };
   const g = classifyGuidance3(raw);
   if (g) return { kind: 'guided', register: 'scope', match: g, tag: `scope:${g.category}` };

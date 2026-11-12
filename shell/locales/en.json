@@ -42,12 +42,14 @@
       "tangentsExhaustedTouchTaken": "The only internal tangent — the one at the touch point — is already drawn.",
       "tangentsExhaustedNoInternal": "Circles in this configuration have no internal common tangent.",
       "tangentsExhaustedContained": "A circle contained inside another has no common tangent at all.",
+      "lowercaseLabels": "Point labels are written in UPPERCASE letters. Try: {{corrected}}",
       "proofTarget": "That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{sentence}}»",
       "proofTargetCheckPanel": "You can check whether the claim is true in the «{{panel}}» panel: type each quantity in the claim there, press «{{ask}}», and compare the answers — for example, for AB = AC ask for AB and for AC."
     },
     "notice": {
       "alreadyDrawn": "That's already on the figure — nothing to add.",
       "alreadyHeld": "That's already on the figure — added as a separate given.",
+      "labelCase": "Point names are written in capitals, so this was entered as: {{corrected}}",
       "converge": "{{a}} and {{b}} have landed at the same point.",
       "createdPoint": "New point {{names}} was created — if this is a typo, press ✕ to undo the line.",
       "createdPoints": "New points {{names}} were created — if this is a typo, press ✕ to undo the line.",

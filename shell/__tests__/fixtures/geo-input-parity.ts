@@ -222,6 +222,7 @@ export type Family =
   | 'chords-arcs'
   | 'circles'
   | 'tangents'
+  | 'lowercase'
   | 'topic';
 
 /**
@@ -1199,7 +1200,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-coordinate-point', family: 'topic', steps: ['נתונה הנקודה A(2,6)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '3-D spells a point A(2,-2,6), so only analytic reads this spelling' },
   { id: 'ex-coordinate-letter-after-1774', family: 'topic', steps: ['(3,5)A'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-409: right-to-left typing, taught as A(3,5) (ADR-W-030)' },
   { id: 'ex-coordinate-equals-1774', family: 'topic', steps: ['A = (3,5)'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-409: never accepted, taught as A(3,5) (ADR-W-030, ruling 2026-09-19 on #1245)' },
-  { id: 'ex-coordinate-case-1808', family: 'topic', steps: ['c(4,7)'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-423: taught as «C(4,7)» (judged q13 under ADR-W-030)' },
+  { id: 'ex-coordinate-case-1808', family: 'topic', steps: ['c(4,7)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: 'ADR-AG-423 taught it as «C(4,7)»; since #2823 (ADR-AG-478, ADR-W-203) it records as «C(4,7)» with the notice' },
   { id: 'ex-coordinate-bare-1774', family: 'topic', steps: ['(3,5)'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-422: taught as «נתונה הנקודה (3,5)» (the operator, 2026-11-06: "Teach it")' },
   { id: 'ex-coordinate-point-planar-1954', family: 'topic', steps: ['A(0,0)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#1954: the bare spelling the operator typed into 3-D. A PLANAR coordinate is analytic's; since #1954 both 2-D and 3-D answer it with the same «…נעשה בכלי «גאומטריה אנליטית»» pointer before the model — the refusal itself is locked per product (src3d/__tests__/issue-1954-coordinate-point.test.ts), because X1 lists 3-D among the builders that READ coordinates and this row cannot express the arity split" },
   { id: 'ex-axis', family: 'topic', steps: ['C על ציר ה-x'], expect: 'builds', exception: 'X1' },
@@ -1499,6 +1500,15 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'stated-angle-interior-2813-01', family: 'polygons', steps: ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°', 'מרובע ABDC'], expect: 'refused', note: 'the reported case: every builder drew ABDC crossed before #2813' },
   { id: 'stated-angle-interior-2813-02', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', '∠DAB = 70°', '∠BCD = 110°'], expect: 'refused', note: 'the angle line completes it' },
   { id: 'stated-angle-interior-2813-03', family: 'polygons', steps: ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°'], expect: 'builds', note: 'the control: convex at every view' },
+  // ── #2823 (ADR-W-208 / ADR-828 / ADR-AG-478 / ADR-3D-492, operator rulings 2026-11-10 and 2026-11-12): a lowercase letter
+  // where only a point can stand is read in capitals, with a notice; anywhere else it is asked for in capitals
+  { id: 'lowercase-certain-2823-01', family: 'lowercase', steps: ['נקודה j'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'S1, the operator\'s example; 3-D reads it as «נקודה J», which it does not build: a bare free point is not a 3-D sentence (X9\'s family; the pattern reads only a capital)' },
+  { id: 'lowercase-certain-2823-02', family: 'lowercase', steps: ['משולש abc'], expect: 'builds', note: 'S2, the operator\'s example' },
+  { id: 'lowercase-certain-2823-03', family: 'lowercase', steps: ['משולש ABC', 'm אמצע AB'], expect: 'builds', note: 'S3, from #1594' },
+  { id: 'lowercase-certain-2823-04', family: 'lowercase', steps: ['משולש ABC', 'x אמצע AB'], expect: 'builds', note: 'S3 with an axis letter: an axis is never a midpoint (#1594)' },
+  { id: 'lowercase-certain-2823-05', family: 'lowercase', steps: ['משולש ABC', '∠abc = 40'], expect: 'builds', note: 'S4' },
+  { id: 'lowercase-ask-2823-01', family: 'lowercase', steps: ['משולש ABC', 'd על AB'], expect: 'refused', knownGap: [{ product: '3d' }], note: 'unanchored: asked in capitals. 3-D asks it in decideDeterministic3 (the App\'s lane, after decideSubmit3), which this runner does not reach' },
+  { id: 'lowercase-ask-2823-02', family: 'lowercase', steps: ['משולש ABC', 'נקודה d על ab'], expect: 'refused', knownGap: [{ product: '3d' }], note: 'one certain run beside an unanchored one: the whole line is asked. 3-D: as -01' },
 
   // #1987 (ADR-622) / #1986: four FREE points read in a second order. 2-D draws the CONCAVE quadrilateral — which
   // vertex is reflex is a configuration axis, not a fixed default — and analytic draws it too; since #1986 (ADR-3D-418)

@@ -48,7 +48,8 @@ import { extensionSideVerdict } from './extensionSide';
 import { dryRunOutcome, groupKey, nameByUseCommands, primeFoldFor, replay, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
 import { unaccountedSpans } from '@/parser/spanAccounting';
-import { type DecideLog, type DecideNote, type Verdict2D, decideFromParse, decidePreParse } from './decideDeterministic';
+import { type DecideLog, type DecideNote, type Verdict2D, decideFromParse, decidePreParse, labelCaseFold2D, withLabelCase } from './decideDeterministic';
+import { LABEL_CASE_ASK, LABEL_CASE_NOTICE } from '../../shell/labelCase';
 import { unreadItems } from './honestyGates';
 import { logDebug } from '@/debug/sessionLog';
 import { otherUtteranceForError } from './errorSubject';
@@ -230,6 +231,10 @@ async function chainSentence(text: string, i: number, deps: BoxDeps): Promise<Se
 async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   const { t, locale, ui } = deps;
   if (deps.isBusy()) return; // a submit is already in flight (E3) — chips/enter can't race a second one
+  // #2823 (ADR-828, ADR-W-208): a line whose every lowercase label can only be a point is read — and stored, and shown —
+  // in capitals from here on, and says so when it commits (`withLabelCase`); every other lowercase line keeps the ask.
+  const cased = labelCaseFold2D(utterance, useGeoStore.getState().facts);
+  if (cased) utterance = cased.text;
   ui.setInputNote('');
   ui.setLlmDropped([]);
   ui.setRenameNote('');
@@ -297,7 +302,7 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   ui.setBusy(true);
   await deps.nextPaint();
   const st0 = store();
-  const verdict = await decideFromParse({ facts: st0.facts, seed: st0.seed, view: deps.view(), centresShown: deps.centresShown?.() }, utterance, locale, {
+  const verdict = withLabelCase(await decideFromParse({ facts: st0.facts, seed: st0.seed, view: deps.view(), centresShown: deps.centresShown?.() }, utterance, locale, {
     // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
     // the commit, and every later replay of this content then run at TAIL speed on the main thread.
     prefold: async (trial, seed) => {
@@ -308,7 +313,7 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
         if (!isCancelled(err)) throw err; // cancelled prefold: fall through — the sync path still works
       }
     },
-  });
+  }), cased);
   // #1697 (ADR-588): the #186 / #539 auto-binds (and the #1673 step-aside) the decision simulated are the LINE'S
   // OWN facts — `name-by-use` commands committed in the line's group, ahead of its statements, and applied by
   // `replay`. They used to be store renames applied here whatever the verdict, so the name belonged to no line:
@@ -477,7 +482,7 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
     const fold = lowercaseLabelFold(utterance, llmCmds, parseCtxNow().points ?? []); // #2195: the teaching criterion, on this lane too
     if (fold) {
       logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:lowercase-labels', commands: llmCmds });
-      ui.setInputNote(t('input.scope.lowercase-labels', { corrected: fold.corrected }));
+      ui.setInputNote(t(LABEL_CASE_ASK, { corrected: fold.corrected }));
       ui.setBusy(false);
       return;
     }
@@ -612,6 +617,7 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   // logged so a `source:llm` submit stays reconstructable, corrections included.
   logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out!.built.map((g) => g.step), dropped: out!.dropped, commands: llmCmds, ...(out!.restored ? { restored: out!.restored } : {}) });
   ui.setLlmDropped(out!.dropped);
+  if (cased) ui.setInputNote(t(LABEL_CASE_NOTICE, { corrected: cased.text })); // #2823: the model's lane says it too
   ui.clearText();
   deps.resolveAfterCommit();
 }

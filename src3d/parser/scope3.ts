@@ -1,4 +1,5 @@
 import { EN_STOP, NOUN_EN } from './parse3';
+import { askCandidate, lowercaseNamesInCommands } from '../../shell/labelCase';
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 
 /**
@@ -41,7 +42,6 @@ export type ScopeCategory3 =
   | 'bare-solid'
   | 'ui-command'
   | 'oblique-prism'
-  | 'lowercase-labels'
   | 'ambiguous-height'
   | 'latin-angle-label'
   /**
@@ -339,12 +339,18 @@ const EN_WORD = new RegExp('^(?:' + NOUN_EN + ')$', 'i');
 const isEnglishProse = (run: string): boolean => EN_STOP.has(run) || EN_WORD.test(run);
 
 export function upperCasedLabelCandidate3(utterance: string): string | null {
+  return labelAskCandidate3(utterance, []);
+}
+
+/**
+ * #2823 ([ADR-3D-492](../../docs/06b-decisions-3d.md#adr-3d-492), ADR-W-208) — the ASK, through every builder's lift
+ * (`shell/labelCase` askCandidate): a single lowercase letter is asked too now, except where 3-D gives it a meaning — a
+ * letter #353's convention reserves (vectors u, v, w; parameters t, k, m; the axes x, y, z), a name the figure's commands
+ * already carry, an English prose word; and a symbolic plane equation is never lifted at all.
+ */
+const RESERVED3 = /^[uvwtkmxyz]$/;
+export function labelAskCandidate3(utterance: string, facts: readonly { cmds: readonly unknown[] }[]): string | null {
   if (SYMBOLIC_PLANE_EQ3.test(utterance)) return null;
-  let changed = false;
-  const out = utterance.replace(/(?<![A-Za-z])([a-z][a-z0-9']+)(?![A-Za-z])/g, (run: string) => {
-    if (isEnglishProse(run)) return run;
-    changed = true;
-    return run.toUpperCase();
-  });
-  return changed ? out : null;
+  const used = lowercaseNamesInCommands(facts.flatMap((f) => f.cmds));
+  return askCandidate(utterance, (run) => isEnglishProse(run.toLowerCase()) || RESERVED3.test(run) || used.has(run));
 }

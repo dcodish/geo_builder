@@ -7464,11 +7464,11 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 
 ## ADR-W-203 — A lowercase letter that can only be a point label is accepted and written in uppercase; an ambiguous one asks for uppercase, in every builder (#2823)
 
-**Status:** accepted · 2026-11-10 · operator ruling, all four builders · not yet built (#2823) · changes what 2-D's lowercase-names message and analytic's AI fallback do today · LADDER stage: **none** (the reading of a label)
+**Status:** accepted · 2026-11-10 · operator ruling, all four builders · **built** 2026-11-12 by [ADR-W-208](#adr-w-208) (#2823), with the 2026-11-12 axis-letter ruling · changes what 2-D's lowercase-names message and analytic's AI fallback do today · LADDER stage: **none** (the reading of a label)
 **Operator:** 2026-11-10, Rulings Inbox, answering #2807's lowercase question («נקודה t» in 3-D):
 > "new ruling that we need to think about: when a lowercase is used for a point, we should accept it if its for sure an upper case. like נקודה j or משולש abc. the reason is mobile phones where it a pain to use capital always. so we need a review on where we reject these letters and if its for sure upper case, we accept but the input is written in upper case. where we are not sure, we ask user to use upper case. This would be for all tools and its different than what we have until now"
 
-**Requirements:** [02w](02w-requirements-workspace.md) (a row is added when #2823 is built) · **Design:** none yet; #2823's plan names it
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-37 · **Design:** [04w](04w-design-shell.md) § *Lowercase point labels* (ADR-W-208)
 
 **Decision.**
 1. **Certain → accepted, written uppercase.** Where a lowercase letter can only be a point label («נקודה j», the letter run after a polygon noun «משולש abc»), the line is accepted and its row shows the label in uppercase.
@@ -7494,3 +7494,24 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 1. **One notice key** for a held row in every builder: `suite.notice.alreadyHeld` — «זה כבר קיים באיור — נוסף כנתון נפרד.» / "That's already on the figure — added as a separate given." (new text of the session's, ADR-W-174). `suite.notice.alreadyDrawn` retires when the last builder ports.
 2. **One shared table** of held sequences and controls (`held-row-2790.ts`), asserted by each tree through its own decision: one row appended, the notice, no point moves, the relation holding once the earlier row is unticked and deleted.
 3. **Split landing.** The round landed 2-D first (the reference, ADR-W-118 B1), then analytic and complex (ADR-AG-462, ADR-AG-463, ADR-CX-089), each asserting the shared table through its own decision; until 3-D's port lands it answers a held line with its old no-row note — a parity known gap naming #2790.
+
+## ADR-W-208 — ADR-W-203 built: one reader of the slot a lowercase letter sits in, a notice when it is read in capitals, and one ask, in every builder (#2823)
+
+**Status:** accepted · 2026-11-12 · round [#2855](https://github.com/dcodish/geo_builder/issues/2855) · **builds** [ADR-W-203](#adr-w-203) in all four builders ([ADR-828](06-decisions.md#adr-828), [ADR-3D-492](06b-decisions-3d.md#adr-3d-492), [ADR-AG-478](06c-decisions-analytic.md#adr-ag-478), [ADR-CX-092](06d-decisions-complex.md#adr-cx-092)) · **amends** [ADR-W-030](#adr-w-030) invariant 1 for point labels (a certain label is accepted with a notice, not taught) · folds #1594 and the analytic/3-D half of #2159 · LADDER stage: **none** (the reading of a label, before the parse)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-37 · **Design:** [04w](04w-design-shell.md) § *Lowercase point labels*
+**Operator:** ADR-W-203 (2026-11-10); and 2026-11-12, Rulings Inbox card `d-2823-axis-letter`, **accept**: a lowercase x, y or z after «נקודה» («נקודה x») is accepted as the capital point with the notice — replacing the plan's "ask" row for the axis letters.
+
+**Measured at pickup** (`b9f8b916`, each builder's own submit decision): 2-D asked on every lowercase line, certain slots included («נקודה j», «משולש abc», «m אמצע AB», «∠abc = 40» → «שמות נקודות נכתבים באות לטינית גדולה. נסו: …»); analytic sent them to the model (`not-handled`), taught «c(4,7)», and recorded "point j" with a lowercase point; 3-D read #181's anchors silently with the lowercase text in the row («m אמצע AB», «∠abc = 40»), asked on runs of two letters or more, and sent single letters to the model; complex refused all of them as not understood.
+
+**Class.** *Each builder decided "is this lowercase letter a point?" with its own function and anchors, and none of them read the SLOT the letter sits in*, so the same sentence was asked, taught, read silently or refused by builder.
+
+**Decision.**
+1. **One reader:** `shell/labelCase.ts`. `certainLabelFold(line, { used, axes, solidNouns })` writes a line in capitals when EVERY lowercase label-run in it stands in a certain slot: S1 a point or vertex noun before single labels («נקודה j», «הנקודות a ו-b», "point j"); S2 a polygon noun (or a product's solid noun) before a vertex run of its arity («משולש abc», «ריבוע abcd»); S3 the subject of a midpoint sentence («m אמצע AB»); S4 an angle's vertex triple («∠abc», «זווית sdb»); S5 a coordinate head («c(4,7)»). Never certain: a letter the figure already uses (`used`: a measure, a parameter, a line, a vector, a complex name), an axis letter outside S1 and S3 (the 2026-11-12 ruling for S1; #1594's for S3), a single letter after the angle sign, a run of the wrong arity or with a repeated letter, and every unanchored run. A letter inside brackets is a value, an axis named as an axis («ציר ה-x») is notation, and a unit or function name is never a label. One uncertain run leaves the whole line to the ask.
+2. **The fold runs at each builder's submit entry, before the parse**, and the folded text is what is parsed, stored and shown — so every honesty gate downstream sees an uppercase label (#779's lesson). The line commits with one suite notice, `suite.notice.labelCase`: «שמות נקודות נכתבים באותיות גדולות, ולכן נרשם: {{corrected}}» / "Point names are written in capitals, so this was entered as: {{corrected}}" (the plan's text, ADR-W-174), said first and beside any other notice the step carries.
+3. **One ask:** every other lowercase line that would build in capitals gets `suite.refusal.lowercaseLabels` — 2-D's sentence, moved to the suite — with the corrected line. Its candidate is 2-D's lift (`askCandidate`, moved from `parse.ts` unchanged); each builder passes what it keeps lowercase and proves the candidate before suggesting it.
+
+**Sibling audit.** All four builders are in this item (the ruling is "all tools"); no `EXCEPTIONS` family is needed — complex's own lowercase numbers are kept by `used`, not by an exception. The parity table gains a `lowercase` family.
+
+**Locks.** `shell/__tests__/label-case-2823.test.ts` (every slot in Hebrew and English, every never-certain row, the ask); parity rows `lowercase-certain-2823-01..05`, `lowercase-ask-2823-01..02`; the per-builder locks named in each product ADR; scenario `lowercase-certain-2823` (`scenarios-corpus-4.ts`).
+
+**Behaviour change for a student:** in every builder, «נקודה j», «משולש abc», «m אמצע AB», «∠abc = 40» (and «c(4,7)» where coordinates are read) are accepted, the row shows the capitals, and a note says so; «d על AB» and other lowercase letters that could be something else are answered with the request to write them in capitals, in every builder.

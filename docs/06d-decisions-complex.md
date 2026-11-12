@@ -4529,3 +4529,17 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Locks.** `src-complex/__tests__/already-drawn-1990.test.ts` drives the shared table (`HELD_CASES_COMPLEX`) through the real `submitLine`: one row, the note, no point moving at 4 seeds, and, with the earlier row muted and then deleted, the row carrying the relation alone; controls. Re-based on ADR-W-200's authority: `entailed-noop-2268`, `triage-replay-cx-2241`, `sibling-phrasings`, `app/__tests__/acceptance-gate`.
 
 **Behaviour change for a student:** in complex, «|z1| = 5» after «z1 = 3+4i» (and every exact restatement) is listed as its own row, and the tool says «זה כבר קיים באיור — נוסף כנתון נפרד.» instead of adding nothing.
+
+## ADR-CX-092 — A certain lowercase label is decided and recorded in capitals with a notice; the run-rejecting refusal becomes the ask (#2823)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2823](https://github.com/dcodish/geo_builder/issues/2823) (P2, all four builders) · round [#2855](https://github.com/dcodish/geo_builder/issues/2855)
+**Requirements:** [02d](02d-requirements-complex.md) — a point's name (ADR-CX-062's subject floor) · **Design:** [04d](04d-design-complex.md) § *Design rules with teeth* · **LADDER stage:** none
+**Builds** [ADR-W-208](06w-decisions-workspace.md#adr-w-208).
+
+**Measured at pickup** (`b9f8b916`, `decideSubmitCx`): «משולש abc», "triangle abc" and every other lowercase point line were refused not-understood (a lowercase run that is neither a z/w name nor a capital rejects the whole run, #791).
+
+**Decision.** `decideSubmitCx` folds first (`labelCaseFoldCx`: the shared reader; complex has no axes, and its own lowercase names — the z and w families, `i`, `o`, every declared family and every name a held line uses — are `used`, so they are never folded), decides on the capitalised text, and records with the note `label-case` (with `held` when the line was held too); the App says `suite.notice.labelCase`. A loaded session replays as saved. When an unfolded line does not parse, the ask: the shared lift keeping complex's names, proved by this same decision, refused `lowercase-labels` with `suite.refusal.lowercaseLabels`.
+
+**Locks.** `src-complex/__tests__/issue-2823-lowercase.test.ts` (the triangle records in capitals with the note, a z/w name and a declared name are never folded, the ask).
+
+**Behaviour change for a student:** in complex «משולש abc» records as «משולש ABC» with the note; a lowercase point letter elsewhere that would build in capitals is asked in capitals instead of «לא הבנתי».

@@ -35,6 +35,7 @@ import { curveDetailsKey, curveParts, namedRow } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
+import { LABEL_CASE_NOTICE } from '../shell/labelCase';
 import { commitRecord, decideEditHost, decideSubmit, decideToggle, noticeText, reachesFallback, sentenceOutcome } from './app/submit';
 import { submitTyped, type SentenceOutcome } from '../shell/sentences';
 import { activeOf, activePins, rowOf } from './app/active';
@@ -977,7 +978,7 @@ export function App() {
        * intention as a mistake is the #1045 lesson.
        */
       case 'teach':
-        setNotice(t(verdict.note === 'point-order' ? 'noticeTeachPointOrder' : verdict.note === 'point-equals' ? 'noticeTeachPointEquals' : verdict.note === 'point-bare' ? 'noticeTeachPointBare' : verdict.note === 'point-case' ? 'noticeTeachPointCase' : 'noticeTeachCanonical', { verb: verdict.verb, canonical: verdict.canonical }));
+        setNotice(t(verdict.note === 'point-order' ? 'noticeTeachPointOrder' : verdict.note === 'point-equals' ? 'noticeTeachPointEquals' : verdict.note === 'point-bare' ? 'noticeTeachPointBare' : 'noticeTeachCanonical', { verb: verdict.verb, canonical: verdict.canonical }));
         return sentenceOutcome(verdict); // the canonical goes INTO the box (ADR-W-030)
       /**
        * #1154 — A RENAME rewrites the session (every line, every ask row) in ONE store commit, or names
@@ -1640,8 +1641,11 @@ export function App() {
                 const edit = decideEditHost(i, next, lines, disabled, seed, seedNames, hosts);
                 if (!edit.ok) return false;
                 // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
-                logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
-                replaceLine(i, next, edit.host?.ring);
+                // #2823 (ADR-AG-478): a certain lowercase label is stored in capitals, as at submit
+                const text = edit.text ?? next;
+                logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${text}` });
+                replaceLine(i, text, edit.host?.ring);
+                if (edit.text) setNotice(t(LABEL_CASE_NOTICE, { corrected: edit.text }));
                 return true;
               }}
               onDelete={(id) => {

@@ -21,7 +21,10 @@
 import { describe, expect, it } from 'vitest';
 import { normalize3, parse3 } from '../parser/parse3';
 import { upperCasedLabelCandidate3 } from '../parser/scope3';
-import { derive3, useGeo3 } from '../store/store3';
+import { derive3, labelCaseFold3, useGeo3 } from '../store/store3';
+
+/** #2823 (ADR-3D-492): the store's certain-label reading, which replaced the uplift inside `normalize3`. */
+const up3 = (u: string): string => labelCaseFold3(u, [])?.text ?? u;
 
 const cmds = (u: string) => {
   const r = parse3(u);
@@ -39,20 +42,21 @@ describe('#924 arm 1 — the coordinate definition: a lowercase label before a 3
     ['נקודה c(1,2,3)', 'נקודה C(1,2,3)'], // the #181 noun anchor, unchanged
   ]) {
     it(`«${lower}» ≡ «${upper}»`, () => {
-      expect(normalize3(lower)).toBe(normalize3(upper));
-      expect(cmds(lower)).toEqual(cmds(upper));
+      expect(normalize3(up3(lower))).toBe(normalize3(upper));
+      expect(cmds(up3(lower))).toEqual(cmds(upper));
     });
   }
 
   it('the parameter of a parametric line is NOT a label: «t(m-2,m,m+2)» mid-sentence stays lowercase', () => {
     for (const u of ['ישר l x=(1,2,3)+t(m-2,m,m+2)', 'x=(1,2,3)+t(2,0,2)', 'משוואת הישר AC היא x=(8,-1,-1)+t(k+1,0,k-3)']) {
       expect(normalize3(u), u).toBe(u);
+      expect(up3(u), u).toBe(u); // #2823: nor at the store's seam
       expect(parse3(u).ok, u).toBe(true);
     }
   });
 
   it('a lone axis letter never uplifts, even before a tuple', () => {
-    expect(normalize3('x(1,2,3)')).toBe('x(1,2,3)');
+    expect(up3('x(1,2,3)')).toBe('x(1,2,3)');
   });
 });
 

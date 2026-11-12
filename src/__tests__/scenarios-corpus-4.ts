@@ -50,6 +50,8 @@ import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-ha
 import { ctxOf } from './scenario-pipeline';
 import { gateVerdict, heldKind } from './submit-gate';
 import { ringOrderVerdict } from '@/app/ringOrder';
+import { labelCaseFold2D } from '@/app/decideDeterministic';
+import { lowercaseLabelFold } from '@/parser';
 import i18n from '@/i18n';
 import { circleResolver, humanizeError } from '@/i18n/humanizeError';
 import { circleMenuTitle } from '@/i18n/circleText';
@@ -6790,6 +6792,30 @@ export const SCENARIOS_4: Scenario[] = [
         const turns = q.map((o, i) => Math.sign((q[(i + 1) % 4].x - o.x) * (q[(i + 2) % 4].y - o.y) - (q[(i + 1) % 4].y - o.y) * (q[(i + 2) % 4].x - o.x)));
         expect(turns.every((t) => t !== 0 && t === turns[0]), `seed ${seed}: ABCD convex`).toBe(true);
       }
+    },
+  },
+  {
+    id: 'lowercase-certain-2823',
+    title:
+      '#2823 (ADR-828, ADR-W-208): the operator\'s own examples «נקודה j» and «משולש abc» are read in capitals — the rows read «נקודה J», «משולש ABC» and the step says so; «d על AB» after the triangle is asked in capitals',
+    guards:
+      "Operator rulings ADR-W-203 (2026-11-10): *\"when a lowercase is used for a point, we should accept it if its for sure an upper case. like נקודה j or משולש abc … where we are not sure, we ask user to use upper case. This would be for all tools\"*; 2026-11-12: a lowercase x, y or z after «נקודה» is accepted too. Measured at pickup on b9f8b916 through decideDeterministic2D: every lowercase line, the certain ones included, was refused with «שמות נקודות נכתבים באות לטינית גדולה. נסו: …». Root cause: no builder read the SLOT a lowercase letter sits in; 2-D asked on all of them. Fix: `shell/labelCase` `certainLabelFold` at the submit entry, before the parse (`labelCaseFold2D`), the folded text committed and shown with `suite.notice.labelCase`; the ask is unchanged for every other line. The full-path unit lock is src/app/__tests__/label-case-2823.test.ts.",
+    // the rows the app commits for the operator's typed «נקודה j» · «משולש abc»
+    steps: ['נקודה J', 'משולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      // the operator's exact lines fold to exactly these rows, with the notice
+      expect(labelCaseFold2D('נקודה j', [])?.text).toBe('נקודה J');
+      expect(labelCaseFold2D('משולש abc', factsOf(['נקודה J']))?.text).toBe('משולש ABC');
+      expect(labelCaseFold2D('נקודה x', [])?.text).toBe('נקודה X'); // the 2026-11-12 ruling
+      expect(stripFormatControls(he('suite.notice.labelCase', { corrected: 'נקודה J' }) as string)).toBe('שמות נקודות נכתבים באותיות גדולות, ולכן נרשם: נקודה J');
+      // «d על AB» after the triangle is not certain: it keeps the ask, with the line in capitals
+      const tri = factsOf(['משולש ABC']);
+      expect(labelCaseFold2D('d על AB', tri)).toBeNull();
+      const pr = parse('d על AB', ctxOf(tri));
+      expect(pr.ok && lowercaseLabelFold('d על AB', pr.commands, ['A', 'B', 'C'])?.corrected).toBe('D על AB');
+      expect(stripFormatControls(he('suite.refusal.lowercaseLabels', { corrected: 'D על AB' }) as string)).toBe('שמות נקודות נכתבים באות לטינית גדולה. נסו: D על AB');
     },
   },
 ];

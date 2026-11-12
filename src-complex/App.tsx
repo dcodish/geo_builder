@@ -57,7 +57,7 @@ import { RadicalText } from './render/radicalText';
 import { complexBidi } from './i18n';
 import registry from '../products.json';
 import { EXAMPLE_LINES } from './app/example';
-import { errorText } from './app/errorText';
+import { errorText, noteText } from './app/errorText';
 import { coincidencesCx } from './app/coincidences';
 import { convergeText } from '../shell/converge';
 import { knowledgeAnswerText } from './replay/scene2';
@@ -799,7 +799,8 @@ export function App() {
                 <Banner kind="error">{errorText(lastError, t)}</Banner>
               )}
               {/* #2268 (ADR-CX-084) → #2790 (ADR-CX-089, ADR-W-204): a held line is its own row — a notice, not a refusal */}
-              {lastNote && <Banner kind="notice">{t('suite.notice.alreadyHeld')}</Banner>}
+              {/* #2823 (ADR-CX-092): a line read in capitals says so first, and that it was held too when it was */}
+              {lastNote && <Banner kind="notice">{noteText(lastNote, t)}</Banner>}
               {/* #1595 (ADR-CX-086, ADR-W-176): two named numbers on one dot are accepted, and the page always says so —
                   2-D's ADR-123 sentence through the suite key, read from the drawn figure while it has the pair */}
               {coincidences.length > 0 && (

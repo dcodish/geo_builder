@@ -226,6 +226,8 @@ export function errorText(error: InputError, t: Translate): string {
     'reserved-coordinate': 'errReservedCoordinate',
     // #2427 (ADR-AG-325) — the operator's ruled sentence (2026-10-20), with the corrected line
     'capital-magnitude': 'errCapitalMagnitude',
+    // #2823 (ADR-AG-478) — the suite's ask, 2-D's sentence, with the line in capitals
+    'lowercase-labels': 'suite.refusal.lowercaseLabels',
     'bad-arity': 'errBadArity',
     'repeated-vertex': 'errRepeatedVertex',
     // #2386 (ADR-AG-310) — the operator's ruled sentence (2026-10-20, option (a)) and its horizontal mirror
@@ -403,7 +405,7 @@ export function errorText(error: InputError, t: Translate): string {
     product: error.key === 'mixed-number' ? error.product : error.key === 'juxtaposed-numbers' ? (error.product ?? '') : '',
     comma: error.key === 'juxtaposed-numbers' ? (error.comma ?? '') : '',
     letter: error.key === 'capital-magnitude' ? error.letter : '',
-    corrected: error.key === 'capital-magnitude' ? error.corrected : '',
+    corrected: error.key === 'capital-magnitude' || error.key === 'lowercase-labels' ? error.corrected : '',
     role: error.key === 'ambiguous-role-side' ? t(error.role === 'leg' ? 'roleWordLeg' : error.role === 'hypotenuse' ? 'roleWordHypotenuse' : 'roleWordBase') : '',
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
     vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',

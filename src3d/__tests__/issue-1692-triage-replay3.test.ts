@@ -43,7 +43,8 @@ const SWEEP: ReadonlyArray<{ why: string; session: string; now: Now; detail: str
   // #2790 (ADR-3D-484): a restated fact is its own row (held), so the replay builds it
   { why: '#2790: a restated fact is its own row', session: 'משולש ABC ⏎ משולש ABC', now: 'built', detail: 'solid' },
   { why: 'a line that records with nothing positioned yet is BUILT (the App records it)', session: 'המישור π1: z = 1', now: 'built', detail: 'plane3' },
-  { why: '#353: the lowercase nudge', session: 'פירמידה sabcd', now: 'guided', detail: 'scope:lowercase-labels' },
+  // #2823 (ADR-3D-492): «פירמידה sabcd» is a certain slot now (accepted in capitals); the ask keeps an unanchored run
+  { why: '#353 → #2823: the lowercase ask', session: 'ab = 5', now: 'guided', detail: 'scope:lowercase-labels' },
   { why: 'ADR-3D-040: the guidance register', session: 'פירמידה', now: 'guided', detail: 'scope:bare-solid' },
   // #1467 (ADR-3D-382): a refusal with its true code is not a gap. #2609 (ADR-3D-408): «AB ⊥ AC» alone now BUILDS on a
   // blank canvas (the created points are placed), so the reasoned refusal is two givens that cannot both hold

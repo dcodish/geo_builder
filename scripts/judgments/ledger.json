@@ -4355,6 +4355,16 @@
       "reason": "Reverses ADR-3D-047's idempotent re-declare; no precedent.",
       "at": "2026-11-11T10:12:57.683Z",
       "status": "escalated"
+    },
+    {
+      "id": "text-2823-label-case-notice",
+      "kind": "text",
+      "issue": "#2823",
+      "what": "the notice a line read in capitals carries (suite.notice.labelCase), in every builder",
+      "choice": "«שמות נקודות נכתבים באותיות גדולות, ולכן נרשם: {{corrected}}» / \"Point names are written in capitals, so this was entered as: {{corrected}}\"",
+      "chosen": true,
+      "at": "2026-11-12T17:12:29.509Z",
+      "status": "pending"
     }
   ],
   "demoted": {

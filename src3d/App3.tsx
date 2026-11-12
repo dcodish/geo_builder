@@ -5,6 +5,7 @@
  * src/ — docs/20 §12 rule 1).
  */
 
+import { LABEL_CASE_ASK, LABEL_CASE_NOTICE } from '../shell/labelCase';
 import type { Seed3 } from './engine/components3';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -596,7 +597,7 @@ export default function App3() {
       // on it is pure cost (the 2-D ADR-289 twin), and a lowercase-label line is taught its spelling.
       logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: 'not-understood', intermediate: true });
       logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'scope', result: v.tag });
-      setGuidanceNote(v.register === 'lowercase-labels' ? t('scope.lowercase-labels', { corrected: v.corrected }) : t(v.match.messageKey));
+      setGuidanceNote(v.register === 'lowercase-labels' ? t(LABEL_CASE_ASK, { corrected: v.corrected }) : t(v.match.messageKey)); // #2823: every builder's ask
       useGeo3.setState({ lastError: null });
       return 'kept';
     }
@@ -626,7 +627,8 @@ export default function App3() {
       }
     }
     if (err) return 'kept';
-    setGuidanceNote(null);
+    // #2823 (ADR-3D-492): a line read in capitals says so — the row already shows the capital
+    setGuidanceNote(v.kind === 'record' && v.cased ? t(LABEL_CASE_NOTICE, { corrected: v.fact.utterance }) : null);
     return 'consumed';
   };
 

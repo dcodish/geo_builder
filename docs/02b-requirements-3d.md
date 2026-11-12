@@ -196,14 +196,19 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 
 ## Reading a statement — read, asked, refused
 
-- **FR-SP-8 (Must)** — **Case in labels: where the anchor proves a run is a label, it is read as one;
-  elsewhere the convention is taught, never guessed.** Point labels are uppercase by convention, and 3-D
-  carries case-significant tokens 2-D lacks (axes x/y/z, parameters k/m/t, vector names u/v/w, R vs r,
-  ℓ), so a blanket case-fold is not available. A lowercase run reads as a label only where an anchor proves
-  it (an angle or point noun, the head of a coordinate definition, the single-letter subject of a midpoint statement);
-  elsewhere — a SOLID noun included — it is **taught**, never sent to the paid fallback.
-  - Sources: ADR-3D-039, ADR-3D-092, ADR-3D-223, ADR-3D-226, ADR-3D-287; #181, #353, #498, #924, #1523,
-    #1861.
+- **FR-SP-8 (Must)** — **Case in labels: where only a point's name can stand, a lowercase run is accepted in
+  capitals and the student is told; elsewhere the convention is asked for, never guessed.** Point labels are
+  uppercase by convention, and 3-D carries case-significant tokens 2-D lacks (axes x/y/z, parameters k/m/t,
+  vector names u/v/w, R vs r, ℓ), so a blanket case-fold is not available. A lowercase run is read as a label
+  where only a label can stand — after a point or vertex noun («נקודה x» included, the operator's 2026-11-12
+  ruling), an angle's three letters, a polygon's or a SOLID's vertex run («תיבה abcda'b'c'd'»), the head of a
+  coordinate definition, the single-letter subject of a midpoint statement — and never when the figure already
+  uses the letter (a parameter, a vector, a line). The row shows the capitals and a note says «שמות נקודות נכתבים
+  באותיות גדולות, ולכן נרשם: …». Elsewhere a lowercase label, single letters included (but not u, v, w, t, k, m,
+  x, y, z), is **asked for in capitals** («שמות נקודות נכתבים באות לטינית גדולה. נסו: …») when the capitalised
+  line reads, never sent to the paid fallback.
+  - Sources: ADR-3D-039, ADR-3D-092, ADR-3D-223, ADR-3D-226, ADR-3D-287, ADR-3D-492, ADR-W-208; #181, #353,
+    #498, #924, #1523, #1861, #2823.
 - **FR-SP-22 (Must)** — **A symbol typed as any of its look-alike glyphs reads as the symbol**
   ([FR-SU-17](02w-requirements-workspace.md)). «AC ⟂ AB» reads as «AC ⊥ AB» (and «SA ⟂ ABC» on a plane),
   «∡ABC» and «∢ABC» as «∠ABC», a keyboard `<` before a run of letters as «∠», «40⁰» / «40º» / «40˚» as

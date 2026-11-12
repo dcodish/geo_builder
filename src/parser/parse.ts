@@ -25,6 +25,7 @@ import { restoreStatedSequences as restoreStatedSequencesShared } from '../../sh
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
+import { askCandidate, liftedRuns as shellLiftedRuns } from '../../shell/labelCase';
 import { foldTangentSide } from './tangentSide';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { foldPrimes } from '../../shell/primes';
@@ -16060,28 +16061,13 @@ export function latinAngleLetters(commands: readonly AnyCommand[], earlier: read
  * let the caller PROOF re-parse the candidate (the note fires only if the candidate parses, so a
  * genuine gap stays a genuine gap). Hebrew text lifts every standalone run, singles included; Latin
  * text lifts non-filler runs of at most 4 letters (the 3-D cap — real English words stay words).
+ *
+ * #2823 ([ADR-W-208](../../docs/06w-decisions-workspace.md#adr-w-208)): the lift is the SHARED ask of every builder now
+ * (`shell/labelCase` `askCandidate`), moved there unchanged.
  */
-const LIFT_RUN = /(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g;
-/** The runs {@link upperCasedLabelCandidate} lifts. */
-const liftable = (run: string, heb: boolean): boolean => {
-  const low = run.toLowerCase();
-  if (UNIT_WORDS.has(low)) return false;
-  return heb || !(EN_FILLER_WORDS.has(low) || run.replace(/\d/g, '').length > 4);
-};
-const liftedRuns = (utterance: string): string[] => (utterance.match(LIFT_RUN) ?? []).filter((run) => liftable(run, hasHebrewScript(utterance)));
+const liftedRuns = (utterance: string): string[] => shellLiftedRuns(utterance);
 export function upperCasedLabelCandidate(utterance: string): string | null {
-  // Lifted from the RAW text (same fidelity ruling as the fold's corrected sentence) — the candidate
-  // is both re-parsed (parse normalizes internally) and SHOWN, so it must read as what the student
-  // typed, case aside.
-  const s = utterance;
-  const heb = hasHebrewScript(s);
-  let changed = false;
-  const out = s.replace(LIFT_RUN, (run) => {
-    if (!liftable(run, heb)) return run;
-    changed = true;
-    return run.toUpperCase();
-  });
-  return changed ? out : null;
+  return askCandidate(utterance);
 }
 
 /**

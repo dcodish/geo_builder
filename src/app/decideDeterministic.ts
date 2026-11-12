@@ -52,6 +52,7 @@ import {
   typedLabels,
 } from '@/parser';
 import { independentConstructs } from './independence';
+import { LABEL_CASE_ASK, LABEL_CASE_NOTICE, certainLabelFold, lowercaseNamesInCommands, type LabelFold } from '../../shell/labelCase';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { clauseCoverageVerdict, compoundNotHonoured, joinedSubject, splitStatements } from './clauseCoverage';
 import { extensionSideVerdict } from './extensionSide';
@@ -836,7 +837,7 @@ export async function decideFromParse(
   if (r.ok) {
     const fold = lowercaseLabelFold(utterance, r.commands, pctx.points ?? []);
     if (fold) {
-      return refuse('guided', { source: 'scope', result: 'scope:lowercase-labels', commands: r.commands }, { key: 'input.scope.lowercase-labels', params: { corrected: fold.corrected } });
+      return refuse('guided', { source: 'scope', result: 'scope:lowercase-labels', commands: r.commands }, { key: LABEL_CASE_ASK, params: { corrected: fold.corrected } });
     }
   }
   let weak: 'error' | 'empty' | 'dropped' | null = null;
@@ -1223,7 +1224,7 @@ export async function decideFromParse(
       const lr = parse(lifted, lctx);
       // #2195 (ADR-738): taught only when the lifted letters exist or the line defines them (ruling 2026-10-18)
       if (lr.ok && lr.commands.length > 0 && liftTeachable(utterance, lr.commands, lctx.points ?? [])) {
-        return refuse('guided', { source: 'scope', result: 'scope:lowercase-labels' }, { key: 'input.scope.lowercase-labels', params: { corrected: lifted } });
+        return refuse('guided', { source: 'scope', result: 'scope:lowercase-labels' }, { key: LABEL_CASE_ASK, params: { corrected: lifted } });
       }
     }
   }
@@ -1353,6 +1354,24 @@ export function appendNote(note: DecideNote | null, tip: DecideNote): DecideNote
   return { ...note, also: note.also ? appendNote(note.also, tip) : tip };
 }
 
+/**
+ * #2823 ([ADR-828](../../docs/06-decisions.md#adr-828), ADR-W-208) — a line whose every lowercase label stands where only a
+ * point can stand («נקודה j», «משולש abc», «m אמצע AB», «∠abc = 40») is read in CAPITALS before anything else reads it:
+ * the folded text is what is parsed, stored and shown, so every honesty gate downstream sees an uppercase label. A letter
+ * the figure already gives another meaning — a measure, a variable, an angle's symbol — is never folded (it is `used`):
+ * that line, like every other lowercase one, keeps the ask (`lowercaseLabelFold`, `upperCasedLabelCandidate`).
+ */
+export function labelCaseFold2D(utterance: string, facts: readonly Fact[]): LabelFold | null {
+  return certainLabelFold(utterance, { used: lowercaseNamesInCommands(facts.map((f) => f.cmd)), axes: ['x', 'y'] });
+}
+
+/** #2823: the notice a capitalised line carries — first, before any note the step already has. */
+export function withLabelCase(verdict: Verdict2D, fold: LabelFold | null): Verdict2D {
+  if (!fold || (verdict.kind !== 'commit' && verdict.kind !== 'noop')) return verdict;
+  const note: DecideNote = { key: LABEL_CASE_NOTICE, params: { corrected: fold.text } };
+  return { ...verdict, note: verdict.note ? appendNote(note, verdict.note) : note };
+}
+
 /** The whole pre-LLM lane in one call — for a caller with no spinner to paint (log-triage, #1358). */
 export async function decideDeterministic2D(
   state: DecideState,
@@ -1360,5 +1379,7 @@ export async function decideDeterministic2D(
   locale: 'he' | 'en',
   hooks: DecideHooks = {},
 ): Promise<Verdict2D> {
-  return decidePreParse(utterance, state.view, state.centresShown) ?? decideFromParse(state, utterance, locale, hooks);
+  const cased = labelCaseFold2D(utterance, state.facts); // #2823: the certain lowercase labels, in capitals first
+  const text = cased?.text ?? utterance;
+  return withLabelCase(decidePreParse(text, state.view, state.centresShown) ?? (await decideFromParse(state, text, locale, hooks)), cased);
 }

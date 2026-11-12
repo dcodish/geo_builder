@@ -15,7 +15,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { normalize3, parse3 } from '../parser/parse3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
-import { derive3, useGeo3 } from '../store/store3';
+import { derive3, labelCaseFold3, useGeo3 } from '../store/store3';
+
+/** #2823 (ADR-3D-492): the store's certain-label reading, which replaced #181's uplift inside `normalize3`. */
+const up3 = (u: string): string => labelCaseFold3(u, [])?.text ?? u;
 
 function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
@@ -56,7 +59,7 @@ describe('#1523 — the operator\'s exact sequence', () => {
   });
 });
 
-describe('#1523 — the subject position is an FR-SP-8 anchor', () => {
+describe('#1523 — the subject position is an FR-SP-8 anchor (read at the store since #2823)', () => {
   const twins: [string, string][] = [
     ['x אמצע SA', 'X אמצע SA'],
     ['y אמצע SA', 'Y אמצע SA'],
@@ -73,17 +76,17 @@ describe('#1523 — the subject position is an FR-SP-8 anchor', () => {
   ];
   for (const [lower, upper] of twins) {
     it(`«${lower}» parses exactly like «${upper}»`, () => {
-      expect(normalize3(lower)).toBe(normalize3(upper));
-      const r = parse3(lower);
+      expect(normalize3(up3(lower))).toBe(normalize3(upper));
+      const r = parse3(up3(lower));
       expect(r).toEqual(parse3(upper));
       expect(r).toMatchObject({ ok: true, commands: [{ type: 'point-on-segment3', t: 0.5 }] });
     });
   }
 
   it('the anchor is the midpoint frame, nothing wider: the lone-axis and adjective boundaries hold', () => {
-    expect(normalize3('נקודה x')).toBe('נקודה x'); // #181's axis exemption, where no frame proves a label
-    expect(normalize3('x אמצעי SA')).toBe('x אמצעי SA'); // «אמצעי» is the perp-bisector adjective (#330)
-    expect(normalize3('x על SA')).toBe('x על SA'); // un-anchored remainder stays with the #353 convention
+    expect(up3('נקודה x')).toBe('נקודה X'); // #2823: the operator's 2026-11-12 ruling — an axis letter after «נקודה» is the point
+    expect(up3('x אמצעי SA')).toBe('x אמצעי SA'); // «אמצעי» is the perp-bisector adjective (#330)
+    expect(up3('x על SA')).toBe('x על SA'); // un-anchored remainder stays with the ask
   });
 });
 

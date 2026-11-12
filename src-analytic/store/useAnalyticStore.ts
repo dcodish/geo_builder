@@ -137,6 +137,8 @@ export type InputError =
    * sizes are lowercase except R. `letter` is the capital, `corrected` the student's line with it lowercased.
    */
   | { key: 'capital-magnitude'; detail: string; letter: string; corrected: string }
+  /** #2823 (ADR-AG-478, ADR-W-208) — a lowercase letter that may be a point but is not certainly one: asked in capitals. `corrected` records here. */
+  | { key: 'lowercase-labels'; detail: string; corrected: string }
   /** A shape noun and a vertex count that disagree (#1042). */
   | { key: 'bad-arity'; detail: string }
   /** One label used for two vertices of the same figure (#1042). */

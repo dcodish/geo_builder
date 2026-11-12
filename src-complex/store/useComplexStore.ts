@@ -71,6 +71,8 @@ export type InputError =
    * √ spelling, which the grammar has already read (the 2-D #246 guidance).
    */
   | { key: 'word-root'; detail: string; suggestion: string }
+  /** #2823 (ADR-CX-092, ADR-W-208) — a lowercase letter that may be a point but is not certainly one: asked in capitals. `corrected` records here. */
+  | { key: 'lowercase-labels'; detail: string; corrected: string }
   /**
    * #1365 — a glued `i` whose other letter is a complex number («zi»): ambiguous, so refused with
    * `suggestion` — the line with the explicit product (`z*i`), which the grammar has already read.
@@ -114,7 +116,11 @@ export type InputError =
  * line just typed, not a refusal: the statement is true and the figure already held it. The line is recorded as its own
  * row and the note rides that commit; `detail` is the student's line.
  */
-export type InputNote = { key: 'already-held'; detail: string };
+/**
+ * `already-held` (#2790): the line is held already. `label-case` (#2823, ADR-CX-092): the student's lowercase point labels
+ * were read in capitals — `detail` is the line as recorded; `held` when it was held as well.
+ */
+export type InputNote = { key: 'already-held'; detail: string } | { key: 'label-case'; detail: string; held?: true };
 
 /** Save format (suffix `-complex.json`, the per-product convention): the SOURCE LINES in
  * order — loading replays them through the real parse path, so a saved session doubles as

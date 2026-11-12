@@ -2053,6 +2053,8 @@ conic, `solid` / `none` for a circle (a hidden circle also drops its centre cros
 
 ### The submit path's three answers ([ADR-AG-020](06c-decisions-analytic.md#adr-ag-020))
 
+**A certain lowercase label** ([ADR-AG-478](06c-decisions-analytic.md#adr-ag-478), #2823): `decideSubmit` and `decideEditHost` first call `labelCaseFoldAnalytic` (`shell/labelCase` with the axes x, y and `lowercaseNamesIn` over the held lines) and decide on the capitalised text; a record carries `cased` and `commitRecord` says `suite.notice.labelCase`. An unfolded `not-handled` line whose shared-lift candidate records is refused `lowercase-labels`.
+
 `App.submit` dry-runs the list with the new line: `faulted` refuses; `created` / `narrowed` record; `known` records too, as
 its own row with the already-held notice ([ADR-AG-462](06c-decisions-analytic.md#adr-ag-462), ADR-W-200). The effect is decided once, at the apply boundary, and carried by `fold` and `derive`; `narrowed` exists
 because `absorbed` hid two events. **Held lines** ([ADR-AG-462](06c-decisions-analytic.md#adr-ag-462)): a `known` outcome, or a line passing

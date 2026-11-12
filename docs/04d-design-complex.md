@@ -89,6 +89,8 @@ never as a contradiction or a refutation.
 
 ## Design rules with teeth
 
+- **A certain lowercase label is read in capitals first** ([ADR-CX-092](06d-decisions-complex.md#adr-cx-092), #2823). `decideSubmitCx` calls `labelCaseFoldCx` (`shell/labelCase`, with the z/w families, `i`, `o`, the declared families and the held lines' names as `used`) before the ask routing and decides on the capitalised text; the record's note is `label-case`. An unfolded line that does not parse is asked in capitals (`lowercase-labels`) when the lifted line records. A load replays as saved.
+
 - **Span accounting, and no `dropped*` gate — ever.** Every non-filler token span in a line is claimed by
   the parse, or the line is refused ([`FR-LN-1`](02d-requirements-complex.md)). The 2-D history is the
   argument: per-symptom `dropped*` gates accumulate, each one narrow, and still leave holes.

@@ -42,6 +42,7 @@ import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { readDisplayMode } from '../../shell/displayMode';
 import { unreadScript } from '../../shell/inputScript';
 import { findProofTarget } from '../../shell/proofTarget';
+import { askCandidate, certainLabelFold, lowercaseNamesIn, type LabelFold } from '../../shell/labelCase';
 import { parseLineV2 } from '../parser/rules';
 import { trigAngleMismatch } from '../parser/normalize';
 import { complexScopeOf, parseAsk } from './deriveLines';
@@ -412,8 +413,12 @@ export type SubmitVerdictCx =
   | { readonly kind: 'refuse'; readonly error: InputError };
 
 export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = false): SubmitVerdictCx {
-  const line = raw.trim();
   const active = activeOf(state.lines, state.disabled);
+  // #2823 (ADR-CX-092, ADR-W-208): a line whose every lowercase label can only be a point («משולש abc») is decided — and
+  // recorded — in capitals, and says so. The z/w family, i, o and every name the figure declares or uses are never
+  // folded (`labelCaseFoldCx`); any other lowercase line that would record in capitals is asked to be typed so.
+  const cased = replaying ? null : labelCaseFoldCx(raw.trim(), active);
+  const line = cased?.text ?? raw.trim();
 
   // #1870 (ADR-CX-083, ADR-W-107; ruling B14) — a claim to PROVE, refused first: before the ask routing and
   // before the grammar, the 2-D placement, so no partial reading records half of a mixed line
@@ -444,7 +449,11 @@ export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = fa
   // #1437 amendment: the question is read FIRST, because a framed question («מהו |w|», «|w|?») is
   // not a statement the grammar reads — refusing it here as unparseable would never reach the lane
   const parsed = parseInFigure(line, active);
-  if (!parsed.ok) return { kind: 'refuse', error: unreadRefusal(parsed, line, active) };
+  if (!parsed.ok) {
+    const ask = cased || replaying ? null : labelAskCx(line, active);
+    if (ask && decideSubmitCx(state, ask).kind === 'record') return { kind: 'refuse', error: { key: 'lowercase-labels', detail: line, corrected: ask } };
+    return { kind: 'refuse', error: unreadRefusal(parsed, line, active) };
+  }
 
   // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)
   const verdict = acceptLine(active, line, state.seed);
@@ -454,7 +463,22 @@ export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = fa
   // row that implied it is muted or deleted. Seed-free, so a value that merely holds in this drawing records silently.
   // A load replays the student's rows as saved and asks nothing (`replaying`).
   const held = !replaying && lineEntailed(active, line);
+  if (cased) return { kind: 'record', line, seed: verdict.seed, note: { key: 'label-case', detail: line, ...(held ? { held: true as const } : {}) } };
   return { kind: 'record', line, seed: verdict.seed, ...(held ? { note: { key: 'already-held', detail: line } as const } : {}) };
+}
+
+/** The lowercase names complex gives a meaning: the z/w family, `i`, `o`, every declared family and every name a held line uses. */
+const complexNames = (active: readonly string[]): Set<string> => new Set(['z', 'w', 'i', 'o', ...scopeOf(active), ...lowercaseNamesIn(active)]);
+
+/** #2823 (ADR-CX-092) — the shared certain-slot reading (`shell/labelCase`) with complex's own names. Complex has no axis letters. */
+export function labelCaseFoldCx(line: string, active: readonly string[]): LabelFold | null {
+  return certainLabelFold(line, { used: complexNames(active) });
+}
+
+/** #2823 (ADR-CX-092) — the ask's candidate: every builder's lift, leaving complex's own lowercase names as typed. */
+function labelAskCx(line: string, active: readonly string[]): string | null {
+  const names = complexNames(active);
+  return askCandidate(line, (run) => names.has(run.toLowerCase()) || names.has(run[0].toLowerCase()) || /^[zw]d*$/i.test(run));
 }
 
 /**
