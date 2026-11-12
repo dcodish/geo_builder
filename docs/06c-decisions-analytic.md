@@ -15911,6 +15911,8 @@ The same coupling broke three things a student sees, each confirmed against the 
 
 ## ADR-AG-426 — Every point that moves along one curve has its locus, however many other points move (#2738)
 
+> **⚠ Superseded in part** 2026-11-12 by [ADR-AG-472](#adr-ag-472) (#2849): a point stated on a carrier that holds still (a given curve, a fixed line) has no chip, so the two-circle, one-circle and midpoint cases below lose the movers' chips. The walk, the point's own freedom and the bisector cases are unchanged.
+
 **Date:** 2026-11-07 · **Status:** accepted · feature (analytic, P2) · operator ruling · branch `feat/2738-locus-every-mover` · **supersedes in part [ADR-AG-352](#adr-ag-352)** (which points get a chip) · **LADDER stage:** none (the locus walk over the solved figure, not a rung)
 **Requirements:** [02c](02c-requirements-analytic.md) R87 (amended: the point's own freedom), R200 (amended: every such point has a chip) · **Design:** [04c](04c-design-analytic.md) § "The locus lane" → "The point's own freedom: its part, and the directions it does not move in pinned"
 **Operator:** 2026-11-07, answering the question ADR-AG-425 left open: *"when there is more than 1 point with a locus, allpoints shoudl get the chip of showing the locus."*
@@ -16397,3 +16399,22 @@ Each of those points moves along a curve.
 **Locks.** Unit: `src-analytic/__tests__/issue-1618-sentence-frame.test.ts` (#2062 block). Parity rows `subject-frame-*-2062`.
 
 **Behaviour change for a student:** «הנקודה M מקיימת: AM = MB» and «M מקיים AM = MB» build, where they went to the AI.
+
+## ADR-AG-472 — A point stated on a given curve has no locus chip: its locus is that curve, already drawn (#2849)
+
+**Date:** 2026-11-12 · **Status:** accepted · bug (analytic, P2) · fix round #2855 stream F · branch `fix/2849-no-chip-on-given-curve` · **supersedes in part [ADR-AG-426](#adr-ag-426)** (which points get a chip) · **LADDER stage:** none (the chip's choice over the solved figure, not a rung)
+**Requirements:** [02c](02c-requirements-analytic.md) R200 (amended: a point on a given curve has no chip) · **Design:** [04c](04c-design-analytic.md) § "The way in: the chip and the guide row"
+**Operator:** 2026-11-12, on `x^2+2y^2=16` · «AB מיתר באליפסה» · «M אמצע AB»: *"in this case, A and B should not have the chip. they are on the ellipse so their locus is just the ellipse."*; then, confirming the reach: *"whenever a point is on a given curve, there is no point of giving it a chip. it just clutters the screen and is meaningless"*; and a second figure, `7x^2+9y^2=63` · «F1 מוקד ימני של האליפסה» · «F2 מוקד שמאלי» · «משולש F1F2D» · «D על האליפסה», where the chip sat on the triangle row: *"the show locus chip appears on the triangle for some reason"*.
+
+**Measured at pickup** (`origin/main` @ `caf619a5`, `locusChips(derive(…))`): the chord figure `[A, B]` on line 1; with «AB מקביל לישר y=x» added `[A, B, M]`; the focus triangle `[D]` on the triangle row (the row that introduced D); #2738's `ONE_CIRCLE` and `TWO_CIRCLES` `[M, N]`.
+
+**Class.** *A point stated on a fixed carrier was offered its locus*, and that locus is the carrier itself: every chip of that kind can only redraw a curve the student typed. ADR-AG-426 gives the chip to every point whose positions form a curve (`hasLocus`), and a point on a fixed curve trivially qualifies.
+
+**Decision.**
+1. **`onFixedCarrier(raw, env, id, start, seed, choiceSeed)`** (`engine/locus.ts`): true when `id` has an incidence statement (`on-curve`, `on-line`, `on-line-2pt`) whose carrier holds still over every free direction of the point's part: the part is `locusPartAt`'s, the parameters are fixed (as `hasLocus` holds them), and no point the carrier is built from (`inputsOf`; none for `on-line`) moves along any vector of `jacobianRank`'s null basis (central differences at `MOTION_STEP`, the `MOVES` bar).
+2. **`locusChips`** (`app/locusChip.ts`) skips such a point after `hasLocus`. That loop is the one place a chip is chosen; `hasLocus` stays the engine's "does it move along one curve" predicate and the walk is untouched. The ask does not read `hasLocus` (it answers a chip's record, and a typed locus question answers the pointer, ADR-AG-381), so there is no second predicate to keep in agreement.
+3. **Kept:** a point on a carrier that itself moves («P על הישר AB» while B moves: its locus is not the line), every derived point (a midpoint, a foot, a crossing: none of them is stated on a carrier), and the bisector's «נקודה M» · «MA = MB» (a distance, not a given curve).
+
+**Locks.** `src-analytic/__tests__/issue-2738-locus-every-mover.test.ts`: re-expected (`TWO_CIRCLES`, `ONE_CIRCLE`, `MID`, the free point beside a mover, the chord-length pair: no chip; the bisector beside a second mover: the bisector's chip only; the bisector beside «מרובע» / «טרפז» / «מעוין» unchanged); `onFixedCarrier` unit rows (a stated circle, an axis, the line through two fixed points: yes; the line through a moving point, the bisector, a stated distance, a derived midpoint: no); the operator's two figures over seeds 0 to 2 (the chord: no chip; with «AB מקביל לישר y=x»: `[M, line 2]` only; the focus triangle: no chip on any row).
+
+**Behaviour change for a student:** a point placed on a given curve (the chord's ends on the ellipse, «M על המעגל I», «D על האליפסה», a point on a stated line or an axis) no longer shows «הצג מקום גאומטרי». A point that moves along something not drawn (the midpoint of a chord kept parallel to a line, «נקודה M» with «MA = MB») keeps it.
