@@ -12,9 +12,9 @@
  * for the identical ring declared directly. Both halves are locked here: the guard SEES the ring, and
  * the requirement machinery therefore stops accepting those configurations.
  */
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { factsOf } from '../../__tests__/scenario-pipeline';
-import { meetsRequirements, polygonsConvex, replay, ringConvexityProofs, ringOrderContradiction } from '../../store/geoStore';
+import { lastConfigTier, meetsRequirements, polygonsConvex, reflexSeatsYieldToStatedCorners, replay, ringConvexityProofs, ringOrderContradiction } from '../../store/geoStore';
 import type { Id, Vec } from '../../engine';
 
 /** A hand-built DART over A,B,C,D — concave whatever the figure's own sample happens to be. */
@@ -180,5 +180,56 @@ describe('ringOrderContradiction (#2811) blames the latest line, in all three or
   it('a saved contradiction is never blamed on an unrelated line; no proof, no refusal', () => {
     expect(hit2811(['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABCD'], 'AB = 5')).toBeNull();
     expect(hit2811(['מרובע ABCD'], 'מרובע ABDC'), 'two orders of free points: a concave quadrilateral (ADR-622)').toBeNull();
+  });
+});
+
+/**
+ * #2813 (ADR-823 Am. 1) — THE BROWSER PATH: the post-commit search runs in the geometry WORKER (`geoWorker.ts`,
+ * `autoResolve` → `findValidConfig` under `WORKER_SEARCH_BUDGET_MS`), and the submit gate drops an Enter while it is in
+ * flight. Found by round #2855's pre-play: «מרובע ABCD · מרובע ABDC · ∠DAB = 70°» left the search re-seating ABCD's
+ * stored reflex vertex (A, now a stated corner) only after the whole seed sweep, so «∠BCD = 110°» typed next was never
+ * answered. The stored seat yields to the statement structurally: the worker answers at the 'current' tier.
+ */
+describe('#2813 — a stored reflex seat yields to a later stated angle (the worker path)', () => {
+  type Posted = { done?: { op: string; found?: { facts: { cmd: { type: string; reflex?: number } }[]; seed: number } | null; ok?: true } };
+  const g = globalThis as unknown as { self?: { postMessage: (m: unknown) => void; onmessage?: (e: { data: unknown }) => void } };
+  const posted: Posted[] = [];
+  let onmessage: ((e: { data: unknown }) => void) | undefined;
+  // the worker posts through the global `self` at call time, so the fake stays installed for this block
+  let before: typeof g.self;
+  beforeAll(async () => {
+    before = g.self;
+    g.self = { postMessage: (m) => posted.push(m as Posted) };
+    await import('../../store/geoWorker'); // load-in-body-ok: the subject IS what loading does — the worker registers self.onmessage
+    onmessage = g.self.onmessage;
+  }, 60_000);
+  afterAll(() => {
+    g.self = before;
+  });
+  it('the worker re-seats A off the reflex corner at once, and the next line is refused', () => {
+    {
+      const worker = (facts: ReturnType<typeof factsOf>, seed: number) => {
+        posted.length = 0;
+        onmessage!({ data: { id: 1, op: 'autoResolve', facts, seed } });
+        return posted[posted.length - 1]!.done!;
+      };
+      // the store as the App leaves it: each commit, then the worker's search applied
+      let facts = factsOf(['מרובע ABCD', 'מרובע ABDC']);
+      const r2 = worker(facts, 0);
+      if (r2.found) facts = r2.found.facts as typeof facts;
+      expect(facts.some((f) => f.cmd.type === 'quadrilateral' && (f.cmd as { reflex?: number }).reflex !== undefined), 'the dart is a stored reflex seat').toBe(true);
+      const withAngle = [...facts, ...factsOf(['זווית DAB = 70']).filter((f) => f.cmd.type === 'set-angle')];
+      const r3 = worker(withAngle, 0);
+      const found = r3.found ?? null;
+      expect(found, 'the worker finds a view').not.toBeNull();
+      expect(lastConfigTier, 'at once: the stored seat yields before any sample').toBe('current');
+      const quad = found!.facts.find((f) => f.cmd.type === 'quadrilateral' && f.cmd.reflex !== undefined)!;
+      expect((quad.cmd as unknown as { ids: string[] }).ids[quad.cmd.reflex!], 'the reflex vertex is not the stated corner A').not.toBe('A');
+      expect(reflexSeatsYieldToStatedCorners(withAngle), 'and the helper is the identity once nothing is ruled out').not.toBe(withAngle);
+      expect(reflexSeatsYieldToStatedCorners(found!.facts as typeof facts)).toBe(found!.facts);
+      // and the line typed next is refused structurally, naming the angles
+      const next = factsOf(['מרובע ABCD', 'זווית BCD = 110']).filter((f) => f.cmd.type === 'set-angle').map((f) => f.cmd);
+      expect(ringOrderContradiction(found!.facts as typeof facts, next)?.proof.reason).toBe('angles');
+    }
   });
 });
