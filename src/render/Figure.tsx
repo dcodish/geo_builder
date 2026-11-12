@@ -18,7 +18,7 @@ import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from
 // #1631: the point menu is the shared letter popover — one look and one offer rule in every builder.
 import { LetterPopover } from '../../shell/frame/LetterPopover';
 import { SegmentMenu } from '../../shell/frame/SegmentMenu';
-import { segInk } from '../../shell/frame/segmentDisplay';
+import { hiddenWith, segInk, type SegEnds } from '../../shell/frame/segmentDisplay';
 import { angleArcPoints, equalTickSegments, rightAngleKnee } from '../../shell/marks';
 import { swapOffered, type LetterRenameResult } from '../../shell/frame/letterOffer';
 import { displayPrimes } from '../../shell/primes';
@@ -137,6 +137,11 @@ export interface FigureProps {
   onHighlightFact?: (factId: string) => void;
   /** Per-segment display style (keyed by seg id) — hidden and/or dashed (FR-RN-10). */
   segStyle?: Record<Id, { hidden?: boolean; dashed?: boolean }>;
+  /**
+   * #2852 (ADR-825): the points that may go with a hidden segment — named by the tool, held by no other row
+   * (`app/hideOwnership` `lonePoints`). Absent = none: a hidden segment then takes only its value and its marks.
+   */
+  lonePoints?: ReadonlySet<Id>;
   /** Hide/show a segment (clicked on the canvas) — the host wires the store's `toggleSegHidden`. */
   onToggleSegHidden?: (id: Id) => void;
   /** Make a segment dashed/solid (clicked on the canvas) — the host wires the store's `toggleSegDashed`. */
@@ -241,6 +246,7 @@ export function Figure({
   pointMenuText,
   onHighlightFact,
   segStyle,
+  lonePoints,
   onToggleSegHidden,
   onToggleSegDashed,
   onSwap,
@@ -309,6 +315,44 @@ export function Figure({
     setMenu({ kind, id, x: view.panX + screen.x * view.zoom, y: view.panY + screen.y * view.zoom, seq: menuSeq.current });
   }
 
+  /**
+   * #2852 (ADR-825) — A HIDDEN SEGMENT TAKES WHAT EXISTS ONLY FOR IT: its length, its knee, its ticks, and a point the
+   * tool named for it that nothing else holds. One decision with the analytic canvas (`shell` `hiddenWith`); the scene
+   * is built from what it leaves. Display only: the facts, the replay and every answer are untouched.
+   */
+  const hid = useMemo(() => {
+    const segs = construction.objects.filter((o): o is Extract<typeof o, { kind: 'segment' }> => o.kind === 'segment');
+    const ends = (o: (typeof segs)[number]): SegEnds => [o.a, o.b];
+    const knees = (angleMarks ?? []).flatMap((m, i) => (m.right ? [{ i, v: m.vertex, arms: [m.ray1, m.ray2] }] : []));
+    const statedPairs = (statedEqual ?? []).flatMap((cls, ci) => cls.map((p, pi) => ({ ci, pi, p })));
+    const w = hiddenWith({
+      hidden: segs.filter((o) => segStyle?.[o.id]?.hidden).map(ends),
+      drawn: segs.filter((o) => !segStyle?.[o.id]?.hidden).map(ends),
+      values: (labels?.lengths ?? []).map((l) => [l.a, l.b] as const),
+      knees,
+      ticks: statedPairs.map((x) => x.p as SegEnds),
+      marked: [
+        ...(labels?.angles ?? []).flatMap((a) => [a.vertex, a.ray1, a.ray2]),
+        ...(angleMarks ?? []).flatMap((m) => (m.right ? [] : [m.vertex, m.ray1, m.ray2])),
+        ...(labels?.areas ?? []).flatMap((a) => a.ids),
+        ...(labels?.arcs ?? []).flatMap((a) => [a.a, a.b]),
+      ],
+      lone: lonePoints ?? new Set(),
+    });
+    const goneEnds = new Set(segs.filter((o) => segStyle?.[o.id]?.hidden).map((o) => [o.a, o.b].sort().join('|')));
+    if (goneEnds.size === 0) return { labels, angleMarks, statedEqual, points: w.points, goneEnds };
+    const goneKnee = new Set(knees.filter((_, k) => w.knees[k]).map((k) => k.i));
+    const goneStated = new Set(statedPairs.filter((_, k) => w.ticks[k]).map((x) => `${x.ci}:${x.pi}`));
+    return {
+      labels: labels && { ...labels, lengths: labels.lengths.filter((_, i) => !w.values[i]) },
+      angleMarks: angleMarks?.filter((_, i) => !goneKnee.has(i)),
+      // only the tick ON the hidden segment goes; its class's other members keep theirs (the analytic canvas's rule)
+      statedEqual: statedEqual?.map((cls, ci) => cls.filter((_, pi) => !goneStated.has(`${ci}:${pi}`))),
+      points: w.points,
+      goneEnds,
+    };
+  }, [construction, segStyle, labels, angleMarks, statedEqual, lonePoints]);
+
   const { scene, transform, crossings, labelDirs, oriented } = useMemo(() => {
     // Rotate/flip the figure in world space, then fit — so it stays centred and
     // labels (computed here, drawn upright) follow the new orientation. A standing
@@ -323,7 +367,7 @@ export function Figure({
     // A single flip is an odd isometry — it reverses the CCW sense of the pre-oriented positions the
     // scene is built from, so the arc resolver must know the parity or every arc draws as its
     // complement (ADR-356, issue #170 — «רבע מעגל» flipped drew the 270° arc).
-    const s = buildScene(construction, oriented, labels, angleMarks, { showCenters, circles, mirrored: o.flipX !== o.flipY, coincidences });
+    const s = buildScene(construction, oriented, hid.labels, hid.angleMarks, { showCenters, circles, mirrored: o.flipX !== o.flipY, coincidences, suppress: hid.points });
     // View stability (F4): keep the previous fit while the figure still fits — refit only on
     // overflow / gross shrink, or when the viewport/orientation genuinely changed.
     const vp = { width: vw, height: vh, padding };
@@ -360,19 +404,22 @@ export function Figure({
     const labelDirs = chooseLabelDirs(ptScreen, obstacles, circScreen, REF_OFF, REF_CLEAR);
 
     return { scene: s, transform: t, crossings: x, labelDirs, oriented };
-  }, [construction, positions, circles, labels, angleMarks, vw, vh, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters, forcedCrossings]);
+  }, [construction, positions, circles, hid, vw, vh, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters, forcedCrossings]);
 
   // "View relations" is now HOVER-DRIVEN to fight clutter (ADR-167 Am.): the resting figure is clean, and
   // pointing at a side/angle reveals ONLY its equality class. `hoverRel` is the class under the cursor;
   // `relMarks` draws just that class, and a hovered length class also gets accent strokes on its members.
   const [hoverRel, setHoverRel] = useState<RelationPick | null>(null);
   const activeHover = relations ? hoverRel : null; // ignore a stale pick once the layer is off
-  const hoverMarks = relations && activeHover ? relationMarks(relationsForPick(relations, activeHover), oriented, [], (angleMarks ?? []).filter((m) => m.right)) : null;
+  // #2852: the hovered class's ticks skip a hidden segment — no tick on a line that is not drawn (the class itself is unchanged)
+  const picked = relations && activeHover ? relationsForPick(relations, activeHover) : null;
+  const pickedShown = picked && { ...picked, equalSegments: picked.equalSegments.map((cls) => cls.filter(([a, b]) => !hid.goneEnds.has([a, b].sort().join('|')))) };
+  const hoverMarks = pickedShown ? relationMarks(pickedShown, oriented, [], (hid.angleMarks ?? []).filter((m) => m.right)) : null;
   // #444: a DECLARED equality needs no hover — it is the named shape's own marking, and the student who
   // typed «דלתון» / «משולש שווה שוקיים» turned the layer on precisely to see it.
   const statedMarks =
-    relations && statedEqual && statedEqual.length > 0
-      ? relationMarks({ equalSegments: [], equalAngles: [], definiteAngles: [], definiteLengths: [], samplesUsed: 0 }, oriented, statedEqual)
+    relations && hid.statedEqual && hid.statedEqual.length > 0
+      ? relationMarks({ equalSegments: [], equalAngles: [], definiteAngles: [], definiteLengths: [], samplesUsed: 0 }, oriented, hid.statedEqual)
       : null;
   const relMarks: RelationMarks | null =
     hoverMarks || statedMarks

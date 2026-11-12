@@ -1401,7 +1401,8 @@ a sentence the tool parsed.
 - a clicked segment → «הסתירו קטע», «מקווקו»
 - a clicked unlettered centre, typed M → «M מרכז המעגל x²+y²=16»
 - **A clicked curve has the same menu** *(operator, 2026-10-16: "in 2d, i can click a line and hide it or make it dashed … this is needed")*: a line, a parabola or an ellipse → «הסתירו קטע», «מקווקו», then its measure entries; a circle → «הסתירו קטע» alone (2-D's circle menu). A hidden line stays as a faint ghost to click; a hidden circle draws nothing, centre cross included, and is clicked on its former outline. Undoable, saved, and carried by a letter change; the givens, crossings and answers are unchanged.
-- Sources: ADR-AG-201, #1653, #1598, ADR-AG-297, #2238.
+- **A hidden segment takes what exists only for it** *(operator, 2026-11-12: "the height is 4.8 just so the shape is shown correctly but without showing it on the screen")*: its value, its right-angle knee, an equal-length tick on it, and a point the tool named only for it (H in «גובה המעוין 4.8»). A point the student named, or one another line or mark uses, stays. The row keeps the value and shows «מוסתר»; clicking the ghost or the mark brings it all back. ADR-AG-474, #2852.
+- Sources: ADR-AG-201, #1653, #1598, ADR-AG-297, #2238, ADR-AG-474, #2852.
 
 ---
 

@@ -2047,7 +2047,13 @@ envelope and the persist trigger. A curve click resolves through `app/curveDispl
 conic, `solid` / `none` for a circle (a hidden circle also drops its centre cross). A letter change re-keys it by POSITION
 (`relabelCurveStyle(style, before, after)` over the two derivations' drawn curves), because a curve id may carry letters or a hash.
 
-*Identifiers:* `serialize` · `{hidden?, dashed?}` · `shell` · `cleanSegDisplay` · `knows.segStyle` · `SceneSegment` · `key` · `ink` · `solid` · `dashed` · `ghost` · `measurablesOf` · `centreOf` · `onCentre(offerId, screen)` · `onCrossing` · `nameInUse` · `centreSentenceOf(figure, offerId, letter)` · `centreLabelOf` · `label` · `decideSwap(auto, taken)`
+**What a hidden segment takes** ([ADR-AG-474](06c-decisions-analytic.md#adr-ag-474), #2852). `buildScene` reads the scene
+into `shell`'s `hiddenWith`: ghost segments, `stated.lengths`, `stated.rights`, `stated.equalLengths`, and the points every
+other stated mark touches. A ghost carries no label, the stated layer is drawn from what is left, and a lone point (and
+its dashed extension) is not drawn. `app/hideOwnership.ts` decides the lone points (`lonePoints`: minted, used by no other
+line, built into nothing but a segment or polygon) and the rows that show «מוסתר» (`hiddenRowLines`).
+
+*Identifiers:* `serialize` · `{hidden?, dashed?}` · `shell` · `cleanSegDisplay` · `knows.segStyle` · `knows.lonePoints` · `hiddenWith` · `hiddenRowLines` · `SceneSegment` · `key` · `ink` · `solid` · `dashed` · `ghost` · `measurablesOf` · `centreOf` · `onCentre(offerId, screen)` · `onCrossing` · `nameInUse` · `centreSentenceOf(figure, offerId, letter)` · `centreLabelOf` · `label` · `decideSwap(auto, taken)`
 
 ## The app: submit, ask, locus
 

@@ -5680,6 +5680,8 @@ The precedent, for every later parity case: **B1 asks for one verdict per plane-
 
 **ADR-W-118 Amendment 4 (2026-11-03): B7's conic line follows the 2026-10-14 ruling (#1863, #1218).** The operator, 2026-10-14 (card `d14-1218-focus`): *"the 9 October four-state control wins"* over the 2026-10-07 "always marked" line. So analytic marks a parabola's focus and directrix, and an ellipse's foci and both directrices, **only when the student presses the curve's chip** (nothing → directrix → focus → both), writing their values when the givens determine them. The circle-centre exception is unchanged. Realised by [ADR-AG-376](06c-decisions-analytic.md#adr-ag-376). **Requirements:** [02c](02c-requirements-analytic.md) R20, R221, R222 · **Design:** none (a ruling transcribed; the mechanism is ADR-AG-376's).
 
+**ADR-W-118 Amendment 5 (2026-11-12): a value the student HID stays readable in the givens row (#2852).** B2 adds: *a value the student hid stays readable in the givens row, which shows «מוסתר»; a hidden value is the student's choice, never the tool's.* Hiding a segment takes its value, its marks and a point the tool named only for it ([ADR-W-207](#adr-w-207)). **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-14 · **Design:** none (a rule; the mechanism is ADR-W-207's).
+
 ## ADR-W-119 — The C4 documentation guards: a superseded ADR says so, requirement ids are unique, a cited ladder lists its ADR, instruction files point at live docs, a parity gap names open work or is parked, MEMORY.md has a ceiling (#1861)
 
 **Status:** accepted · 2026-10-07 · process (#1861 step 5) · implements ruling C4 of [ADR-W-118](#adr-w-118), and B15 for the parity rows.
@@ -7494,3 +7496,19 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 1. **One notice key** for a held row in every builder: `suite.notice.alreadyHeld` — «זה כבר קיים באיור — נוסף כנתון נפרד.» / "That's already on the figure — added as a separate given." (new text of the session's, ADR-W-174). `suite.notice.alreadyDrawn` retires when the last builder ports.
 2. **One shared table** of held sequences and controls (`held-row-2790.ts`), asserted by each tree through its own decision: one row appended, the notice, no point moves, the relation holding once the earlier row is unticked and deleted.
 3. **Split landing.** The round landed 2-D first (the reference, ADR-W-118 B1), then analytic and complex (ADR-AG-462, ADR-AG-463, ADR-CX-089), each asserting the shared table through its own decision; until 3-D's port lands it answers a held line with its old no-row note — a parity known gap naming #2790.
+
+## ADR-W-207 — A hidden segment takes what exists only for it; a value the student hid stays readable in the givens row (#2852)
+
+**Status:** accepted · 2026-11-12 · round #2855 · **amends** [ADR-W-118](#adr-w-118) B2 and [ADR-W-106](#adr-w-106) · **built by** [ADR-825](06-decisions.md#adr-825) (2-D) and [ADR-AG-474](06c-decisions-analytic.md#adr-ag-474) (analytic) · LADDER stage: **none** (display)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-14 · **Design:** [04w](04w-design-shell.md) § *The segment menu* — `hiddenWith`, the row's `hidden` mark, the suite keys `suite.hiddenRow.*`
+
+**The operator's report and ruling** (2026-11-12, #2852). Analytic, «מעוין שצלעו 5» · «גובה המעוין 4.8» · «אלכסוני המעוין על הצירים», the height hidden: *"i wanted to say that the height is 4.8 just so the shape is shown correctly but without showing it on the screen. So i pressed the line and hid it, but the 4.8 was still there and H and the knee are still there."* Asked about hiding AB in triangle ABC, the ruling: *"in that case, we can go with the original proposal"*.
+
+**Decision.**
+1. **What goes with a hidden segment**, in every builder with segment hide: its value (a length written on it), its marks (a right-angle knee with an arm along it, an equal-length tick on it), and an endpoint that exists only for it: a point the TOOL named that no other drawn segment, kept mark or value, curve, circle, line or other point uses, and that no other active line names. A point the student named never goes, nor one anything else uses: hiding AB in «משולש ABC» takes AB and its value only.
+2. **One decision**, `hiddenWith` in `shell/frame/segmentDisplay.ts` beside `segInk`, over point ids. Each product reads its scene into it and decides `lone` (who named a point, which lines use it) over its own record; both canvases paint from what it leaves.
+3. **Display only.** The constraint, the row, every answer, the undo slice and the stability rule are untouched. Clicking the ghost (or the row's mark) shows it all again. The export serialises the canvas, so it draws none of it.
+4. **B2, amended:** *a value the student HID stays readable in the givens row, which shows «מוסתר» (hidden); a hidden value is the student's choice, never the tool's.* The row that drew the segment as its own line or stated its length carries the mark (`FactRow.hidden`, `suite.hiddenRow.mark` / `.title`); clicking it shows the segment again.
+5. **3-D** has no segment hide (FR-SU-14 promises it only where a student can click a segment), so there is nothing to port; this arrives with 3-D's segment menu. No parity cell: the parity table holds sentences, and this is a display rule.
+
+**Behaviour change for a student:** hiding a line (2-D and analytic) also hides its number, its right-angle mark and a point the tool named only for it; the row in the list keeps the value and shows «מוסתר», and clicking the faint line or the mark brings everything back.

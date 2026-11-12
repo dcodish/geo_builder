@@ -7,7 +7,7 @@
  * segment out of the figure (unmeasurable), and a dash that a save file forgets.
  */
 import { describe, expect, it } from 'vitest';
-import { segInk, toggleSegFlag, type SegDisplayMap } from '../frame/segmentDisplay';
+import { hiddenWith, segInk, toggleSegFlag, type HideScene, type SegDisplayMap } from '../frame/segmentDisplay';
 import { segmentDisplayFaults, type InkSeen, type SegmentDisplaySubject } from './fixtures/segment-display-rows';
 
 type Bug = 'hide-inks' | 'hide-drops' | 'hide-unmeasurable' | 'undo-misses' | 'dash-not-saved' | 'hidden-not-saved' | 'unhide-forgets-dash' | 'show-stuck' | 'dash-no-op';
@@ -80,5 +80,61 @@ describe('#1653 — the shared segment-display checks really check', () => {
     ['dash-no-op', /«dashed» did not dash/],
   ] as const)('CATCHES a builder whose bug is %s', (bug, fault) => {
     expect(segmentDisplayFaults(stub(bug)).join(' | ')).toMatch(fault);
+  });
+});
+
+/**
+ * #2852 — what a hidden segment takes with it: its value, its knee and its ticks, and an endpoint the tool named that
+ * nothing else holds. Never a point the student named, never one another drawn segment, mark or value touches.
+ */
+describe('#2852 — hiddenWith: a hidden segment takes what exists only for it', () => {
+  // the operator's rhombus: sides AB BC CD DA, the height DH with its «4.8» and the knee at H; H is the tool's letter
+  const rhombus = (over: Partial<HideScene> = {}): HideScene => ({
+    hidden: [['D', 'H']],
+    drawn: [['A', 'B'], ['B', 'C'], ['C', 'D'], ['A', 'D']],
+    values: [['A', 'B'], ['H', 'D']],
+    knees: [{ v: 'H', arms: ['D', 'A', 'B'] }],
+    ticks: [],
+    marked: [],
+    lone: new Set(['H']),
+    ...over,
+  });
+
+  it('the height hidden: its value, its knee and its foot H go; the side’s value stays', () => {
+    const w = hiddenWith(rhombus());
+    expect(w.values).toEqual([false, true]);
+    expect(w.knees).toEqual([true]);
+    expect([...w.points]).toEqual(['H']);
+  });
+
+  it('nothing hidden takes nothing', () => {
+    const w = hiddenWith(rhombus({ hidden: [], drawn: [['A', 'B'], ['D', 'H']] }));
+    expect(w).toEqual({ values: [false, false], knees: [false], ticks: [], points: new Set() });
+  });
+
+  it('a point the student named stays (H not lone)', () => {
+    expect(hiddenWith(rhombus({ lone: new Set() })).points.size).toBe(0);
+  });
+
+  it('a lone point another drawn segment ends at stays', () => {
+    expect(hiddenWith(rhombus({ drawn: [['A', 'B'], ['H', 'B']] })).points.size).toBe(0);
+  });
+
+  it('a lone point a kept mark or value touches stays — another knee, another length, an angle', () => {
+    expect(hiddenWith(rhombus({ knees: [{ v: 'H', arms: ['D'] }, { v: 'H', arms: ['C', 'A'] }] })).points.size).toBe(0);
+    expect(hiddenWith(rhombus({ values: [['H', 'C']] })).points.size).toBe(0);
+    expect(hiddenWith(rhombus({ marked: ['H'] })).points.size).toBe(0);
+  });
+
+  it('hiding AB in triangle ABC takes AB’s value only — A and B stay', () => {
+    const w = hiddenWith({ hidden: [['A', 'B']], drawn: [['B', 'C'], ['A', 'C']], values: [['B', 'A']], knees: [], ticks: [['A', 'B'], ['B', 'C']], marked: [], lone: new Set() });
+    expect(w.values).toEqual([true]);
+    expect(w.ticks).toEqual([true, false]);
+    expect(w.points.size).toBe(0);
+  });
+
+  it('a knee whose arms run along other segments stays', () => {
+    const w = hiddenWith({ hidden: [['A', 'B']], drawn: [['B', 'C'], ['A', 'C']], values: [], knees: [{ v: 'C', arms: ['A', 'B'] }], ticks: [], marked: [], lone: new Set() });
+    expect(w.knees).toEqual([false]);
   });
 });

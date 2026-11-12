@@ -16518,3 +16518,20 @@ This also settles the open card about the «both» state zooming out to keep an 
 **Ports (ADR-W-157).** 2-D is the reference and is unchanged. 3-D's circles are a different construct, so no port.
 
 **Behaviour change for a student:** in analytic, «AB קוטר האליפסה», «AB הוא קוטר האליפסה», «קוטר האליפסה AB» and «AB מיתר האליפסה» draw the diameter or chord of the drawn ellipse. «AB הוא קוטר המעגל», «קוטר המעגל AB», «CD הוא מיתר של המעגל» and «מיתר המעגל AB» draw on the drawn circle. With two curves of that kind the tool asks which. «AB קוטר הפרבולה» gets the parabola's «לפרבולה אין מרכז…» sentence. Before, each went to the AI.
+
+## ADR-AG-474 — Hiding a segment hides its value, its knee and a point the tool named for it, by 2-D's rule (#2852)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2852](https://github.com/dcodish/geo_builder/issues/2852) (feature, `P2`, `2d`/`analytic`) · round #2855
+**Requirements:** [02c](02c-requirements-analytic.md) R138 · **Design:** [04c](04c-design-analytic.md) § *The canvas's click menus* · **LADDER stage:** none (display)
+**Builds** [ADR-W-207](06w-decisions-workspace.md#adr-w-207) for analytic, the port of [ADR-825](06-decisions.md#adr-825) in the same item (ADR-W-157) · **amends** [ADR-AG-201](#adr-ag-201) ("a hidden segment is still in the figure; only its ink goes")
+
+**Measured at pickup** (`c82d767c`, store → `derive` → `buildScene`): the operator's «מעוין שצלעו 5» · «גובה המעוין 4.8» · «אלכסוני המעוין על הצירים», DH hidden → `seg-DH` ghost, but its «4.8» label, the knee at H (`stated.rights` v = H) and the minted H all drawn.
+
+**Decision.**
+1. `buildScene` reads the scene into `hiddenWith`: the segments split by `ink === 'ghost'`, `stated.lengths` as the values, `stated.rights` (arms `a`, `b`, `alt`) as the knees, `stated.equalLengths` as the ticks, and every stated angle, equal angle, area, arc and side equation's points as marked. A ghost segment carries no label; the stated layer is drawn from what is left; a lone point is not drawn, and neither is a dashed extension to it.
+2. **Lone points** — `app/hideOwnership.ts` `lonePoints(construction, minted)`: a letter the tool chose (`Derivation.minted`), that no object other than a segment or polygon is built from (`objectDeps`) and that no other active line uses (`objectLine`, `rowLine` over `constraintRefs`). App hands it as `knows.lonePoints`.
+3. **The row mark** — `hiddenRowLines(construction, hidden)`: the line that drew a hidden segment as a segment of its own, or stated its length (`length-eq` on its two points), shows «מוסתר»; its click toggles those segments back.
+
+**Locks.** `src-analytic/__tests__/segment-display-1653.test.tsx` (#2852 block, through the real store, `derive`, `buildScene` and `Figure` markup): the operator's rhombus with DH hidden — no H, no knee, no «4.8», the «5» kept, the rhombus's sides unmoved, line 1 marked, everything back on show; hiding AB in triangle ABC keeps A, B and C; a tool-named H another line uses («M אמצע DH») stays.
+
+**Behaviour change for a student:** in the analytic builder, hiding a line also hides its number, its right-angle mark and a point the tool named only for it (H in «גובה המעוין 4.8»); the rhombus stays as the givens make it, the row keeps the value and shows «מוסתר», and clicking the faint line or the mark brings it all back.

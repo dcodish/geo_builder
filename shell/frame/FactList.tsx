@@ -48,6 +48,12 @@ export interface FactRow {
    * look in every builder because the chrome draws it, not each product.
    */
   tag?: { text: string; title?: string };
+  /**
+   * #2852 (ADR-W-207) — the row's segment is HIDDEN on the canvas: a quiet «מוסתר» mark beside the statement, so a
+   * value the student hid stays readable here, and clicking the mark shows the segment again (the canvas menu's own
+   * toggle). The product decides which rows carry one and supplies the words.
+   */
+  hidden?: { text: string; title?: string; onShow: () => void };
   /** Under the statement, OUTSIDE its direction scope (advisories, readouts). Each note carries
    *  its own direction — a Hebrew sentence under an LTR statement is still a Hebrew sentence. */
   notes?: ReactNode;
@@ -205,6 +211,11 @@ export function FactList({
               <span data-testid="fact-tag" dir={textDir(row.tag.text)} title={row.tag.title} style={tagStyle}>
                 {row.tag.text}
               </span>
+            )}
+            {row.hidden && editing?.id !== row.id && (
+              <button type="button" data-testid="fact-hidden" title={row.hidden.title} aria-label={row.hidden.title} style={chipBtn} onClick={row.hidden.onShow}>
+                {row.hidden.text}
+              </button>
             )}
             {row.trail !== undefined && editing?.id !== row.id && <span style={trailStyle}>{row.trail}</span>}
             <span style={rowActions}>

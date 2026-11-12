@@ -54,6 +54,77 @@ export type SegInk = 'solid' | 'dashed' | 'ghost';
 
 export const segInk = (d: SegDisplay | undefined): SegInk => (d?.hidden ? 'ghost' : d?.dashed ? 'dashed' : 'solid');
 
+/** A segment by its two endpoint point ids (in either order). */
+export type SegEnds = readonly [string, string];
+
+/**
+ * WHAT A HIDDEN SEGMENT TAKES WITH IT — the canvas's facts about who owns what (#2852).
+ *
+ * Everything is by POINT ID, so the decision is the same in every builder; each product reads its own scene into it.
+ */
+export interface HideScene {
+  /** The segments the student hid. */
+  hidden: readonly SegEnds[];
+  /** Every OTHER segment the canvas draws (not hidden). */
+  drawn: readonly SegEnds[];
+  /** The values written ON a segment (a stated or shown length), by that segment's ends. */
+  values: readonly SegEnds[];
+  /** The right-angle knees: the vertex and the points its arms run toward. */
+  knees: ReadonlyArray<{ v: string; arms: readonly string[] }>;
+  /** The equal-length ticks, by the ticked segment's ends. */
+  ticks: readonly SegEnds[];
+  /** The points every OTHER drawn mark or value touches (an angle's arc and value, an area, an arc's value …). */
+  marked: Iterable<string>;
+  /**
+   * The points that may go with a hidden segment: named by the TOOL, never by the student, and held by nothing
+   * outside this canvas's segments and marks — no other active line, no curve, circle or point built from it. The
+   * product decides this from its own record of who named what and which line uses what.
+   */
+  lone: ReadonlySet<string>;
+}
+
+/** Which of the scene's values, knees and ticks go with the hidden segments (by index), and which points. */
+export interface HiddenWith {
+  values: boolean[];
+  knees: boolean[];
+  ticks: boolean[];
+  points: Set<string>;
+}
+
+const endsKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
+
+/**
+ * HIDING A SEGMENT HIDES WHAT EXISTS ONLY FOR IT (#2852) — the one decision both flat canvases paint from.
+ *
+ * Operator, 2026-11-12: *"i wanted to say that the height is 4.8 just so the shape is shown correctly but without
+ * showing it on the screen"* — and, of hiding AB in triangle ABC, *"in that case, we can go with the original
+ * proposal"*. With its ink, a hidden segment takes:
+ * 1. its value (a length written on it);
+ * 2. its marks — a right-angle knee with an arm along it, an equal-length tick on it;
+ * 3. an endpoint that exists only for it — a {@link HideScene.lone} point that no drawn segment and no kept mark
+ *    or value touches.
+ *
+ * A point the student named, or one anything else uses, never goes (hiding AB in «משולש ABC» takes AB and its
+ * label only). Display only: nothing here changes the figure, its rows or any answer.
+ */
+export function hiddenWith(s: HideScene): HiddenWith {
+  const gone = new Set(s.hidden.map(([a, b]) => endsKey(a, b)));
+  const out: HiddenWith = {
+    values: s.values.map(([a, b]) => gone.has(endsKey(a, b))),
+    knees: s.knees.map((k) => k.arms.some((p) => gone.has(endsKey(k.v, p)))),
+    ticks: s.ticks.map(([a, b]) => gone.has(endsKey(a, b))),
+    points: new Set(),
+  };
+  if (gone.size === 0) return out;
+  const held = new Set<string>(s.marked);
+  for (const [a, b] of s.drawn) held.add(a).add(b);
+  s.values.forEach(([a, b], i) => { if (!out.values[i]) held.add(a).add(b); });
+  s.ticks.forEach(([a, b], i) => { if (!out.ticks[i]) held.add(a).add(b); });
+  s.knees.forEach((k, i) => { if (!out.knees[i]) for (const p of [k.v, ...k.arms]) held.add(p); });
+  for (const [a, b] of s.hidden) for (const p of [a, b]) if (s.lone.has(p) && !held.has(p)) out.points.add(p);
+  return out;
+}
+
 /** A segment display map read from a save file, kept only as `key → {hidden?, dashed?: true}` (a
  *  hand-edited file cannot inject anything else, and an all-off entry is dropped). */
 export function cleanSegDisplay(raw: unknown): SegDisplayMap {

@@ -1944,6 +1944,17 @@ The engine leaves an unstated choice free (ADR-052) and cyclable (ADR-138); this
 
 ## Render and marks
 
+### A hidden segment takes what exists only for it ([ADR-825](06-decisions.md#adr-825), [ADR-W-207](06w-decisions-workspace.md#adr-w-207), #2852)
+
+`Figure.tsx` reads its scene into the shared decision `hiddenWith` (`shell/frame/segmentDisplay.ts`) before it builds
+the scene: the segments split by `segStyle`, the length labels, the right-angle marks, the declared equal classes,
+and the points every other mark touches. The scene is built from what it leaves — `buildScene`'s `suppress` drops the
+lone points, so their extensions go too. Which points may go is the facts' question, answered in
+`src/app/hideOwnership.ts` (`lonePoints`: never typed, at most one row names it, nothing but a segment or polygon built
+from it) and handed in as the `lonePoints` prop; `hiddenRowGroups` gives the rows that show «מוסתר».
+
+*Identifiers:* `hiddenWith` · `lonePoints` · `hiddenRowGroups` · `suppress` · `FactRow.hidden`
+
 ### An off-ink construction point's dashed extension ([ADR-612](06-decisions.md#adr-612), [ADR-W-124](06w-decisions-workspace.md#adr-w-124), #1971, #1937)
 
 The extension is render-time **decoration**, not a dependency-graph object. It has no id and no letter, it is never

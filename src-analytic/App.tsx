@@ -31,6 +31,7 @@ import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/
 import { INITIAL_VIEW, centreOf, panned, toWorld, viewAfterChange, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtAnalytic } from './format';
+import { hiddenRowLines, lonePoints } from './app/hideOwnership';
 import { curveDetailsKey, curveParts, namedRow } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
@@ -1119,6 +1120,8 @@ export function App() {
       segStyle,
       // #2238 — the student's per-curve display choices (hidden / dashed)
       curveStyle,
+      // #2852 (ADR-AG-474) — the tool's letters that may go with a hidden segment (no other line uses them)
+      lonePoints: lonePoints(d.construction, d.minted),
       // #1714 — what the student STATED about a length, angle, area or arc, written on the figure
       stated: d.stated,
       // #1863 — the conic role marks the chips asked for (ADR-AG-376), and the ellipses that are circles (ADR-AG-377)
@@ -1132,6 +1135,11 @@ export function App() {
     // poolTick: the pool completed, re-read the gates (#1473)
   }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle, roleMarks, display, coincidences]);
 
+  // #2852 (ADR-AG-474): the rows a hidden segment touches (by active line), each with the keys its «מוסתר» shows again
+  const hiddenRows = useMemo(
+    () => hiddenRowLines(d.construction, new Set(Object.entries(segStyle).filter(([, v]) => v.hidden).map(([k]) => k))),
+    [d, segStyle],
+  );
   const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 
   // The DOF cue (02c P4 — an under-determined figure is drawn, and its openness is VISIBLE).
@@ -1545,6 +1553,13 @@ export function App() {
                 text: line,
                 // #1973 (ADR-AG-430): the shape the row's cevian was drawn in, BESIDE the student's words — 2-D's tag (ADR-797)
                 tag: hostTag(d.hosts.find((h) => rows[h.index] === i)?.host, t),
+                // #2852 (ADR-AG-474, ADR-W-207): a row whose segment is hidden on the canvas says so; its click shows it again
+                ...([...hiddenRows.keys()].some((l) => rows[l] === i)
+                  ? (() => {
+                      const keys = [...hiddenRows].filter(([l]) => rows[l] === i).flatMap(([, ks]) => ks);
+                      return { hidden: { text: t('suite.hiddenRow.mark'), title: t('suite.hiddenRow.title'), onShow: () => keys.forEach((k) => toggleSegHidden(k)) } };
+                    })()
+                  : {}),
                 // #1864 (ADR-AG-267): the tool's choice for this row's unstated given, said under it (2-D's `role="note"`).
                 ...(unstatedNotes.some((n) => rows[n.line] === i)
                   ? {

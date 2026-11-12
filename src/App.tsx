@@ -100,6 +100,7 @@ import { offArcNoticeText, violationText } from '@/i18n/violationText';
 import { circleMenuTitle } from '@/i18n/circleText';
 import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
 import { figureExplainer } from '@/app/studentVocabulary';
+import { hiddenRowGroups, lonePoints } from '@/app/hideOwnership';
 /**
  * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
  * spinner) is only committed to the DOM on the next frame; a blocking SYNCHRONOUS solve started in
@@ -820,6 +821,19 @@ export default function App() {
   // GEOMETRY from the displayable state; STATUS/ERROR from the real current state (the step list and the
   // error banner must tell the truth about what just happened).
   const { construction, positions, circles, labels: builtLabels, angleMarks, violations, coincidences, forcedOffArc, degeneracies } = display;
+  /**
+   * #2852 (ADR-825): the tool's letters that may go with a hidden segment, and the rows a hidden segment touches (each
+   * shows «מוסתר»; its click shows the segments again). Decided over the facts, which the renderer cannot see.
+   */
+  const lonePointSet = useMemo(() => lonePoints(facts, construction), [facts, construction]);
+  const hiddenRows = useMemo(
+    () =>
+      hiddenRowGroups(
+        facts,
+        new Map(construction.objects.flatMap((o) => (o.kind === 'segment' && segStyle[o.id]?.hidden ? [[o.id, [o.a, o.b] as [string, string]] as const] : []))),
+      ),
+    [facts, construction, segStyle],
+  );
   /** #1973 (ADR-797): the rings the figure holds now — a row's host tag shows only while its shape is one of them. */
   const polygonRings = useMemo(() => construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), [construction]);
   /** #2305 (ADR-755): how every sentence names a circle of the displayed figure (`circleRefs` → `circleText`). */
@@ -1334,6 +1348,7 @@ export default function App() {
               bad: t('pointMenu.bad'),
             }}
             segStyle={segStyle}
+            lonePoints={lonePointSet}
             onToggleSegHidden={toggleSegHidden}
             onToggleSegDashed={toggleSegDashed}
             onSwap={swap}
@@ -1662,6 +1677,10 @@ export default function App() {
                     // («AE גובה» · «במשולש ABC»), never inside them — the operator's ruling of 2026-10-10, option C
                     // — while the figure holds that shape (`heldHost`: a muted or edited-away ring names nothing)
                     tag: hostTag(heldHost(g.facts.find((f) => f.host)?.host, polygonRings), t),
+                    // #2852 (ADR-825, ADR-W-207): a row whose segment is hidden on the canvas says so; its click shows it again
+                    ...(hiddenRows.has(g.key)
+                      ? { hidden: { text: t('suite.hiddenRow.mark'), title: t('suite.hiddenRow.title'), onShow: () => hiddenRows.get(g.key)!.forEach((id) => toggleSegHidden(id)) } }
+                      : {}),
                     lead: (
                       <span style={{ fontSize: 12, width: 16, textAlign: 'center', flexShrink: 0 }}>
                         {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : state === 'waiting' ? <span data-testid="waiting-mark" style={{ color: '#2563eb' }}>⧗</span> : <span style={{ color: '#94a3b8' }}>○</span>}

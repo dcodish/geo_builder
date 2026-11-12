@@ -77,6 +77,10 @@
       "notice": "Something went wrong while showing the figure. Your construction was not erased — press Restore to continue.",
       "noticeUndone": "Something went wrong while showing the figure after your last change, so that change was undone. The rest of your construction was not erased — press Restore to continue.",
       "recover": "Restore"
+    },
+    "hiddenRow": {
+      "mark": "hidden",
+      "title": "This segment is hidden on the figure — click to show it again"
     }
   }
 }

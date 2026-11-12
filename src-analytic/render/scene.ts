@@ -20,7 +20,7 @@ const centreOf = (c: NumCurve): { x: number; y: number } =>
   c.kind === 'circle' ? { x: c.cx, y: c.cy } : c.kind === 'ellipse' ? { x: c.h ?? 0, y: c.k ?? 0 } : { x: 0, y: 0 };
 import { mergedLabels } from '../../shell/converge';
 import { tickStep } from '../../shell/ticks';
-import { segInk, type SegDisplay, type SegDisplayMap, type SegInk } from '../../shell/frame/segmentDisplay';
+import { hiddenWith, segInk, type SegDisplay, type SegDisplayMap, type SegEnds, type SegInk } from '../../shell/frame/segmentDisplay';
 import { angleArcPoints, equalTickSegments, markFitScale, rightAngleKnee, unitOf, wedgeBisector, type MarkPt } from '../../shell/marks';
 import type { StatedMeasures, StatedValue } from '../engine/statedMeasures';
 import { ALL_SHOWN, type CanvasDisplay } from './canvasDisplay';
@@ -793,6 +793,12 @@ export interface SceneKnowledge {
   /** #2238 — the student's per-curve display choices, keyed by the curve's object id. */
   curveStyle?: SegDisplayMap;
   /**
+   * #2852 (ADR-AG-474) — the points that may go with a hidden segment (`app/hideOwnership` `lonePoints`): letters the
+   * tool chose that no other line uses. Who named a point and which lines use it are questions about the construction,
+   * handed in like the knowledge gates. Absent = none, so a hidden segment takes only its value and its marks.
+   */
+  lonePoints?: ReadonlySet<string>;
+  /**
    * What the student STATED about a measure (#1714, ADR-AG-225) — `Derivation.stated`, handed in like the
    * knowledge gates: which constraint is a statement is a question about the fold, which the renderer cannot see.
    */
@@ -969,6 +975,41 @@ export function buildScene(
   }
 
   /**
+   * #2852 (ADR-AG-474) — A HIDDEN SEGMENT TAKES WHAT EXISTS ONLY FOR IT: its value, its knee, its ticks, and a point the
+   * tool named for it that nothing else holds. One decision with 2-D's (`shell/frame/segmentDisplay` `hiddenWith`);
+   * the stated layer below and the points are drawn from what it leaves.
+   */
+  const segEnds = (i: number): SegEnds => fig.segments[i].ends as SegEnds;
+  const st = knows.stated;
+  const hide = hiddenWith({
+    hidden: projected.flatMap((s, i) => (s.ink === 'ghost' ? [segEnds(i)] : [])),
+    drawn: projected.flatMap((s, i) => (s.ink === 'ghost' ? [] : [segEnds(i)])),
+    values: (st?.lengths ?? []).map((l) => [l.a, l.b] as const),
+    knees: (st?.rights ?? []).map((r) => ({ v: r.v, arms: r.alt !== undefined ? [r.a, r.b, r.alt] : [r.a, r.b] })),
+    ticks: (st?.equalLengths ?? []).map((e) => [e.a, e.b] as const),
+    marked: [
+      ...(st?.angles ?? []).flatMap((g) => [g.v, g.a, g.b]),
+      ...(st?.equalAngles ?? []).flatMap((g) => [g.v, g.a, g.b]),
+      ...(st?.areas ?? []).flatMap((a) => a.ids),
+      ...(st?.arcs ?? []).flatMap((a) => [a.a, a.b]),
+      ...(st?.sideEquations ?? []).flatMap((e) => [e.a, e.b]),
+    ],
+    lone: knows.lonePoints ?? new Set(),
+  });
+  for (const s of projected) if (s.ink === 'ghost') s.label = undefined;
+  const keptStated: StatedMeasures | undefined = st && {
+    ...st,
+    lengths: st.lengths.filter((_, i) => !hide.values[i]),
+    rights: st.rights.filter((_, i) => !hide.knees[i]),
+    equalLengths: st.equalLengths.filter((_, i) => !hide.ticks[i]),
+  };
+  /** A point that went with a hidden segment: where it stood, so the dashed extension out to it goes too. */
+  const goneAt = fig.points.filter((p) => hide.points.has(p.id));
+  const toGone = (e: { a: { x: number; y: number }; b: { x: number; y: number } }) =>
+    goneAt.some((p) => [e.a, e.b].some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 1e-9));
+  const extensionsKept = (fig.extensions ?? []).filter((e) => !toGone(e));
+
+  /**
    * The arcs, projected (#1622 E4). Sampled in WORLD space and then transformed, like every curve, so the isotropic
    * Y-flip turns the counter-clockwise world sweep into what the student sees without a second convention here.
    */
@@ -1032,7 +1073,7 @@ export function buildScene(
     // #2688: «ערכים על הסרטוט» unticked → the letter alone; every label box below is measured from this
     return any && display.values ? ([part(prov.x, 'x'), part(prov.y, 'y')] as [ScenePart, ScenePart]) : undefined;
   };
-  const bare: ScenePoint[] = fig.points.map((p) => {
+  const bare: ScenePoint[] = fig.points.filter((p) => !hide.points.has(p.id)).map((p) => {
     const label = merged.get(p.id) ?? p.id;
     /**
      * A merged label's carrier writes the stated coordinates of the dot: its own, else the first member's that has any
@@ -1084,7 +1125,7 @@ export function buildScene(
    * label, a crossing's offer ring, the dotted construction behind «הצג בנייה».
    */
   for (const s of projected) if (s.ink !== 'ghost') drawnInk.push(s);
-  for (const e of fig.extensions ?? []) drawnInk.push({ x1: t.sx(e.a.x), y1: t.sy(e.a.y), x2: t.sx(e.b.x), y2: t.sy(e.b.y) });
+  for (const e of extensionsKept) drawnInk.push({ x1: t.sx(e.a.x), y1: t.sy(e.a.y), x2: t.sx(e.b.x), y2: t.sy(e.b.y) });
   for (const m of knows.marks ?? []) drawnInk.push({ x1: t.sx(m.from.x), y1: t.sy(m.from.y), x2: t.sx(m.foot.x), y2: t.sy(m.foot.y) });
   for (const l of knows.loci ?? []) if (l.points.length >= 2) inkRun(l.points.map((q) => [t.sx(q.x), t.sy(q.y)] as const), new Set(l.starts ?? []));
   const softBoxes: LabelBox[] = [...furniture];
@@ -1120,7 +1161,7 @@ export function buildScene(
   const labelled = projected.filter((s) => s.label);
   // #1714: the stated-measure layer's marks, and its labels as REQUESTS — placed in the same call as the lengths, so
   // one placement keeps every stated value clear of every other (#1717's rule, one path).
-  const statedDraft = statedScene(fig, t, knows.stated, projected, knows.sideEquationText);
+  const statedDraft = statedScene(fig, t, keptStated, projected, knows.sideEquationText);
   // #2688 (ADR-AG-388): values switched off → the stated layer keeps its MARKS (arcs, knees, ticks) and writes no value
   if (!display.values) {
     statedDraft.requests = [];
@@ -1226,7 +1267,7 @@ export function buildScene(
     segments,
     arcs,
     construction,
-    extensions: (fig.extensions ?? []).map((e) => ({ x1: t.sx(e.a.x), y1: t.sy(e.a.y), x2: t.sx(e.b.x), y2: t.sy(e.b.y) })),
+    extensions: extensionsKept.map((e) => ({ x1: t.sx(e.a.x), y1: t.sy(e.a.y), x2: t.sx(e.b.x), y2: t.sy(e.b.y) })),
     points,
     crossings,
     measures,
