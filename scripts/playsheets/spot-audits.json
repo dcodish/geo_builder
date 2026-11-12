@@ -48,6 +48,38 @@
         "האם הנקודה M נמצאת במישור AEC?"
       ],
       "lookFor": "Every line builds; the last one adds nothing and says the answer is in the data panel's point × plane row."
+    },
+    {
+      "sheet": "round-2855-w1",
+      "id": "T7",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "x^2+2y^2=16",
+        "AB מיתר באליפסה",
+        "M אמצע AB",
+        "AB מקביל לישר y=x"
+      ],
+      "lookFor": "Exactly one chip, «הצג מקום גאומטרי», on M's row; none on the chord row (read from the shot: only the M row carries it)."
+    },
+    {
+      "sheet": "prod-2026-11-12-2",
+      "id": "P9",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "https://themathbible.com",
+      "path": "/analytic-builder/",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "נקודה M",
+        "MA = MB"
+      ],
+      "lookFor": "M's row still has «הצג מקום גאומטרי»."
     }
   ],
   "results": [
