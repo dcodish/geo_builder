@@ -212,8 +212,9 @@ export function errorText(error: InputError, t: Translate): string {
     'arc-length-unread': 'errArcLengthUnread',
     // #2625 (ADR-AG-454) — a parabola has no centre, so no diameter: its own reason, not the generic refusal
     'parabola-no-diameter': 'errParabolaNoDiameter',
-    // #2625 (ADR-AG-454 Am. 1) — the same reason for its centre; the vertex the student may mean is not read yet, said so
-    'parabola-no-centre': 'errParabolaNoCentre',
+    // #2625 (ADR-AG-454 Am. 1) — the same reason for its centre; #2835 (ADR-AG-470): the vertex it may mean is read, so
+    // the sentence names it as the next step, in the student's own letter
+    'parabola-no-centre': error.key === 'parabola-no-centre' && error.name ? 'errParabolaNoCentre' : 'errParabolaNoCentreNoName',
     // #1919 — the operator chose THIS sentence for a name the tool cannot read, in every builder.
     'unread-name': 'errRenameBadName',
     'unread-word': 'errUnreadWord',
@@ -406,6 +407,8 @@ export function errorText(error: InputError, t: Translate): string {
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
     vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',
     polygonNoun: error.key === 'bisector-is-side' ? t(polygonNounKey(error.polygonKind)) : '',
+    // #2835 (ADR-AG-470): the letter the student gave the point (none given: `errParabolaNoCentreNoName`'s own «V»)
+    name: error.key === 'parabola-no-centre' ? (error.name ?? '') : '',
     // #2386: the position word the student used, in the locale's spelling
     word: (error.key === 'side-of-vertical' || error.key === 'side-of-horizontal') && error.side ? t(SIDE_WORD_KEY[error.side]) : '',
   }) + near;

@@ -237,7 +237,9 @@ const he = {
   errRadianAngle: 'בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90',
   // #2625 (ADR-AG-454) — a diameter of the parabola: the reason, chosen under ADR-W-174 (`chose-2625-text`, 2026-11-02)
   // #2625 (ADR-AG-454 Am. 1) — its centre: the same reason, and the vertex said plainly to be unread (no next step to teach)
-  errParabolaNoCentre: 'לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, הכלי עדיין לא קורא אותו.',
+  errParabolaNoCentre: 'לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «{{name}} קודקוד הפרבולה».',
+  errParabolaNoCentreAsk: 'לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «שיעורי קודקוד הפרבולה».',
+  errParabolaNoCentreNoName: 'לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «V קודקוד הפרבולה».',
   errParabolaNoDiameter: 'לפרבולה אין מרכז, ולכן אין לה קוטר. אם התכוונתם למיתר, כתבו «{{detail}} מיתר בפרבולה».',
   errArcLengthUnread: 'הכלי עדיין לא קורא אורך של קשת. קשת נכתבת כאן במעלות — למשל קשת {{detail}} = 40',
   errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — «{{detail}}» אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
@@ -865,7 +867,9 @@ const en: typeof he = {
   errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
   errRenameBadName: '«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errRadianAngle: 'In plane geometry, angles are written in degrees — for example ∠ABC = 90',
-  errParabolaNoCentre: 'A parabola has no centre. If you meant its vertex, the tool does not read it yet.',
+  errParabolaNoCentre: 'A parabola has no centre. If you meant its vertex, write «{{name}} is the vertex of the parabola».',
+  errParabolaNoCentreAsk: 'A parabola has no centre. If you meant its vertex, write «the vertex of the parabola».',
+  errParabolaNoCentreNoName: 'A parabola has no centre. If you meant its vertex, write «V is the vertex of the parabola».',
   errParabolaNoDiameter: 'A parabola has no centre, so it has no diameter. If you meant a chord, write «{{detail}} is a chord of the parabola».',
   errArcLengthUnread: "This tool does not read an arc's length yet. An arc is written here in degrees — for example arc {{detail}} = 40",
   errUnreadWord: 'This tool reads Hebrew and English only — «{{detail}}» is in neither. Try writing the line in Hebrew or English.',

@@ -123,7 +123,7 @@ export type InputError =
   /** #2625 (ADR-AG-454) — «AB קוטר בפרבולה»: a parabola has no centre, so it has no diameter; `detail` is the line. */
   | { key: 'parabola-no-diameter'; detail: string }
   /** #2625 (ADR-AG-454 Am. 1) — «O מרכז הפרבולה»: a parabola has no centre. */
-  | { key: 'parabola-no-centre'; detail: string }
+  | { key: 'parabola-no-centre'; detail: string; name?: string }
   /** #1919 — a letter the tool cannot read; `detail` is the run(s) as typed (`shell/inputScript`). */
   | { key: 'unread-name' | 'unread-word'; detail: string }
   /** #2222 (ADR-AG-284) — an ASCII mixed number «5 1/2», refused with its unambiguous spellings (`engine/expr.findMixedNumber`). */

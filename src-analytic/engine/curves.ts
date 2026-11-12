@@ -9,7 +9,7 @@
  * so a raw algebraic residual would silently change meaning between questions.
  */
 import { curveFromEquation, type ClassifyResult } from './conic';
-import { canonicalOf, frameOf, lineToWorld, toLocal, toWorld } from './conicFrame';
+import { canonicalOf, frameOf, lineToWorld, parabolaRolePoint, toLocal, toWorld } from './conicFrame';
 import type { Env } from './expr';
 import type { Curve, NumCurve } from './types';
 
@@ -85,7 +85,7 @@ export function isOn(c: NumCurve, x: number, y: number, tol = 1e-6): boolean {
 
 /** `y² = 2px` → focus `(p/2, 0)`. The memorised triple the formula sheet does NOT give. */
 export function parabolaFocus(c: NumCurve & { kind: 'parabola' }): { x: number; y: number } {
-  return toWorld(c, c.p / 2, 0);
+  return parabolaRolePoint(c, 'focus');
 }
 
 /** `y² = 2px` → directrix `x = −p/2`, as a line `1·x + 0·y + p/2 = 0`. */

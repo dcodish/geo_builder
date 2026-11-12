@@ -417,6 +417,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['משולש ABC', 'מעגל O', 'F על מעגל O'],
   },
   { category: 'derived', family: 'F16', he: 'F מוקד הפרבולה', en: 'F is the focus of the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
+  // #2835 (ADR-AG-470) — the parabola's vertex, the focus's twin role point; a translated parabola's vertex is (h, k).
+  { category: 'derived', family: 'F16', he: 'V קודקוד הפרבולה', en: 'V is the vertex of the parabola', needs: ['(y-3)^2=8(x-2)'] },
   // #1432 am. 1 — the bagrut's centre-by-coordinates circle, and the perimeter as a real given. Not featured.
   { category: 'circles', family: 'F5', he: 'נתון מעגל שמרכזו (2,3) ורדיוסו 5', en: 'circle centred at (2,3) with radius 5' },
   { category: 'relations', family: 'F20', he: 'היקף המשולש ABC הוא 12', en: 'the perimeter of triangle ABC is 12', needs: ['A(0,0)', 'B(3,0)', 'נקודה C'] },
