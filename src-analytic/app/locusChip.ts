@@ -28,6 +28,14 @@
  * is the engine's own `hasLocus` — the point's own motion over its part's freedom, at the configuration being shown —
  * started from the free positions `drawableAt` gives, which is the same start `locusOf` walks from.
  *
+ * ## …except a point stated ON a carrier that holds still (#2849, ADR-AG-472)
+ *
+ * Operator, 2026-11-12: *"whenever a point is on a given curve, there is no point of giving it a chip. it just clutters the
+ * screen and is meaningless"*. The chord's ends on the ellipse, «M על המעגל I», «D על האליפסה»: each one's locus is the
+ * curve the student typed, so the engine's `onFixedCarrier` drops its chip. A point on a carrier that itself moves, a
+ * derived point (a midpoint, a foot, a crossing) and the bisector's «נקודה M» keep theirs. This loop is the one place a
+ * chip is chosen: the ask never re-decides it (it answers a chip's record, and a typed locus question points to the chip).
+ *
  * ## Where it sits: the row that INTRODUCED the point
  *
  * The construction's line provenance, `objectLine` (#1687, ADR-AG-348), is the fold's own attribution — the first
@@ -38,7 +46,7 @@
 import { ask, type Answer } from './ask';
 import type { Derivation } from '../engine/derive';
 import { drawableAt, drawnChoiceSeed } from '../engine/evaluate';
-import { hasLocus } from '../engine/locus';
+import { hasLocus, onFixedCarrier } from '../engine/locus';
 import { isFree, type Id } from '../engine/types';
 import { locusSentence } from '../parser/locusPhrases';
 
@@ -86,7 +94,10 @@ export function locusChips(d: Derivation): LocusChip[] {
   for (const p of d.figure.points) {
     const line = d.construction.objectLine?.[p.id];
     if (line === undefined) continue;
-    if (!hasLocus(d.construction, f.env, p.id, start, d.configuration.seed, drawnChoiceSeed(f, d.configuration.seed))) continue;
+    const choice = drawnChoiceSeed(f, d.configuration.seed);
+    if (!hasLocus(d.construction, f.env, p.id, start, d.configuration.seed, choice)) continue;
+    // #2849 (ADR-AG-472): a point stated on a carrier that holds still has that carrier for its locus, already drawn.
+    if (onFixedCarrier(d.construction, f.env, p.id, start, d.configuration.seed, choice)) continue;
     chips.push({ line, id: p.id, sentence: locusSentence(p.id) });
   }
   return chips;

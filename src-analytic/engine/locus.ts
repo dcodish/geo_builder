@@ -43,7 +43,7 @@ import {
   type LocusShape,
   type SymbolicCurve,
 } from './locusFit';
-import { isDirectionSymbol, isRadiusSymbol, paramRegister } from './carriers';
+import { inputsOf, isDirectionSymbol, isRadiusSymbol, paramRegister } from './carriers';
 import type { Conic } from './conic';
 import { jacobianRank, solveLM, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, withToleranceFactor } from './solve';
 import type { Env } from './expr';
@@ -514,6 +514,41 @@ export function hasLocus(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>
   const x0 = sys.toVec(start);
   if (x0.some((v) => !Number.isFinite(v))) return false;
   return locusWalk(sys, x0, id)?.moves ?? false;
+}
+
+/**
+ * Is `id` stated ON a carrier that holds still over every way its part of the figure can move? (#2849, ADR-AG-472.)
+ *
+ * Operator, 2026-11-12: *"whenever a point is on a given curve, there is no point of giving it a chip. it just clutters the
+ * screen and is meaningless"*. Such a point's locus is the carrier the student already typed (the chord's ends A and B on
+ * the ellipse, «M על המעגל I», «D על האליפסה»), so the chip would only redraw it. The carriers are the incidence statements:
+ * `on-curve` (any named curve), `on-line` (a fixed line) and `on-line-2pt` (the line through two points). The carrier holds
+ * still when no point it is built from (`inputsOf`) moves along any free direction of the part (`jacobianRank`'s null
+ * basis), at the configuration shown and with the parameters fixed, as `hasLocus` measures. A point on a carrier that
+ * itself moves («P על הישר AB» while A moves) traces something else and is not this case.
+ */
+export function onFixedCarrier(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed = 0, choiceSeed?: number): boolean {
+  const c: Construction = locusPartAt(raw, seed, choiceSeed ?? choiceSeedOf(raw, seed), id);
+  const carriers: Id[][] = [];
+  for (const k of c.constraints) {
+    if (k.t === 'on-line' && k.id === id) carriers.push([]);
+    else if (k.t === 'on-curve' && k.id === id) carriers.push(inputsOf(c, k.curve).points);
+    else if (k.t === 'on-line-2pt' && k.id === id) carriers.push([k.a, k.b]);
+  }
+  if (carriers.length === 0) return false;
+  const sys = carrierSystem(c, env, { params: 'fixed' });
+  const x0 = sys.toVec(start);
+  if (x0.some((v) => !Number.isFinite(v))) return false;
+  const nullBasis = sys.ids.length === 0 || sys.residualsAt(x0).length === 0 ? [] : jacobianRank(x0, sys.residualsAt).nullBasis;
+  const ups = nullBasis.map((b) => sys.positionsAt(x0.map((v, k) => v + MOTION_STEP * b[k])));
+  const dns = nullBasis.map((b) => sys.positionsAt(x0.map((v, k) => v - MOTION_STEP * b[k])));
+  const still = (p: Id) =>
+    ups.every((up, j) => {
+      const a = up.get(p);
+      const b = dns[j].get(p);
+      return !a || !b || Math.hypot(a.x - b.x, a.y - b.y) / (2 * MOTION_STEP) <= MOVES;
+    });
+  return carriers.some((pts) => pts.every(still));
 }
 
 /**
