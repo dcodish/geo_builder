@@ -1894,6 +1894,17 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2477 (ADR-761): a diameter stated about «המעגל» is drawn on the drawn circle, and beside two it asks which ──
   { id: 'diameter-of-the-circle-2477', family: 'chords-arcs', steps: ['מעגל O', 'AB הוא קוטר של המעגל'], expect: 'builds', exception: 'X8', note: '2-D drew a second circle P on AB beside O, green, before ADR-761; analytic already drew AB on O' },
   { id: 'diameter-of-the-circle-two-asks-2477', family: 'chords-arcs', steps: ['מעגל O', 'מעגל P', 'AB הוא קוטר של המעגל'], expect: 'asks', exception: 'X8', note: '2-D drew a third circle M, green, before ADR-761; analytic already asked' },
+  // ── #2502 (ADR-AG-468): the copula and the construct state «קוטר/מיתר המעגל»; analytic answered not-handled before ──
+  { id: 'copula-diameter-2502', family: 'chords-arcs', steps: ['מעגל O', 'AB הוא קוטר המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'copula-chord-2502', family: 'chords-arcs', steps: ['מעגל O', 'CD הוא מיתר של המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'copula-diameter-two-circles-2502', family: 'chords-arcs', steps: ['מעגל O', 'מעגל P', 'AB הוא קוטר המעגל'], expect: 'asks', exception: 'X8' },
+  { id: 'construct-diameter-2502', family: 'chords-arcs', steps: ['מעגל O', 'AB קוטר המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'construct-diameter-first-2502', family: 'chords-arcs', steps: ['מעגל O', 'קוטר המעגל AB'], expect: 'builds', exception: 'X8' },
+  { id: 'construct-chord-2502', family: 'chords-arcs', steps: ['מעגל O', 'AB מיתר המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'construct-chord-first-2502', family: 'chords-arcs', steps: ['מעגל O', 'מיתר המעגל AB'], expect: 'builds', exception: 'X8' },
+  { id: 'chord-of-the-circle-2502', family: 'chords-arcs', steps: ['מעגל O', 'מיתר AB של המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'construct-chord-two-circles-2502', family: 'chords-arcs', steps: ['מעגל O', 'מעגל P', 'AB מיתר המעגל'], expect: 'asks', exception: 'X8' },
+  { id: 'construct-diameter-no-circle-2502', family: 'chords-arcs', steps: ['AB קוטר המעגל'], expect: 'builds', exception: 'X8' },
   // ── #2257 (ADR-767): an inscription whose inner shape is already drawn moves THAT shape into the container ──
   { id: 'inscribe-existing-square-named-2257', family: 'inscribed', steps: ['ריבוע ABCD', 'משולש EFG', 'הריבוע ABCD חסום במשולש EFG'], expect: 'builds', exception: 'X8', note: '2-D refused «would be flat» before ADR-767; analytic already put A–D on the sides' },
   { id: 'inscribe-existing-square-definite-2257', family: 'inscribed', steps: ['ריבוע ABCD', 'משולש EFG', 'הריבוע חסום במשולש EFG'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }], note: '2-D drew a second square HIJK, green, before ADR-767; analytic does not read the unnamed inscription (not-handled)' },

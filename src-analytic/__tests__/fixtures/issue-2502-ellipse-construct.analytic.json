@@ -1,0 +1,14 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "x^2/25+y^2/9=1",
+    "AB קוטר האליפסה",
+    "CD הוא קוטר האליפסה",
+    "קוטר האליפסה EF",
+    "GH מיתר האליפסה",
+    "מיתר האליפסה KL"
+  ],
+  "seed": 0,
+  "name": "#2502 — the operator's «the term קוטר in ellipse is not defined?»: «AB קוטר האליפסה» and every construct-state spelling read as «AB קוטר באליפסה»"
+}
