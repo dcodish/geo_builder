@@ -1948,8 +1948,8 @@ optional envelope field cleaned by `cleanAnnotations`, so an old file loads with
 (re-keyed by `relabelCurveStyle`, now generic over the value). The fold never reads it, so it is never a given or a
 question. A key whose object is gone is kept and ignored. **How the later surfaces plug in:** #1211 adds a `coords`
 facet keyed by a point id and written from the point's click menu; #1121 adds a `line` facet (equation, slope) keyed
-by a line id, drawn BESIDE the name (2026-10-09 answer 4) through the same placement; #1752 adds the focus mark's click
-(naming it), which records a sentence through `decideSubmit` as the centre offer does — the mark itself is this one.
+by a line id, drawn BESIDE the name (2026-10-09 answer 4) through the same placement; #1752's focus click is built
+(#2851, ADR-AG-465, "The focus offer" below) — it records a sentence through `decideSubmit`, so it is no facet.
 Each is a facet, a reader in `cleanAnnotations`, and a projection into `SceneKnowledge`; no store or envelope field.
 
 **The chip.** `app/conicMarks.ts` `conicChips(d, annotations)`: one per STATED parabola or ellipse, on its
@@ -1965,6 +1965,15 @@ nothing at all where a student's point stands at the focus. A hidden curve (#223
 as `SceneKnowledge.roleMarks` and returns `scene.roles`: foci as dots, directrices clipped to the view box by
 `polylines`, their labels as requests in the ONE `placeSceneLabels` call (priority 2, after angles and lengths),
 through `lbl`. The frame takes them in: `markAnchors` feeds `drawnBox`'s extra points (a focus; where a directrix crosses its axis). `Figure.tsx` paints them in `analytic-roles`: dashed 1.25px directrices, blue dots, ink labels.
+
+**The focus offer** ([ADR-AG-465](06c-decisions-analytic.md#adr-ag-465), #2851). A focus mark that carries its book letter
+carries `offer: { id: 'focus:<k>:<curve>', letter, title }`; `focusSentenceOf(d, id, letter)` composes its sentence
+(«<letter> מוקד הפרבולה», «<letter> מוקד <side> של האליפסה», words from `parser/conicRoleWords.ts`, the side read against
+the ellipse's centre), null when stale or when two curves of that kind make «האליפסה» ambiguous. `buildScene` passes the
+offer through `roles.foci`; `Figure.tsx` draws a transparent r=8 hit target per offer (`analytic-focus-offers`,
+`data-noexport`, under the points) when `onFocus` is given. `App.tsx` opens `LetterPopover` with `initialValue` =
+the letter; `focusPopoverOps` (`app/centreName.ts`) runs the centre's decision with this composer — `normalizePointName`,
+`nameInUse` + holder, `decideSubmit`, `commitRecord` — and offers no swap.
 
 **The circle case.** `isCircleShaped(c, id)` — `(a − b)/max(1, a, b)` read through `isKnowledge`, zero in every
 configuration. Such an ellipse has no chip and no marks; `SceneKnowledge.circleShaped` gives it a circle's centre cross

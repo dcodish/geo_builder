@@ -1,0 +1,12 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "7x^2+9y^2=63",
+    "F1 מוקד ימני של האליפסה",
+    "F2 מוקד שמאלי של האליפסה",
+    "משולש F1F2D"
+  ],
+  "seed": 0,
+  "name": "#2851 — the rows two clicks on the shown foci record: F₁ = (√2, 0), F₂ = (−√2, 0), the triangle on the foci"
+}
