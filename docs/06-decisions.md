@@ -20915,7 +20915,7 @@ A display-only change (hiding a point, a measure toggle) is not a new figure: it
 
 **Decision.** `ringConvexityProofs` (one reader; reasons: a stated «קמור», one circle through every letter read off the commands) and `ringOrderContradiction` (structural, on the trial facts, blamed on the latest line; refused only when that is the line's own fact) in `replay/core.ts`; `app/ringOrder.ts` gives both seams one verdict, before `forcedCrossedRing`, with the shared `input.ringContradictsNoun` naming the line. `convexityYields` does not yield a proved ring.
 
-**Locks.** Unit `src/replay/__tests__/ring-convexity-proof-2811.test.ts`. Scenario `crossed-ring-circle-last-2811` (`scenarios-corpus-4.ts`). Parity: `crossed-ring-2810-03` loses its 2-D cell; rows `crossed-ring-2811-01..03`.
+**Locks.** Unit: the #2811 block of `src/replay/__tests__/issue-443-macro-convexity.test.ts` (the reader per reason, three of four letters proves nothing, the blame in all three orders; a whole-figure file of its own is refused by ADR-W-191). Scenario `crossed-ring-circle-last-2811` (`scenarios-corpus-4.ts`). Parity: `crossed-ring-2810-03` loses its 2-D cell; rows `crossed-ring-2811-01..03`.
 
 **Behaviour change for a student:** «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» (and the other circle, and a point stated on the circle that completes it) refuses the line that completes it with the crossed-shape message, instead of drawing one order crossed.
 
