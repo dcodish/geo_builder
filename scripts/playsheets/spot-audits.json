@@ -30,6 +30,24 @@
         "KF = 20"
       ],
       "lookFor": "«p» answers «2 או 18»."
+    },
+    {
+      "sheet": "prod-2026-11-12",
+      "id": "P10",
+      "kind": "3d:assertion",
+      "queued": "2026-11-12",
+      "product": "3d",
+      "base": "https://themathbible.com",
+      "path": "/3d-builder/",
+      "lines": [
+        "תיבה ABCDA'B'C'D'",
+        "נסמן: AA' = w, AB = v, AD = u",
+        "הנקודה E היא אמצע המקצוע BB'",
+        "הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w",
+        "מישור AEC",
+        "האם הנקודה M נמצאת במישור AEC?"
+      ],
+      "lookFor": "Every line builds; the last one adds nothing and says the answer is in the data panel's point × plane row."
     }
   ],
   "results": [
