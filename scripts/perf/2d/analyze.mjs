@@ -15,11 +15,13 @@
 //   tableA.md             every action ≥ --table-min: the utterance sequence, the wait, main/worker split, dominant slice
 // Takes seconds. A missing results file is reported as "no data".
 //
-// COMPARABILITY: all values are wall-clock timings — compare runs only from a quiet machine. `clipped` (a 12 s
-// search budget was hit) and `outcome` are deterministic and comparable anywhere.
+// COMPARABILITY: the timings are wall-clock — compare runs only from a quiet machine. `work` (the work meter's three
+// counts, #2873: evaluateCore calls in all, on the page, before the paint) is clock-free and comparable anywhere,
+// except on an action marked `clipped` (a 12 s search budget was hit: where it stopped depends on the machine).
+// `outcome` is deterministic too.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { cli, outDir, rel, readJsonl, median, countBuckets, countsText, countsMarkdown } from '../lib/common.mjs';
+import { cli, outDir, rel, readJsonl, median, countBuckets, countsText, countsMarkdown, workText, workSummary } from '../lib/common.mjs';
 
 const args = cli();
 const OUT = outDir('2d', args);
@@ -49,7 +51,9 @@ const slices = (r) => ({
   autoResolve: (r.autoResolve_worker ?? 0) + (r.post_autoResolve_worker ?? 0),
   postLLM: (r.post_dryrun_main ?? 0) + (r.post_commit_main ?? 0),
   render: (r.render_main ?? 0) + (r.render2_main ?? 0) + (r.post_render_main ?? 0),
-  load: r.load_main ?? 0,
+  load: (r.load_main ?? 0) + (r.audit_main ?? 0),
+  edit: r.edit_main ?? 0,
+  remove: r.remove_main ?? 0,
   resample: r.resample_worker ?? 0,
   detect: r.detect_bg ?? 0,
 });
@@ -72,19 +76,20 @@ for (const r of sweep) {
   const base = c[c.length - 1] ?? r;
   const sl = slices(base);
   const top = Object.entries(sl).sort((x, y) => y[1] - x[1])[0];
-  all.push({ ...r, sweep_ms: r.total_ms, confirm_ms: runs, value_ms: med ?? r.total_ms ?? 0, clipped: Boolean(base.clipped || r.clipped), main_ms: base.main_ms ?? r.main_ms, worker_ms: base.worker_ms ?? r.worker_ms, dominant: top[1] > 0 ? top[0] : '?' });
+  all.push({ ...r, work: base.work ?? r.work, sweep_ms: r.total_ms, confirm_ms: runs, value_ms: med ?? r.total_ms ?? 0, clipped: Boolean(base.clipped || r.clipped), main_ms: base.main_ms ?? r.main_ms, worker_ms: base.worker_ms ?? r.worker_ms, dominant: top[1] > 0 ? top[0] : '?' });
 }
 const timed = all.filter((r) => !r.error);
 const counts = countBuckets(timed, (r) => [r.k, `${r.k} @${r.source ?? r.item?.split(':')[0] ?? '?'}`], (r) => r.value_ms);
 console.log(countsText(counts, 'action'));
 console.log(`actions ${timed.length}  errors ${all.length - timed.length}  timeouts ${timed.filter((r) => r.timeout).length}  re-measured ${timed.filter((r) => r.confirm_ms.length).length}`);
+console.log(workSummary(timed, 'evaluateCore calls; an action marked CLIPPED was cut by the 12 s clock, so its count is not reproducible'));
 
 const slowOf = (r) => Math.max(r.value_ms, (r.post_main_ms ?? 0) + (r.post_worker_ms ?? 0));
 const slow = timed.filter((r) => slowOf(r) >= MIN).sort((a, b) => slowOf(b) - slowOf(a));
 console.log(`actions ≥ ${MIN} ms: ${slow.length}`);
 if (args.has('--list')) {
   for (const r of [...timed].sort((a, b) => slowOf(b) - slowOf(a)).slice(0, 40))
-    console.log(String(Math.round(r.value_ms)).padStart(8), 'ms', String(r.k + (r.press ? '#' + r.press : '')).padEnd(10), `${r.itemIdx}:${r.si}`.padEnd(9), r.item ?? '', '|', r.u ?? '', '|', r.outcome ?? (r.timeout ? 'TIMEOUT' : ''), r.clipped ? 'CLIPPED' : '', `main ${r.main_ms ?? '?'} worker ${r.worker_ms ?? '?'}`, r.post_main_ms !== undefined ? `post-LLM main ${r.post_main_ms} worker ${r.post_worker_ms}` : '');
+    console.log(String(Math.round(r.value_ms)).padStart(8), 'ms', String(r.k + (r.press ? '#' + r.press : '')).padEnd(10), `${r.itemIdx}:${r.si}`.padEnd(9), r.item ?? '', '|', r.u ?? '', '|', r.outcome ?? (r.timeout ? 'TIMEOUT' : ''), r.clipped ? 'CLIPPED' : '', `main ${r.main_ms ?? '?'} worker ${r.worker_ms ?? '?'}`, r.post_main_ms !== undefined ? `post-LLM main ${r.post_main_ms} worker ${r.post_worker_ms}` : '', workText(r.work));
   for (const r of all.filter((x) => x.error).slice(0, 10)) console.log('ERROR', r.item, r.si, String(r.error).slice(0, 200));
 }
 if (given) process.exit(0); // a subset run is printed, never written over the full sweep's files
@@ -122,16 +127,17 @@ function sequence(r) {
 }
 const esc = (s) => String(s ?? '').replace(/\|/g, '\\|');
 const fmt = (ms) => Math.round(ms ?? 0).toLocaleString('en-US').replace(/,/g, ' ');
+const units = (w, f) => (w ? fmt(w[f]) : '');
 const rows = timed.filter((r) => r.value_ms >= TABLE_MIN).sort((a, b) => b.value_ms - a.value_ms);
-const md = ['| # | action | sequence (slow step in **bold**; ⚓ = measured on the logged figure) | ms | re-measured | main ms | worker ms | dominant slice | budget | source | item:step |', '|---|---|---|---|---|---|---|---|---|---|---|'];
+const md = ['| # | action | sequence (slow step in **bold**; ⚓ = measured on the logged figure) | ms | re-measured | main ms | worker ms | work units | on the page | before paint | dominant slice | budget | source | item:step |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|'];
 rows.forEach((r, i) => {
   const { prior, anchored } = sequence(r);
   const shown = prior.length > 10 ? ['…', ...prior.slice(-10)] : prior;
-  const act = r.k === 'submit' ? `**${esc(r.u)}**` : r.k === 'another' ? `**[«הציגו תצורה אחרת» press ${r.press ?? 1}]**` : r.k === 'load' ? '**[load the figure cold]**' : r.k === 'delete' ? '**[delete a row]**' : '**[background detect]**';
+  const act = r.k === 'submit' ? `**${esc(r.u)}**` : r.k === 'another' ? `**[«הציגו תצורה אחרת» press ${r.press ?? 1}]**` : r.k === 'load' ? '**[load the figure cold]**' : r.k === 'delete' ? '**[delete a row]**' : r.k === 'edit' ? '**[edit the last row to its own text]**' : '**[background detect]**';
   const src = r.source === 'prod' ? `prod ${String(r.item).slice(5)} (user ${String(r.user).slice(0, 6)})` : r.source === 'debug' ? `debug ${String(r.item).slice(6)}${r.occ > 1 ? ` ×${r.occ}` : ''}` : `${r.source} ${String(r.item).replace(/^[a-z]+:/, '')}`;
   const ms = r.timeout && !r.confirm_ms.length ? `>${fmt(r.total_ms)}` : fmt(r.value_ms);
   const re = r.confirm_ms.length ? r.confirm_ms.map(fmt).join(', ') : 'sweep only';
-  md.push(`| ${i + 1} | ${r.k}${r.press ? ' #' + r.press : ''} | ${(anchored ? '⚓ ' : '') + [...shown.map(esc), act].join(' · ')} | ${ms} | ${re} | ${fmt(r.main_ms)} | ${fmt(r.worker_ms)} | ${r.k === 'detect' ? 'detect (bg)' : r.dominant} | ${r.clipped ? '12 s budget hit' : r.timeout ? 'watchdog' : ''} | ${esc(src)} | ${r.itemIdx}:${r.si} |`);
+  md.push(`| ${i + 1} | ${r.k}${r.press ? ' #' + r.press : ''} | ${(anchored ? '⚓ ' : '') + [...shown.map(esc), act].join(' · ')} | ${ms} | ${re} | ${fmt(r.main_ms)} | ${fmt(r.worker_ms)} | ${units(r.work, 'total')} | ${units(r.work, 'page')} | ${units(r.work, 'prePaint')} | ${r.k === 'detect' ? 'detect (bg)' : r.dominant} | ${r.clipped ? '12 s budget hit' : r.timeout ? 'watchdog' : ''} | ${esc(src)} | ${r.itemIdx}:${r.si} |`);
 });
 writeFileSync(path.join(OUT, 'tableA.md'), md.join('\n') + '\n');
 console.log(`wrote ${rel(OUT)}/: confirm-targets.txt (${targets.size} items), measurements.json, counts.md, tableA.md (${rows.length} rows ≥ ${TABLE_MIN} ms)`);

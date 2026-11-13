@@ -35,7 +35,10 @@
     "playsheet": "node scripts/play-sheet-drive.mjs",
     "playsheet:close": "node scripts/play-sheet-close.mjs",
     "find-message": "node scripts/find-message.mjs",
-    "parity-table": "node scripts/parity-table.mjs"
+    "parity-table": "node scripts/parity-table.mjs",
+    "work:record": "node scripts/perf/work-meter.mjs record",
+    "work:check": "node scripts/perf/work-meter.mjs check",
+    "work:report": "node scripts/perf/work-meter.mjs report"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

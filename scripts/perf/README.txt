@@ -3,8 +3,14 @@ scripts/perf — the four "how long does a student wait" timing harnesses (issue
 
 Each builder has its own harness. It replays real sequences — the product's fixtures, its scenario corpus, prod
 sessions and the operator's dev sessions — through that builder's REAL code and times every student action:
-submit a line, «הציגו תצורה אחרת», load a saved figure, delete (and, where the builder has it, edit) a row.
+submit a line, «הציגו תצורה אחרת», load a saved figure, edit a row, delete a row.
 Use them before and after an optimisation, on the same machine.
+
+Every action is measured twice in the same run: its TIME, and its WORK — the work meter's three counts (#2873,
+ADR-W-210): solver work in units, in all / on the page's UI thread / before the figure can paint. One unit is one
+evaluateCore call (2-D), one residual evaluation (3-D, analytic), one exact solve (complex). The actions themselves
+live in each product's tests — <tree>/__tests__/work-meter/driver*.ts — and are the SAME code the suite's work-meter
+gate runs, so a count read here and a count the gate fails on describe the same action.
 
 Run everything from the repo root. Nothing here ever calls the LLM: each harness drives only the deterministic
 lane and stubs globalThis.fetch to throw (the stub sits right under the imports of each harness .ts file).
@@ -57,16 +63,31 @@ INPUTS
   logs/debug-log[-3d|-analytic|-complex].jsonl. logs/ is gitignored and per machine: a missing file is reported
   as "no data" and that corpus is skipped (--prod / --debug name another file).
 
+THE WORK METER'S OWN COMMANDS (scripts/perf/work-meter.mjs; it runs the gates under vitest and takes the suite lock)
+  npm run work:report                          every builder's totals, from the committed baselines (no run)
+  npm run work:check -- 2d                     one builder's gate alone (2d | 3d | analytic | complex | all)
+  npm run work:record -- 3d --only <fixture>   record a new fixture's counts (seconds); without --only: the whole builder
+  npm run work:record -- 2d --accept-rise      write counts that ROSE — only with the numbers in the change's ADR
+  npm run work:check -- 2d --slow              the SLOW CORPUS: the open speed issues' own sequences
+                                               (<tree>/__tests__/work-meter/slowCorpus*.ts), against baseline-slow.jsonl.
+                                               Too slow for the suite, so it is checked and recorded here, on demand.
+  The baselines are <tree>/__tests__/work-meter/baseline.jsonl (and baseline-slow.jsonl); docs/08 "The work meter" says when.
+
 COMPARING RUNS
   Timings (every "ms") are only comparable on a QUIET machine — no test suite, no second sweep, same machine,
   before and after. The four harnesses run one at a time for the same reason.
-  Clock-free counters are comparable anywhere, under any load: 3-D records resolves / lmSolves / lmEvals /
-  uncached per action, analytic records poolSlices. 2-D and complex record none — their deterministic fields
-  are the verdict/outcome and (2-D) `clipped`, a search budget that was hit.
+  WORK is clock-free and comparable anywhere, under any load: every record of every harness carries
+  work { total, page, prePaint }, and each summary prints the corpus's total with its page and before-paint shares.
+  One exception, 2-D only: a harness runs the browser's clock budgets, so an action marked `clipped` (a 12 s search
+  budget was hit) stopped where the machine's speed put it and its count is not reproducible. The gate and
+  work-meter.mjs run with no clock, so THEIR 2-D counts are exact and are the whole search's.
+  Other clock-free counters: 3-D records resolves / lmSolves / lmEvals / uncached per action, analytic poolSlices.
   A profile's percentages are comparable anywhere; its milliseconds are a timing.
 
 LAYOUT
-  <product>/<harness>.ts     the measurement, run under vite-node; imports only its own product tree (+ shell/)
+  <product>/<harness>.ts     the corpora, the jobs and the CLI, run under vite-node; imports only its own product
+                             tree (+ shell/). The actions it measures are <tree>/__tests__/work-meter/driver*.ts
+  work-meter.mjs             record / check / report the work-meter baselines (above)
   <product>/*.mjs            driver (watchdog: an action silent for 60 s is killed and recorded), confirm,
                              profile, summarise — each file's header says what it does and writes
   lib/common.mjs, lib/profsum.mjs    plumbing shared by the .mjs scripts; no product code

@@ -7590,3 +7590,120 @@ Phase 2 precedes phase 3 because a worker result has to be adopted into a conten
 - [asked] When a search is cut off before it finishes, the tool says that no solution was found and asks whether to keep searching, instead of refusing the line or saying «אין תצורה אחרת — הצורה נקבעה». *"we should say honestly that a solution was not found and if we should continue searching"* (2026-11-13). A search that finishes and finds nothing keeps today's refusal.
 - [asked] The longest a student waits before that question is about 10 seconds. *"10s is an ok number"* (2026-11-13). The limit is counted in work and calibrated to that time (invariant 3). Measured the same day over the 1 716 lines real students submitted in prod: 16 (0.9 %) take 10 s or more, 15 of them in 2-D, in 4 of 173 sessions; 10 of those 15 end accepted, so the limit is a safety net and the speed work is the cure.
 - [asked] In 3-D, after a figure is redrawn (another configuration, load, delete), the values panel and the crossing dots may show as pending for a moment, as analytic's values do. *"3d can behave like analytics"* (2026-11-13).
+
+### ADR-W-210 Amendment 1 (2026-11-13) — phase 0 as built: the work meter and its gate (#2873)
+
+**Status:** built · 2026-11-13 · debt (P2, workspace: all four builders + `shell/`) · branch `debt/2873-work-meter` · started on the operator's word (*"start phase 0 and 1"*)
+**Requirements:** none (internal): no line, verdict, drawing or message changes, and [NFR-PF-1](03-nonfunctional-requirements.md) is not amended. The counts are the instrument its budgets will be set from · **Design:** [docs/04w](04w-design-shell.md) "The work meter" (the counter, the lane, the phase); [docs/08](08-testing-strategy.md) "The work meter" (the gate, the baseline, when to re-record); [docs/17 §7](17-design-rules.md) (each rule now names its check)
+
+**Root cause addressed.** docs/17 §7's rules and NFR-PF-1 had no check, so every speed regression was found by the operator's play (PR #2860: 0.2 s presses became 6 s presses). After this change, a recorded student action that does more solver work than its baseline fails the suite, in every builder.
+
+**What is counted.** One counter, `shell/workMeter.ts`, called from each builder's innermost solving function. A unit is a count, never a time, and its cost differs between builders and figures, so a count is only compared with the same action of the same figure.
+
+| Builder | One unit | Where the unit is charged |
+|---|---|---|
+| 2-D | one `evaluateCore` call | `countWork()` (`src/engine/solveBudget.ts:57`), which `evaluateCore` (`src/engine/evaluate.ts:1650`) calls first. It is the EXECUTED call: [ADR-558](06-decisions.md#adr-558)'s `work.done` goes on charging memo hits for its own budgets, and the meter does not read it |
+| 3-D | one residual evaluation of `leastSquares`, the Jacobian's included | `src3d/engine/solve3.ts:90`, beside the existing `leastSquaresStats.evals` |
+| Analytic | one residual evaluation | `solveLM` (`src-analytic/engine/solve.ts:1644`), and in the same unit the two routines that solve beside it: `jacobianRank` (`:1975`, every rank the engine takes, with `freeRank`'s own evaluation at `:1942`) and `scanRoots` (`src-analytic/engine/pinRoots.ts:46`). `enumerateBlockRoots` (`pinRoots.ts:291`) makes its solves through `solveLM` and is counted there |
+| Complex | one exact solve | `exactSolve` (`src-complex/replay/derive2.ts:475`): every `foldConstraints` (`:682`) makes exactly one and `entailedBy` (`:509`) two. The counter sits one call below the fold so that the entailment gate is counted in the same unit |
+
+**What is not counted, and how much it is.** Measured on CPU profiles of whole walks of the heaviest fixtures (every action of the figure, 500 µs sampling): the share of sampled time that is under a counted function.
+
+| Builder | Walks profiled | Time inside the counted function | The rest |
+|---|---|---|---|
+| 2-D | the five heaviest fixtures (`hexagon-regular-by-angles-2797`, `issue-1771-semicircle-three-vertices`, `issue-2405-all-common-tangents-apart`, `inscribe-square-in-quad-2257`, `2022-summer-a-issue59`) | 33–54 % inside `evaluateCore` | 41–64 % is `resolveDriven`'s own loops (Nelder–Mead, LM, Gauss–Seidel) around their evaluations. Each evaluation is one counted call, so this time moves with the count. 2.6–5.6 % is outside the solver: parsing, the fold's bookkeeping, garbage collection |
+| 3-D | the five heaviest (`prism-eq-first-815`, `letter-coords-new-point-2563`, `plane-both-forms-2367`, `nine-separate-shapes-2764`, `length-letter-2092`), and the slow corpus's parameter figure `#863 on-line` | 92–95 % inside `leastSquares` (96.7 % on `#863 on-line`) | garbage collection and the walk's own code 5–8 % (3 % on `#863 on-line`); the knowledge sampler's code outside a solve under 1 % |
+| Analytic | `exam-2379-q3-route-2392`, `issue-2231-rhombus-perp-foot`, `issue-2230-rhombus-strict-side`, `corpus471.json#18/4`, `corpus471.json#3/5` | 91–95 % (on the three figures `solveLM` alone is 94.6–95.2 %; the rank adds 0.2–0.4 %) | `evaluateUncached`'s own code 1.4–2.3 %, garbage collection about 2 % |
+| Complex | `2b-capstone`, walked 200 times | **3 %** inside `exactSolve` | **80 % is re-reading the lines** (`parseLineV2`, `src-complex/parser/rules.ts:1461`, reached from `lowerLines`, `src-complex/app/deriveLines.ts:240`, and `complexScopeOf`, `:494`); the fold outside its exact solve is 9 % |
+
+Solver routines that make no counted call, each with its measured share on those walks:
+- **2-D:** none in a loop. Every solver evaluation is one `evaluateCore` call: `solveOneParam`'s scan (`src/engine/evaluate.ts:350`), `residFull` (`:508`), `rowsFor` (`:533`), `costFull` (`:1126`) and the Gauss–Seidel `ownResid` (`:1216`). The closed-form scan of an on-segment point, `solvedOnSegmentCandidates` (`src/engine/solve.ts:865`, with `directionRoots` `:809` and `solveParam` `src/engine/geometry.ts:254`; called from `tryEval`, `evaluate.ts:2246`, and `branchCount`, `step.ts:2880`), evaluates no figure and is not counted: 0.0 % of the sampled time on all five walks.
+- **3-D:** the parameter root scans `signChangeRoots` and `touchZeroRoots` (`src3d/engine/evaluate.ts:704`, `:739`) and the rank probes `numericRank` (`src3d/engine/solve3.ts:546`), `matrixRank3` (`src3d/engine/evaluate.ts:2429`) and `metricRank` (`src3d/engine/freeVecSystem.ts:469`). A solve they trigger is counted in `leastSquares`; their own arithmetic is not. On the five walks, and on the parameter figure `#863 on-line`, the scans and the probes outside a counted solve are 0.0 % of the sampled time.
+- **Analytic:** `tangentFreedomOf`'s own finite-difference Jacobian (`src-analytic/engine/evaluate.ts:950`) evaluates positions, not a solve, and is not counted (0.0 %). The rank it takes afterwards is. On three light parameter figures (`answer-in-parameter-q16-2735`, `exam-2024w-locus-param-1138`, `issue-2521-radius-letter-binds`, about 0.1 s a walk) the pin-root seeding's own code outside a counted routine (`seedPinRoots`, `src-analytic/engine/evaluate.ts:3656`) is about 1 %. On those figures only 55 % of the time is under a counted routine at all: the rest is reading the lines and building the scene, which is not solving. The meter guards the slow cases, which are solver-bound, and says nothing about a light figure's parsing.
+- **Complex:** `solveTier1` called directly by `placeSolutionSets` while lowering (`src-complex/app/deriveLines.ts:563`): one linear solve per lowering that places a solution set, under 0.1 %. **The larger fact is the table's last row.** Complex's time is in reading its lines, which every fold and every scope lookup repeats, and the meter was specified to count solving. A change that doubles the folds of an action fails the complex gate; a change that makes each fold read its lines twice does not. Before complex's count is used as the "work ceiling" invariant 1 gives it, line lowering has to be counted too (one `meterWork()` in `lowerLines`). That changes what complex's unit is, so it is left as a decision and not made here.
+
+One thing follows for 2-D's existing work budgets ([ADR-558](06-decisions.md#adr-558)), which use the same unit: an `evaluateCore` call is between a third and a half of the time of the solve that makes it, not all of it. Their calibration in seconds already includes the rest, so nothing changes; it is recorded because the ADR's "one innermost solving function" reads as if the call were the whole cost.
+
+**Lanes.** Each unit is charged to `page` or `worker`. In a real Worker the global scope says so (`globalThis instanceof WorkerGlobalScope`) and nothing there is page work. Everywhere else the lane is `page` unless the work runs through `inWorkerLane`: 2-D's worker client does that in its synchronous fallback (`src/store/geoWork.ts:129`), so under node the work a browser sends to its worker is charged to the worker. 3-D, analytic and complex have no worker, and every unit of theirs is page work. That is the honest starting point of invariant 1.
+
+**Before the paint.** The third count is the work done before the action's figure can paint. The action drivers say where that is, in the App's order:
+- 2-D: everything the student waits for is before the paint (decide, the worker's prefold, commit, the render and its readers, the resolve gate and, when it fails, the worker's search, because the App holds the previous figure until it answers, #573). The background detection sweep is after it.
+- Analytic: the decision and the re-render's derive and readers are before the paint. The passive effects, the configuration pool's slices and its settle are after it.
+- 3-D and complex: there is no work after the paint. Every unit is before it.
+
+**Actions.** Per fixture: `submit#k` (re-typing row k on the figure of the rows before it), `another#1` (one «הציגו תצורה אחרת»), `load` (cold), `edit` (the last row to its own text: 2-D `runEditCommit`, 3-D `replaceFact`, analytic `decideEditHost`, complex `editLine`), `delete` (the first row) and, in 2-D, `detect` (the background sweep, from cold caches, as its own worker instance has them). The drivers are `<tree>/__tests__/work-meter/driver*.ts`, lifted out of the four `scripts/perf/` harnesses, which now import them: the gate and the timing harness run one driver, so a count and a time describe the same action. Two things the 2-D harness did not drive were added to the driver, because `App.tsx` does them: the render-time readers (`configurationAxes`, `freeDofs`, `freeDofCount`, `unstatedChoices`) and the load audit (`auditLoadedFigure`).
+
+**The baseline.** `<tree>/__tests__/work-meter/baseline.jsonl`, one line per figure-action (`{"k":"<figure>|<action>","total":…,"page":…,"prePaint":…}`), sorted by key under one header line, so two branches that each add a fixture merge as insertions. It lives in the product's tree so that a product's lane and its CI path filter carry it. Registered in [docs/22 §9](22-workflow.md)'s product table and §8's artifact map.
+
+| Builder | Figures | Actions (lines) | Size | Total work | On the page | Before the paint |
+|---|---|---|---|---|---|---|
+| 2-D | 171 | 1 327 | 121 KB | 129 131 273 | 35 497 669 (27.5 %) | 98 851 107 (76.6 %) |
+| 3-D | 176 | 1 266 | 109 KB | 93 384 256 | 93 384 256 (100 %) | 93 384 256 (100 %) |
+| Analytic | 208 | 1 963 | 177 KB | 189 345 082 | 189 345 082 (100 %) | 139 294 357 (73.6 %) |
+| Complex | 45 | 305 | 26 KB | 1 231 | 1 231 (100 %) | 1 231 (100 %) |
+
+Units are not comparable across rows. 2-D by action, where its lanes differ: `detect` 30.3 M (none on the page, none before the paint), `another` 26.0 M (0.0 % on the page), `submit` 25.8 M (47.5 %), `load` 23.4 M (23.2 %), `delete` 17.5 M (66.3 %), `edit` 6.2 M (99.8 %). In analytic the part after the paint is the pool and the passive effects: 32.9 % of a submit, 48.6 % of a load, 46.7 % of an edit. `npm run work:report` prints these from the committed baselines.
+
+**The gate** is one test file per tree, `<tree>/__tests__/work-meter-gate.test.ts`, over the shared rule in `shell/__tests__/work-gate.ts`. It runs in `npm run test:full` and in the product's own `test:run:<product>` lane.
+- An action above its baseline in `total`, `page` or `prePaint` fails. The message names the figure, the action, the typed line, each count's before and after, the `scripts/perf` command that times the same action, the re-record command, and the docs/17 §7 obligation.
+- An action with no baseline line fails (a new fixture is recorded before it is committed). So does a baseline line the walk no longer produces, and a baseline figure that is no longer a fixture.
+- The builder's summed `page` count over the recorded actions may not rise (invariant 1, as a ratchet). With a zero tolerance this can only fire together with a per-action failure; it is stated as its own assertion so that it keeps meaning if a tolerance is ever introduced.
+- **The tolerance is zero**, because the counts are exactly reproducible (next paragraph). Any difference is a change in what the code does.
+- A count below its baseline is printed and written to `reports/work-meter/<builder>.json`, never failed. It is locked by re-recording.
+- `npm run work:record -- <builder>` is the same walk writing the baseline. It adds new figures, drops deleted ones and lowers fallen counts. It writes a rise only with `--accept-rise`, and then prints the before and after for the ADR. `--only <text>` re-records the figures whose name contains the text, in seconds.
+
+**Determinism, which is the acceptance bar.** Measured on the dev PC, each run a fresh process:
+- 2-D: four runs (record, record again, `--order reverse`, `--order shuffle:11`), 171 figures and 1 327 actions each, the same counts every time. The second record wrote 0 added, 0 fell, 0 rose; each check reported 0 rises and 0 falls.
+- 3-D: three runs (record, reverse, `shuffle:11`), 176 figures and 1 266 actions, identical.
+- Analytic: three runs (record, reverse, `shuffle:11`), 208 sequences and 1 963 actions, identical.
+- Complex: four runs (record, check, reverse, `shuffle:7`), 45 figures and 305 actions, identical.
+- Independent of what ran before: a gate is its own test file, and vitest gives every file its own process, so no other test shares its module state. Inside the file the two other orders above show that no figure's count depends on its predecessor.
+- Each gate ends with the lock docs/17 §7's fifth rule asks for: it walks two figures again (the one at the tenth and the one at the fiftieth percentile of cost), after the whole corpus and twice in a row, and asserts equal counts.
+- Two things made a count depend on something other than the input, one seen and one latent. Both were removed at the root rather than tolerated:
+  1. **A memo `clearReplayCaches` did not clear** (2-D, seen). `narrowingNotes2D` keeps one content-keyed entry (`src/replay/narrowing.ts`), and its attribution replays the figure. A detection sweep of the same figure twice in a row counted 93 902 units, then 49 220. The lock above caught it on its first run. `clearReplayCaches` now clears it (`clearNarrowingMemo`).
+  2. **Two wall clocks on the load path** (2-D, latent). `refreshLoadedFigure` and `auditLoadedFigure` (`src/store/loadAudit.ts`) stop after 4 s and 3 s of real time, under vitest too, and each step they leave unread is a prefix replay. Measured on the dev PC with the suite running, the hexagon fixture's refresh takes 2.5 s and its audit 2.4 s: inside the budgets here, and past them on a machine half as fast, where the load's count would differ. Their budgets are now off under vitest (`import.meta.env.MODE === 'test'`), exactly as the search budgets of `replay/core.ts` have always been. The browser's budgets are unchanged.
+- 3-D, analytic and complex needed nothing: their memos hang off objects each fixture builds anew, and no clock reaches their solvers.
+
+**The suite measures 2-D's unclipped work, not the browser's clipped flow.** Under vitest every 2-D clock budget is off, so a search runs to its end. A browser's worker stops it after 12 s. The gate therefore fails on work a browser might never reach, and says nothing about where a browser's clock cuts a search. `scripts/perf/2d` runs the browser's budgets and marks an action `clipped`; its count for such an action is not reproducible. Phase 4 (limits in work units) removes the difference.
+
+**Cost of the gate**, measured: the wall time of each gate file run alone on the dev PC.
+
+| Builder | Wall time, the gate alone | Wall time inside `npm run test:full` | Excluded |
+|---|---|---|---|
+| 2-D | 6.3 min (377–385 s over four runs) | 11.4 min | nothing |
+| 3-D | 5.1 min (295–322 s over three runs) | 9.7 min | nothing |
+| Analytic | 11.1 min (647–675 s over three runs) | 15.5 min | nothing |
+| Complex | 1.5 s | 1.6 s | nothing |
+
+The full step-by-step walk fits in the suite, so no subset was needed and **no fixture and no action is excluded**. The dearest single action is analytic's `exam-2379-q3-route-2392.analytic.json|another#1`, about 70 s and 18.8 M units. Each gate is one file, so it joins the measured slow tier and `npm run test:fast` does not run it. The whole suite took 23.2 min of wall time with the gates in it (1 459 files, 316 CPU-minutes); a full run of another branch without them, the same hour on the same machine, took 19.8 min. The analytic gate is now the longest file of the suite. If that wall time matters, the gate splits into two files by fixture, which needs the re-record to run them one after the other; it was not done here.
+
+**The counter's own cost** (docs/17 §7, fourth rule), measured as the wall time of one heavy fixture's whole walk with the `meterWork()` calls in the engines and with them removed, minimum of the faster of two timed walks after a warm-up walk, one process per state, the states run one after the other runs each, alternating:
+
+| Builder | Workload | Units | Without the counter | With it | Difference |
+|---|---|---|---|---|---|
+| 2-D | `issue-2405-all-common-tangents-apart`, whole walk | 3 543 606 | 12.91 s | 12.70 s | −1.6 % |
+| 3-D | `prism-eq-first-815`, whole walk | 4 574 248 | 14.32 s | 14.35 s | +0.2 % |
+| Analytic | `corpus471.json#3/5`, whole walk | 12 099 647 | 25.40 s | 25.51 s | +0.4 % |
+| Complex | all 45 fixtures, walked 20 times | 24 620 | 13.27 s | 12.77 s | −3.8 % |
+
+The differences are inside the noise: two of the four are negative, the two timed walks of one state differ by up to 1.1 %, and complex, where the counter fires 24 620 times in 13 s, read 3.8 % faster with it. So the cost was also computed. One `meterWork()` call takes 7 ns under vitest, and the counting wrapper around a residual function 10 ns (a tight loop of 50 M calls, best of nine). At the units above that is 25 ms of 12.7 s in 2-D (0.2 %), 32 ms of 14.3 s in 3-D (0.2 %), 121 ms of 25.5 s in analytic (0.5 %; the measured difference was 113 ms) and 0.2 ms in complex. It is negligible, and a production bundle inlines the call. A second alternating round was started and abandoned when another session's full suite took the machine: one round is what is reported.
+
+**`scripts/perf/` reports the same three counts.** Every record of every harness carries `work { total, page, prePaint }` beside its timings, each summary prints the corpus's work with its page and before-paint shares, and the slow tables gain the three columns. The harnesses gained the `edit` action in their fixture walks. `node scripts/perf/work-meter.mjs` (`npm run work:record` / `work:check` / `work:report`) records, checks and reads the baselines.
+
+**The slow corpus.** The open speed issues' own sequences moved from the harnesses into `<tree>/__tests__/work-meter/slowCorpus*.ts` (2-D 17 sequences, 3-D 14, analytic 3; complex has none, as the ADR's measurement found no complex action over 5 s). The gate walks them on demand, `npm run work:check -- <builder> --slow`, against `baseline-slow.jsonl`. Recorded on 2026-11-13: 2-D 151 actions, 140 304 291 units, 6.7 min (the dearest sequence, `1768-kite-area`, takes 186 s and 52.6 M units, more than a third of the whole fixture corpus); 3-D 94 actions, 39 522 268 units, 2.6 min; analytic 37 actions, 5 916 217 units, 14 s. Together they take about ten minutes: they are outside the suite because #2873 asked for that, not because they could not fit.
+
+**Known limits, said plainly.**
+- **2-D's `page` count is a lower bound.** Under node the page and the worker are one module instance and share one memo. A view the worker has searched is a memo hit when the page draws it, and under node the detection sweep is made cold by clearing the shared caches, where a browser's detect worker keeps its own. Charging a hit the page takes on a worker-computed entry (ADR-558's rule, applied across lanes) or measuring in a real Worker is owed before 2-D's page count is ratcheted to zero in phase 3.
+- **Before-the-paint is the driver's statement** of where the App paints, read from the App's code. No builder marks its paints at run time.
+- **The fixtures hold accepted rows.** A line that cannot hold is walked only where a slow-corpus sequence ends in one, so docs/17 §7's second rule (the failure path is cheaper) is checked on demand, not by the suite.
+- **A fall is not failed.** Until someone re-records, the old, higher count stays the ceiling.
+- **The gate counts work with no clock.** It cannot see whether a loop takes a deadline parameter.
+- **CI runs the gates** in each product's lane (`npx vitest run <tree>/ …`), which adds their wall time there. On this change's first CI run (PR #2884) the gates took 21.5 min (2-D), 13.4 min (3-D), 19.8 min (analytic) and under 2 s (complex), and the lanes 83, 60, 34 and 3 min, against 46–70, 28–32, 37–38 and 2–3 min on the two runs of `main` before it. One run is not a measurement of the lanes, and the 3-D lane's extra half hour is more than its gate; it was not looked into.
+- **"Any machine" was measured on one.** The baselines were recorded on Node 24.15, Windows x64. A count follows the solver's floating-point path, so it assumes the same arithmetic: a JavaScript engine whose `Math` functions round a last bit differently could count differently. CI runs Node 22 on Linux, and it was the first check of that: on this change's first commit all four lanes passed their gates against these baselines (PR #2884), so every count was the same on a second operating system and a second Node major. If a machine ever disagrees, the fix is to find the operation that differs, never a tolerance.
+
+**Files changed outside tests and docs:** `shell/workMeter.ts` (new: the counter); `src/engine/solveBudget.ts`, `src3d/engine/solve3.ts`, `src-analytic/engine/solve.ts`, `src-analytic/engine/pinRoots.ts`, `src-complex/replay/derive2.ts` (the `meterWork()` calls); `src/store/geoWork.ts` (the worker lane around the synchronous fallback); `src/store/loadAudit.ts` (the two load budgets, off under vitest); `src/replay/narrowing.ts` and `src/replay/core.ts` (`clearReplayCaches` clears the narrowing memo); `scripts/perf/` (the harnesses import the drivers and print the counts; `work-meter.mjs` is new); `package.json` (three scripts).
+
+**Sibling audit.** All four builders are instrumented, gated and recorded in this one change. `server/` has no solver.
+
+**What the student will see.**
+- [asked] Nothing. This is the measuring instrument (*"start phase 0 and 1"*); no line, verdict, drawing, message or timing a student meets changes. The two 2-D budgets changed are changed under vitest only.

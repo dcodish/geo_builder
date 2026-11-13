@@ -16,11 +16,11 @@
 //                       phase; table A lists every action ≥ --table-min on figure or total, with its sequence
 // Takes seconds. A missing results file is reported as "no data".
 //
-// COMPARABILITY: phase values are wall-clock timings — compare runs only from a quiet machine. `poolSlices` and
-// `verdict` are clock-free.
+// COMPARABILITY: phase values are wall-clock timings — compare runs only from a quiet machine. `work` (the work meter's three counts, #2873: all the solver work, the part on the page, the part before the paint),
+// `poolSlices` and `verdict` are clock-free.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { cli, outDir, rel, readJsonl, median, countBuckets, countsText, countsMarkdown } from '../lib/common.mjs';
+import { cli, outDir, rel, readJsonl, median, countBuckets, countsText, countsMarkdown, workText, workSummary } from '../lib/common.mjs';
 
 const args = cli();
 const OUT = outDir('analytic', args);
@@ -40,6 +40,7 @@ const tos = rows.filter((r) => r.timeout || r.crashed);
 const LANES = [['figure (main)', (r) => r.ph.figure], ['post (main, after paint)', (r) => r.ph.post], ['to settled (all)', (r) => r.ph.total], ['longest pool slice', (r) => r.ph.poolMaxSlice]];
 const counts = countBuckets(acts.flatMap((r) => LANES.map(([lane, v]) => ({ k: `${r.kind} · ${lane}`, v: v(r) }))), (x) => [x.k], (x) => x.v);
 console.log(`actions ${acts.length}  errors ${errs.length}  timeouts/crashes ${tos.length}`);
+console.log(workSummary(acts, 'residual evaluations of solveLM / jacobianRank / scanRoots'));
 console.log(countsText(counts, 'action · lane'));
 const bySource = {};
 for (const r of acts) bySource[r.source] = (bySource[r.source] ?? 0) + 1;
@@ -49,7 +50,7 @@ console.log(`actions ≥ ${MIN} ms to settled: ${slow.length}`);
 const f0 = (x) => (x ?? 0).toFixed(0);
 if (args.has('--list')) {
   for (const r of [...acts].sort((a, b) => b.ph.total - a.ph.total).slice(0, 40))
-    console.log(f0(r.ph.total).padStart(7), 'ms', r.kind.padEnd(10), String(r.ph.verdict ?? '').padEnd(10), `figure ${f0(r.ph.figure)} (decide ${f0(r.ph.decide)} render ${f0(r.ph.render)}) post ${f0(r.ph.post)} pool ${f0(r.ph.pool)}/${r.ph.poolSlices} slices settle ${f0(r.ph.settle)}`, '|', r.key, '|', (r.utterance ?? '').slice(0, 50), '| lines before:', r.pre.lines.length);
+    console.log(f0(r.ph.total).padStart(7), 'ms', r.kind.padEnd(10), String(r.ph.verdict ?? '').padEnd(10), `figure ${f0(r.ph.figure)} (decide ${f0(r.ph.decide)} render ${f0(r.ph.render)}) post ${f0(r.ph.post)} pool ${f0(r.ph.pool)}/${r.ph.poolSlices} slices settle ${f0(r.ph.settle)}`, '|', r.key, '|', (r.utterance ?? '').slice(0, 50), '| lines before:', r.pre.lines.length, '|', workText(r.work));
 }
 for (const e of errs.slice(0, 10)) console.log('ERR', e.source, e.id, String(e.error).slice(0, 200));
 for (const t of tos) console.log('TIMEOUT/CRASH', JSON.stringify(t));
@@ -57,7 +58,7 @@ if (given) process.exit(0); // a subset run is printed, never written over the f
 
 const commitFile = path.join(OUT, 'commit.txt');
 fs.writeFileSync(path.join(OUT, 'to-confirm.txt'), slow.map((r) => r.key).join('\n') + (slow.length ? '\n' : ''));
-const actions = acts.map(({ job, source, id, iph, step, kind, utterance, index, pre, ph, key }) => ({ key, job, source, id, iph, step, kind, utterance, index, preLines: pre.lines, preSeed: pre.seed, preHosts: pre.hosts, ph }));
+const actions = acts.map(({ job, source, id, iph, step, kind, utterance, index, pre, ph, work, key }) => ({ key, job, source, id, iph, step, kind, utterance, index, preLines: pre.lines, preSeed: pre.seed, preHosts: pre.hosts, ph, work }));
 fs.writeFileSync(path.join(OUT, 'measurements.json'), JSON.stringify({ generated: new Date().toISOString(), commit: fs.existsSync(commitFile) ? fs.readFileSync(commitFile, 'utf8').trim() : 'unknown', actions, errors: errs, timeouts: tos }));
 fs.writeFileSync(path.join(OUT, 'counts.md'), countsMarkdown(counts, 'action · lane'));
 const wrote = ['measurements.json', `to-confirm.txt (${slow.length} keys)`, 'counts.md'];
@@ -74,21 +75,21 @@ if (fs.existsSync(confFile)) {
     const f = (x) => median(reps.map((r) => r[x]));
     const ph = { decide: f('decide'), render: f('render'), figure: f('figure'), post: f('post'), pool: f('pool'), poolSlices: reps[0].poolSlices, poolMaxSlice: f('poolMaxSlice'), settle: f('settle'), total: f('total') };
     const dominant = Object.entries({ decide: ph.decide, render: ph.render, post: ph.post, pool: ph.pool, settle: ph.settle }).sort((x, y) => y[1] - x[1])[0][0];
-    confirmed.push({ key: k, source: a.source, id: a.id, iph: a.iph, step: a.step, kind: a.kind, utterance: a.utterance, preLines: a.preLines, verdict: reps[0].verdict ?? '', ph, runs: reps.map((r) => Math.round(r.total)), dominant, sweep: a.ph.total });
+    confirmed.push({ key: k, source: a.source, id: a.id, iph: a.iph, step: a.step, kind: a.kind, utterance: a.utterance, preLines: a.preLines, verdict: reps[0].verdict ?? '', ph, work: reps[0].work ?? a.work, runs: reps.map((r) => Math.round(r.total)), dominant, sweep: a.ph.total });
   }
   confirmed.sort((x, y) => Math.max(y.ph.figure, y.ph.total) - Math.max(x.ph.figure, x.ph.total));
   fs.writeFileSync(path.join(OUT, 'confirmed.json'), JSON.stringify(confirmed, null, 1));
   const s = (ms) => (ms / 1000).toFixed(1);
   const bar = (t) => String(t ?? '').replace(/\|/g, '/');
-  const md = ['| # | action | sequence (slow step ⟶) | confirm median: figure (main) s | to settled s | runs (total ms) | sweep s | lanes | dominant | source | key |', '|---|---|---|---|---|---|---|---|---|---|---|'];
+  const md = ['| # | action | sequence (slow step ⟶) | confirm median: figure (main) s | to settled s | runs (total ms) | sweep s | work units · on the page · before paint | lanes | dominant | source | key |', '|---|---|---|---|---|---|---|---|---|---|---|---|'];
   let i = 0;
   for (const r of confirmed.filter((x) => Math.max(x.ph.figure, x.ph.total) >= TABLE_MIN)) {
     i += 1;
     const seq = r.preLines.map(bar).join(' · ');
-    const step = r.kind === 'another' ? '«הציגו תצורה אחרת»' : r.kind === 'load' ? '(load file)' : r.kind === 'delete' ? `✕ delete «${bar(r.utterance)}»` : `«${bar(r.utterance)}»`;
+    const step = r.kind === 'another' ? '«הציגו תצורה אחרת»' : r.kind === 'load' ? '(load file)' : r.kind === 'edit' ? `✎ edit to «${bar(r.utterance)}»` : r.kind === 'delete' ? `✕ delete «${bar(r.utterance)}»` : `«${bar(r.utterance)}»`;
     const lanes = `decide ${s(r.ph.decide)} · render ${s(r.ph.render)} · post ${s(r.ph.post)} · bg pool ${s(r.ph.pool)} (${r.ph.poolSlices} slices, longest ${s(r.ph.poolMaxSlice)}) · settle ${s(r.ph.settle)}`;
     const from = (r.source === 'prod' ? `prod sid ${r.id} (user ${String(r.iph).slice(0, 6)})` : `${r.source} ${bar(r.id)}`) + ` · step ${r.step}`;
-    md.push(`| ${i} | ${r.kind}${r.verdict ? ` (${r.verdict})` : ''} | ${seq}${seq ? ' · ' : ''}⟶ ${step} | ${s(r.ph.figure)} | ${s(r.ph.total)} | ${r.runs.join(', ')} | ${s(r.sweep)} | ${lanes} | ${r.dominant} | ${from} | ${bar(r.key)} |`);
+    md.push(`| ${i} | ${r.kind}${r.verdict ? ` (${r.verdict})` : ''} | ${seq}${seq ? ' · ' : ''}⟶ ${step} | ${s(r.ph.figure)} | ${s(r.ph.total)} | ${r.runs.join(', ')} | ${s(r.sweep)} | ${r.work ? `${r.work.total} · ${r.work.page} · ${r.work.prePaint}` : ''} | ${lanes} | ${r.dominant} | ${from} | ${bar(r.key)} |`);
   }
   fs.writeFileSync(path.join(OUT, 'tableA.md'), md.join('\n') + '\n');
   wrote.push(`confirmed.json (${confirmed.length})`, `tableA.md (${i} rows ≥ ${TABLE_MIN} ms)`);

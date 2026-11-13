@@ -11,6 +11,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildParseCtx, parse } from '@/parser';
 import {
+  clearReplayCaches,
   dryRunOutcome,
   foldStats,
   getFoldFor,
@@ -24,6 +25,7 @@ import {
 } from '../geoStore';
 import { geoWork, isStaleBasis, supersedeStaleSearches } from '../geoWork';
 import type { AnyCommand } from '@/engine';
+import { meterAction, workLane } from '../../../shell/workMeter';
 
 let n = 0;
 function factsOf(...utterances: string[]): Fact[] {
@@ -166,5 +168,38 @@ describe('the search basis — applyView is a compare-and-set, a stale search is
     st().toggleHidden('A');
     expect(supersedeStaleSearches(st())).toBe(false);
     await expect(pending).resolves.not.toBeNull();
+  });
+});
+
+describe('the work meter lane (#2873, ADR-W-210): the fallback is the work a browser sends to its worker', () => {
+  it('charges every operation of the client to the worker lane, and the same work called directly to the page', async () => {
+    const triangle = () => factsOf('משולש ABC', 'AB = 5', 'BC = 6', 'זווית ABC = 40');
+    for (const op of [
+      (f: Fact[]) => geoWork.prefold(f, 0),
+      (f: Fact[]) => geoWork.resample(f, 0),
+      (f: Fact[]) => geoWork.autoResolve(f, 0),
+      (f: Fact[]) => geoWork.detect(f),
+    ]) {
+      const facts = triangle();
+      clearReplayCaches();
+      const m = meterAction();
+      await op(facts);
+      const work = m.end();
+      expect(work.total).toBeGreaterThan(0); // the operation did solve: the lane below is not vacuous
+      expect(work.page).toBe(0);
+    }
+    const facts = triangle();
+    clearReplayCaches();
+    const m = meterAction();
+    replay(facts, 0);
+    const direct = m.end();
+    expect(direct.total).toBeGreaterThan(0);
+    expect(direct.page).toBe(direct.total);
+  });
+
+  it('restores the page lane after a fallback that throws', async () => {
+    const broken = [{ id: 'x', utterance: 'x', enabled: true, cmd: null }] as unknown as Fact[];
+    await geoWork.prefold(broken, 0).catch(() => undefined);
+    expect(workLane()).toBe('page');
   });
 });

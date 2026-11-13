@@ -26,12 +26,13 @@
 // WATCHDOG. ONE vite-node child at a time; a child silent for the limit is killed, the in-flight action recorded as
 // ">60 s", and the sweep resumes at the next corpus item.
 //
-// COMPARABILITY. Every number is a wall-clock timing: comparable only on a QUIET machine, same machine, before vs
-// after. This harness records no clock-free counter; `verdict` and `nLines` are deterministic.
+// COMPARABILITY. Every `ms` is a wall-clock timing: comparable only on a QUIET machine, same machine, before vs
+// after. `work` (the work meter's three counts, #2873: all the solver work, the part on the page, the part before the paint)
+// is clock-free and comparable anywhere; `verdict` and `nLines` are deterministic too.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cli, outDir, rel, rotate, viteNode, killTree, lineReader, median, commitStamp, passThrough, countBuckets, countsText, countsMarkdown } from '../lib/common.mjs';
+import { cli, outDir, rel, rotate, viteNode, killTree, lineReader, median, commitStamp, passThrough, countBuckets, countsText, countsMarkdown, workText, workSummary } from '../lib/common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const HARNESS = path.join(HERE, 'harness.ts');
@@ -82,19 +83,20 @@ function summarize(doc, write) {
   const counts = countBuckets(rows, (m) => [m.kind, `${m.kind} @${m.source ?? m.item?.split(':')[0] ?? '?'}`], msOf);
   console.log(countsText(counts, 'action'));
   console.log(`items ${doc.items}  actions ${rows.length}  timeouts ${rows.filter((m) => m.timeout).length}  re-measured ${rows.filter((m) => m.confirm).length}  slowest ${Math.round(Math.max(...rows.map(msOf)))} ms  (commit ${doc.commit ?? 'unknown'})`);
-  console.log('\n      ms  action      item@action | last line | verdict | parts');
+  console.log(workSummary(rows, 'exact solves'));
+  console.log('\n      ms  action      item@action | last line | verdict | parts | work');
   for (const m of [...rows].sort((a, b) => msOf(b) - msOf(a)).slice(0, only || args.has('--list') ? 40 : 12))
-    console.log(String(Math.round(msOf(m))).padStart(8), ' ' + `${m.kind}#${m.step}`.padEnd(11), `${m.item}@${actionOf(m)}`, '|', (m.seq ?? []).at(-1) ?? '', '|', m.verdict ?? '', '|', JSON.stringify(m.parts ?? {}), m.confirm ? `confirm ${JSON.stringify(m.confirm)}` : '');
+    console.log(String(Math.round(msOf(m))).padStart(8), ' ' + `${m.kind}#${m.step}`.padEnd(11), `${m.item}@${actionOf(m)}`, '|', (m.seq ?? []).at(-1) ?? '', '|', m.verdict ?? '', '|', JSON.stringify(m.parts ?? {}), '|', workText(m.work), m.confirm ? `confirm ${JSON.stringify(m.confirm)}` : '');
   if (!write) return;
   fs.writeFileSync(path.join(OUT, 'counts.md'), countsMarkdown(counts, 'action'));
   const esc = (t) => String(t ?? '').replace(/\|/g, '\\|');
-  const md = ['| # | action | sequence (the action is on the LAST line for a submit; otherwise on the whole list) | ms | solo runs | parts (ms) | lines | source | item@action |', '|---|---|---|---|---|---|---|---|---|'];
+  const md = ['| # | action | sequence (the action is on the LAST line for a submit; otherwise on the whole list) | ms | solo runs | parts (ms) | work units · on the page · before paint | lines | source | item@action |', '|---|---|---|---|---|---|---|---|---|---|'];
   const slow = rows.filter((m) => msOf(m) >= TABLE_MIN).sort((a, b) => msOf(b) - msOf(a));
   slow.forEach((m, i) => {
     const seq = (m.seq ?? []).map(esc);
     if (m.kind === 'submit' && seq.length) seq[seq.length - 1] = `**${seq[seq.length - 1]}**`;
     const act = m.kind === 'submit' ? '' : m.kind === 'another' ? ` — **press «הציגו תצורה אחרת» ×${m.step}**` : ` — **${m.kind}**`;
-    md.push(`| ${i + 1} | ${m.kind}${m.verdict ? ` (${esc(m.verdict)})` : ''} | ${seq.join(' · ')}${act} | ${m.timeout && !m.confirm ? '>' + LIMIT : Math.round(msOf(m))} | ${m.confirm ? m.confirm.join(', ') : m.timeout ? 'watchdog' : 'sweep only'} | ${esc(Object.entries(m.parts ?? {}).map(([k, v]) => `${k} ${v}`).join(' · '))} | ${m.nLines ?? ''} | ${m.source}${m.users ? ` (user ${String(m.users).slice(0, 6)})` : ''} | ${esc(m.item)}@${actionOf(m)} |`);
+    md.push(`| ${i + 1} | ${m.kind}${m.verdict ? ` (${esc(m.verdict)})` : ''} | ${seq.join(' · ')}${act} | ${m.timeout && !m.confirm ? '>' + LIMIT : Math.round(msOf(m))} | ${m.confirm ? m.confirm.join(', ') : m.timeout ? 'watchdog' : 'sweep only'} | ${esc(Object.entries(m.parts ?? {}).map(([k, v]) => `${k} ${v}`).join(' · '))} | ${m.work ? `${m.work.total} · ${m.work.page} · ${m.work.prePaint}` : ''} | ${m.nLines ?? ''} | ${m.source}${m.users ? ` (user ${String(m.users).slice(0, 6)})` : ''} | ${esc(m.item)}@${actionOf(m)} |`);
   });
   fs.writeFileSync(path.join(OUT, 'tableA.md'), md.join('\n') + '\n');
   console.log(`wrote ${rel(OUT)}/: ${path.basename(outFile)}, counts.md, tableA.md (${slow.length} rows ≥ ${TABLE_MIN} ms)`);

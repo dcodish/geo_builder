@@ -38,7 +38,7 @@ import { objectParents, type MeasureExpr } from '@/engine/types';
 import { DOUBLE_ROOT_SPLIT } from '@/engine/geometry';
 import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, isSatisfied, declaredRingsHold, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
 import { resolveBinds } from './naming';
-import { narrowingNotes2D, type RowNouns } from './narrowing';
+import { clearNarrowingMemo, narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
 import type { CevianHost } from '../../shell/cevianHost';
 import { Structure, pairKey, ringOnOneCircle } from '@/engine/structure';
@@ -541,12 +541,14 @@ function translateFold(node: FoldNode, permToOrig: number[]): FoldNode {
  * that content runs at TAIL speed and the tab never pays the cold fold.
  */
 export type { FoldNode };
-/** Test-only: forget every memoized replay, fold and pool (a COLD measurement on demand). The replay cache is
- *  identity-keyed, so a fresh facts array is already cold there. */
+/** Test-only: forget every memoized replay, fold, pool and narrowing note (a COLD measurement on demand). The replay
+ *  cache is identity-keyed, so a fresh facts array is already cold there. EVERY content-keyed memo of this layer is
+ *  cleared here: the work meter's counts (#2873, ADR-W-210) are reproducible only because nothing survives it. */
 export function clearReplayCaches(): void {
   foldCache.clear();
   searchFoldCache.clear();
   sampleMemo = null;
+  clearNarrowingMemo();
 }
 export function getFoldFor(facts: Fact[]): FoldNode | null {
   const node = foldCache.get(foldKey(resolveBinds(facts))) ?? null;

@@ -1,0 +1,38 @@
+{"_":"THE WORK-METER BASELINE (#2873, ADR-W-210). One line per figure-action, sorted by key: solver work in units, never seconds (total = all of it, page = on the UI thread, prePaint = before the figure can paint). Never edited by hand: `npm run work:record -- <builder>` rewrites it, and docs/08 says when."}
+{"k":"#1647 touch sentence|another#1","total":859704,"page":859704,"prePaint":859704}
+{"k":"#1647 touch sentence|delete","total":9460,"page":9460,"prePaint":9460}
+{"k":"#1647 touch sentence|edit","total":834934,"page":834934,"prePaint":834934}
+{"k":"#1647 touch sentence|load","total":807711,"page":807711,"prePaint":807711}
+{"k":"#1647 touch sentence|submit#1","total":5536,"page":5536,"prePaint":5536}
+{"k":"#1647 touch sentence|submit#2","total":3374,"page":3374,"prePaint":3374}
+{"k":"#1647 touch sentence|submit#3","total":6534,"page":6534,"prePaint":6534}
+{"k":"#1647 touch sentence|submit#4","total":544235,"page":544235,"prePaint":544235}
+{"k":"#1647 touch sentence|submit#5","total":807711,"page":807711,"prePaint":807711}
+{"k":"#2737 nine+1 shapes|another#1","total":268502,"page":268502,"prePaint":268502}
+{"k":"#2737 nine+1 shapes|delete","total":190398,"page":190398,"prePaint":190398}
+{"k":"#2737 nine+1 shapes|edit","total":236746,"page":236746,"prePaint":236746}
+{"k":"#2737 nine+1 shapes|load","total":239264,"page":239264,"prePaint":239264}
+{"k":"#2737 nine+1 shapes|submit#1","total":0,"page":0,"prePaint":0}
+{"k":"#2737 nine+1 shapes|submit#10","total":236746,"page":236746,"prePaint":236746}
+{"k":"#2737 nine+1 shapes|submit#2","total":6220,"page":6220,"prePaint":6220}
+{"k":"#2737 nine+1 shapes|submit#3","total":13227,"page":13227,"prePaint":13227}
+{"k":"#2737 nine+1 shapes|submit#4","total":31748,"page":31748,"prePaint":31748}
+{"k":"#2737 nine+1 shapes|submit#5","total":46849,"page":46849,"prePaint":46849}
+{"k":"#2737 nine+1 shapes|submit#6","total":84009,"page":84009,"prePaint":84009}
+{"k":"#2737 nine+1 shapes|submit#7","total":219012,"page":219012,"prePaint":219012}
+{"k":"#2737 nine+1 shapes|submit#8","total":227551,"page":227551,"prePaint":227551}
+{"k":"#2737 nine+1 shapes|submit#9","total":236746,"page":236746,"prePaint":236746}
+{"k":"#2737 ten free quadrilaterals|another#1","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|delete","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|edit","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|load","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|submit#1","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|submit#10","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|submit#2","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|submit#3","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|submit#4","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|submit#5","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|submit#6","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|submit#7","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|submit#8","total":0,"page":0,"prePaint":0}
+{"k":"#2737 ten free quadrilaterals|submit#9","total":0,"page":0,"prePaint":0}

@@ -1,7 +1,7 @@
 // 2-D TIMING SWEEP — the entry point of the 2-D long-wait harness (#2867).
 //
 // WHAT IT MEASURES. How long the 2-D App makes a student wait for each action — submit a line, «הציגו תצורה אחרת»,
-// load a saved figure, delete a row, and the background detect — by replaying real sequences through the real 2-D
+// load a saved figure, edit a row, delete a row, and the background detect — by replaying real sequences through the real 2-D
 // code (perf2d.ts has the per-slice breakdown: main thread / worker / background). Corpora: known slow issue
 // sequences, src/__tests__/fixtures, the scenario corpus, prod sessions (logs/perf-prod-events.jsonl, else
 // logs/prod-events-2d.jsonl) and the operator's dev sessions (logs/debug-log.jsonl). A missing log is "no data".
@@ -31,9 +31,10 @@
 // WATCHDOG. ONE vite-node child at a time; an action silent for > limit is recorded as a timeout (">60 s"), the
 // child is killed and the sweep restarts at the NEXT item.
 //
-// COMPARABILITY. Every number is a wall-clock timing: comparable only on a QUIET machine (no test suite, no dev
-// server load), same machine, before vs after. The 2-D harness records no clock-free counter; the deterministic
-// fields are `outcome` and `clipped` (a search budget was hit).
+// COMPARABILITY. Every `*_ms` is a wall-clock timing: comparable only on a QUIET machine (no test suite, no dev
+// server load), same machine, before vs after. Each record also carries `work` — the work meter's three counts
+// (#2873: evaluateCore calls in all, on the page, before the paint) — clock-free and comparable anywhere, except on
+// an action marked `clipped` (a 12 s search budget was hit). `outcome` is deterministic too.
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -167,6 +167,16 @@ function carryConfiguration(fresh: AnyCommand[], saved: AnyCommand[]): AnyComman
 }
 
 /**
+ * The two load budgets, in milliseconds (#2873, ADR-W-210 Am. 1). As the search budgets of `replay/core.ts`: tests run
+ * with NO deadline (vitest sets MODE 'test'), so what a load refreshes and audits is a function of the file alone, on
+ * any machine under any load. Measured on the dev PC with the suite running, the hexagon fixture's refresh takes 2.5 s
+ * and its audit 2.4 s: inside the budgets here, and past them on a machine half as fast, where the steps left unread
+ * would change what the load did. The browser's budgets are unchanged.
+ */
+const REFRESH_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 4000;
+const AUDIT_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 3000;
+
+/**
  * Audit a loaded fact list against the CURRENT parser. Budgeted (each step costs a prefix `replay`;
  * a pathological figure must not freeze the load) — `complete: false` means the budget ran out and
  * later steps went unchecked. A step with no utterance (a direct command) is skipped; a step whose
@@ -191,7 +201,7 @@ function carryConfiguration(fresh: AnyCommand[], saved: AnyCommand[]): AnyComman
  * {@link auditLoadedFigure}; on budget exhaustion the remaining steps are kept as saved (never partially
  * corrupt). Returns the (possibly rebuilt) fact list + the 1-based indices of the steps that changed.
  */
-export function refreshLoadedFigure(facts: Fact[], budgetMs = 4000): { facts: Fact[]; refreshed: number[] } {
+export function refreshLoadedFigure(facts: Fact[], budgetMs = REFRESH_BUDGET_MS): { facts: Fact[]; refreshed: number[] } {
   const t0 = Date.now();
   const steps = stepsOf(facts);
   const out: Fact[] = [];
@@ -241,7 +251,7 @@ export function refreshLoadedFigure(facts: Fact[], budgetMs = 4000): { facts: Fa
   return { facts: out, refreshed };
 }
 
-export function auditLoadedFigure(facts: Fact[], budgetMs = 3000): { findings: LoadAuditFinding[]; complete: boolean } {
+export function auditLoadedFigure(facts: Fact[], budgetMs = AUDIT_BUDGET_MS): { findings: LoadAuditFinding[]; complete: boolean } {
   const t0 = Date.now();
   const findings: LoadAuditFinding[] = [];
   const steps = stepsOf(facts);

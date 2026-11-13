@@ -1,3 +1,5 @@
+import { meterWork } from '../../shell/workMeter';
+
 /**
  * Cooperative wall-clock budget for the failure-path recruit ladder (docs/17 §7 — "no unbudgeted
  * sweeps"; issues #59/#41). The old search budgets (`SEARCH_BUDGET_MS`, `SAMPLE_BUDGET_MS`) are checked
@@ -47,10 +49,12 @@ export function withSolveBudget<T>(deadlineAt: number, fn: () => T): T {
  */
 export const work: { done: number; limitAt: number | null; executed: number } = { done: 0, limitAt: null, executed: 0 };
 
-/** One unit of work (called by `evaluateCore`). `executed` counts only the calls actually made — never a charged hit. */
+/** One unit of work (called by `evaluateCore`). `executed` counts only the calls actually made — never a charged hit.
+ *  #2873 (ADR-W-210): the same executed unit feeds the work meter, which adds the lane and the phase. */
 export function countWork(): void {
   work.done++;
   work.executed++;
+  meterWork();
   if (frame) frame.own++;
 }
 

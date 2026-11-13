@@ -12,7 +12,8 @@
 //
 // WHAT IT MEASURES — all on the MAIN THREAD (there is no Worker anywhere in src-complex): submit / show-another /
 // load / edit / delete. "render" = what App.tsx's useMemo chain recomputes after the store changes
-// (deriveLines + coincidencesCx + realParamNotes + askRowsOf + buildScene); `parts` holds the split.
+// (deriveLines + coincidencesCx + realParamNotes + askRowsOf + buildScene); `parts` holds the split. The actions are
+// src-complex/__tests__/work-meter/driverCx.ts — the one driver this harness and the work-meter gate share.
 // CORPORA: src-complex/__tests__/fixtures, prod sessions (logs/perf-prod-events-complex.jsonl, else the log-triage
 // pull logs/prod-events-complex.jsonl), the operator's dev sessions (logs/debug-log-complex.jsonl) and the
 // hand-authored scaling probes below. A missing input is "no data" and its corpus is skipped.
@@ -20,21 +21,18 @@
 // NO LLM (CLAUDE.md rule 2): only decideSubmitCx is called — a line it does not read is recorded as refused, never
 // escalated — and `globalThis.fetch` is stubbed to throw right below the imports as a second lock.
 //
-// COMPARABILITY: every value is a wall-clock timing — comparable only on a quiet machine. This harness records no
-// clock-free counter; `verdict` and `nLines` are deterministic.
+// COMPARABILITY: every `ms` is a wall-clock timing — comparable only on a quiet machine. `work` is CLOCK-FREE and
+// comparable anywhere: the work meter's three counts (#2873, ADR-W-210) — exact solves in all, on the page's UI
+// thread, and before the figure can paint — the same numbers the suite's gate holds a fixture to. `verdict` and
+// `nLines` are deterministic too.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { Session } from 'node:inspector';
-import { decideSubmitCx, hydrateSession, editLine } from '../../../src-complex/app/submit';
-import { deriveLines, complexScopeOf } from '../../../src-complex/app/deriveLines';
-import { coincidencesCx } from '../../../src-complex/app/coincidences';
-import { realParamNotes } from '../../../src-complex/app/paramNote';
-import { askRowsOf } from '../../../src-complex/app/askLane';
-import { buildScene } from '../../../src-complex/scene/scene';
-import { useComplexStore } from '../../../src-complex/store/useComplexStore';
-import { ingestTypedText } from '../../../shell/bidi';
+import { hydrateSession } from '../../../src-complex/app/submit';
+// The actions themselves are the ONE driver this harness and the work-meter gate share (#2873).
+import { anotherCx, applyLineCx, blankCx, editLastCx, loadCx, removeFirstCx, savedFileCx, submitCx, type ActionRecordCx } from '../../../src-complex/__tests__/work-meter/driverCx';
 
 (globalThis as any).fetch = async () => {
   throw new Error('perf harness: network disabled (no LLM)');
@@ -136,25 +134,6 @@ function probes(): Item[] {
 }
 
 // ---------------------------------------------------------------------------------------------- timing
-interface St { lines: string[]; disabled: number[]; seed: number; queries: string[] }
-const activeOf = (s: St) => s.lines.filter((_, i) => !s.disabled.includes(i));
-
-/** App.tsx's useMemo chain after a store change (letterLines empty: no chip toggled). */
-function render(s: St): { ms: number; parts: Record<string, number>; pts: number } {
-  const active = activeOf(s);
-  const t0 = performance.now();
-  const d = deriveLines(active, s.seed, s.seed, s.queries, new Set());
-  const t1 = performance.now();
-  coincidencesCx(d);
-  askRowsOf(s.queries, d.knowledge, new Set(complexScopeOf(active).keys()));
-  const t2 = performance.now();
-  realParamNotes(active, d, s.seed);
-  const t3 = performance.now();
-  buildScene(d, { n: 1 });
-  const t4 = performance.now();
-  return { ms: t4 - t0, parts: { derive: t1 - t0, misc: t2 - t1, paramNotes: t3 - t2, scene: t4 - t3 }, pts: d.points.length };
-}
-
 const PROF = arg('--prof');
 let warming = false;
 let profSession: Session | null = null;
@@ -180,11 +159,14 @@ const out = (o: any) => {
 };
 const r1 = (x: number) => Math.round(x * 10) / 10;
 
+/** One action's record: the driver's times (rounded) and the work meter's three counts. */
+const shown = (r: ActionRecordCx) => ({ ms: r1(r.ms), parts: Object.fromEntries(Object.entries(r.parts).map(([k, x]) => [k, r1(x)])), ...(r.verdict !== undefined ? { verdict: r.verdict } : {}), nLines: r.nLines, ...(r.audit !== undefined ? { audit: r.audit } : {}), work: r.work });
+
 function runItem(it: Item, opts: { only?: string }) {
-  const s: St = { lines: [], disabled: [], seed: 0, queries: [] };
+  const s = blankCx();
   const prefix: string[] = [];
   const want = (kind: string) => !opts.only || opts.only === kind;
-  if (opts.only?.startsWith('submit')) { /* only the submit */ }
+  const tag = { item: it.id, source: it.source, users: it.users };
   let stepNo = 0;
   for (const st of it.steps) {
     stepNo++;
@@ -197,61 +179,38 @@ function runItem(it: Item, opts: { only?: string }) {
     if (!u) continue;
     prefix.push(u);
     if (opts.only && opts.only !== `submit#${stepNo}`) {
-      const v = decideSubmitCx(s, u);
-      if (v.kind === 'record') { s.lines.push(ingestTypedText(v.line)); s.seed = v.seed; } else if (v.kind === 'ask') s.queries.push(v.line);
+      applyLineCx(s, u);
       continue;
     }
     out({ ev: 'begin', item: it.id, kind: 'submit', step: stepNo });
-    const t0 = performance.now();
-    const v = decideSubmitCx(s, u);
-    const decide = performance.now() - t0;
-    if (v.kind === 'record') { s.lines.push(ingestTypedText(v.line)); s.seed = v.seed; } else if (v.kind === 'ask') s.queries.push(v.line);
-    const r = v.kind === 'refuse' ? { ms: 0, parts: {}, pts: -1 } : render(s);
-    out({ ev: 'm', item: it.id, source: it.source, users: it.users, kind: 'submit', step: stepNo, seq: [...prefix], ms: r1(decide + r.ms), parts: { decide: r1(decide), ...Object.fromEntries(Object.entries(r.parts).map(([k, x]) => [k, r1(x)])) }, verdict: v.kind === 'refuse' ? `refuse:${v.error.key}` : v.kind, nLines: s.lines.length, thread: 'main' });
+    out({ ev: 'm', ...tag, kind: 'submit', step: stepNo, seq: [...prefix], ...shown(submitCx(s, u)), thread: 'main' });
   }
   if (s.lines.length === 0 || opts.only?.startsWith('submit')) return;
   // show another ×6 on the final figure
   const seed0 = s.seed;
   for (let k = 1; k <= 6; k++) {
     if (want(`another#${k}`)) {
-      s.seed = seed0 + k;
       out({ ev: 'begin', item: it.id, kind: 'another', step: k });
-      const r = render(s);
-      out({ ev: 'm', item: it.id, source: it.source, users: it.users, kind: 'another', step: k, seq: [...prefix], ms: r1(r.ms), parts: Object.fromEntries(Object.entries(r.parts).map(([q, x]) => [q, r1(x)])), nLines: s.lines.length, thread: 'main' });
+      out({ ev: 'm', ...tag, kind: 'another', step: k, seq: [...prefix], ...shown(anotherCx(s, seed0 + k)), thread: 'main' });
     }
   }
   s.seed = seed0;
   // load: a cold hydrate of the saved file (the fixture itself, or the final state as a save would write it)
-  const file = it.file ?? { app: 'complex-builder', version: 1, lines: s.lines, freePos: {}, seed: s.seed, view: 'cart', ...(s.queries.length ? { queries: s.queries } : {}) };
+  const file = it.file ?? savedFileCx(s);
   if (want('load')) {
     out({ ev: 'begin', item: it.id, kind: 'load', step: 0 });
-    const t0 = performance.now();
-    hydrateSession(file);
-    const h = performance.now() - t0;
-    const g = useComplexStore.getState();
-    const r = render({ lines: [...g.lines], disabled: [...g.disabled], seed: g.seed, queries: [...g.queries] });
-    out({ ev: 'm', item: it.id, source: it.source, users: it.users, kind: 'load', step: 0, seq: [...prefix], ms: r1(h + r.ms), parts: { hydrate: r1(h), ...Object.fromEntries(Object.entries(r.parts).map(([q, x]) => [q, r1(x)])) }, nLines: g.lines.length, audit: g.loadAudit ? g.loadAudit.failed.length : 0, thread: 'main' });
+    out({ ev: 'm', ...tag, kind: 'load', step: 0, seq: [...prefix], ...shown(loadCx(file)), thread: 'main' });
   } else hydrateSession(file);
-  const g0 = useComplexStore.getState();
-  if (g0.lines.length >= 1 && want('edit')) {
+  if (want('edit')) {
     // edit the LAST line in place to its own text: editLine's gateChange path (config tries + blame on failure)
-    const idx = g0.lines.length - 1;
-    out({ ev: 'begin', item: it.id, kind: 'edit', step: idx });
-    const t0 = performance.now();
-    const ok = editLine(idx, g0.lines[idx]);
-    const e = performance.now() - t0;
-    const g = useComplexStore.getState();
-    const r = render({ lines: [...g.lines], disabled: [...g.disabled], seed: g.seed, queries: [...g.queries] });
-    out({ ev: 'm', item: it.id, source: it.source, users: it.users, kind: 'edit', step: idx, seq: [...prefix], ms: r1(e + r.ms), parts: { gate: r1(e) }, verdict: ok ? 'ok' : 'refused', nLines: g.lines.length, thread: 'main' });
+    out({ ev: 'begin', item: it.id, kind: 'edit', step: s.lines.length - 1 });
+    const r = editLastCx();
+    if (r) out({ ev: 'm', ...tag, kind: 'edit', step: r.nLines - 1, seq: [...prefix], ...shown(r), thread: 'main' });
   }
-  const g1 = useComplexStore.getState();
-  if (g1.lines.length >= 2 && want('delete')) {
+  if (want('delete')) {
     out({ ev: 'begin', item: it.id, kind: 'delete', step: 0 });
-    const t0 = performance.now();
-    g1.removeLine(0);
-    const g = useComplexStore.getState();
-    const r = render({ lines: [...g.lines], disabled: [...g.disabled], seed: g.seed, queries: [...g.queries] });
-    out({ ev: 'm', item: it.id, source: it.source, users: it.users, kind: 'delete', step: 0, seq: [...prefix], ms: r1(performance.now() - t0), parts: Object.fromEntries(Object.entries(r.parts).map(([q, x]) => [q, r1(x)])), nLines: g.lines.length, thread: 'main' });
+    const r = removeFirstCx();
+    if (r) out({ ev: 'm', ...tag, kind: 'delete', step: 0, seq: [...prefix], ...shown(r), thread: 'main' });
   }
 }
 

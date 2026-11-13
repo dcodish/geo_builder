@@ -28,6 +28,7 @@
  * still runs as before for anything the scan does not cover.
  */
 import type { Constraint } from './solve';
+import { meterWork } from '../../shell/workMeter';
 import { inDomain, type Domain } from './types';
 import type { Env } from './expr';
 
@@ -39,7 +40,12 @@ export const ROOT_EPS = 1e-6;
 const SAME_ROOT = 1e-6;
 
 /** The roots of `f` over `domain ∩ [−L, L]`, ascending — or `'identity'` when `f` holds on a run of the grid. */
-export function scanRoots(f: (v: number) => number[] | null, domain: Domain, L: number): number[] | 'identity' {
+export function scanRoots(f0: (v: number) => number[] | null, domain: Domain, L: number): number[] | 'identity' {
+  // #2873 (ADR-W-210): a scan's residual evaluations are solver work in the same unit as `solveLM`'s.
+  const f = (v: number): number[] | null => {
+    meterWork();
+    return f0(v);
+  };
   const lo = Math.max(domain.min ?? -L, -L);
   const hi = Math.min(domain.max ?? L, L);
   if (!(hi > lo)) return [];

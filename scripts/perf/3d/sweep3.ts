@@ -10,7 +10,9 @@
 // WHAT IT MEASURES — all on the MAIN THREAD (3-D has no worker):
 //   submit  = decideDeterministic3 (App3.submitSentence3) + dispatchVerdict + the App's render-side derivations
 //   another = store.resample() + render;  load = store.loadFigure + auditLoad3 + render (cold fact-array identity)
-//   delete  = store.remove(first fact) + render;  llm-step = decideSteps3 + dispatch + render (prod LLM-committed lines)
+//   edit    = store.replaceFact(last fact, its own text) + render;  delete = store.remove(first fact) + render
+//   llm-step = decideSteps3 + dispatch + render (prod LLM-committed lines)
+// The actions are src3d/__tests__/work-meter/driver3.ts — the one driver this harness and the work-meter gate share.
 // "render" = what App3 recomputes on a new (facts, seed): derive3 (memo), freeDofCount3, plane/dihedral/param chips
 // (collectWedges), dataView (panel open by default on wide screens), buildScene3 at the home camera.
 // Task ids: fx:<fixture file> · prod:<sid> · dbg:<session> · issue:<name>. CORPORA: fixtures3/, prod sessions
@@ -23,23 +25,17 @@
 //
 // COMPARABILITY: ms / decideMs / renderMs are wall-clock timings — comparable only on a quiet machine. The counters
 // recorded beside them are CLOCK-FREE and comparable anywhere, on any machine, under any load:
+//   work { total, page, prePaint } — the work meter's three counts (#2873, ADR-W-210): residual evaluations in all, on
+//     the page's UI thread, and before the figure can paint. The same numbers the suite's gate holds a fixture to.
 //   uncached (derive3 memo misses) · resolves (resolve passes) · lmSolves / lmEvals (least-squares solves / residual evaluations).
 import { readFileSync, readdirSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { useGeo3, derive3, decideSteps3, decideCommands3, deriveStats3, type Fact3 } from '../../../src3d/store/store3';
-import { decideDeterministic3 } from '../../../src3d/app/decideDeterministic3';
+import { useGeo3, decideSteps3, decideCommands3, type Fact3 } from '../../../src3d/store/store3';
 import { deserializeFigure3 } from '../../../src3d/store/figureFile3';
-import { auditLoad3 } from '../../../src3d/store/loadAudit3';
-import { freeDofCount3, resolveStats3 } from '../../../src3d/engine/evaluate';
-import { leastSquaresStats } from '../../../src3d/engine/solve3';
-import { dataView } from '../../../src3d/engine/dataView';
-import { planeChipsByFact } from '../../../src3d/store/planeChips';
-import { dihedralChipsByFact } from '../../../src3d/store/dihedralChips';
-import { paramChipsByFact } from '../../../src3d/store/paramChips';
-import { collectWedges, competingArcSymbols } from '../../../src3d/render/wedges';
-import { buildScene3 } from '../../../src3d/render/scene3';
-import { HOME_CAMERA } from '../../../src3d/render/camera';
+// The actions themselves are the ONE driver this harness and the work-meter gate share (#2873).
+import { another3, editLast3, loadFacts3, loadText3, metered3, removeFirst3, render3 as render, submitLine3 as submitLine } from '../../../src3d/__tests__/work-meter/driver3';
+import { SLOW_CORPUS_3D } from '../../../src3d/__tests__/work-meter/slowCorpus3';
 
 (globalThis as any).fetch = async () => {
   throw new Error('perf harness: network disabled (no LLM)');
@@ -73,7 +69,7 @@ const PROF = arg('--prof'); // with --only/--action: write a .cpuprofile of the 
 
 type St = { facts: Fact3[]; seed: any };
 type Action = {
-  kind: 'submit' | 'another' | 'load' | 'delete' | 'llm-step';
+  kind: 'submit' | 'another' | 'load' | 'edit' | 'delete' | 'llm-step';
   prior: string[]; // enabled utterances on the figure before the action
   utterance?: string;
   run: () => { verdict: string; decideMs?: number; renderMs?: number };
@@ -84,38 +80,7 @@ const now = () => performance.now();
 const clean = (fs: any[]): Fact3[] => fs.map((f) => ({ id: f.id, enabled: f.enabled !== false, utterance: f.utterance, cmds: f.cmds }));
 const priorOf = (): string[] => useGeo3.getState().facts.filter((f) => f.enabled).map((f) => f.utterance);
 
-/** The App's render-side derivations for the store's current (facts, seed). */
-function render(): number {
-  const t = now();
-  const { facts, seed } = useGeo3.getState();
-  try {
-    const d = derive3(facts, seed);
-    freeDofCount3(d.construction, d.resolved);
-    planeChipsByFact(facts, (id) => d.status[id] === 'ok', (n) => d.resolved.planes.has(n));
-    dihedralChipsByFact(facts, (id) => d.status[id] === 'ok');
-    paramChipsByFact(facts, competingArcSymbols(collectWedges(d.construction, d.resolved.positions)));
-    dataView(d.construction, seed);
-    buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1, {}, true, () => 'value', []);
-  } catch {
-    /* a render throw is not a timing concern here */
-  }
-  return now() - t;
-}
 const setState = (st: St) => useGeo3.setState({ facts: st.facts, seed: st.seed, lastError: null, lastNotice: null });
-
-/** Submit one typed line exactly as App3.submitSentence3 does (deterministic lane only — never the LLM). */
-function submitLine(raw: string): { verdict: string; decideMs: number; renderMs: number } {
-  const t = now();
-  const v = decideDeterministic3(useGeo3.getState(), raw);
-  let verdict: string = v.kind;
-  if (v.kind === 'guided') useGeo3.setState({ lastError: null });
-  else {
-    useGeo3.getState().dispatchVerdict(v);
-    if (v.kind === 'refused') verdict = `refused:${(v.error as any)?.code}`;
-  }
-  const decideMs = now() - t;
-  return { verdict, decideMs, renderMs: v.kind === 'record' || v.kind === 'retick' || v.kind === 'rename' || v.kind === 'swap' ? render() : 0 };
-}
 
 // ---------------------------------------------------------------- corpora
 function fixtureTasks(): Task[] {
@@ -132,14 +97,7 @@ function fixtureTasks(): Task[] {
         if (!r.ok) return;
         // LOAD first (cold: fresh identities, nothing of this figure derived yet)
         setState({ facts: [], seed: 0 });
-        await emit({ kind: 'load', prior: r.facts.filter((f) => f.enabled).map((f) => f.utterance), fn: () => {
-          const rr = deserializeFigure3(text) as any;
-          const t = now();
-          useGeo3.getState().loadFigure(rr.facts, rr.seed, rr.queries, rr.planeDisplay, rr.displayMode, rr.dihedralShown);
-          const a = auditLoad3(rr.facts, rr.seed);
-          const decideMs = now() - t;
-          return { verdict: a.failed.length ? `load-failed:${a.failed.length}/${a.total}` : 'ok', decideMs, renderMs: render() };
-        } });
+        await emit({ kind: 'load', prior: r.facts.filter((f) => f.enabled).map((f) => f.utterance), fn: () => loadText3(text) });
         // step through the utterances one submit at a time
         setState({ facts: [], seed: 0 });
         render();
@@ -158,20 +116,13 @@ function fixtureTasks(): Task[] {
         }
         // show another, PRESSES times on the stepped figure
         for (let i = 0; i < PRESSES; i++)
-          await emit({ kind: 'another', prior: priorOf(), fn: () => {
-            const t = now();
-            useGeo3.getState().resample();
-            const decideMs = now() - t;
-            return { verdict: `seed:${JSON.stringify(useGeo3.getState().seed)}`, decideMs, renderMs: render() };
-          } });
+          await emit({ kind: 'another', prior: priorOf(), fn: another3 });
+        // edit the last fact to its own text
+        if (useGeo3.getState().facts.length > 0)
+          await emit({ kind: 'edit', prior: priorOf(), utterance: useGeo3.getState().facts[useGeo3.getState().facts.length - 1].utterance, fn: editLast3 });
         // delete the first fact
         if (useGeo3.getState().facts.length > 1)
-          await emit({ kind: 'delete', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: () => {
-            const t = now();
-            useGeo3.getState().remove(useGeo3.getState().facts[0].id);
-            const decideMs = now() - t;
-            return { verdict: `err:${(useGeo3.getState().lastError as any)?.code ?? 'none'}`, decideMs, renderMs: render() };
-          } });
+          await emit({ kind: 'delete', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: removeFirst3 });
       },
     }));
 }
@@ -210,10 +161,7 @@ function prodTasks(): Task[] {
           else if (a === 'show-another' && useGeo3.getState().facts.length)
             await emit({ kind: 'another', prior: priorOf(), fn: () => {
               history.push(cur());
-              const t = now();
-              useGeo3.getState().resample();
-              const decideMs = now() - t;
-              return { verdict: `seed:${JSON.stringify(useGeo3.getState().seed)}`, decideMs, renderMs: render() };
+              return another3();
             } });
           continue;
         }
@@ -239,12 +187,7 @@ function prodTasks(): Task[] {
       }
       // the session's final figure: delete-first (load is not replayable from prod: the file is not logged)
       if (useGeo3.getState().facts.length > 1)
-        await emit({ kind: 'delete', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: () => {
-          const t = now();
-          useGeo3.getState().remove(useGeo3.getState().facts[0].id);
-          const decideMs = now() - t;
-          return { verdict: `err:${(useGeo3.getState().lastError as any)?.code ?? 'none'}`, decideMs, renderMs: render() };
-        } });
+        await emit({ kind: 'delete', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: removeFirst3 });
     },
   }));
 }
@@ -292,53 +235,21 @@ function debugTasks(): Task[] {
         if (!fig) return;
         const f0 = fig;
         setState({ facts: [], seed: 0 });
-        await emit({ kind: 'load', prior: f0.facts.filter((f) => f.enabled).map((f) => f.utterance), fn: () => {
-          const facts = JSON.parse(JSON.stringify(f0.facts));
-          const t = now();
-          useGeo3.getState().loadFigure(facts, f0.seed);
-          const a = auditLoad3(facts, f0.seed);
-          const decideMs = now() - t;
-          return { verdict: a.failed.length ? `load-failed:${a.failed.length}/${a.total}` : 'ok', decideMs, renderMs: render() };
-        } });
+        await emit({ kind: 'load', prior: f0.facts.filter((f) => f.enabled).map((f) => f.utterance), fn: () => loadFacts3(JSON.parse(JSON.stringify(f0.facts)), f0.seed) });
         for (let i = 0; i < PRESSES; i++)
-          await emit({ kind: 'another', prior: priorOf(), fn: () => {
-            const t = now();
-            useGeo3.getState().resample();
-            const decideMs = now() - t;
-            return { verdict: `seed:${JSON.stringify(useGeo3.getState().seed)}`, decideMs, renderMs: render() };
-          } });
+          await emit({ kind: 'another', prior: priorOf(), fn: another3 });
         if (useGeo3.getState().facts.length > 1)
-          await emit({ kind: 'delete', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: () => {
-            const t = now();
-            useGeo3.getState().remove(useGeo3.getState().facts[0].id);
-            const decideMs = now() - t;
-            return { verdict: `err:${(useGeo3.getState().lastError as any)?.code ?? 'none'}`, decideMs, renderMs: render() };
-          } });
+          await emit({ kind: 'delete', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: removeFirst3 });
       },
     });
   }
   return tasks;
 }
 
-/** The open / recently closed slow issues' own sequences (each stepped, then pressed PRESSES times, then loaded cold). */
-const ISSUE_ROWS: [string, string[]][] = [
-  ['#2787 square', ['ריבוע ABCD', 'קטע AS', '|SA| = 5']],
-  ['#2787 rectangle', ['מלבן ABCD', 'קטע AS', '|SA| = 5']],
-  ['#2787 control apex', ['מלבן ABCD', 'פירמידה ABCDS שבסיסה ריבוע', '|SA| = 5']],
-  ['#2749 narrowed', ['מלבן ABCD', 'ריבוע ABCD', 'קטע AS', '|SA| = 5']],
-  ['#2749 narrowed AC', ['מלבן ABCD', 'ריבוע ABCD', '|AC| = 5']],
-  ['#2806 x-axis', ['ריבוע ABCD', 'הקודקוד A נמצא על ציר ה-x']],
-  ['#2806 z-axis', ['ריבוע ABCD', 'הקודקוד A נמצא על ציר ה-z']],
-  ['#2806 origin', ['ריבוע ABCD', 'A בראשית הצירים']],
-  ['#2806 rhombus', ['מעוין ABCD', 'הקודקוד A נמצא על ציר ה-x']],
-  ['#2806 kite', ['דלתון ABCD', 'הקודקוד A נמצא על ציר ה-x']],
-  ['#863 on-line', ["מנסרה ישרה משולשת ABCA'B'C'", "ישר AA'=(k-1,k-7,k+1)", 'AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)']],
-  ['#863 equation', ["מנסרה ישרה משולשת ABCA'B'C'", "ישר AA'=(k-1,k-7,k+1)", 'משוואת הישר AC היא x=(8,-1,-1)+t(k+1,0,k-3)']],
-  ['#863 pair', ["מנסרה ישרה משולשת ABCA'B'C'", "AA'=(k-1,k-7,k+1)", 'משוואת הישר AC היא x=(8,-1,-1)+t(k+1,0,k-3)']],
-  ['#863 fixture', ["מנסרה ישרה משולשת ABCA'B'C'", "AA'=(k-1,k-7,k+1)", 'AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)']],
-];
+/** The open / recently closed slow issues' own sequences (each stepped, then pressed PRESSES times, then loaded cold):
+ *  the slow corpus the work meter records too (#2873). */
 function issueTasks(): Task[] {
-  return ISSUE_ROWS.map(([name, lines]) => ({
+  return SLOW_CORPUS_3D.map(({ id: name, lines }) => ({
     id: `issue:${name}`,
     corpus: 'issue' as const,
     build: async (emit) => {
@@ -346,21 +257,9 @@ function issueTasks(): Task[] {
       render();
       for (const u of lines) await emit({ kind: 'submit', prior: priorOf(), utterance: u, fn: () => submitLine(u) });
       for (let i = 0; i < PRESSES; i++)
-        await emit({ kind: 'another', prior: priorOf(), fn: () => {
-          const t = now();
-          useGeo3.getState().resample();
-          const decideMs = now() - t;
-          return { verdict: `seed:${JSON.stringify(useGeo3.getState().seed)}`, decideMs, renderMs: render() };
-        } });
+        await emit({ kind: 'another', prior: priorOf(), fn: another3 });
       const saved = JSON.stringify(useGeo3.getState().facts);
-      await emit({ kind: 'load', prior: priorOf(), fn: () => {
-        const facts = JSON.parse(saved);
-        const t = now();
-        useGeo3.getState().loadFigure(facts, 0);
-        const a = auditLoad3(facts, 0);
-        const decideMs = now() - t;
-        return { verdict: a.failed.length ? `load-failed:${a.failed.length}/${a.total}` : 'ok', decideMs, renderMs: render() };
-      } });
+      await emit({ kind: 'load', prior: priorOf(), fn: () => loadFacts3(JSON.parse(saved), 0) });
     },
   }));
 }
@@ -402,11 +301,8 @@ async function main() {
         await sess.post('Profiler.setSamplingInterval', { interval: 200 });
         await sess.post('Profiler.start');
       }
-      const u0 = deriveStats3.uncached, r0 = resolveStats3.uncached, s0 = leastSquaresStats.solves, e0 = leastSquaresStats.evals;
-      const t0 = now();
-      let r: any;
-      try { r = a.fn(); } catch (e) { r = { verdict: `throw:${String((e as Error)?.message ?? e).slice(0, 80)}` }; }
-      const ms = now() - t0;
+      const r = metered3(a.fn);
+      const ms = r.ms;
       if (profiling) {
         const { profile } = await sess.post('Profiler.stop');
         writeFileSync(PROF!, JSON.stringify(profile));
@@ -414,7 +310,7 @@ async function main() {
       }
       if (ONLY_ACTION !== undefined && idx !== ONLY_ACTION) return;
       appendFileSync(OUT, JSON.stringify({ ti, ai: idx, task: task.id, corpus: task.corpus, user: task.user, kind: a.kind, prior: a.prior, utterance: a.utterance,
-        ms: Math.round(ms), decideMs: Math.round(r.decideMs ?? ms), renderMs: Math.round(r.renderMs ?? 0), uncached: deriveStats3.uncached - u0, resolves: resolveStats3.uncached - r0, lmSolves: leastSquaresStats.solves - s0, lmEvals: leastSquaresStats.evals - e0, verdict: r.verdict, thread: 'main' }) + '\n');
+        ms: Math.round(ms), decideMs: Math.round(r.decideMs ?? ms), renderMs: Math.round(r.renderMs ?? 0), work: r.work, uncached: r.stats.uncached, resolves: r.stats.resolves, lmSolves: r.stats.lmSolves, lmEvals: r.stats.lmEvals, verdict: r.verdict, thread: 'main' }) + '\n');
     });
     if (HB) writeFileSync(HB, JSON.stringify({ ti, done: true, t: Date.now() }));
   }
