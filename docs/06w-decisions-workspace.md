@@ -7515,3 +7515,75 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 **Not decided here (step 3, after he has used the console):** retiring the Rulings Inbox, the roadmap page and its database, `roadmap-refresh`, the daily cloud routine (#2643) and the round dashboard, with the skills and docs/22 that point at them. Until then they keep running beside it. Also open: editing an answer from the page before a session acts on it (ADR-W-202 §4); today a correction is a second comment.
 
 **Consequences.** A ruling, a pass or an approval is in GitHub the moment he taps; a running round reads it at its next wake as it reads any comment. The GitHub token and the console password are new production secrets (RUNBOOK). The unit map's question list is a session's assignment from `docs/sample questions/` (2026-11-13) and is his to correct.
+
+## ADR-W-210 — One compute contract for every builder: the page never solves, every wait is shown and bounded, and a work meter gates regressions (#2867)
+
+**Status:** accepted · 2026-11-13 · operator direction, session mechanism · workspace (all four builders + `shell/`) · a program, not one change: each phase lands under its own issue and PR. The student-visible parts are listed at the end and wait for rulings ([ADR-W-117](#adr-w-117)).
+**Operator:** 2026-11-12, Rulings Inbox:
+> "Speed is very important. Users waiting for 30s will most likely leave if they just wait with no feedback that something is happening. A dedicated session should track these long cases and find ways to deal with them"
+
+2026-11-13, in chat, on the per-case session list the scoping pass proposed:
+> "im not conviced that the optimizations planed are the right ones. I dont want local optimization - i want overall optimization so we dont end up fixing one issue just to discover later we have an issue somewhere else. This is something we need a higher level of thinking for."
+>
+> "we must fix this for all tools. user should know the engine is working and not frozen"
+
+**Requirements:** [docs/03](03-nonfunctional-requirements.md) NFR-PF-1 is the promise this serves; it is not amended here (phase 0 adds the measured budgets) · **Design:** none yet: each phase edits [docs/04w](04w-design-shell.md) and its builder's design doc in its own commit
+
+**Why (measured, 2026-11-13, `main` @ c9d2ce02; the map and the sizing sheets are on #2867).**
+- About 33 600 student actions were replayed and timed across the four builders. About 375 take 5 s or more: 2-D 238 (19 of them ≥ 30 s; the worst prod session had a student wait 36–148 s per line), analytic about 70 (one over 60 s), 3-D 67, complex none.
+- **The rules already exist and nothing checks them.** [docs/17 §7](17-design-rules.md) requires a deadline inside the innermost loop, a failure path cheaper than the success path, and one shared sampler. NFR-PF-1 promises a step in about 200 ms. Each is broken in more than one builder.
+- **Local fixes moved cost instead of removing it.** #2749 fell from 179 s to 4.9 s and what is left is another cause; #1647's decision fell to 0.09 s and the line still takes 1.7 s to draw; #2513 was filed at 2.5 s and measures about 20 s; the analytic pool slice was documented as 7–101 ms ([ADR-AG-180](06c-decisions-analytic.md#adr-ag-180)) and takes 6–9 s on one exam figure.
+- **The slow cases share five causes**, none of them local to a function:
+  1. the engine solves on the page's UI thread (all of 3-D, analytic and complex; in 2-D every gate that runs before the worker prefold, plus edit, delete, toggle and the load audit);
+  2. one action solves the same content several times, because caches hang off objects that are rebuilt per action (only 2-D's fold is keyed by content; analytic's `derive` has no memo at all; 3-D folds from an empty construction every time);
+  3. a line that cannot hold costs more than one that can;
+  4. limits are wall clocks checked between work units, or there are none; and **a search that runs out is shown as a verdict** in every iterative builder (2-D «אין תצורה אחרת — הצורה נקבעה» after the 12 s clip; 3-D `bound-unsatisfiable`; analytic a refusal on the walk's fallback figure);
+  5. each solve starts cold.
+- **Facts that constrain the design** (sizing pass):
+  - In 2-D, 3-D and analytic, accepting or refusing a line IS the solve. There is no cheap figure to draw before the verdict on a submit or an edit.
+  - Each iterative builder has exactly one innermost solving function, and a counter already sits in or beside it: 2-D `evaluateCore` + `countWork` ([ADR-558](06-decisions.md#adr-558)); 3-D `leastSquares` + `leastSquaresStats`; analytic `solveLM` (its `evaluateStats` counts a coarser unit).
+  - The derived figure crosses a worker boundary as data in 2-D, analytic and complex. In 3-D it does not as it stands: three lazy closures on the pivot run the solver on whichever thread reads them first (the clone throws on 82 of 176 fixtures).
+  - The pages call engine readers on the derived object (about 50 sites in 2-D and in analytic), and 240–320 test files per builder call the engine synchronously.
+  - A busy worker cannot see a cancel message; cancel means terminating it, which discards its caches.
+  - 2-D's clock budgets are `Infinity` under test, so the suite never runs the browser's control flow for a search.
+  - The shared chrome's edit and rename contracts return synchronously (`shell/frame/FactList.tsx`, `LetterPopover.tsx`).
+
+**Decision — five invariants, the same in every builder.**
+
+1. **The page never solves.** Every call into a builder's innermost solving function made on the UI thread is counted per student action, and that count is ratcheted to zero, builder by builder. The check lives at that one function, so it sees transitive calls a name list cannot (2-D's `main-thread-sweeps.test.ts` is the name-list precedent it replaces). Complex is the stated exception: its fold is exact and costs about 2 ms, so it keeps the UI thread under a work ceiling and gets no worker until the meter says otherwise.
+2. **One job per student action, on one shared queue.** `shell/` owns the queue: lanes (what the student waits for; background knowledge), a basis stamp on every job (the result is applied only if the facts and seed it was computed for are still current), cancellation, and a synchronous in-process executor for tests and for complex. **The working state is derived from the queue**, never from a flag a call site sets and clears. This is how the operator's ruling reaches every tool at once.
+3. **Bounded and honest.** Every search has a limit in work units, checked inside the solver's loop. Reaching it is its own outcome, "not decided": never a verdict, never a refusal that names a statement, never cached as one. No wall clock decides a verdict or a stored fact (the #1857 class), so the suite and the browser run the same control flow.
+4. **Compute once.** Solved content is keyed by content, and the part that does not depend on the configuration is shared by every configuration (analytic's construction is a function of the lines alone; 2-D's fold already is). The caches live where the solving runs and outlive the action. Where a drawing does not depend on knowledge (show-another, load, delete, undo, panels, asks, crossings), the figure is delivered first and knowledge follows as pending. On submit and edit the verdict is the solve, so no provisional figure is drawn.
+5. **Metered.** Each student action reports three counts: total work, work on the UI thread, and work before the first paint. A committed baseline over every fixture and the slow corpus feeds a gate: an action whose count grows fails the suite unless its ADR records the before and after (docs/17 §7's fourth rule, made mechanical). Counts are compared per figure against that figure's own baseline, because a unit's cost differs between figures and builders.
+
+**How it is built.**
+- **Route: settle, then hand over** (2-D's prefold, widened), not "the page never derives". The worker runs the whole decision for an action and returns a *settled* result: plain data with every lazily solved value already forced. The page adopts it into its own memo and keeps its synchronous readers, which invariant 1 then proves solve-free. The rejected route (the figure arrives as data and the page holds no engine) would convert about 50 synchronous readers per builder and leave the production path almost untested by the existing suites; it fixes nothing the chosen route does not.
+- **`shell/` gains** the queue, the worker client with its synchronous fallback, the busy state, the basis check and the meter envelope, parameterized by each builder's operations and carrying no product knowledge ([ADR-W-016](#adr-w-016)). The edit and rename contracts become awaitable once, for all four builders.
+- **Cancel** stays termination for a search the student abandons; a work limit ends everything else. A cancel flag the solver can read would need cross-origin isolation on a shared host and is not adopted.
+- **Existing decisions this will amend when its phase lands**, each by its own ADR with measurements: the unbounded primary fold ([ADR-281](06-decisions.md#adr-281)); the interactive searches' clock budgets ([ADR-296](06-decisions.md#adr-296), ADR-558's known limit); analytic's pool that completes on the UI thread (ADR-AG-180); the identity-keyed memo locks in 3-D.
+
+**Phases, in dependency order.** Each has an exit the meter can show. Sizes are S / M / L per builder and are estimates.
+
+| Phase | What lands | Size | Exit |
+|---|---|---|---|
+| 0 — Meter and gate | the three counts at each inner function; the baseline; the gate; `scripts/perf/` as the timing instrument | S–M | every fixture action in all four builders has a recorded count; the gate is in `test:full` |
+| 1 — A visible working state | the shell queue and busy state in all four builders; the indicator is painted before the work starts, as 2-D's submit already does | S–M | every action longer than the threshold shows it, in every tool, pre-played |
+| 2 — Compute once | content keys: one construction per line list in analytic; fold reuse in 3-D; in 2-D the solved tail, the per-gate trial arrays and the fold cache's size | M each | total work per action falls against the baseline; no figure's count rises |
+| 3 — Off the page | the decision as one worker job with a settled result: analytic (L), 3-D (L, needs the pivot's lazies forced and the pin-origin table carried), 2-D's remaining gates, edit, delete and load (M–L), complex on the same-thread executor (S) | L | UI-thread work is zero across the corpus |
+| 4 — Limits and the third outcome | work limits replace clocks; "not decided" exists in every builder | M each, after rulings | no clock on a verdict path; the suite runs the browser's flow |
+| 5 — A cheap "no", then solver internals | impossibility checks before a search, shared failure memory, and whatever the meter ranks next | open | chosen by the meter, never by a single report |
+
+Phase 2 precedes phase 3 because a worker result has to be adopted into a content-keyed memo, and analytic and 3-D have none.
+
+**The open speed issues are evidence, not a work list.** #2787, #863, #2601, #2359, #2481, #2104, #1768, #2295 and #2513 are each a row of the slow corpus and close when the phase that removes their cause lands. Fixing one alone is the local optimization this ADR exists to stop.
+
+**Found on the way, covered by invariant 2 (2-D, read from code, not yet reproduced):** the busy flag has three owners and no `finally`, so a rejected prefold can leave it set and every later submit dropped (`src/app/submitPipeline.ts:297-311`); a verdict is committed onto the live store with no check that the figure it was computed for is still there (`submitPipeline.ts:130-136`), while undo, delete and edit stay enabled.
+
+**Not changed.** What any line means, any verdict, any drawing. `(facts, seed)` stays the source of truth and positions are never stored. Product trees still never import each other; the shared part lives in `shell/`. Rule 2: none of this touches the model.
+
+**What the student will see.**
+- [asked] Every tool shows that the engine is working; the page never looks frozen. *"user should know the engine is working and not frozen"*
+- [2-D] The indicator is 2-D's «חושב…» on the submit button, and input while busy follows [ADR-W-198](#adr-w-198) and the #2861 ruling, in every tool.
+- [proposed] When a search reaches its limit the tool says it could not decide, instead of refusing the line or saying «אין תצורה אחרת — הצורה נקבעה». The wording, and whether the student may ask it to keep going, need a ruling.
+- [proposed] The longest a student may wait before that outcome. Needs a number.
+- [proposed] In 3-D, after a figure is redrawn (another configuration, load, delete), the values panel and the crossing dots may show as pending for a moment, as analytic's values do.
