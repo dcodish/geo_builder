@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { applyEdit, planAction, runWrites } from '../ops/actions';
@@ -14,6 +14,7 @@ import { handleManagement, type ManagementOpts } from '../ops/handler';
 import { backlog, cost, ledger, makeCtx, needsMe, optionsOf, pace, playBlocks, proposedLines, readiness, section, sinceLast, wsRow, type Plan } from '../ops/sections';
 import { closesOf, deployRows, newestProdTag, type Issue, type Snapshot } from '../ops/snapshot';
 import { BUILDERS, builderUsage, issueFor } from '../ops/usage';
+import { t } from '../ops/text';
 import type { UsageEvent } from '../eventLog';
 // @ts-expect-error — a plain .mjs script; its pure exports are what is tested
 import { memberVerdicts, questionState } from '../../scripts/ops/readiness.mjs';
@@ -483,20 +484,18 @@ export type _G = GhClient;
 // ── the words table (server/ops/he.json, ADR-W-153) ──────────────────────────
 
 describe('#2868 — every console text key resolves, and none is orphaned', () => {
-  it('t() keys used in server/ops exist in he.json, and every he.json text is used', async () => {
-    const fs = await import('node:fs');
+  it('t() keys used in server/ops exist in he.json, and every he.json text is used', () => {
     const dir = path.join(__dirname, '..', 'ops');
     const used = new Set<string>();
-    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.ts'))) {
-      for (const m of fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/\bt\('([\w.]+)'\)/g)) used.add(m[1]);
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.ts'))) {
+      for (const m of readFileSync(path.join(dir, f), 'utf8').matchAll(/\bt\('([\w.]+)'\)/g)) used.add(m[1]);
     }
-    const table = JSON.parse(fs.readFileSync(path.join(dir, 'he.json'), 'utf8'));
+    const table = JSON.parse(readFileSync(path.join(dir, 'he.json'), 'utf8'));
     const leaves: string[] = [];
     const walk = (o: Record<string, unknown>, pre: string) => {
       for (const [k, v] of Object.entries(o)) if (k !== '$comment') typeof v === 'string' ? leaves.push(pre + k) : walk(v as Record<string, unknown>, `${pre}${k}.`);
     };
     walk(table, '');
-    const { t } = await import('../ops/text');
     for (const k of used) expect(() => t(k), k).not.toThrow();
     expect(leaves.filter((k) => !used.has(k))).toEqual([]);
   });

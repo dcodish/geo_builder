@@ -267,7 +267,8 @@ The operator's page at `/geo-builder/management` (Apache: `ProxyPass /geo-builde
 | `server/ops/usage.ts` | Pure: per builder, the window's visitors, sessions, lines and failures, and the failed lines grouped, through the dashboards' own classifiers (`PROFILE_*.classify`, `outcomeOfComplex`) and verdict maps. |
 | `server/ops/actions.ts` | The allow-list: `planAction(form, now)` → the writes (pure), `runWrites(gh, writes, ref)` performs them; `applyEdit` is the pure JSON edit a file commit carries (`pull`, `recordAudit` from `scripts/lib/case-closure.mjs`). |
 | `server/ops/auth.ts` | Its own stateless session cookie `geo_mgmt` (8 h, path-scoped), the CSRF token (HMAC of the session), RFC 6238 TOTP. |
-| `server/ops/render.ts` | Hebrew RTL HTML strings, plain forms, no script. |
+| `server/ops/render.ts` | The HTML, plain forms, no script. |
+| `server/ops/he.json` + `text.ts` | Every Hebrew word of the console, read by key through `t()` ([ADR-W-153](06w-decisions-workspace.md#adr-w-153): no Hebrew literals in code); a test asserts every key resolves and none is orphaned. |
 | `server/ops/handler.ts` | Routes, login, CSRF + same-origin check, write mode (`off`/`dry`/`on`; `on` needs the TOTP secret), the small state file (the operator's device hashes, the last visit) beside the event logs. |
 
 **Env:** `MGMT_USERNAME` (default `ADMIN_USERNAME`), `MGMT_PASSWORD`, `MGMT_COOKIE_SECRET` (must differ from the admin secret), `MGMT_TOTP_SECRET` (base32), `MGMT_GITHUB_TOKEN`, `MGMT_WRITES`, `MGMT_REF` (default `main`), `MGMT_BASE` (default `/geo-builder/management`), `MGMT_STATE`. Missing username, password or secret ⇒ the console answers only "off". No token ⇒ 503 on every screen.
