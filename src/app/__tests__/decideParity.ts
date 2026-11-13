@@ -24,6 +24,7 @@ import { parse } from '@/parser';
 import { buildParseCtx } from '@/parser/context';
 import type { AnyCommand } from '@/engine';
 import type { Scenario } from '@/__tests__/scenarios-harness';
+import { createWorkQueue } from '../../../shell/work';
 
 const FIXTURES = path.resolve(__dirname, '../../__tests__/fixtures');
 
@@ -45,15 +46,13 @@ function makeDeps(rec: StepRecord): SubmitDeps {
       setRenameNote: (m) => { if (m) rec.renames.push(m); },
       setLlmDropped: () => {},
       clearText: () => { rec.cleared++; },
-      setBusy: () => {},
     },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => { rec.resolved++; },
     llmAbortRef: { current: null },
     explainError: (raw, said) => `explain:${raw ?? ''}|${said ?? ''}`,

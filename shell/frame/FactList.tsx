@@ -87,10 +87,13 @@ export interface FactListProps {
    *  face the acceptance gate) — refusal shows on the product's error surface. */
   onToggle?: (id: string) => void;
   toggleLabel?: string;
-  /** Begin/commit an in-place edit. `editValueOf` supplies the raw text; commit returns false to
-   *  KEEP the editor open (the edit was refused — the product's error surface names why). */
+  /** Begin/commit an in-place edit. `editValueOf` supplies the raw text; commit answers false to
+   *  KEEP the editor open (the edit was refused — the product's error surface names why). The answer may
+   *  be a promise (#2874, ADR-W-210): an edit is a job on the product's work queue, which paints the working
+   *  indicator before the engine runs. The editor stays open while the answer is pending, and a second
+   *  commit of the same edit (Enter, then the blur) is not sent. */
   editValueOf?: (id: string) => string;
-  onEditCommit?: (id: string, next: string) => boolean;
+  onEditCommit?: (id: string, next: string) => boolean | Promise<boolean>;
   editLabel?: string;
   /**
    * The product's CONTENT direction (its bidi kit's `textDir`) — one decision for BOTH the row's
@@ -134,10 +137,17 @@ export function FactList({
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const editRef = useRef<HTMLInputElement | null>(null);
 
-  const commit = () => {
-    if (!editing || !onEditCommit) return;
-    if (onEditCommit(editing.id, editing.text)) setEditing(null);
-    // refused → the editor stays open; the product's error surface names the refusal
+  const committing = useRef(false);
+
+  const commit = async () => {
+    if (!editing || !onEditCommit || committing.current) return;
+    committing.current = true;
+    try {
+      if (await onEditCommit(editing.id, editing.text)) setEditing(null);
+      // refused → the editor stays open; the product's error surface names the refusal
+    } finally {
+      committing.current = false;
+    }
   };
 
   return (
@@ -173,10 +183,10 @@ export function FactList({
                   value={editing.text}
                   onChange={(e) => setEditing({ id: row.id, text: e.target.value })}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') commit();
+                    if (e.key === 'Enter') void commit();
                     if (e.key === 'Escape') setEditing(null);
                   }}
-                  onBlur={commit}
+                  onBlur={() => void commit()}
                   style={editBox}
                 />
                 {symbols && (

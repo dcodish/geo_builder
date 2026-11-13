@@ -50,6 +50,10 @@ export { swapOffered };
  * 2-D's rename answer in the shared popover's vocabulary (#1631): the store's `target-taken` is the
  * popover's `taken`, and the holder becomes its quoted wording plus the row highlight (#238).
  */
+/** What the host answers a rename and a swap with (2-D's store results, structurally). */
+type RenameAnswer = { ok: boolean; reason?: string; holder?: FigureLetterHolder | null };
+type SwapAnswer = { ok: boolean; reason?: string };
+
 export function letterRename(
   res: { ok: boolean; reason?: string; holder?: FigureLetterHolder | null },
   onHighlightFact?: (factId: string) => void,
@@ -127,7 +131,8 @@ export interface FigureProps {
    *  become clickable and open the edit menu. */
   /** #238: a refused rename may name WHO holds the target letter. Typed structurally, like the rest of
    *  this component's host callbacks, so the renderer stays a pure consumer with no store import. */
-  onRename?: (from: Id, to: Id) => { ok: boolean; reason?: string; holder?: FigureLetterHolder | null };
+  /** #2874 (ADR-W-210): the answer may be a promise — the host runs the rename as a job on its work queue. */
+  onRename?: (from: Id, to: Id) => RenameAnswer | Promise<RenameAnswer>;
   /** Hide/show a point's label + dot (clicked on the canvas) — the host wires the store's `toggleHidden`. */
   onToggleHidden?: (id: Id) => void;
   /** Localised strings for the on-canvas point-edit menu (rename / hide / show / the no-op reasons). */
@@ -143,7 +148,7 @@ export interface FigureProps {
   onToggleSegDashed?: (id: Id) => void;
   /** Swap a segment's two endpoint labels (A ↔ B) — the host wires the store's `swap`. Lets the student
    *  flip which end is which (e.g. a chord's C/D) without the rename "target taken" dead-end (ADR-122). */
-  onSwap?: (a: Id, b: Id) => { ok: boolean; reason?: string };
+  onSwap?: (a: Id, b: Id) => SwapAnswer | Promise<SwapAnswer>;
   /** Localised strings for the on-canvas segment menu. */
   segMenuText?: { hide: string; show: string; dashed: string; solid: string; swap: string };
   /** Circle ids hidden on the figure (a display preference, like {@link segStyle}'s hidden). */
@@ -1091,7 +1096,7 @@ export function Figure({
           bounds={{ width: vw, height: vh }}
           title={menu.id}
           label={menu.id}
-          onRename={onRename && !isHidden(menu.id) ? (from, to) => letterRename(onRename(from, to), onHighlightFact) : undefined}
+          onRename={onRename && !isHidden(menu.id) ? async (from, to) => letterRename(await onRename(from, to), onHighlightFact) : undefined}
           onSwap={onSwap}
           strings={{
             placeholder: pointMenuText?.rename ?? 'rename',
@@ -1138,7 +1143,7 @@ export function Figure({
             if (!seg?.aId || !seg.bId) return null;
             const { aId, bId } = seg;
             return (
-              <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onSwap(aId, bId); setMenu(null); }}>
+              <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { void onSwap(aId, bId); setMenu(null); }}>
                 {segMenuText?.swap ?? 'swap'}
               </button>
             );

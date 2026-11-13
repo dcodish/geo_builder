@@ -1,0 +1,455 @@
+{
+ "name": "feat-2874",
+ "title": "#2874 — every tool shows that it is working, and the indicator keeps moving (PR, port 5174)",
+ "cases": [
+  {
+   "id": "T1",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "title": "3-D: a slow line shows «חושב…» with a turning ring, from Enter until the figure appears",
+   "lines": [
+    "ריבוע ABCD",
+    "קטע AS",
+    "|SA| = 5"
+   ],
+   "lookFor": "Type the three lines. On the third («|SA| = 5», about 2–4 seconds): from the moment you press Enter the «הוסף» button is grey, reads «חושב…», and the small ring beside the word KEEPS TURNING the whole time, until the figure is redrawn. Then press «הציגו תצורה אחרת»: now that button itself is grey and reads «חושב…» with the turning ring, until the figure changes.",
+   "before": "The page freezes for 2–4 seconds with nothing on it changing: no «חושב…», no motion.",
+   "expectRows": [
+    "ריבוע ABCD",
+    "קטע AS",
+    "|SA| = 5"
+   ],
+   "_probe": "motion probe 2026-11-13, PR port: «|SA| = 5» kept the page thread busy 2.2 s; 125 screencast frames arrived inside that stretch, 123 distinct images of the button (the ring turning). «הציגו תצורה אחרת»: 2.2 s busy, 123 frames, 120 distinct. On main: 0 frames in the same stretch."
+  },
+  {
+   "id": "T2",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "title": "2-D: «בטל» pressed while a file is still loading waits for the load, then undoes it",
+   "lines": [
+    "משולש ABC"
+   ],
+   "lookFor": "A RULING IS NEEDED HERE. Type the line. Press «טען» and choose src/__tests__/fixtures/hexagon-regular-by-angles-2797.geo.json (it loads for about 8 seconds, «חושב…» with the ring). WHILE it still says «חושב…», press «בטל». On this build the press waits its turn: the hexagon appears, and then the undo takes it back, so you end on the triangle ABC. Is that what «בטל» should do during a load?",
+   "before": "On prod the same press runs at once: the triangle disappears while the file is still loading, and you end on the hexagon.",
+   "expectRows": [
+    "משולש ABC"
+   ],
+   "_probe": "probe 2026-11-13: main ends on the 10 hexagon rows (the undo removed the triangle at once); the PR ends on «משולש ABC» (the undo ran after the load and undid it). The driver cannot choose a file, so it only builds the triangle."
+  },
+  {
+   "id": "T3",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "title": "3-D: turning a row off and on, and «הציגו תצורה אחרת», on the slow figure",
+   "lines": [
+    "ריבוע ABCD",
+    "קטע AS",
+    "|SA| = 5"
+   ],
+   "after": [
+    {
+     "toggle": 3
+    },
+    {
+     "toggle": 3
+    }
+   ],
+   "cycles": 1,
+   "lookFor": "Un-ticking row 3 is quick. Ticking it again takes about 2 seconds, and for all of it «הוסף» reads «חושב…» with the ring; the three rows are there at the end. «הציגו תצורה אחרת» shows «חושב…» on its own button.",
+   "before": "Each of these froze the page for about 2 seconds with nothing shown.",
+   "expectRows": [
+    "ריבוע ABCD",
+    "קטע AS",
+    "|SA| = 5"
+   ],
+   "_probe": "timeline probe: re-enable 2.2 s, edit «|SA| = 6» 2.2 s, «הציגו תצורה אחרת» 2.2 s — «חושב…» and the mark on screen from 14–50 ms after the press until the figure; no page error."
+  },
+  {
+   "id": "T4",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "title": "3-D: an ordinary figure builds exactly as before",
+   "lines": [
+    "קובייה ABCD",
+    "M אמצע BB'"
+   ],
+   "lookFor": "The cube and M on the edge BB′, both rows green. The button blinks «חושב…» for a moment on each line, no longer than 2-D does on its own lines.",
+   "before": "unchanged (a regression guard); the blink is new in 3-D.",
+   "expectRows": [
+    "קובייה ABCD",
+    "M אמצע BB'"
+   ],
+   "expectFigure": [
+    "M"
+   ],
+   "_probe": "timeline probe: each fast action shows «חושב…» for 65–70 ms (2-D submit on main: 110–125 ms)."
+  },
+  {
+   "id": "T5",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "title": "3-D: a wrong claim is still refused, with the same sentence",
+   "lines": [
+    "קובייה ABCD",
+    "∠BAC = 60"
+   ],
+   "lookFor": "The second line is refused: «הטענה לא מתקיימת בציור — בדקו את החישוב»; one row only, and the line stays in the box.",
+   "before": "unchanged (a regression guard).",
+   "expectRefusal": "הטענה לא מתקיימת בציור"
+  },
+  {
+   "id": "T6",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "title": "3-D: «החלף בין A ל-B» typed in the box swaps the letters",
+   "lines": [
+    "קובייה ABCD",
+    "החלף בין A ל-B"
+   ],
+   "lookFor": "The row now reads «קובייה BACD», and the two letters have changed places on the figure.",
+   "before": "unchanged (a regression guard): the swap now runs as a job on the queue.",
+   "expectRows": [
+    "קובייה BACD"
+   ],
+   "_probe": "probe: the canvas letter popover on main and on the PR give the same rows — rename A→K «קובייה KBCD», the taken letter C quotes its holder and offers the swap, the swap gives «קובייה KCBD»."
+  },
+  {
+   "id": "T7",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "title": "3-D: a line typed while the tool is still working stays in the box",
+   "lines": [
+    "ריבוע ABCD",
+    "קטע AS",
+    "|SA| = 5"
+   ],
+   "lookFor": "Un-tick row 3 and tick it again; while «חושב…» shows (about 2 seconds) type «M אמצע AB» and press Enter. Enter is off while the tool works: the line stays in the box, and a second Enter after «חושב…» is gone adds it.",
+   "before": "The page was frozen and showed nothing; the Enter was taken when it thawed, and the line was added.",
+   "expectRows": [
+    "ריבוע ABCD",
+    "קטע AS",
+    "|SA| = 5"
+   ],
+   "_probe": "probe 2026-11-13: main ends with 4 rows and an empty box; the PR ends with 3 rows and «M אמצע AB» in the box. This is ADR-W-198 (Enter off while «חושב…») reaching every action, as ADR-W-210 states it."
+  },
+  {
+   "id": "T8",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "title": "Analytic: the slow rhombus lines show «חושב…» with the ring for the whole wait",
+   "lines": [
+    "מעוין BADC",
+    "שכל קודקודיו מונחים על הצירים",
+    "CA=10",
+    "O(0,0)",
+    "מרחק נקודה O מהצלע DA הוא √5",
+    "x_A > 0"
+   ],
+   "lookFor": "Every line is accepted (six rows). The last two take about 8 and 12 seconds; for all of that time «הוסף» reads «חושב…» and the ring turns.",
+   "before": "The page froze for 8–12 seconds per line with nothing shown.",
+   "expect": [
+    "6 נתונים"
+   ],
+   "_probe": "motion probe: «x_A > 0» kept the page thread busy 11.8 s; 702 screencast frames inside it, 681 distinct images of the button."
+  },
+  {
+   "id": "T9",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "title": "Analytic: deleting a row and «בטל» on the slow figure",
+   "lines": [
+    "מעוין BADC",
+    "שכל קודקודיו מונחים על הצירים",
+    "CA=10",
+    "O(0,0)",
+    "מרחק נקודה O מהצלע DA הוא √5",
+    "x_A > 0"
+   ],
+   "after": [
+    {
+     "clickOn": "ul li:nth-child(6) button:has-text(\"✕\")",
+     "say": "לחצו ✕ בשורה 6"
+    },
+    {
+     "click": "בטל"
+    }
+   ],
+   "lookFor": "The delete takes about 8 seconds and the undo about 11; «חושב…» with the ring shows for all of both. Six rows at the end.",
+   "before": "Both froze the page with nothing shown.",
+   "expect": [
+    "6 נתונים"
+   ],
+   "_probe": "motion probe: delete 8.4 s busy, 495 frames, 481 distinct; «הציגו תצורה אחרת» 12.2 s busy, 727 frames, 670 distinct (on its own button)."
+  },
+  {
+   "id": "T10",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "title": "Analytic: an ordinary figure builds exactly as before",
+   "lines": [
+    "A(1,2)",
+    "B(4,6)",
+    "קטע AB"
+   ],
+   "lookFor": "A, B and the segment between them; three rows.",
+   "before": "unchanged (a regression guard).",
+   "expectRows": [
+    "A(1,2)",
+    "B(4,6)",
+    "קטע AB"
+   ],
+   "expectFigure": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "T11",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "title": "Analytic: a length the points contradict is still refused, with the same sentence",
+   "lines": [
+    "A(1,2)",
+    "B(4,6)",
+    "קטע AB",
+    "AB = 7"
+   ],
+   "lookFor": "The last line is refused: «לא נמצאה תצורה שבה מתקיים: «AB = 7»»; three rows, and the line stays in the box.",
+   "before": "unchanged (a regression guard).",
+   "expectRefusal": "לא נמצאה תצורה שבה מתקיים"
+  },
+  {
+   "id": "T12",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "title": "2-D: the slow line shows «חושב…» as today, and now the ring turns",
+   "lines": [
+    "מעגל O",
+    "ריבוע ABCD חסום במעגל O",
+    "ריבוע חוסם את מעגל O"
+   ],
+   "lookFor": "Three rows. The third line takes about 5 seconds: «הוסף» reads «חושב…» as it does today, and the ring beside it turns the whole time.",
+   "before": "«חושב…» was shown, standing still for about 4 seconds while the page computed.",
+   "expectRows": [
+    "מעגל O",
+    "ריבוע ABCD חסום במעגל O",
+    "ריבוע חוסם את מעגל O"
+   ],
+   "_probe": "motion probe: 3.9 s with the page thread busy; 228 screencast frames inside it, 224 distinct. Timeline as measured on main: «חושב…» 8–16 ms after Enter, cleared with the figure."
+  },
+  {
+   "id": "T13",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "title": "2-D: the defining interaction builds exactly as before",
+   "lines": [
+    "ריבוע ABCD",
+    "נקודה G על AD",
+    "זווית GBA = 37"
+   ],
+   "lookFor": "The square, G on AD, the 37° angle at B; three green rows.",
+   "before": "unchanged (a regression guard).",
+   "expectRows": [
+    "ריבוע ABCD",
+    "נקודה G על AD",
+    "∠GBA = 37"
+   ],
+   "expectFigure": [
+    "G"
+   ]
+  },
+  {
+   "id": "T14",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "title": "2-D: a contradicting length is still refused, with the same sentence",
+   "lines": [
+    "משולש ABC",
+    "AB = 5",
+    "AB = 7"
+   ],
+   "lookFor": "The third line is refused: «לא ניתן: «AB = 7» סותר את «AB = 5» …»; two rows, and the line stays in the box.",
+   "before": "unchanged (a regression guard).",
+   "expectRefusal": "סותר את"
+  },
+  {
+   "id": "T15",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "title": "2-D: deleting a row and «בטל» now show «חושב…»",
+   "lines": [
+    "משולש ABC",
+    "נקודה D על BC"
+   ],
+   "after": [
+    {
+     "clickOn": "ul li:nth-child(2) button:has-text(\"✕\")",
+     "say": "לחצו ✕ בשורה 2"
+    },
+    {
+     "click": "בטל"
+    }
+   ],
+   "lookFor": "The row goes and comes back; both rows at the end. Each press blinks «חושב…» on «הוסף» (on a heavy figure it stays for the whole wait).",
+   "before": "Nothing was shown for a delete or an undo (about 1 second frozen on the hexagon file).",
+   "expectRows": [
+    "משולש ABC",
+    "נקודה D על BC"
+   ],
+   "_probe": "timeline probe on hexagon-regular-by-angles-2797: delete of row 2 0.98 s, toggle 0.93 s — «חושב…» and the ring throughout (52 of 52 screencast frames distinct). The load paints «חושב…» at 28 ms (main: 783 ms)."
+  },
+  {
+   "id": "T16",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "title": "2-D: editing a row in place still works, and shows «חושב…»",
+   "lines": [
+    "משולש ABC",
+    "נקודה D על BC"
+   ],
+   "after": [
+    {
+     "clickOn": "ul li:nth-child(2) button:has-text(\"✎\")",
+     "say": "לחצו ✎ בשורה 2"
+    },
+    {
+     "typeInto": "ul li input:not([type=checkbox])",
+     "text": "נקודה E על BC"
+    }
+   ],
+   "lookFor": "The row reads «נקודה E על BC» and E is on BC; the editor closed.",
+   "before": "unchanged (a regression guard): the edit now runs as a job and the editor waits for its answer.",
+   "expectRows": [
+    "נקודה E על BC"
+   ],
+   "expectFigure": [
+    "E"
+   ],
+   "_probe": "probe: a refused edit («AB = -5 בלה») keeps the editor open with «העריכה לא נקלטה — נסחו אותה כמו משפט חדש», an accepted one closes it — the same on main and on the PR."
+  },
+  {
+   "id": "T17",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "title": "2-D: «החלף בין A ל-B» typed in the box swaps the letters",
+   "lines": [
+    "משולש ABC",
+    "החלף בין A ל-B"
+   ],
+   "lookFor": "The row now reads «משולש BAC».",
+   "before": "unchanged (a regression guard).",
+   "expectRows": [
+    "משולש BAC"
+   ]
+  },
+  {
+   "id": "T18",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5174",
+   "path": "/complex.html",
+   "title": "Complex: lines, a row off and on — nothing broke, and the blink is short",
+   "lines": [
+    "w1 = 3+4i",
+    "w2 = 2cis150",
+    "w = w1*w2",
+    "z^5 = w^2"
+   ],
+   "after": [
+    {
+     "toggle": 4
+    },
+    {
+     "toggle": 4
+    }
+   ],
+   "lookFor": "Four rows and the five roots on their ring. Each action blinks «חושב…» on «הוסף» for a moment (about 65 ms), shorter than 2-D blinks on its own lines.",
+   "before": "Complex showed no indicator at all.",
+   "expectRows": [
+    "w1 = 3+4i",
+    "w2 = 2cis150",
+    "w = w1*w2",
+    "z^5 = w^2"
+   ],
+   "_probe": "timeline probe: every action (submit, show another, toggle, delete, undo) shows «חושב…» for 65–70 ms; no page error."
+  },
+  {
+   "id": "T19",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5174",
+   "path": "/complex.html",
+   "title": "Complex: a contradicting line is still refused, with the same sentence",
+   "lines": [
+    "z1 = 3+4i",
+    "|z1| = 6"
+   ],
+   "lookFor": "The second line is refused: «המשפט לא נוסף — אינו מתיישב עם: «z1 = 3+4i»»; one row.",
+   "before": "unchanged (a regression guard).",
+   "expectRefusal": "המשפט לא נוסף"
+  },
+  {
+   "id": "T20",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5174",
+   "path": "/complex.html",
+   "title": "Complex: deleting a row and «בטל»",
+   "lines": [
+    "w1 = 3+4i",
+    "w2 = 2cis150",
+    "w = w1*w2"
+   ],
+   "after": [
+    {
+     "clickOn": "ul li:nth-child(3) button:has-text(\"✕\")",
+     "say": "לחצו ✕ בשורה 3"
+    },
+    {
+     "click": "בטל"
+    }
+   ],
+   "lookFor": "The row goes and comes back: three rows at the end.",
+   "before": "unchanged (a regression guard).",
+   "expectRows": [
+    "w1 = 3+4i",
+    "w2 = 2cis150",
+    "w = w1*w2"
+   ]
+  }
+ ]
+}

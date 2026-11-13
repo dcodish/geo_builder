@@ -96,6 +96,12 @@ import { onSharedLink } from '../shell/session/link';
 import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
 import { ShareSheet } from '../shell/frame/ShareSheet';
 import { loadAnalyticSession } from './app/loadSession';
+import { ANOTHER, MODEL, actAn, armBasisGuardAn, jobStoreAn, workAn } from './app/workAn';
+import { WorkingMark, useLatest, useWorking } from '../shell/frame/WorkingMark';
+
+// #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
+// without the work queue shows up the first time anyone presses it.
+if (import.meta.env.DEV) armBasisGuardAn((message) => console.error(message));
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { unstatedChoices } from './engine/unstatedChoices';
@@ -168,14 +174,9 @@ export function App() {
     error,
     queries,
     setQueries,
-    recordLine,
-    recordLlmLines,
     spokenFor,
     hosts,
     disabled,
-    setDisabled,
-    applyRename,
-    applySwap,
     seedNames,
     segStyle,
     toggleSegHidden,
@@ -187,10 +188,6 @@ export function App() {
     toggleCurveDashed,
     annotations,
     setAnnotations,
-    removeLine,
-    replaceLine,
-    clearAll,
-    goToSeed,
     setError,
     notice,
     setNotice,
@@ -199,8 +196,6 @@ export function App() {
     loadAudit,
     setLoadAudit,
     serialize,
-    undo,
-    redo,
   } = useAnalyticStore();
   /**
    * Can we step back or forward? Read from the TEMPORAL store, as both siblings do, so a disabled
@@ -215,8 +210,16 @@ export function App() {
    * #2552 D9 (ADR-AG-344): or the new circle it stated, by its centre (`circle`).
    */
   const [createdNotice, setCreatedNotice] = useState<{ index: number; line: string; names: string[]; circle?: string } | null>(null);
-  /** #1251 — the LLM fallback is in flight. Owns only the spinner; the decision lives in app/fallback.ts. */
-  const [thinking, setThinking] = useState(false);
+  /**
+   * #2874 (ADR-W-210): the tool is WORKING on something the student did — the work queue's derived state,
+   * never a flag set here. Every action that re-solves the figure is a job on `workAn`: counted from the
+   * click, run only after this state has been painted (this builder solves on the page's own thread, in the
+   * handler and in the render), and released in a `finally` after the paint that shows the result. The
+   * model fallback (#1251) is part of its submit's job.
+   */
+  const working = useWorking(workAn);
+  /** «הציגו תצורה אחרת» is counted on its own lane and shown on its own button, as 2-D shows it. */
+  const resampling = useWorking(workAn, ANOTHER);
 
   /**
    * SAVE and LOAD (#1087) — the shared envelope, the shared naming, the sibling’s own order.
@@ -244,7 +247,8 @@ export function App() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    void file.text().then((text) => {
+    // #2874: a load re-solves the whole figure — one job, the parse and the audit included
+    void file.text().then((text) => workAn.run(() => {
       let parsed: unknown;
       try {
         parsed = JSON.parse(text);
@@ -277,7 +281,7 @@ export function App() {
       loadAnalyticSession(env.data, figureNameFromFileName(file.name, 'analytic'));
       // A load is a new figure, so the view it is seen through is a new view too (#1209).
       showWholeFigure();
-    });
+    }));
   };
 
   /**
@@ -293,11 +297,13 @@ export function App() {
   /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
 
-  const openLinkAn = (payload: string) => {
-    const r = openSharedAnalytic(payload);
-    if (r === true) showWholeFigure();
-    else setShareError(r);
-  };
+  // #2874: opening a link is a load — one job
+  const openLinkAn = (payload: string) =>
+    void workAn.run(() => {
+      const r = openSharedAnalytic(payload);
+      if (r === true) showWholeFigure();
+      else setShareError(r);
+    });
 
   useEffect(() => {
     // A link outranks the session offer and is never shown beside it: the student asked for THIS
@@ -382,14 +388,18 @@ export function App() {
 
   const acceptOffer = () => {
     if (!offer) return;
-    const ok = restoreSessionAn(offer.payload);
-    setOffer(null);
-    if (ok) showWholeFigure();
-    else {
-      // Refused: named in this product's own error voice, then stop offering what cannot open.
-      setError({ key: 'load-unreadable', detail: t('sessionOffer') });
-      forgetSessionAn();
-    }
+    const payload = offer.payload;
+    // #2874: restoring is loading — one job
+    void workAn.run(() => {
+      const ok = restoreSessionAn(payload);
+      setOffer(null);
+      if (ok) showWholeFigure();
+      else {
+        // Refused: named in this product's own error voice, then stop offering what cannot open.
+        setError({ key: 'load-unreadable', detail: t('sessionOffer') });
+        forgetSessionAn();
+      }
+    });
   };
 
   const declineOffer = () => {
@@ -588,13 +598,14 @@ export function App() {
    */
   const showWholeFigure = () => setView(INITIAL_VIEW);
 
-  const clearSession = () => {
-    logAnalytic({ kind: 'action', action: 'clear' });
-    clearAll();
-    setDraft('');
-    setAskText('');
-    showWholeFigure();
-  };
+  const clearSession = () =>
+    void workAn.run(() => {
+      logAnalytic({ kind: 'action', action: 'clear' });
+      jobStoreAn().clearAll();
+      setDraft('');
+      setAskText('');
+      showWholeFigure();
+    });
   const [dataOpen, setDataOpen] = useState(true);
   /**
    * «הצג בנייה» — the medians, altitudes or bisectors that DEFINE a derived point (#1030).
@@ -897,7 +908,10 @@ export function App() {
    * {@link submitSentence} in order, one row each, and sets the box to what is left when it stops.
    */
   const submit = (raw: string) => {
-    void submitTyped(raw, submitSentence, setDraft);
+    // #2874: a submit is ONE job, its model call included. While the tool works a submit is not taken: Enter
+    // is off and the line stays in the box (ADR-W-198), now for every action the tool is working on. The
+    // sentence body is the LATEST render's, so a job that waited its turn reads the figure as it is then.
+    void workAn.runIfIdle(() => submitTyped(raw, (sentence) => live.current.submitSentence(sentence), setDraft));
   };
 
   /**
@@ -955,7 +969,7 @@ export function App() {
       case 'record':
         // #1350 — the notice rides IN the commit that records the line: `recordLine` clears the
         // transient surfaces, so a notice set before it would be erased by the very line that earned it.
-        commitRecord(verdict, recordLine, t);
+        commitRecord(verdict, jobStoreAn().recordLine, t);
         if (verdict.created?.length || verdict.createdCircle) {
           const now = useAnalyticStore.getState().lines;
           setCreatedNotice({
@@ -985,12 +999,12 @@ export function App() {
        * is dispatched here rather than decided by `decideSubmit`, which sees only the active lines.
        */
       case 'rename': {
-        const r = dispatchRename(verdict.from, verdict.to, sessionOf(live), { applyRename, setError }, cur);
+        const r = dispatchRename(verdict.from, verdict.to, sessionOf(live), { applyRename: jobStoreAn().applyRename, setError }, cur);
         return r.kind === 'apply' ? 'consumed' : 'kept';
       }
       // #1303 / #1631 — a SWAP («החלף בין A ל-B»): the rename's contract, two letters at once.
       case 'swap': {
-        const r = dispatchSwap(verdict.a, verdict.b, sessionOf(live), { applySwap, setError }, cur);
+        const r = dispatchSwap(verdict.a, verdict.b, sessionOf(live), { applySwap: jobStoreAn().applySwap, setError }, cur);
         return r.kind === 'apply' ? 'consumed' : 'kept';
       }
     }
@@ -1019,17 +1033,22 @@ export function App() {
 
   /** Answers whether the model's lines were recorded — the sentence was taken (#1778: the paragraph chain goes on). */
   const tryFallback = async (raw: string, original: InputError, act: readonly string[], atSeed: Seed): Promise<boolean> => {
-    setThinking(true);
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
     try {
-      const out = await runFallback(raw, act, atSeed, (utterance, context, keep, contradicted) =>
-        llmParseAnalytic(utterance, context, {
-          signal: ctl.signal,
-          locale: i18n.language === 'en' ? 'en' : 'he',
-          ...(keep?.length ? { keep } : {}),
-          ...(contradicted?.length ? { contradicted } : {}),
-        }),
+      // #2874: the wait for the model is counted on the queue's MODEL lane (nested in this submit's job, which
+      // has already painted the working state) and released in the queue's `finally`.
+      const out = await workAn.run(
+        () =>
+          runFallback(raw, act, atSeed, (utterance, context, keep, contradicted) =>
+            llmParseAnalytic(utterance, context, {
+              signal: ctl.signal,
+              locale: i18n.language === 'en' ? 'en' : 'he',
+              ...(keep?.length ? { keep } : {}),
+              ...(contradicted?.length ? { contradicted } : {}),
+            }),
+          ),
+        { lane: MODEL, paint: false },
       );
       if (out.retry) logAnalytic(nameRetryEvent(out.retry)); // #2231 (ADR-W-189)
       /**
@@ -1059,7 +1078,7 @@ export function App() {
       if (out.kind === 'lines') {
         // #1297 (operator ruling 2026-09-27, 'student's words now'): the rows DISPLAY the sentence
         // the student typed; the machine lines stay the stored truth so replay is unchanged.
-        recordLlmLines(raw, out.lines, noticeText(out.notice, t), out.configuration);
+        jobStoreAn().recordLlmLines(raw, out.lines, noticeText(out.notice, t), out.configuration);
         return true;
       }
       /**
@@ -1072,7 +1091,6 @@ export function App() {
       return false;
     } finally {
       clearTimeout(timer);
-      setThinking(false);
     }
   };
 
@@ -1218,6 +1236,85 @@ export function App() {
 
   // NO `suiteActions`: AppFrame renders the language toggle AND the About button itself, using this
   // product's own `language` key. Passing a toggle here put two «English» buttons on the suite bar.
+  /**
+   * #2874 (ADR-W-210) — THE JOB BODIES of the actions this component decides itself, kept as the LATEST
+   * render defines them (`useLatest`). A job runs after the paint, and after any job asked for before it;
+   * these read `lines`, `d` and the rest from the render current THEN, never from the render that was
+   * clicked. Each is one student action that re-solves the figure.
+   */
+  const live = useLatest({
+    submitSentence,
+    /** #1548 — the mute checkbox: muting always applies; un-muting faces the typed-line gate (`decideToggle`). */
+    toggleRow: (id: string) => {
+      const i = Number(id);
+      const verdict = decideToggle(i, lines, disabled, seed, d, hosts);
+      logAnalytic({
+        kind: 'action',
+        action: 'toggle',
+        detail: `${i}:${disabled.includes(i) ? 'on' : 'off'}`,
+        ...(verdict.kind === 'refused' ? { result: verdict.error.key } : {}),
+      });
+      if (verdict.kind === 'refused') setError(verdict.error);
+      else jobStoreAn().setDisabled(verdict.disabled);
+    },
+    editRow: (id: string, next: string): boolean => {
+      const i = Number(id);
+      // #1973 (ADR-AG-430): an edit is an accept — the row records the host its new sentence resolved to
+      const edit = decideEditHost(i, next, lines, disabled, seed, seedNames, hosts);
+      if (!edit.ok) return false;
+      // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
+      logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
+      jobStoreAn().replaceLine(i, next, edit.host?.ring);
+      return true;
+    },
+    deleteRow: (id: string) => {
+      logAnalytic({ kind: 'action', action: 'delete', detail: lines[Number(id)] ?? id });
+      jobStoreAn().removeLine(Number(id));
+    },
+    /**
+     * «הציגו תצורה אחרת». The button asks for what it PROMISES — a figure that differs (#1084).
+     *
+     * Incrementing the seed redrew the same picture for the first few presses on the operator's own
+     * figure, while the DOF cue beside it said the figure still had freedom. When nothing differs,
+     * saying so beats redrawing in silence.
+     */
+    another: () => {
+      const next = anotherConfiguration(active, seed, undefined, seedNames, pins);
+      // #1300: the seed IS the configuration, so a replay that loses this press redraws a
+      // different figure from the one the report is about.
+      logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });
+      // #1262: the frame is carried across the configuration change (see the box effect).
+      if (next.found) carryFrameRef.current = true;
+      if (next.found) jobStoreAn().goToSeed(next.seed);
+      else setNotice(t('noticeOnlyConfiguration'));
+    },
+    /** A POINT's letter popover (#1631): a taken letter is answered IN the popover (its holder, the swap offer);
+     *  every other refusal keeps the analytic tree's own sentence in the error line, which says WHY. */
+    renameLetter: (from: string, to: string): LetterRenameResult =>
+      letterRenameOf(
+        dispatchRename(
+          from,
+          to,
+          { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations },
+          { applyRename: jobStoreAn().applyRename, setError: (e) => (e && e.key === 'rename-taken' ? undefined : setError(e)) },
+          d,
+        ),
+      ),
+    swapLetters: (a: string, b: string) => ({
+      ok:
+        dispatchSwap(a, b, { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations }, { applySwap: jobStoreAn().applySwap, setError }, d).kind ===
+        'apply',
+    }),
+    /** #1598 — the centre offer's popover: the letter typed records the sentence the typed path would. */
+    centreOps: (offerId: string) =>
+      centrePopoverOps(
+        offerId,
+        { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations },
+        { record: (v) => commitRecord(v, jobStoreAn().recordLine, t), applySwap: jobStoreAn().applySwap, setError },
+        d,
+      ),
+  });
+
   return (
     <AppFrame
       title={t('suite.product.analytic')}
@@ -1382,7 +1479,7 @@ export function App() {
               placeholder={t('inputPlaceholder')}
               submitLabel={t('add')}
               /* #1251 — the fallback is a network round-trip; the student sees it working. */
-              busy={thinking}
+              busy={working}
               busyLabel={t('thinking')}
               symbols={SYMBOLS}
               /*
@@ -1458,7 +1555,7 @@ export function App() {
                     text={t(createdNoticeTextOf(createdNotice).key, createdNoticeTextOf(createdNotice).params)}
                     undoLabel={t(CREATED_NOTICE_KEYS.undo)}
                     onUndo={() => {
-                      removeLine(createdNotice.index);
+                      void actAn.removeLine(createdNotice.index);
                       setCreatedNotice(null);
                     }}
                   />
@@ -1620,34 +1717,12 @@ export function App() {
                * because this handler exists. Muting always applies; un-muting faces the typed-line gate
                * (`decideToggle`) and, refused, the row stays muted and the error surface names why.
                */
-              onToggle={(id) => {
-                const i = Number(id);
-                const verdict = decideToggle(i, lines, disabled, seed, d, hosts);
-                logAnalytic({
-                  kind: 'action',
-                  action: 'toggle',
-                  detail: `${i}:${disabled.includes(i) ? 'on' : 'off'}`,
-                  ...(verdict.kind === 'refused' ? { result: verdict.error.key } : {}),
-                });
-                if (verdict.kind === 'refused') setError(verdict.error);
-                else setDisabled(verdict.disabled);
-              }}
+              onToggle={(id) => void workAn.run(() => live.current.toggleRow(id))}
               toggleLabel={t('factToggle')}
               editValueOf={(id) => lines[Number(id)] ?? ''}
-              onEditCommit={(id, next) => {
-                const i = Number(id);
-                // #1973 (ADR-AG-430): an edit is an accept — the row records the host its new sentence resolved to
-                const edit = decideEditHost(i, next, lines, disabled, seed, seedNames, hosts);
-                if (!edit.ok) return false;
-                // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
-                logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
-                replaceLine(i, next, edit.host?.ring);
-                return true;
-              }}
-              onDelete={(id) => {
-                logAnalytic({ kind: 'action', action: 'delete', detail: lines[Number(id)] ?? id });
-                removeLine(Number(id));
-              }}
+              // #2874: an edit and a delete re-solve the figure — jobs; the editor waits for the edit's answer
+              onEditCommit={(id, next) => workAn.run(() => live.current.editRow(id, next))}
+              onDelete={(id) => void workAn.run(() => live.current.deleteRow(id))}
               footer={
                 /* CLEAR-ALL MOVED to the under-canvas row (#1098) — it acts on the figure, like
                    undo/redo, and #739 made that call for complex for the same reason. What stays
@@ -1816,27 +1891,19 @@ export function App() {
           <div style={figureRowStyle}>
             <button
               type="button"
-              style={lines.length === 0 ? rowAccentOffStyle : rowAccentStyle}
-              disabled={lines.length === 0}
-              onClick={() => {
-                /**
-                 * The button asks for what it PROMISES — a figure that differs (#1084).
-                 *
-                 * Incrementing the seed redrew the same picture for the first few presses on the
-                 * operator's own figure, while the DOF cue beside it said the figure still had
-                 * freedom. When nothing differs, saying so beats redrawing in silence.
-                 */
-                const next = anotherConfiguration(active, seed, undefined, seedNames, pins);
-                // #1300: the seed IS the configuration, so a replay that loses this press redraws a
-                // different figure from the one the report is about.
-                logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });
-                // #1262: the frame is carried across the configuration change (see the box effect).
-                if (next.found) carryFrameRef.current = true;
-                if (next.found) goToSeed(next.seed);
-                else setNotice(t('noticeOnlyConfiguration'));
-              }}
+              style={lines.length === 0 || resampling ? rowAccentOffStyle : rowAccentStyle}
+              disabled={lines.length === 0 || resampling}
+              // #2874: one job on its own lane — the button reads «חושב…» and is off while it runs, as 2-D's does
+              onClick={() => void workAn.runIfIdle(() => live.current.another(), { lane: ANOTHER })}
             >
-              {t('another')}
+              {resampling ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {t('thinking')}
+                  <WorkingMark />
+                </span>
+              ) : (
+                t('another')
+              )}
             </button>
 
             {/* #1864 (ADR-AG-267): while the tool holds a choice the student has not stated, say so beside the button
@@ -1888,7 +1955,7 @@ export function App() {
               disabled={!canUndo}
               onClick={() => {
                 logAnalytic({ kind: 'action', action: 'undo' }); // #1300
-                undo();
+                void actAn.undo();
               }}
             >
               {t('undo')}
@@ -1899,7 +1966,7 @@ export function App() {
               disabled={!canRedo}
               onClick={() => {
                 logAnalytic({ kind: 'action', action: 'redo' }); // #1300
-                redo();
+                void actAn.redo();
               }}
             >
               {t('redo')}
@@ -2328,13 +2395,9 @@ export function App() {
             level (it must not scale with the zoom or clip at the canvas edge) and the popover places
             itself inside its positioned container.
           */
-          const state = { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations };
           const letter = pick.letter;
-          const onRename = (from: string, to: string): LetterRenameResult => {
-            // A taken letter is answered IN the popover (its holder, the swap offer); every other refusal
-            // keeps the analytic tree's own sentence in the error line, which says WHY.
-            return letterRenameOf(dispatchRename(from, to, state, { applyRename, setError: (e) => (e && e.key === 'rename-taken' ? undefined : setError(e)) }, d));
-          };
+          // #2874: a rename re-solves the figure — a job; the popover waits for its answer
+          const onRename = (from: string, to: string) => workAn.run(() => live.current.renameLetter(from, to));
           return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
               <LetterPopover
@@ -2345,7 +2408,7 @@ export function App() {
                 title={letter}
                 label={letter}
                 onRename={onRename}
-                onSwap={(a, b) => ({ ok: dispatchSwap(a, b, state, { applySwap, setError }, d).kind === 'apply' })}
+                onSwap={(a, b) => workAn.run(() => live.current.swapLetters(a, b))}
                 strings={{
                   placeholder: t('letterPlaceholder'),
                   apply: t('letterApply'),
@@ -2432,13 +2495,12 @@ export function App() {
         taken letter quotes its holder and offers the swap, like every LetterPopover.
       */}
       {centrePick && (() => {
-        const state = { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations };
-        const ops = centrePopoverOps(
-          centrePick.offerId,
-          state,
-          { record: (v) => commitRecord(v, recordLine, t), applySwap, setError },
-          d,
-        );
+        // #2874: naming a centre records a line, and its swap rewrites the session — jobs, decided on the latest render
+        const offerId = centrePick.offerId;
+        const ops = {
+          onRename: (from: string, to: string) => workAn.run(() => live.current.centreOps(offerId).onRename(from, to)),
+          onSwap: (a: string, b: string) => workAn.run(() => live.current.centreOps(offerId).onSwap(a, b)),
+        };
         return (
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
             <LetterPopover

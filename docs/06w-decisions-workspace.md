@@ -7707,3 +7707,54 @@ The differences are inside the noise: two of the four are negative, the two time
 
 **What the student will see.**
 - [asked] Nothing. This is the measuring instrument (*"start phase 0 and 1"*); no line, verdict, drawing, message or timing a student meets changes. The two 2-D budgets changed are changed under vitest only.
+
+### ADR-W-210 Amendment 2 (2026-11-13) — phase 1 as built: the work queue, the derived working state, and an indicator that moves (#2874)
+
+Branch `feat/2874-working-indicator`, a feature PR (all four builders + `shell/`). Operator, 2026-11-13: *"we must fix this for all tools. user should know the engine is working and not frozen"*; *"start phase 0 and 1"*.
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-37 (new), and its parity row · **Design:** [04w](04w-design-shell.md) § "The work queue and the working indicator"; the edit and rename contracts in § "The letter popover" and the fact list
+
+**Measured before** (`main` @ `0ccf557a`, a real browser through `scripts/lib/browser-harness.mjs`, the page's own animation frames recorded). 2-D is the reference:
+- *Submit.* Within one frame of Enter (4–10 ms) «הוסף» is off, greyed (opacity 0.6) and reads «חושב…», and a small «חושב…» shows under the box. Both clear one frame after the figure appears: 110–125 ms for an ordinary line. Nothing on the page moves meanwhile: on «מעגל O» · «ריבוע ABCD חסום במעגל O» · «ריבוע חוסם את מעגל O» the third line shows «חושב…» for 5.1 s, 3.7 s of it with the page's thread busy and the label standing still. A format guide answered before the parse (a LaTeX line) shows nothing.
+- *«הציגו תצורה אחרת».* That button itself is off and reads «חושב…» while the search runs; the submit button does not change and the box stays open.
+- *Load* (`hexagon-regular-by-angles-2797`). The indicator is first painted 783 ms after the file is chosen, behind 767 ms of work that started in the same task as the flag; then it stays for the worker's prefold and the audit, 9.0 s in all.
+- *Delete, toggle, edit, undo, rename, swap, merge, promote.* Nothing is shown.
+- 3-D and analytic show «חושב…» on the submit button only around the model call; complex shows nothing.
+
+**Root cause.** The working state was a flag each call site set and cleared around the one wait it knew about. The engine's own work runs synchronously in the handler or in the React render after the store update, so a flag set in the same task cannot paint before it, and most actions had no flag at all. In 2-D the flag had three owners (the submit, the load, the post-commit search) and no `finally`: **reproduced on `main`** by rejecting the worker's prefold with an error that is not a cancel — `setBusy` was called `[true]` and never `false`, and the student's next submit was dropped by the busy gate, committing nothing.
+
+**Built.**
+- **`shell/work.ts` — the queue.** `createWorkQueue({ paint, basis, sameBasis })` gives `run(work, { lane?, paint? })`, `runIfIdle(…)`, `working(lane?)`, `inJob()`, `subscribe`, `idle()`. A job is COUNTED when it is asked for, waits for a paint, runs after every earlier job of its lane, and is released in a `finally` after the paint that follows its work. `working()` is the count: no call site sets it. A job's handle carries `basis` (the stamp taken at the action) and `stale()`, `join(promise)` (work started and not awaited, such as 2-D's post-commit search, belongs to the job) and `paint()`. `paint` is injected; with no `requestAnimationFrame` (node, the suite) it resolves at once, so no test of the engines or the stores changed. In a browser it is two animation frames, and resolves at once in a hidden tab, so a figure opened in a background tab still loads.
+- **Lanes.** `interactive` is the student's actions and drives the submit button. `another` is «הציגו תצורה אחרת», shown on its own button as 2-D shows it. `model` is the model call a submit makes, nested in the submit's job with `paint: false`; in 3-D it keeps the last line's notices hidden until the answer, as the old flag did.
+- **`shell/frame/WorkingMark.tsx`.** `WorkingMark` is a ring turned by a CSS animation of `transform` alone, on its own layer; `InputArea` shows it beside «חושב…» while `busy`. `useWorking(queue, lane)` reads the derived state; `useLatest` keeps a component's job bodies as the latest render defines them, so a job that waited its turn reads the figure as it is when it runs.
+- **Two shell contracts are awaitable, once for all four builders:** `FactList`'s `onEditCommit` and `LetterPopover`'s `onRename` / `onSwap` may answer a promise. The editor and the popover stay as they are while the answer is pending, and a second commit of the same edit (Enter, then the blur) is not sent.
+- **Per builder: a queue, a registry, a queued table** — `src/app/work.ts`, `src3d/app/work3.ts`, `src-analytic/app/workAn.ts`, `src-complex/app/workCx.ts`. Every function the store exposes is a job (it writes the figure's basis) or free with a reason; the queued table (`act…`) is derived from the job list. Routed in every builder: submit (typed, a chip, the guide's «try», a named crossing), «הציגו תצורה אחרת», load (file, shared link, restored session), edit, delete, toggle, rename and swap (typed and from the canvas), undo, redo, clear. 2-D also: merge and a centre's name (typed), promote, the post-commit search, the load audit.
+- **2-D's three-owner boolean is gone.** `SubmitDeps` lost `ui.setBusy`, `isBusy` and `nextPaint` and gained `work`. A submit is one job; a pasted paragraph is one job with a paint between its sentences; the post-commit search is joined to the job that launched it.
+
+**Measured after** (the same probe, the branch's dev server):
+
+| Action | Before | After |
+| --- | --- | --- |
+| 2-D ordinary submit | «חושב…» 110–125 ms | the same, 150 ms, with the ring |
+| 2-D load (hexagon) | indicator first painted at 783 ms | at 28 ms |
+| 2-D delete / toggle of row 2 (hexagon) | about 1 s, nothing shown | «חושב…» for the whole second |
+| 3-D «\|SA\| = 5» on «ריבוע ABCD» · «קטע AS» | 2.3 s frozen, nothing shown | «חושב…» from 14 ms to the figure |
+| 3-D «הציגו תצורה אחרת», re-enable, edit on that figure | 2.2 s each, nothing shown | shown throughout (the search on its own button) |
+| analytic «x_A > 0» after the rhombus lines | 11.5 s frozen, nothing shown | shown throughout |
+| analytic delete (8.1 s), undo (11.1 s), «הציגו תצורה אחרת» (11.7 s) | nothing shown | shown throughout |
+| complex, any action | nothing shown | «חושב…» for about 65 ms |
+
+**The indicator moves while the page's thread is busy — measured, not assumed.** A screencast is fed by the compositor. Recorded around a slow action, with the stretch in which the page ran no animation frame taken as "its thread was busy": 3-D's submit, 2.3 s busy, 132 screencast frames inside it, 130 distinct images of the button; analytic's submit, 11.5 s busy, 682 frames, 662 distinct; analytic's delete, 8.1 s, 476 and 462; 2-D's delete, 0.97 s, 51 and 51. On `main` the same stretch has no change at all.
+
+**What this phase did not take from invariant 2.** No cancellation and no worker client (phase 3); 2-D's search keeps its own ✕. The basis stamp is carried and read by nothing: what a job commits is unchanged, and the hazard recorded above (a verdict committed onto a figure that changed meanwhile) is narrower only because a routed action now waits for the job before it.
+
+**Locks.** `shell/__tests__/work-queue-2874.test.ts` (the count, paint first, one at a time in order, release on a throw, joined work, lanes, the stamp, the guard). `shell/__tests__/fixtures/work-routing-rows.ts` with a thin lock per tree (`work-routing.test.ts`) and the meta-lock `work-routing-meta-2874.test.ts`: a store action nobody classified fails; a free action that writes a basis field fails (read from the store's own `set(…)` calls); a component that reaches a job action through the store fails; and the product's real table is driven under the basis guard. `src/app/__tests__/submit-wedge-2874.test.ts` is the reproduced wedge. Each page arms the basis guard in development: a figure that changes with no job running is reported on the console.
+
+**Sibling audit.** The class (a working state owned by call sites) was present in all four builders and is removed in all four. Not routed, on purpose, each a registry row with its reason: the ask lanes and the data panels (they read the figure, and 2-D's and analytic's show their own pending state), display choices, the figure's name, complex's drag of a free point.
+
+**What the student will see.**
+- [asked] In every tool, whenever the engine is working on something the student did, the submit button is off and reads «חושב…» from the action until the result is on screen. *"user should know the engine is working and not frozen"*
+- [2-D] It is 2-D's indicator, where 2-D shows it: the submit button for an action on the figure, and the «הציגו תצורה אחרת» button itself for that search (measured at `main`, above). Complex gains the wording «חושב…».
+- [asked] A ring beside «חושב…» keeps turning while the page computes. *"working and not frozen"*
+- [2-D] Enter is off while the tool works, and a typed line stays in the box ([ADR-W-198](#adr-w-198)): now during every action, in every tool. Measured in 3-D on the slow figure, with a row re-enabled (2 s) and «M אמצע AB» typed and entered meanwhile: `main` takes the Enter when the page thaws and adds the row; the branch leaves the line in the box, and a second Enter adds it. Saying so on that Enter is #2861 («עדיין עובד…»), ruled and not built here.
+- [proposed] An action pressed while the tool is still working (a delete during a model call, a second undo) runs when the first is done, in the order pressed. During a frozen page that was already so; during a wait on the model or on 2-D's worker it used to run at once. It follows from "one job at a time" (invariant 2) and is listed for his ruling. Measured in 2-D: «משולש ABC», then a file is loaded (8 s in the worker) and «בטל» is pressed while it loads. On `main` the undo runs at once and the session ends on the loaded figure; on the branch it runs after the load and undoes it, ending on the triangle.
+

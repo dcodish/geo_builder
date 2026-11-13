@@ -16,6 +16,7 @@ vi.mock('@/parser/llm', () => ({ llmParse: (...a: unknown[]) => llmParseMock(...
 import { runSubmit, type SubmitDeps } from '../submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
 import i18n from '@/i18n';
+import { createWorkQueue } from '../../../shell/work';
 
 type Lng = 'he' | 'en';
 const st = () => useGeoStore.getState();
@@ -34,14 +35,12 @@ async function submit(line: string, lng: Lng = 'he'): Promise<{ note: string; ad
       setRenameNote: (m) => notes.push(m),
       setLlmDropped: () => {},
       clearText: () => {},
-      setBusy: () => {},
     },
     view: () => {
       const d = replay(st().facts, st().seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => raw ?? '',

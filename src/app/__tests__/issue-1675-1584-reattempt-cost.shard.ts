@@ -31,6 +31,7 @@ import { parse, buildParseCtx } from '@/parser';
 import i18n from '@/i18n';
 import { factsOf } from '@/__tests__/scenario-pipeline';
 import { SCENARIOS_4 } from '@/__tests__/scenarios-corpus-4';
+import { createWorkQueue } from '../../../shell/work';
 
 /** The shard file's `vi.mock` stub, driven untyped as before the split (its resolved value is not an LlmOutcome). */
 const llmParseMock = llmParse as unknown as Mock;
@@ -41,14 +42,13 @@ async function submit(line: string): Promise<{ accepted: boolean; notes: string[
   const deps: SubmitDeps = {
     t: (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'he' }) as string,
     locale: 'he',
-    ui: { setInputNote: (m) => { if (m) notes.push(m); }, setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => { cleared++; }, setBusy: () => {} },
+    ui: { setInputNote: (m) => { if (m) notes.push(m); }, setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => { cleared++; } },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => String(raw),

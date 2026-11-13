@@ -17,6 +17,7 @@ import { explainError, humanizeError, type Translate } from '@/i18n/humanizeErro
 import { groupKey, replay, useGeoStore } from '@/store/geoStore';
 import { runSetGroupEnabled } from '@/app/editPipeline';
 import { runSubmit, type SubmitDeps } from '@/app/submitPipeline';
+import { createWorkQueue } from '../../../shell/work';
 
 const he: Translate = (k, o) => i18n.getFixedT('he')(k, o) as string;
 const en: Translate = (k, o) => i18n.getFixedT('en')(k, o) as string;
@@ -34,15 +35,13 @@ function deps(): SubmitDeps {
       setRenameNote: () => {},
       setLlmDropped: () => {},
       clearText: () => {},
-      setBusy: () => {},
     },
     view: () => {
       const s = st();
       const d = replay(s.facts, s.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw, said, other) => { if (raw) raws.push(raw); return explainError(raw, he, said, other); },

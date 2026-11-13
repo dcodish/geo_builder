@@ -19,6 +19,7 @@ import { groupKey, replay, useGeoStore } from '@/store/geoStore';
 import { COMMAND_CATALOG } from '@/parser/catalog';
 import i18n from '@/i18n';
 import { findNumberPair } from '../../../shell/juxtaposedNumbers';
+import { createWorkQueue } from '../../../shell/work';
 
 const t = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'he' }) as string;
 const tEn = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'en' }) as string;
@@ -29,14 +30,13 @@ function makeDeps() {
   const deps: SubmitDeps = {
     t,
     locale: 'he',
-    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++, setBusy: () => {} },
+    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++ },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => String(raw),

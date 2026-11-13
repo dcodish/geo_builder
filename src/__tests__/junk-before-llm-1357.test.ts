@@ -22,6 +22,7 @@ import type { SubmitDeps } from '../app/submitPipeline';
 import { classifyOutOfScope } from '../parser/scope';
 import { COMMAND_CATALOG } from '../parser/catalog';
 import { replay, useGeoStore } from '@/store/geoStore';
+import { createWorkQueue } from '../../shell/work';
 
 function makeDeps() {
   const notes: string[] = [];
@@ -33,15 +34,13 @@ function makeDeps() {
       setRenameNote: () => {},
       setLlmDropped: () => {},
       clearText: () => {},
-      setBusy: () => {},
     },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => raw ?? '',

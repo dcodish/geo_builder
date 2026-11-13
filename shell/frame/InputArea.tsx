@@ -18,6 +18,7 @@ import { useRef } from 'react';
 import { color, fs, radius } from '../theme';
 import type { SymbolSpec } from '../symbols';
 import { SymbolRow } from './SymbolRow';
+import { WorkingMark } from './WorkingMark';
 
 export interface InputAreaProps {
   value: string;
@@ -25,7 +26,11 @@ export interface InputAreaProps {
   onSubmit: () => void;
   placeholder: string;
   submitLabel: string;
-  /** Replaces the submit label while the product is thinking (LLM escalation etc.). */
+  /**
+   * The product is WORKING on something the student did (#2874, ADR-W-210): the submit button is off, reads
+   * `busyLabel`, and carries the moving mark, which keeps turning while the page's own thread is busy. The
+   * product passes its queue's derived state (`useWorking`), never a flag of its own.
+   */
   busy?: boolean;
   busyLabel?: string;
   /** The product's palette (#525: shared core + per-tool extension — the DATA is per product). */
@@ -118,7 +123,14 @@ export function InputArea({
           style={box}
         />
         <button type="submit" disabled={busy} style={busy ? { ...send, opacity: 0.6 } : send}>
-          {busy ? (busyLabel ?? submitLabel) : submitLabel}
+          {busy ? (
+            <span style={busyFace}>
+              {busyLabel ?? submitLabel}
+              <WorkingMark />
+            </span>
+          ) : (
+            submitLabel
+          )}
         </button>
       </form>
       {previewText !== null && (
@@ -171,6 +183,7 @@ const send: CSSProperties = {
   cursor: 'pointer',
   whiteSpace: 'nowrap',
 };
+const busyFace: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6 };
 const previewStyle: CSSProperties = {
   fontFamily: 'ui-monospace, Consolas, monospace',
   fontSize: fs.body,

@@ -16,6 +16,7 @@ import { runSubmit } from '../submitPipeline';
 import { runEditCommit } from '../editPipeline';
 import type { SubmitDeps } from '../submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
+import { createWorkQueue } from '../../../shell/work';
 
 function makeDeps() {
   const calls = {
@@ -23,7 +24,6 @@ function makeDeps() {
     renameNotes: [] as string[],
     llmDropped: [] as string[][],
     cleared: 0,
-    busy: [] as boolean[],
     resolved: 0,
     /** #943: [raw engine error, the student's own sentence] as handed to the display layer. */
     explained: [] as [string, string | undefined][],
@@ -36,15 +36,13 @@ function makeDeps() {
       setRenameNote: (m) => calls.renameNotes.push(m),
       setLlmDropped: (s) => calls.llmDropped.push(s),
       clearText: () => calls.cleared++,
-      setBusy: (b) => calls.busy.push(b),
     },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => calls.resolved++,
     llmAbortRef: { current: null },
     explainError: (raw, said) => { calls.explained.push([raw ?? '', said]); return raw ?? ''; },
@@ -299,7 +297,7 @@ describe('submit pipeline — independent constructs are taught, never decompose
     expect(calls.resolved, 'no commit, so no auto-resolve').toBe(0);
     // The whole point of the ruling: the figure that shipped was the LLM's decomposition.
     expect(llmParseMock, 'the paid LLM is never called').not.toHaveBeenCalled();
-    expect(calls.busy.at(-1), 'the spinner is cleared').toBe(false);
+    expect(deps.work.working(), 'the working state is cleared').toBe(false);
   });
 
   // #1778 (ADR-W-125, operator ruling 2026-10-05 "split into rows"): a SENTENCE BOUNDARY is no longer one
@@ -553,12 +551,15 @@ describe('#2782 (ADR-810) — a line typed while the previous one is processing 
     const run = runSubmit(utterance, {
       ...deps,
       ui: { ...deps.ui, clearText: undefined, editText: (update) => (box.text = update(box.text)) },
-      nextPaint: async () => {
-        if (!painted) {
-          painted = true;
-          await gate;
-        }
-      },
+      // #2874: the paint is the queue's now — the job's first paint is the one that waits
+      work: createWorkQueue({
+        paint: async () => {
+          if (!painted) {
+            painted = true;
+            await gate;
+          }
+        },
+      }),
     });
     return { box, release, run };
   };

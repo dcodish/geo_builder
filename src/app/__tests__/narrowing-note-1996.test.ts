@@ -29,6 +29,7 @@ import i18n from '@/i18n';
 import { humanizeError } from '@/i18n/humanizeError';
 import { stripFormatControls } from '../../../shell/bidi';
 import { narrowingFaults, type NarrowGate } from '../../../shell/__tests__/fixtures/narrowing-note-rows';
+import { createWorkQueue } from '../../../shell/work';
 
 const he = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'he' }) as string;
 
@@ -41,14 +42,13 @@ async function play(lines: readonly string[]): Promise<boolean> {
     const deps: SubmitDeps = {
       t: (key, opts) => he(key, opts),
       locale: 'he',
-      ui: { setInputNote: () => {}, setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => {}, setBusy: () => {} },
+      ui: { setInputNote: () => {}, setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => {} },
       view: () => {
         const st = useGeoStore.getState();
         const r = replay(st.facts, st.seed);
         return { construction: r.construction, positions: r.positions };
       },
-      isBusy: () => false,
-      nextPaint: async () => {},
+      work: createWorkQueue(),
       resolveAfterCommit: () => {},
       llmAbortRef: { current: null },
       explainError: (raw, said) => humanizeError(raw, he, said),

@@ -16,8 +16,8 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Figure } from '@/render';
 import { replaySession, figureAtStep, seedAtStep, type SessionReport, type StepCategory } from '@/validation/replaySession';
-import { useGeoStore } from '@/store/geoStore';
 import { deserializeFigure, serializeFigure } from '@/store/figureFile';
+import { act } from '@/app/work';
 
 const CATEGORY_COLOR: Record<StepCategory, string> = {
   ok: '#2e7d32',
@@ -63,7 +63,7 @@ export default function StepPanel({ initialText = '', initialSelected }: StepPan
     const facts = report.factsAfter[selected];
     const seed = seedAtStep(report, selected, { satisfyingSeed });
     const loaded = deserializeFigure(serializeFigure({ facts, seed }));
-    if (loaded.ok) useGeoStore.getState().loadFigure(loaded.file);
+    if (loaded.ok) void act.loadFigure(loaded.file); // #2874: a load re-solves the figure — a job, like every other
   };
 
   if (!open)

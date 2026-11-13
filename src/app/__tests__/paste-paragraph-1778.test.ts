@@ -12,6 +12,7 @@ import { runSubmit, type SubmitDeps } from '../submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
 import i18n from '@/i18n';
 import { pasteSuite, type PasteRunner } from '../../../shell/__tests__/fixtures/paste-paragraph-rows';
+import { createWorkQueue } from '../../../shell/work';
 
 /** The box as the student sees it, through every way the pipeline touches it. */
 function makeDeps(initial: string) {
@@ -29,15 +30,13 @@ function makeDeps(initial: string) {
       setText: (t) => {
         box.text = t;
       },
-      setBusy: () => {},
     },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: async () => {
       box.resolves++;
     },

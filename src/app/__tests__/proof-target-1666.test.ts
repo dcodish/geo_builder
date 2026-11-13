@@ -29,6 +29,7 @@ import i18n from '@/i18n';
 import { findProofTarget, PROOF_TARGET_KEY } from '../../../shell/proofTarget';
 import { proofTargetFaults, type ProofGate } from '../../../shell/__tests__/fixtures/proof-target-rows';
 import { PROOF_TARGET_SENTENCE, RULED_2D_CHECK_HE } from '../../../shell/__tests__/fixtures/proof-target-check-2492';
+import { createWorkQueue } from '../../../shell/work';
 
 const t = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'he' }) as string;
 const tEn = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'en' }) as string;
@@ -43,14 +44,13 @@ function makeDeps() {
   const deps: SubmitDeps = {
     t,
     locale: 'he',
-    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++, setBusy: () => {} },
+    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++ },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => String(raw),

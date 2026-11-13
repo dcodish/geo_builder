@@ -178,6 +178,17 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   submitted. Holds in all four builders. The operator's ruling (2026-11-09): «enter should be disabled», answering
   the question that offered «Enter disabled while it waits, with the text kept».
   - Sources: [ADR-W-198](06w-decisions-workspace.md#adr-w-198), [ADR-810](06-decisions.md#adr-810), #2782.
+- **FR-SU-37 (Must)** — **The tool shows that it is working, and a working tool never looks frozen.** In every
+  builder, whenever the engine is working on something the student did — a submitted line, «הציגו תצורה אחרת», a
+  load (a file, a shared link, a restored session), an edit, a delete or a toggle of a row, a rename or a swap,
+  an undo or a redo, a clear — the tool says so from the moment of the action until the result is on screen. The
+  indicator is 2-D's: «הוסף» is off and reads «חושב…»; for «הציגו תצורה אחרת» it is that button itself that is off
+  and reads «חושב…». Beside the word a ring keeps turning while the page computes, so a working page cannot be
+  mistaken for a frozen one. While the tool works, Enter is off and a typed line stays in the box (FR-SU-34), and
+  an action pressed meanwhile runs when the first is done, in the order pressed. Not covered: an ask and the data
+  panel, which show their own pending state where they have one. The operator's ruling (2026-11-13): «user should
+  know the engine is working and not frozen».
+  - Sources: [ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 2, #2874.
 - **FR-SU-20 (Must)** — **Radians are the complex Builder's notation only.** In the 2-D, 3-D and analytic
   builders an angle measure written with π («∠ABC = π/2», «∠ABC = pi/2», «גזרה AOB בזווית π/3») is refused at
   once, never sent to the AI fallback and never drawn, with one sentence: «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90». 3-D says it of its own subject, «של המרחב» ([ADR-3D-424](06b-decisions-3d.md#adr-3d-424), #2335).
@@ -342,7 +353,8 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Behaviour | 2-D | 3-D | Analytic | Complex | Status |
 | --- | --- | --- | --- | --- | --- |
 | A pasted paragraph | one row per sentence | same | same | same | **Same** (ADR-W-125, FR-SU-19) |
-| A line typed while the previous one is processing | Enter off («חושב…»); the line stays in the box | same | same | same (no wait: complex is synchronous) | **Same** (ADR-W-198, FR-SU-34) |
+| A line typed while the previous one is processing | Enter off («חושב…»); the line stays in the box | same | same | same | **Same** (ADR-W-198, FR-SU-34) |
+| The engine is working on something the student did (submit, show another, load, edit, delete, toggle, rename, swap, undo, redo, clear) | «הוסף» off, reads «חושב…», a ring turning; the «הציגו תצורה אחרת» search on its own button | same | same | same | **Same** (ADR-W-210 Am. 2, FR-SU-37) |
 | A line that refers to a point the figure lacks («M אמצע AB», «AB = 2 AD» on a blank page) | created free; the notice «נוצרה נקודה חדשה X — …» with ✕ removing the line | same; a named line too («הישר k …»), with no notice (ADR-W-163) | same | created silently, no notice | **Gap** — complex #2562 (`later`); ruled 2026-09-27 (#1467, ADR-W-162); one notice, `shell/frame/CreatedNotice.tsx` + suite keys |
 | An AI answer that drops a shape or role word the student typed («שווה צלעת» answered «משולש ABC») | refused, the word named (dropped-given) | same | records today | n/a (no AI fallback) | **Ruled** — 2026-10-08 (#1906, ADR-W-144, FR-SU-21); analytic's half is #1906's third item; one reader, `shell/llm/honestyCore.ts` `propertyWords` |
 | Plane-geometry sentence verdicts | reference | core families; most gaps parked | locked to 2-D | n/a (not plane geometry) | **Ruled** — ADR-W-108; 3-D parity parked (#1679, icebox; B15) |

@@ -193,6 +193,36 @@
         "משולש ABC"
       ],
       "lookFor": "A triangle."
+    },
+    {
+      "sheet": "feat-2874",
+      "id": "T3",
+      "kind": "3d:assertion",
+      "queued": "2026-11-13",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "lines": [
+        "ריבוע ABCD",
+        "קטע AS",
+        "|SA| = 5"
+      ],
+      "lookFor": "Un-ticking row 3 is quick. Ticking it again takes about 2 seconds, and for all of it «הוסף» reads «חושב…» with the ring; the three rows are there at the end. «הציגו תצורה אחרת» shows «חושב…» on its own button."
+    },
+    {
+      "sheet": "feat-2874",
+      "id": "T7",
+      "kind": "3d:assertion",
+      "queued": "2026-11-13",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "lines": [
+        "ריבוע ABCD",
+        "קטע AS",
+        "|SA| = 5"
+      ],
+      "lookFor": "Un-tick row 3 and tick it again; while «חושב…» shows (about 2 seconds) type «M אמצע AB» and press Enter. Enter is off while the tool works: the line stays in the box, and a second Enter after «חושב…» is gone adds it."
     }
   ],
   "results": [
