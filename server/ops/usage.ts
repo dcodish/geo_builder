@@ -9,6 +9,7 @@
 import { PROFILE_2D, PROFILE_3D, PROFILE_ANALYTIC, outcomeOfComplex, verdictOf, VERDICT_FIXED, type VerdictMap } from '../admin';
 import type { UsageEvent } from '../eventLog';
 import type { Issue } from './snapshot';
+import { t } from './text';
 
 export interface Builder {
   id: string;
@@ -19,15 +20,15 @@ export interface Builder {
 }
 
 export const BUILDERS: Builder[] = [
-  { id: 'analytic', he: 'גאומטריה אנליטית', classify: PROFILE_ANALYTIC.classify, admin: '/analytic-builder/admin' },
-  { id: '3d', he: 'גאומטריה במרחב (3-D)', classify: PROFILE_3D.classify, admin: '/3d-builder/admin' },
-  { id: '2d', he: 'גאומטריה במישור (2-D)', classify: PROFILE_2D.classify, admin: '/geo-builder/admin' },
-  { id: 'complex', he: 'מספרים מרוכבים', classify: outcomeOfComplex, admin: null },
+  { id: 'analytic', he: `${t('usage.BUILDERS.1')}`, classify: PROFILE_ANALYTIC.classify, admin: '/analytic-builder/admin' },
+  { id: '3d', he: `${t('usage.BUILDERS.2')}`, classify: PROFILE_3D.classify, admin: '/3d-builder/admin' },
+  { id: '2d', he: `${t('usage.BUILDERS.3')}`, classify: PROFILE_2D.classify, admin: '/geo-builder/admin' },
+  { id: 'complex', he: `${t('usage.BUILDERS.4')}`, classify: outcomeOfComplex, admin: null },
 ];
 
 /** The outcomes that count as a failure this week: not understood, or built only by the AI. */
 export const FAILED = new Set(['not-understood', 'llm-built']);
-export const FAILED_LABEL: Record<string, string> = { 'not-understood': 'לא הובן', 'llm-built': 'נבנה רק ע״י ה-AI' };
+export const FAILED_LABEL: Record<string, string> = { 'not-understood': `${t('usage.FAILED_LABEL.1')}`, 'llm-built': `${t('usage.FAILED_LABEL.2')}` };
 
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
 

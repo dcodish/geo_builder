@@ -9,6 +9,7 @@
  */
 import { recordAudit } from '../../scripts/lib/case-closure.mjs';
 import type { GhClient } from './github';
+import { t } from './text';
 
 export type Write =
   | { op: 'comment'; issue: number; body: string }
@@ -28,7 +29,7 @@ export interface ActionResult {
 const PRIORITIES = ['P1', 'P2', 'P3', 'later'];
 const BUILDER_LABEL: Record<string, string> = { analytic: 'analytic', '3d': '3d', '2d': '2d', complex: 'complex' };
 
-const stamp = (when: Date) => `_— נכתב בדף הניהול, ${when.toISOString().slice(0, 16).replace('T', ' ')} UTC_`;
+const stamp = (when: Date) => `${t('actions.stamp.1')}${when.toISOString().slice(0, 16).replace('T', ' ')} UTC_`;
 const num = (v: string | null) => (v && /^\d{1,6}$/.test(v) ? Number(v) : null);
 const clean = (v: string | null, max = 4000) => (v ?? '').replace(/\r/g, '').trim().slice(0, max);
 const quote = (s: string) => s.split('\n').map((l) => `> ${l}`).join('\n');
@@ -47,15 +48,15 @@ export function planAction(f: URLSearchParams, when: Date): ActionResult {
       const issue = num(f.get('issue'));
       const option = clean(f.get('option'), 2).toUpperCase();
       const optionLabel = clean(f.get('optionLabel'), 400);
-      if (!issue) return fail('חסר מספר issue.');
-      if (!option && !note) return fail('בחרו אפשרות או כתבו פסיקה.');
+      if (!issue) return fail(`${t('actions.planAction.1')}`);
+      if (!option && !note) return fail(`${t('actions.planAction.2')}`);
       const lines = [`## Operator ruling — ${date} (management page)`, ''];
       if (option) lines.push(`**Choice: ${option}**${optionLabel ? ` — ${optionLabel}` : ''}`, '');
       if (note) lines.push(quote(note), '');
       lines.push(stamp(when));
       return {
         ok: true,
-        message: `הפסיקה נרשמה ב-#${issue}, והתווית needs-operator הוסרה.`,
+        message: `${t('actions.planAction.3')}${issue}${t('actions.planAction.4')}`,
         writes: [
           { op: 'comment', issue, body: lines.join('\n') },
           { op: 'removeLabel', issue, label: 'needs-operator' },
@@ -65,27 +66,27 @@ export function planAction(f: URLSearchParams, when: Date): ActionResult {
     case 'play': {
       const pr = num(f.get('pr'));
       const verdict = f.get('verdict');
-      if (!pr) return fail('חסר מספר PR.');
-      if (verdict !== 'pass' && verdict !== 'fail') return fail('בחרו עבר או נכשל.');
-      if (verdict === 'fail' && !note) return fail('כשמשהו נכשל, כתבו מה ראיתם.');
+      if (!pr) return fail(`${t('actions.planAction.5')}`);
+      if (verdict !== 'pass' && verdict !== 'fail') return fail(`${t('actions.planAction.6')}`);
+      if (verdict === 'fail' && !note) return fail(`${t('actions.planAction.7')}`);
       const body = [
         `## Operator play — ${verdict === 'pass' ? 'PASS ✅' : 'FAIL ❌'} (${date}, management page)`,
         '',
         ...(note ? [quote(note), ''] : []),
         stamp(when),
       ].join('\n');
-      return { ok: true, message: `התוצאה נרשמה על PR #${pr}.`, writes: [{ op: 'comment', issue: pr, body }] };
+      return { ok: true, message: `${t('actions.planAction.8')}${pr}.`, writes: [{ op: 'comment', issue: pr, body }] };
     }
     case 'audit': {
       const sheet = clean(f.get('sheet'), 120);
       const id = clean(f.get('id'), 40);
       const verdict = f.get('verdict');
-      if (!sheet || !id || !/^[\w.-]+$/.test(sheet) || !/^[\w.-]+$/.test(id)) return fail('חסר מזהה בדיקה.');
-      if (verdict !== 'pass' && verdict !== 'fail') return fail('בחרו עבר או נכשל.');
-      if (verdict === 'fail' && !note) return fail('כשמשהו נכשל, כתבו מה ראיתם.');
+      if (!sheet || !id || !/^[\w.-]+$/.test(sheet) || !/^[\w.-]+$/.test(id)) return fail(`${t('actions.planAction.9')}`);
+      if (verdict !== 'pass' && verdict !== 'fail') return fail(`${t('actions.planAction.6')}`);
+      if (verdict === 'fail' && !note) return fail(`${t('actions.planAction.7')}`);
       return {
         ok: true,
-        message: `בדיקת המדגם ${sheet}:${id} נרשמה (${verdict === 'pass' ? 'עברה' : 'נכשלה'}).`,
+        message: `${t('actions.planAction.10')}${sheet}:${id}${t('actions.planAction.11')}${verdict === 'pass' ? `${t('actions.planAction.12')}` : `${t('actions.planAction.13')}`}).`,
         writes: [{
           op: 'editJson',
           path: 'scripts/playsheets/spot-audits.json',
@@ -97,7 +98,7 @@ export function planAction(f: URLSearchParams, when: Date): ActionResult {
     }
     case 'approve': {
       const issue = num(f.get('issue'));
-      if (!issue) return fail('חסר מספר issue.');
+      if (!issue) return fail(`${t('actions.planAction.1')}`);
       const body = [
         `## Plan approved — ${date} (operator, management page)`,
         '',
@@ -108,7 +109,7 @@ export function planAction(f: URLSearchParams, when: Date): ActionResult {
       ].join('\n');
       return {
         ok: true,
-        message: `התוכנית ב-#${issue} אושרה (auto-ok).`,
+        message: `${t('actions.planAction.14')}${issue}${t('actions.planAction.15')}`,
         writes: [
           { op: 'comment', issue, body },
           { op: 'addLabels', issue, labels: ['auto-ok'] },
@@ -119,11 +120,11 @@ export function planAction(f: URLSearchParams, when: Date): ActionResult {
       const issue = num(f.get('issue'));
       const to = f.get('to') ?? '';
       const from = (f.get('from') ?? '').split(',').filter((p) => PRIORITIES.includes(p));
-      if (!issue || !PRIORITIES.includes(to)) return fail('עדיפות לא מוכרת.');
+      if (!issue || !PRIORITIES.includes(to)) return fail(`${t('actions.planAction.16')}`);
       const body = [`## Priority → ${to} — ${date} (operator, management page)`, '', ...(note ? [quote(note), ''] : []), stamp(when)].join('\n');
       return {
         ok: true,
-        message: `העדיפות של #${issue} שונתה ל-${to}.`,
+        message: `${t('actions.planAction.17')}${issue}${t('actions.planAction.18')}${to}.`,
         writes: [
           ...from.filter((p) => p !== to).map((label): Write => ({ op: 'removeLabel', issue, label })),
           { op: 'addLabels', issue, labels: [to] },
@@ -133,12 +134,12 @@ export function planAction(f: URLSearchParams, when: Date): ActionResult {
     }
     case 'park': {
       const issue = num(f.get('issue'));
-      if (!issue) return fail('חסר מספר issue.');
-      if (!note) return fail('כתבו למה זה נדחה (נשמר ב-issue).');
+      if (!issue) return fail(`${t('actions.planAction.1')}`);
+      if (!note) return fail(`${t('actions.planAction.19')}`);
       const body = [`## Parked — ${date} (operator, management page)`, '', quote(note), '', stamp(when)].join('\n');
       return {
         ok: true,
-        message: `#${issue} הועבר לקרח (icebox) ונסגר כ-not planned.`,
+        message: `#${issue}${t('actions.planAction.20')}`,
         writes: [
           { op: 'comment', issue, body },
           { op: 'addLabels', issue, labels: ['icebox'] },
@@ -149,11 +150,11 @@ export function planAction(f: URLSearchParams, when: Date): ActionResult {
     case 'pull': {
       const issue = num(f.get('issue'));
       const week = num(f.get('week'));
-      if (!issue || !week) return fail('חסר issue או שבוע.');
+      if (!issue || !week) return fail(`${t('actions.planAction.21')}`);
       const by = `operator on the management page${note ? `: ${note}` : ''}`;
       return {
         ok: true,
-        message: `#${issue} נמשך לשבוע ${week} בתוכנית.`,
+        message: `#${issue}${t('actions.planAction.22')}${week}${t('actions.planAction.23')}`,
         writes: [
           { op: 'editJson', path: 'ops/plan.json', message: `plan: pull #${issue} into week ${week} (operator, management page)`, edit: 'pull', args: { issue, week, at: date, by } },
           { op: 'comment', issue, body: [`## Pulled into week ${week} — ${date} (operator, management page)`, '', ...(note ? [quote(note), ''] : []), stamp(when)].join('\n') },
@@ -162,8 +163,8 @@ export function planAction(f: URLSearchParams, when: Date): ActionResult {
     }
     case 'note': {
       const issue = num(f.get('issue'));
-      if (!issue || !note) return fail('חסר issue או טקסט.');
-      return { ok: true, message: `ההערה נוספה ל-#${issue}.`, writes: [{ op: 'comment', issue, body: [`## Operator note — ${date} (management page)`, '', quote(note), '', stamp(when)].join('\n') }] };
+      if (!issue || !note) return fail(`${t('actions.planAction.24')}`);
+      return { ok: true, message: `${t('actions.planAction.25')}${issue}.`, writes: [{ op: 'comment', issue, body: [`## Operator note — ${date} (management page)`, '', quote(note), '', stamp(when)].join('\n') }] };
     }
     case 'file': {
       const builder = f.get('builder') ?? '';
@@ -171,7 +172,7 @@ export function planAction(f: URLSearchParams, when: Date): ActionResult {
       const outcome = clean(f.get('outcome'), 40);
       const sessions = clean(f.get('sessions'), 400);
       const link = clean(f.get('link'), 400);
-      if (!BUILDER_LABEL[builder] || !line) return fail('חסר כלי או שורה.');
+      if (!BUILDER_LABEL[builder] || !line) return fail(`${t('actions.planAction.26')}`);
       const body = [
         `**Reported:** ${date} — filed from the management page: a real user typed this line in the last 7 days and it ${outcome === 'llm-built' ? 'needed the AI' : 'was not understood'}.`,
         '',
@@ -186,10 +187,10 @@ export function planAction(f: URLSearchParams, when: Date): ActionResult {
         '',
         stamp(when),
       ].join('\n');
-      return { ok: true, message: `נפתח issue על «${line}».`, writes: [{ op: 'create', title: `«${line}» (${builder}, a user's line)`, body, labels: [BUILDER_LABEL[builder], 'reported'] }] };
+      return { ok: true, message: `${t('actions.planAction.27')}${line}».`, writes: [{ op: 'create', title: `«${line}» (${builder}, a user's line)`, body, labels: [BUILDER_LABEL[builder], 'reported'] }] };
     }
     default:
-      return fail('פעולה לא מוכרת.');
+      return fail(`${t('actions.planAction.28')}`);
   }
 }
 

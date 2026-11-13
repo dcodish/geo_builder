@@ -6,6 +6,7 @@
  * files; these functions only read it.
  */
 import type { Commit, DeployRow, Issue, Pr, Snapshot } from './snapshot';
+import { t } from './text';
 
 // ── the plan file (ops/plan.json) ────────────────────────────────────────────
 
@@ -240,12 +241,12 @@ export interface WsRow {
 }
 
 export const STATUS_LABEL: Record<WsStatusKey, string> = {
-  done: 'הושלם',
-  ontrack: 'בקצב',
-  early: 'התחיל מוקדם',
-  watch: 'לשים לב',
-  behind: 'בפיגור',
-  idle: 'טרם התחיל',
+  done: `${t('sections.STATUS_LABEL.1')}`,
+  ontrack: `${t('sections.STATUS_LABEL.2')}`,
+  early: `${t('sections.STATUS_LABEL.3')}`,
+  watch: `${t('sections.STATUS_LABEL.4')}`,
+  behind: `${t('sections.STATUS_LABEL.5')}`,
+  idle: `${t('sections.STATUS_LABEL.6')}`,
 };
 
 export function currentWeek(plan: Plan, today: string): number {
@@ -275,18 +276,18 @@ export function wsRow(plan: Plan, ws: Workstream, byN: Map<number, Issue>, today
   const total = open + closed;
   const mk = (status: WsStatusKey, why: string): WsRow => ({ ws, open, closed, unknown, bugOpen, featOpen, needs, status, why });
   if (ws.milestone) {
-    if (ws.played) return mk('done', `שיחקת את הגיליון ב-${ws.played}.`);
-    if (cw > ws.to) return mk('behind', 'השבוע שלה עבר והגיליון לא שוחק.');
-    if (cw >= ws.from) return mk('watch', 'בדיקת המוכנות הזו פתוחה עכשיו: אתה משחק את הגיליון.');
-    return mk('idle', `הבדיקה נפתחת ב-${start}.`);
+    if (ws.played) return mk('done', `${t('sections.wsRow.1')}${ws.played}.`);
+    if (cw > ws.to) return mk('behind', `${t('sections.wsRow.2')}`);
+    if (cw >= ws.from) return mk('watch', `${t('sections.wsRow.3')}`);
+    return mk('idle', `${t('sections.wsRow.4')}${start}.`);
   }
-  if (total > 0 && open === 0) return mk('done', 'כל ה-issues כאן סגורים.');
-  if (cw < ws.from) return closed ? mk('early', `השבועות שלה מתחילים ב-${start}, ו-${closed} מתוך ${total} כבר סגורים.`) : mk('idle', `השבועות שלה מתחילים ב-${start}.`);
-  if (cw > ws.to) return mk('behind', `השבוע האחרון שלה עבר עם ${open} פתוחים.`);
-  if (dayGap(start, today) < 7) return mk('ontrack', 'זה השבוע הראשון שלה; הקצב נמדד מהשבוע הבא.');
+  if (total > 0 && open === 0) return mk('done', `${t('sections.wsRow.5')}`);
+  if (cw < ws.from) return closed ? mk('early', `${t('sections.wsRow.6')}${start}${t('sections.wsRow.7')}${closed}${t('sections.wsRow.8')}${total}${t('sections.wsRow.9')}`) : mk('idle', `${t('sections.wsRow.6')}${start}.`);
+  if (cw > ws.to) return mk('behind', `${t('sections.wsRow.10')}${open}${t('sections.wsRow.11')}`);
+  if (dayGap(start, today) < 7) return mk('ontrack', `${t('sections.wsRow.12')}`);
   const elapsed = Math.max(0, Math.min(1, dayGap(start, today) / ((ws.to - ws.from + 1) * 7)));
   const expected = elapsed * total;
-  const pace = `${closed} נסגרו; הקצב דורש כ-${Math.round(expected)} עד היום.`;
+  const pace = `${closed}${t('sections.wsRow.13')}${Math.round(expected)}${t('sections.wsRow.14')}`;
   return closed >= expected ? mk('ontrack', pace) : closed >= expected * 0.6 ? mk('watch', pace) : mk('behind', pace);
 }
 
@@ -405,11 +406,11 @@ export function pace(ctx: Ctx): Pace {
 // ── 4 · What is live? ─────────────────────────────────────────────────────────
 
 export const APP_NAMES: { id: string; he: string; match: RegExp; path: string }[] = [
-  { id: '2d', he: 'גאומטריה במישור (2-D)', match: /\b2-D\b/, path: '/geo-builder/' },
-  { id: 'analytic', he: 'גאומטריה אנליטית', match: /analytic/i, path: '/analytic-builder/' },
-  { id: '3d', he: 'גאומטריה במרחב (3-D)', match: /\b3-D\b/, path: '/3d-builder/' },
-  { id: 'complex', he: 'מספרים מרוכבים', match: /complex/i, path: '/complex-builder/' },
-  { id: 'proxy', he: 'השרת (proxy)', match: /proxy/i, path: '' },
+  { id: '2d', he: `${t('sections.APP_NAMES.1')}`, match: /\b2-D\b/, path: '/geo-builder/' },
+  { id: 'analytic', he: `${t('sections.APP_NAMES.2')}`, match: /analytic/i, path: '/analytic-builder/' },
+  { id: '3d', he: `${t('sections.APP_NAMES.3')}`, match: /\b3-D\b/, path: '/3d-builder/' },
+  { id: 'complex', he: `${t('sections.APP_NAMES.4')}`, match: /complex/i, path: '/complex-builder/' },
+  { id: 'proxy', he: `${t('sections.APP_NAMES.5')}`, match: /proxy/i, path: '' },
 ];
 
 export function live(ctx: Ctx) {

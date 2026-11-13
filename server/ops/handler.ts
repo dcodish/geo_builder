@@ -27,6 +27,7 @@ import { backlogPage, costPage, dryRunText, homePage, issuePage, livePage, login
 import { backlog, cost, live, makeCtx, needsMe, pace, sinceLast } from './sections';
 import { loadSnapshot, toIssue, type Snapshot } from './snapshot';
 import { BUILDERS, builderUsage } from './usage';
+import { t } from './text';
 
 export interface ManagementOpts {
   username: string;
@@ -150,10 +151,10 @@ export async function handleManagement(req: IncomingMessage, res: ServerResponse
       return redirect(res, `${base}${backPath || '/'}`);
     }
     if (sub !== '/act') return send(res, 404, 'not found');
-    if (actLimited(clientIp(req))) return redirect(res, to('יותר מדי פעולות בדקה. נסו שוב בעוד רגע.', false));
+    if (actLimited(clientIp(req))) return redirect(res, to(`${t('handler.handleManagement.1')}`, false));
     const plan = planAction(f, now);
     if (!plan.ok) return redirect(res, to(plan.message, false));
-    if (writes === 'off') return redirect(res, to('הדף במצב קריאה בלבד: לא נכתב דבר.', false));
+    if (writes === 'off') return redirect(res, to(`${t('handler.handleManagement.2')}`, false));
     if (writes === 'dry' || !opts.gh) {
       console.log('[management] dry run:', JSON.stringify(plan.writes));
       return redirect(res, to(dryRunText(plan.writes), true));
@@ -164,12 +165,12 @@ export async function handleManagement(req: IncomingMessage, res: ServerResponse
     } catch (e) {
       const m = e instanceof Error ? e.message : String(e);
       console.error('[management] write failed:', m);
-      return redirect(res, to(`GitHub סירב: ${m.slice(0, 200)}`, false));
+      return redirect(res, to(`${t('handler.handleManagement.3')}${m.slice(0, 200)}`, false));
     }
   }
 
   if (req.method !== 'GET' || !SCREEN_PATHS.has(sub)) return send(res, 404, 'not found');
-  if (!opts.gh) return send(res, 503, 'אין חיבור ל-GitHub: חסר MGMT_GITHUB_TOKEN בשרת.');
+  if (!opts.gh) return send(res, 503, `${t('handler.handleManagement.4')}`);
 
   const flash = url.searchParams.get('ok') ? { ok: true, text: url.searchParams.get('ok')! } : url.searchParams.get('err') ? { ok: false, text: url.searchParams.get('err')! } : null;
   const today = now.toISOString().slice(0, 10);
@@ -199,11 +200,11 @@ export async function handleManagement(req: IncomingMessage, res: ServerResponse
       // Leaving this screen marks the visit: the next one starts from now.
       await writeState(opts.stateFile, { ...st, lastVisit: now.toISOString() });
       return send(res, 200, sincePage(frame, sinceLast(ctx, since), [
-        { label: 'מהביקור הקודם', since: prev },
-        { label: '24 שעות', since: iso(1) },
-        { label: '3 ימים', since: iso(3) },
-        { label: 'שבוע', since: iso(7) },
-        { label: 'שבועיים', since: iso(14) },
+        { label: `${t('handler.handleManagement.5')}`, since: prev },
+        { label: `${t('handler.handleManagement.6')}`, since: iso(1) },
+        { label: `${t('handler.handleManagement.7')}`, since: iso(3) },
+        { label: `${t('handler.handleManagement.8')}`, since: iso(7) },
+        { label: `${t('handler.handleManagement.9')}`, since: iso(14) },
       ]));
     }
     case '/plan':
