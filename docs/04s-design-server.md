@@ -266,15 +266,15 @@ The operator's page at `/geo-builder/management` (Apache: `ProxyPass /geo-builde
 | `server/ops/sections.ts` | Pure: one builder per screen (`needsMe`, `sinceLast`, `pace`, `live`, `backlog`, `cost`) plus the parsers (dossier options, PR play blocks, `[proposed]` lines, round ledger lines). |
 | `server/ops/usage.ts` | Pure: per builder, the window's visitors, sessions, lines and failures, and the failed lines grouped, through the dashboards' own classifiers (`PROFILE_*.classify`, `outcomeOfComplex`) and verdict maps. |
 | `server/ops/actions.ts` | The allow-list: `planAction(form, now)` → the writes (pure), `runWrites(gh, writes, ref)` performs them; `applyEdit` is the pure JSON edit a file commit carries (`pull`, `recordAudit` from `scripts/lib/case-closure.mjs`). |
-| `server/ops/auth.ts` | Its own stateless session cookie `geo_mgmt` (8 h, path-scoped), the CSRF token (HMAC of the session), RFC 6238 TOTP. |
+| `server/ops/auth.ts` | Its own stateless session cookie `geo_mgmt` (8 h, path-scoped), the CSRF token (HMAC of the session). Username and password only (operator, 2026-11-13). |
 | `server/ops/render.ts` | The HTML, plain forms, no script. |
 | `server/ops/he.json` + `text.ts` | Every Hebrew word of the console, read by key through `t()` ([ADR-W-153](06w-decisions-workspace.md#adr-w-153): no Hebrew literals in code); a test asserts every key resolves and none is orphaned. |
-| `server/ops/handler.ts` | Routes, login, CSRF + same-origin check, write mode (`off`/`dry`/`on`; `on` needs the TOTP secret), the small state file (the operator's device hashes, the last visit) beside the event logs. |
+| `server/ops/handler.ts` | Routes, login, CSRF + same-origin check, write mode (`off`/`dry`/`on`), the small state file (the operator's device hashes, the last visit) beside the event logs. |
 
-**Env:** `MGMT_USERNAME` (default `ADMIN_USERNAME`), `MGMT_PASSWORD`, `MGMT_COOKIE_SECRET` (must differ from the admin secret), `MGMT_TOTP_SECRET` (base32), `MGMT_GITHUB_TOKEN`, `MGMT_WRITES`, `MGMT_REF` (default `main`), `MGMT_BASE` (default `/geo-builder/management`), `MGMT_STATE`. Missing username, password or secret ⇒ the console answers only "off". No token ⇒ 503 on every screen.
+**Env:** `MGMT_USERNAME` (default `ADMIN_USERNAME`), `MGMT_PASSWORD`, `MGMT_COOKIE_SECRET` (must differ from the admin secret), `MGMT_GITHUB_TOKEN`, `MGMT_WRITES`, `MGMT_REF` (default `main`), `MGMT_BASE` (default `/geo-builder/management`), `MGMT_STATE`. Missing username, password or secret ⇒ the console answers only "off". No token ⇒ 503 on every screen.
 
 **Response headers:** `content-security-policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'…`, `cache-control: no-store`, `x-frame-options: DENY`. The pages carry no script.
 
 **Unit readiness** is measured off the server: `npm run ops:readiness` (`scripts/ops/readiness.mjs`, with `scripts/ops/measure-corpus.ts` under vite-node) writes `ops/readiness.json`, which a session commits; the console reads it from GitHub and states its age and commit.
 
-**Tests:** `server/__tests__/management-2868.test.ts` (section builders over recorded data, the allow-list and its refusals, writes against a fake GitHub, TOTP against RFC 6238's vector, the routes, the readiness rules). The deploy preflight probes the route like a dashboard mount (`scripts/preflight-routes.mjs`, shape "management console").
+**Tests:** `server/__tests__/management-2868.test.ts` (section builders over recorded data, the allow-list and its refusals, writes against a fake GitHub, the session's expiry, the routes, the readiness rules). The deploy preflight probes the route like a dashboard mount (`scripts/preflight-routes.mjs`, shape "management console").

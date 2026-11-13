@@ -28,7 +28,6 @@
  *                 /admin-analytic tail — #1362)
  *   MGMT_USERNAME / MGMT_PASSWORD / MGMT_COOKIE_SECRET  (the management console's OWN login — #2868, ADR-W-209;
  *                 never the shared admin password; any missing ⇒ the console is disabled)
- *   MGMT_TOTP_SECRET (base32 second factor; without it the console is read-only)
  *   MGMT_GITHUB_TOKEN (fine-grained, this repo only: issues + pull requests read/write, contents write)
  *   MGMT_WRITES  (off | dry | on; default off)   MGMT_REF (branch the ops files are read from; default main)
  *   MGMT_BASE    (default /geo-builder/management)   MGMT_STATE (default beside events.jsonl: management-state.json)
@@ -83,7 +82,7 @@ const admin3Base = process.env.ADMIN_3D_BASE || '/3d-builder/admin';
 const adminAnalyticBase = process.env.ADMIN_ANALYTIC_BASE || '/analytic-builder/admin';
 
 // #2868 — the management console. Its own credentials: it WRITES to GitHub, so the dashboards' shared
-// password (#2762) is not enough; writes additionally need the TOTP second factor.
+// password (#2762) is shared with other pages, and this one writes. Username + password (operator, 2026-11-13).
 const mgmtWrites = (['on', 'dry'] as const).find((m) => m === process.env.MGMT_WRITES) ?? 'off';
 const mgmtGh = process.env.MGMT_GITHUB_TOKEN ? makeGh({ token: process.env.MGMT_GITHUB_TOKEN, repo: 'dcodish/geo_builder' }) : null;
 const mgmtCookieSecret =
@@ -143,7 +142,6 @@ async function dispatch(req: IncomingMessage, res: ServerResponse): Promise<void
       username: process.env.MGMT_USERNAME || adminUsername,
       password: process.env.MGMT_PASSWORD || '',
       cookieSecret: mgmtCookieSecret,
-      totpSecret: process.env.MGMT_TOTP_SECRET || '',
       base: process.env.MGMT_BASE || '/geo-builder/management',
       gh: mgmtGh,
       writes: mgmtWrites,

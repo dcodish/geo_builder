@@ -1,6 +1,6 @@
 /**
  * #2868 (ADR-W-209) — the management console: the section builders over recorded data, the action allow-list,
- * the writes against a fake GitHub, the login with its second factor, CSRF, and the readiness rules.
+ * the writes against a fake GitHub, the login (username + password), CSRF, and the readiness rules.
  */
 import { describe, it, expect } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { applyEdit, planAction, runWrites } from '../ops/actions';
-import { base32Decode, csrfFor, makeSession, totp, totpOk, validSession, SESSION_MS } from '../ops/auth';
+import { csrfFor, makeSession, validSession, SESSION_MS } from '../ops/auth';
 import { makeGh, type GhClient } from '../ops/github';
 import { handleManagement, type ManagementOpts } from '../ops/handler';
 import { backlog, cost, ledger, makeCtx, needsMe, optionsOf, pace, playBlocks, proposedLines, readiness, section, sinceLast, wsRow, type Plan } from '../ops/sections';
@@ -337,17 +337,7 @@ describe('#2868 — writes against a fake GitHub', () => {
 
 // ── auth ─────────────────────────────────────────────────────────────────────
 
-describe('#2868 — login, second factor, CSRF', () => {
-  it('TOTP matches RFC 6238\'s SHA-1 test vector', () => {
-    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'; // base32("12345678901234567890")
-    expect(base32Decode(secret).toString()).toBe('12345678901234567890');
-    expect(totp(secret, 59_000)).toBe('287082');
-    expect(totp(secret, 1_111_111_109_000)).toBe('081804');
-    expect(totpOk(secret, '287082', 59_000 + 30_000)).toBe(true); // one step of drift
-    expect(totpOk(secret, '287082', 59_000 + 90_000)).toBe(false);
-    expect(totpOk(secret, '28708', 59_000)).toBe(false);
-  });
-
+describe('#2868 — the session', () => {
   it('a session expires after 8 hours and needs its secret', () => {
     const s = makeSession('k', 0);
     expect(validSession(s, 'k', SESSION_MS - 1)).toBe(true);
@@ -373,9 +363,8 @@ function mockReq(method: string, url: string, body = '', headers: Record<string,
 }
 
 describe('#2868 — the console routes', () => {
-  const SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
   const opts = (over: Partial<ManagementOpts> = {}): ManagementOpts => ({
-    username: 'op', password: 'pw', cookieSecret: 'cs', totpSecret: SECRET, base: '/m', gh: fakeGitHub().gh, writes: 'on', ref: 'main',
+    username: 'op', password: 'pw', cookieSecret: 'cs', base: '/m', gh: fakeGitHub().gh, writes: 'on', ref: 'main',
     eventLogs: {}, ipSalt: 'salt', stateFile: path.join(mkdtempSync(path.join(tmpdir(), 'mgmt-')), 'state.json'), now: () => NOW, ...over,
   });
   const go = async (o: ManagementOpts, req: ReturnType<typeof mockReq>) => {
@@ -386,14 +375,16 @@ describe('#2868 — the console routes', () => {
 
   it('without a session: the login form, never the data', async () => {
     const res = await go(opts(), mockReq('GET', '/management'));
-    expect(res.body).toContain('קוד מאפליקציית האימות');
+    expect(res.body).toContain('name="password"');
+    expect(res.body).not.toContain('name="code"'); // no authenticator code (operator, 2026-11-13)
     expect(res.body).not.toContain('מה מחכה לי</h1>');
   });
 
-  it('the password alone is not enough when a second factor is configured', async () => {
-    const bad = await go(opts(), mockReq('POST', '/management/login', 'username=op&password=pw&code=000000'));
+  it('a wrong password is refused; the right username and password open a session scoped to the console', async () => {
+    const bad = await go(opts(), mockReq('POST', '/management/login', 'username=op&password=nope'));
     expect(bad.statusCode).toBe(401);
-    const good = await go(opts(), mockReq('POST', '/management/login', `username=op&password=pw&code=${totp(SECRET, NOW.getTime())}`));
+    expect(bad.headers['set-cookie']).toBeUndefined();
+    const good = await go(opts(), mockReq('POST', '/management/login', 'username=op&password=pw'));
     expect(good.statusCode).toBe(303);
     expect(good.headers['set-cookie']).toMatch(/^geo_mgmt=.*HttpOnly; Secure; SameSite=Strict; Path=\/m/);
   });
@@ -411,12 +402,16 @@ describe('#2868 — the console routes', () => {
     expect(fg.calls.filter((c) => c.method !== 'GET')).toEqual([]);
   });
 
-  it('writes stay off without a second factor, even when asked for', async () => {
-    const fg = fakeGitHub();
+  it('with writes on, an action reaches GitHub; with writes off, nothing does', async () => {
     const session = makeSession('cs', NOW.getTime());
-    const res = await go(opts({ totpSecret: '', gh: fg.gh }), mockReq('POST', '/management/act', `action=note&issue=5&note=x&csrf=${csrfFor(session, 'cs')}`, { cookie: `geo_mgmt=${session}` }));
+    const body = `action=note&issue=5&note=x&csrf=${csrfFor(session, 'cs')}`;
+    const on = fakeGitHub();
+    await go(opts({ gh: on.gh }), mockReq('POST', '/management/act', body, { cookie: `geo_mgmt=${session}` }));
+    expect(on.calls.map((c) => c.method)).toEqual(['POST']);
+    const off = fakeGitHub();
+    const res = await go(opts({ writes: 'off', gh: off.gh }), mockReq('POST', '/management/act', body, { cookie: `geo_mgmt=${session}` }));
     expect(decodeURIComponent(res.headers.location)).toContain('קריאה בלבד');
-    expect(fg.calls).toEqual([]);
+    expect(off.calls).toEqual([]);
   });
 
   it('a cross-origin POST is refused even with a token', async () => {

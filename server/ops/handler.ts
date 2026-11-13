@@ -21,7 +21,7 @@ import { readEvents, readVerdicts } from '../admin';
 import { hashIp } from '../eventLog';
 import { clientIp, makeRateLimiter, readBody } from '../http';
 import { planAction, runWrites } from './actions';
-import { COOKIE, SESSION_MS, csrfFor, makeSession, readCookies, safeEq, totpOk, validSession } from './auth';
+import { COOKIE, SESSION_MS, csrfFor, makeSession, readCookies, safeEq, validSession } from './auth';
 import type { GhClient } from './github';
 import { backlogPage, costPage, dryRunText, homePage, issuePage, livePage, loginPage, planPage, sincePage, usagePage, type Frame } from './render';
 import { backlog, cost, live, makeCtx, needsMe, pace, sinceLast } from './sections';
@@ -33,8 +33,6 @@ export interface ManagementOpts {
   username: string;
   password: string;
   cookieSecret: string;
-  /** base32 TOTP secret; empty = no second factor, and then writes stay off */
-  totpSecret: string;
   /** Public base path the browser sees. */
   base: string;
   gh: GhClient | null;
@@ -106,22 +104,19 @@ export async function handleManagement(req: IncomingMessage, res: ServerResponse
   const base = opts.base;
   const cookieAttrs = `HttpOnly; Secure; SameSite=Strict; Path=${base}`;
   const configured = !!(opts.username && opts.password && opts.cookieSecret);
-  const twoFactor = opts.totpSecret.length > 0;
-  // Writes need the second factor (#2762's minimum): without it the console is read-only.
-  const writes: Frame['writes'] = opts.writes === 'on' && !twoFactor ? 'off' : opts.writes;
+  const writes: Frame['writes'] = opts.writes;
 
   if (sub === '/logout') return redirect(res, base, `${COOKIE}=; ${cookieAttrs}; Max-Age=0`);
 
   if (sub === '/login' && req.method === 'POST') {
-    if (loginLimited(clientIp(req))) return send(res, 429, loginPage(base, { error: true, totp: twoFactor, disabled: !configured }));
+    if (loginLimited(clientIp(req))) return send(res, 429, loginPage(base, { error: true, disabled: !configured }));
     const body = await readBody(req, 8 * 1024);
     const p = new URLSearchParams(body ?? '');
     const ok =
       configured &&
       safeEq(p.get('username') ?? '', opts.username) &&
-      safeEq(p.get('password') ?? '', opts.password) &&
-      (!twoFactor || totpOk(opts.totpSecret, p.get('code') ?? '', now.getTime()));
-    if (!ok) return send(res, 401, loginPage(base, { error: true, totp: twoFactor, disabled: !configured }));
+      safeEq(p.get('password') ?? '', opts.password);
+    if (!ok) return send(res, 401, loginPage(base, { error: true, disabled: !configured }));
     // The device he logs in from is his: its visits leave the student counts.
     const st = await readState(opts.stateFile);
     const me = iphOf(req, opts.ipSalt);
@@ -131,7 +126,7 @@ export async function handleManagement(req: IncomingMessage, res: ServerResponse
 
   const session = readCookies(req)[COOKIE];
   if (!configured || !validSession(session, opts.cookieSecret, now.getTime())) {
-    return send(res, 200, loginPage(base, { error: false, totp: twoFactor, disabled: !configured }));
+    return send(res, 200, loginPage(base, { error: false, disabled: !configured }));
   }
   const csrf = csrfFor(session!, opts.cookieSecret);
 

@@ -1,11 +1,10 @@
 /**
  * The management console's login (#2868, ADR-W-209).
  *
- * The admin dashboards share one password with other pages on the same origin (#2762). A page that WRITES
- * rulings and approves plans needs more, so the console has its own credentials, its own cookie scoped to its
- * own path, and a second factor: a time-based code from an authenticator app (RFC 6238, the same codes Google
- * Authenticator shows). Writes are refused unless the second factor is configured. Every POST carries a CSRF
- * token bound to the session cookie.
+ * Username and password, like the admin dashboards (operator, 2026-11-13: "I dont want the authenticator part.
+ * just user password like i have for the geo-builder admin page"). The console has its own credentials and its
+ * own cookie scoped to its own path, because the dashboards' password is shared with other pages on the origin
+ * (#2762) and this page writes. Every POST carries a CSRF token bound to the session cookie.
  *
  * Stateless, like the admin cookie: `geo_mgmt = base64url(exp).hmac(secret, exp)`, checked timing-safe.
  */
@@ -48,41 +47,4 @@ export function readCookies(req: IncomingMessage): Record<string, string> {
     if (eq > 0) out[part.slice(0, eq).trim()] = part.slice(eq + 1).trim();
   }
   return out;
-}
-
-// ── RFC 6238 TOTP (SHA-1, 30 s, 6 digits) ────────────────────────────────────
-
-const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-
-export function base32Decode(s: string): Buffer {
-  const clean = s.toUpperCase().replace(/[\s=-]/g, '');
-  let bits = 0, value = 0;
-  const out: number[] = [];
-  for (const c of clean) {
-    const v = B32.indexOf(c);
-    if (v < 0) throw new Error('bad base32');
-    value = (value << 5) | v;
-    bits += 5;
-    if (bits >= 8) {
-      out.push((value >>> (bits - 8)) & 0xff);
-      bits -= 8;
-    }
-  }
-  return Buffer.from(out);
-}
-
-export function totp(secretB32: string, at: number, step = 30): string {
-  const counter = Math.floor(at / 1000 / step);
-  const msg = Buffer.alloc(8);
-  msg.writeBigUInt64BE(BigInt(counter));
-  const h = createHmac('sha1', base32Decode(secretB32)).update(msg).digest();
-  const o = h[h.length - 1] & 0xf;
-  const code = ((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).toString();
-  return code.padStart(6, '0');
-}
-
-/** A code is accepted for its own 30-second step and one on each side (clock drift). */
-export function totpOk(secretB32: string, code: string, now = Date.now()): boolean {
-  if (!/^\d{6}$/.test(code)) return false;
-  return [-1, 0, 1].some((k) => safeEq(totp(secretB32, now + k * 30_000), code));
 }

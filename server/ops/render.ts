@@ -435,13 +435,12 @@ ${acts}<section class="panel"><h2>${t('render.issuePage.18')}</h2><div class="bo
 
 // ── login ────────────────────────────────────────────────────────────────────
 
-export function loginPage(base: string, opts: { error: boolean; totp: boolean; disabled: boolean }): string {
+export function loginPage(base: string, opts: { error: boolean; disabled: boolean }): string {
   return `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${t('render.loginPage.1')}</title><style>${CSS}
 .login{max-width:360px;margin:12vh auto;padding:0 16px}</style></head><body><div class="login"><section class="panel"><h1>${t('render.page.5')}</h1>
 ${opts.disabled ? `<p class="flash err">${t('render.loginPage.2')}</p>` : `${opts.error ? `<p class="flash err">${t('render.loginPage.6')}</p>` : ''}
 <form method="post" action="${base}/login"><label>${t('render.loginPage.3')}<input type="text" name="username" autocomplete="username" required></label>
 <label>${t('render.loginPage.4')}<input type="password" name="password" autocomplete="current-password" required style="font:inherit;border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%"></label>
-${opts.totp ? `<label>${t('render.loginPage.7')}<input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label>` : ''}
 <button type="submit">${t('render.loginPage.5')}</button></form>`}</section></div></body></html>`;
 }
 
