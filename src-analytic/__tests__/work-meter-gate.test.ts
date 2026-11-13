@@ -12,6 +12,9 @@
  * (`scanRoots`). The analytic tree has no worker, so every unit is page work today — the honest starting point of
  * invariant 1; the part after the paint is the pool and the passive effects.
  *
+ * test-budget: the gate walks all 208 saved sequences through every student action (1 963 actions): about 11 min alone,
+ * 15 min inside the full suite (ADR-W-210 Am. 1). One file, because the baseline is one file.
+ *
  * Re-record: `npm run work:record -- analytic` (docs/08, "The work meter").
  */
 import { describe, expect, it } from 'vitest';

@@ -109,7 +109,7 @@ press take 6 s was found by the operator's play.
 | One unit | one `evaluateCore` call | one residual evaluation of `leastSquares` | one residual evaluation of `solveLM`, `jacobianRank` or `scanRoots` | one exact solve of a fold |
 | Gate | `src/__tests__/work-meter-gate.test.ts` | `src3d/__tests__/work-meter-gate.test.ts` | `src-analytic/__tests__/work-meter-gate.test.ts` | `src-complex/__tests__/work-meter-gate.test.ts` |
 | Baseline | `src/__tests__/work-meter/baseline.jsonl` | `src3d/__tests__/work-meter/baseline.jsonl` | `src-analytic/__tests__/work-meter/baseline.jsonl` | `src-complex/__tests__/work-meter/baseline.jsonl` |
-| Gate's wall time, measured 2026-11-13 | about 6 min | about 5 min | about 11 min | under 2 s |
+| Gate's wall time alone · inside `test:full`, measured 2026-11-13 | 6 min · 11 min | 5 min · 10 min | 11 min · 15 min | under 2 s |
 
 **What a gate does.** It walks **every** fixture of its tree through the student's actions, with the tree's
 action driver (`<tree>/__tests__/work-meter/driver*.ts`, the same code `scripts/perf/` times): re-typing each row

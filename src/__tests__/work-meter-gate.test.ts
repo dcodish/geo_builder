@@ -11,6 +11,9 @@
  * node that is its synchronous fallback, which charges the worker lane and runs every search with NO clock (vitest's
  * MODE 'test'). So this measures the whole search, not the part a browser's 12-second budget lets it finish.
  *
+ * test-budget: the gate walks all 171 fixtures through every student action (1 327 actions), each figure from cold
+ * caches: about 6 min alone, 11 min inside the full suite (ADR-W-210 Am. 1). One file, because the baseline is one file.
+ *
  * Re-record: `npm run work:record -- 2d` (docs/08, "The work meter").
  */
 import { describe, expect, it } from 'vitest';

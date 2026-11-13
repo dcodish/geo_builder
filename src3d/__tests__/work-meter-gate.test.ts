@@ -10,6 +10,9 @@
  * One unit is one residual evaluation of `leastSquares`. 3-D has no worker, so every unit is page work today — the
  * honest starting point of invariant 1.
  *
+ * test-budget: the gate walks all 176 fixtures through every student action (1 266 actions): about 5 min alone, 10 min
+ * inside the full suite (ADR-W-210 Am. 1). One file, because the baseline is one file.
+ *
  * Re-record: `npm run work:record -- 3d` (docs/08, "The work meter").
  */
 import { describe, expect, it } from 'vitest';

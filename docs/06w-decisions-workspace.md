@@ -7668,14 +7668,14 @@ Units are not comparable across rows. 2-D by action, where its lanes differ: `de
 
 **Cost of the gate**, measured: the wall time of each gate file run alone on the dev PC.
 
-| Builder | Wall time | Excluded |
-|---|---|---|
-| 2-D | 6.3 min (377–385 s over four runs) | nothing |
-| 3-D | 5.1 min (295–322 s over three runs) | nothing |
-| Analytic | 11.1 min (665–675 s) | nothing |
-| Complex | 1.5 s | nothing |
+| Builder | Wall time, the gate alone | Wall time inside `npm run test:full` | Excluded |
+|---|---|---|---|
+| 2-D | 6.3 min (377–385 s over four runs) | 11.4 min | nothing |
+| 3-D | 5.1 min (295–322 s over three runs) | 9.7 min | nothing |
+| Analytic | 11.1 min (647–675 s over three runs) | 15.5 min | nothing |
+| Complex | 1.5 s | 1.6 s | nothing |
 
-The full step-by-step walk fits in the suite, so no subset was needed and **no fixture and no action is excluded**. The dearest single action is analytic's `exam-2379-q3-route-2392.analytic.json|another#1`, about 70 s and 18.8 M units. Each gate is one file, so it joins the measured slow tier and `npm run test:fast` does not run it. The analytic gate is now one of the two longest files of its lane.
+The full step-by-step walk fits in the suite, so no subset was needed and **no fixture and no action is excluded**. The dearest single action is analytic's `exam-2379-q3-route-2392.analytic.json|another#1`, about 70 s and 18.8 M units. Each gate is one file, so it joins the measured slow tier and `npm run test:fast` does not run it. The whole suite took 23.2 min of wall time with the gates in it (1 459 files, 316 CPU-minutes); a full run of another branch without them, the same hour on the same machine, took 19.8 min. The analytic gate is now the longest file of the suite. If that wall time matters, the gate splits into two files by fixture, which needs the re-record to run them one after the other; it was not done here.
 
 **The counter's own cost** (docs/17 §7, fourth rule), measured as the wall time of one heavy fixture's whole walk with the `meterWork()` calls in the engines and with them removed, minimum of the faster of two timed walks after a warm-up walk, one process per state, the states run one after the other runs each, alternating:
 
