@@ -136,6 +136,11 @@ export function rowClass2D(cmds: readonly AnyCommand[], ownRings: readonly (read
 }
 
 let memo: { key: string; notes: RingNote[] } | null = null;
+/** Test-only: forget the memoized notes. `clearReplayCaches` calls it — the notes' attribution replays the figure, so a
+ *  kept entry made the work of a "cold" detection depend on which figure was swept before it (#2873). */
+export function clearNarrowingMemo(): void {
+  memo = null;
+}
 
 /**
  * Every forced-narrowing note the figure warrants. `keyOf` is the fold key of the facts (content-keyed memo:

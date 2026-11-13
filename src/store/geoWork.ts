@@ -24,6 +24,7 @@ import {
 } from '@/replay/core';
 import type { RowNouns } from '@/replay/narrowing';
 import { rowNouns } from './rowNouns';
+import { inWorkerLane } from '../../shell/workMeter';
 import type { GeoWorkResponse, ResampleDone, AutoResolveDone, PrefoldDone, DetectDone, ValuesDone } from './geoWorker';
 
 type Done = ResampleDone | AutoResolveDone | PrefoldDone | DetectDone | ValuesDone;
@@ -122,17 +123,22 @@ function call(
 ): Promise<Done> {
   if (!hasWorker) {
     // synchronous fallback — the same functions, same semantics, main thread (tests / no-Worker envs)
+    // #2873 (ADR-W-210): this is the work a browser runs in the worker, so the work meter charges it to the worker lane.
     try {
-      if (op === 'resample') return Promise.resolve({ op, found: searchAnotherView(facts, seed, onProgress) });
-      if (op === 'autoResolve') {
-        if (meetsRequirements(facts, seed)) return Promise.resolve({ op, ok: true } as AutoResolveDone);
-        const found = findValidConfig(facts, seed); // #364 (ADR-510): from the current seed
-        return Promise.resolve({ op, found: found ? { ...found, fold: null } : null } as AutoResolveDone);
-      }
-      if (op === 'detect') return Promise.resolve({ op, result: detectAll(facts, nouns) });
-      if (op === 'values') return Promise.resolve({ op, result: computeValues(facts, queries) });
-      replay(facts, seed);
-      return Promise.resolve({ op: 'prefold', fold: getFoldFor(facts) } as PrefoldDone);
+      return Promise.resolve(
+        inWorkerLane((): Done => {
+          if (op === 'resample') return { op, found: searchAnotherView(facts, seed, onProgress) };
+          if (op === 'autoResolve') {
+            if (meetsRequirements(facts, seed)) return { op, ok: true };
+            const found = findValidConfig(facts, seed); // #364 (ADR-510): from the current seed
+            return { op, found: found ? { ...found, fold: null } : null };
+          }
+          if (op === 'detect') return { op, result: detectAll(facts, nouns) };
+          if (op === 'values') return { op, result: computeValues(facts, queries) };
+          replay(facts, seed);
+          return { op: 'prefold', fold: getFoldFor(facts) };
+        }),
+      );
     } catch (err) {
       return Promise.reject(err);
     }

@@ -101,6 +101,32 @@ export function countsMarkdown(t, title = 'action') {
 }
 
 /** The commit the numbers belong to (short sha, `+dirty` when the tree has uncommitted changes). */
+/**
+ * The work meter's three counts of one action (#2873, ADR-W-210), as text: solver work in units, never seconds —
+ * all of it, the part on the page's UI thread, and the part before the figure can paint. Clock-free: comparable on
+ * any machine under any load, except where a record says a wall-clock budget cut the action short.
+ */
+export const workText = (w) => (w ? `work ${w.total.toLocaleString('en-US')} · page ${w.page.toLocaleString('en-US')} · before paint ${w.prePaint.toLocaleString('en-US')}` : '');
+/** The three counts summed over records that carry them. */
+export function workSum(rows) {
+  const t = { total: 0, page: 0, prePaint: 0, n: 0 };
+  for (const r of rows) {
+    if (!r?.work) continue;
+    t.total += r.work.total;
+    t.page += r.work.page;
+    t.prePaint += r.work.prePaint;
+    t.n += 1;
+  }
+  return t;
+}
+/** One line: the corpus's work, the share on the page and the share before the paint. */
+export function workSummary(rows, unit) {
+  const t = workSum(rows);
+  if (!t.n || !t.total) return `work: no action recorded any (${unit})`;
+  const pct = (x) => `${((100 * x) / t.total).toFixed(1)}%`;
+  return `work over ${t.n} actions: ${t.total.toLocaleString('en-US')} units (${unit}) · on the page ${pct(t.page)} · before the paint ${pct(t.prePaint)}`;
+}
+
 export function commitStamp() {
   try {
     const sha = execSync('git rev-parse --short HEAD', { cwd: REPO, encoding: 'utf8' }).trim();

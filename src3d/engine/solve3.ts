@@ -23,6 +23,7 @@ import { congruentShapes3 } from './configs3';
 import { evalAffine, openPinSymsOf, pinSymAnchor3, pinSymsOf, scalarPinOrigin3, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
 import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
+import { meterWork } from '../../shell/workMeter';
 import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
@@ -86,6 +87,7 @@ export function leastSquares(
   leastSquaresStats.solves++;
   const residuals = (y: number[]): number[] => {
     leastSquaresStats.evals++;
+    meterWork(); // #2873 (ADR-W-210): one residual evaluation is 3-D's unit of work
     return residuals0(y);
   };
   let x = [...x0];

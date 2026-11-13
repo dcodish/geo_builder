@@ -26,8 +26,10 @@
 // killed (with its process tree) and the sweep restarts at the NEXT task (the rest of that task is skipped).
 //
 // COMPARABILITY. ms / decideMs / renderMs are wall-clock timings: comparable only on a QUIET machine, same machine,
-// before vs after. The counters in every record — uncached, resolves, lmSolves, lmEvals — are CLOCK-FREE: the same
-// code gives the same counts on any machine under any load, so they are the numbers to compare across sessions.
+// before vs after. The counters in every record — work { total, page, prePaint } (the work meter's three counts,
+// #2873: residual evaluations in all, on the page, before the paint), uncached, resolves, lmSolves, lmEvals — are
+// CLOCK-FREE: the same code gives the same counts on any machine under any load, so they are the numbers to compare
+// across sessions.
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';

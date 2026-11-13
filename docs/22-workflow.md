@@ -323,7 +323,7 @@ Steps 1–3 run in the reporting session; steps 4–6 run **only in a dedicated 
 1. **File the issue** (§1) — before or in parallel with diagnosis, never "after, if I remember."
 2. **Diagnose per [docs/17](17-design-rules.md)** — reproduce from `logs/debug-log.jsonl` / prod events through the real `parse → replay` path; identify the *class*, not the instance.
 3. **Reclassify honestly:** if diagnosis shows a *missing capability* rather than a defect, relabel `bug` → `feature` and switch to the feature route (§4) — do not silently build new capability under a bug's banner.
-4. **Fix at the root** — ADR entry; unit test + the exact-utterance scenario in `scenarios.test.ts` + index in [test-scenarios.md](test-scenarios.md); full suite + `tsc -b` + build green.
+4. **Fix at the root** — ADR entry; unit test + the exact-utterance scenario in `scenarios.test.ts` + index in [test-scenarios.md](test-scenarios.md); full suite + `tsc -b` + build green. **A new or changed fixture has its solver work recorded in the same commit**: `npm run work:record -- <builder> --only <part of the file name>` (seconds), or the product's work-meter gate fails on it. A gate that fails on a **rise** is a regression until its cause is known, and is re-recorded only with the numbers in the ADR ([docs/08](08-testing-strategy.md), "The work meter"; [ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1).
 5. **Update the contract** ([ADR-W-041](06w-decisions-workspace.md#adr-w-041), §3b) — a fix that changes what the product PROMISES updates its requirements doc, one that changes HOW it is built updates its design doc, **in the same commit**. Most bug fixes restore a promise rather than change one, so most answer `none (internal)` — but the ADR must say so explicitly.
 6. **Land it:** small/contained fixes commit **directly to `main`** with `Fixes #NN` in the message (auto-closes the issue). Large, risky, or multi-session fixes go through a PR (§4 steps 4–6).
 
@@ -459,6 +459,7 @@ working tree**, and an uncommitted change in it belongs to whoever commits next.
 | New capability | requirement in the product's requirements doc (02 / 02b / 02c / 02d / 02w) + `feature` issue + PR |
 | The fix itself | commit/PR with `Fixes #NN`, root cause in the message |
 | Regression lock | fixture first (the product's fixtures folder, §9); a hand-authored scenario only for a bespoke assertion, indexed in [test-scenarios.md](test-scenarios.md) (CLAUDE.md rule 4) |
+| How much solver work a fixture's actions cost | the product's work-meter baseline, `<tree>/__tests__/work-meter/baseline.jsonl` (§9), rewritten by `npm run work:record -- <builder>` and never by hand ([docs/08](08-testing-strategy.md), "The work meter") |
 | Deploy | tag `prod/…` + [DEPLOY-LOG.md](DEPLOY-LOG.md) entry, per [RUNBOOK.md](RUNBOOK.md) |
 | Status | the issue queue, open PRs, the ADR-log tails and DEPLOY-LOG ([ADR-W-002](06w-decisions-workspace.md#adr-w-002)); never a narrative log, never CLAUDE.md |
 | A sentence the student reads | `npm run find-message -- "<text, key or engine code>"` (#2201): every locale table — 2-D `src/i18n/locales`, 3-D `src3d/i18n/locales`, suite `shell/locales`, the analytic and complex TS tables (they stay TS) — plus the inline-Hebrew ratchet's allowed files and the 2-D error bank's code → keys; prints `file · key · value`, substring matches included |
@@ -486,6 +487,7 @@ the shell switcher renders it as data, `server/__tests__/isolation.test.ts` cros
 | **Tests (local)** | `npm run test:run:2d` (= `vitest run src/ server/`) | `npm run test:run:3d` (= `vitest run src3d/ server/`) | `npm run test:run:complex` (= `vitest run src-complex/ shell/ server/`) | `npm run test:run:analytic` (= `vitest run src-analytic/ shell/ server/`) | runs in **every** lane |
 | **CI lane** | `test-2d` | `test-3d` | `test-complex` | `test-analytic` | all |
 | **Fixtures** | `src/__tests__/fixtures/` | `fixtures3/` | `src-complex/__tests__/fixtures/` | `src-analytic/__tests__/fixtures/` | — |
+| **Work-meter baseline** ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1) | `src/__tests__/work-meter/baseline.jsonl` | `src3d/__tests__/work-meter/baseline.jsonl` | `src-complex/__tests__/work-meter/baseline.jsonl` | `src-analytic/__tests__/work-meter/baseline.jsonl` | — |
 | **Save-file suffix** | `-geo` (`<name>-geo.json`, ADR-274) | `-vectors` (`<name>-vectors.json`, ADR-3D-036) | `-complex` (`<name>-complex.json`) | `-analytic` (`<name>-analytic.json`) | — |
 
 All four builders are deployed. `products.json` is the only record of deploy state (its `enabled` flag and comments); DEPLOY-LOG records each deploy. Do not restate deploy status in prose here or in any spec.

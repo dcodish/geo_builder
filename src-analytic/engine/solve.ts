@@ -22,6 +22,7 @@
  * show the least-bad one: `solve` reports that it did not converge, and the caller says so. A drawn
  * figure that violates its own givens is the defect this whole product is built to avoid.
  */
+import { meterWork } from '../../shell/workMeter';
 import { evalExpr, exprText, symbolsOf, type Env } from './expr';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import { CIRCLE_CONIC_WORDS } from '../parser/circleConicWords';
@@ -1627,7 +1628,7 @@ export interface SolveResult {
  */
 export function solveLM(
   x0: number[],
-  residuals: (x: number[]) => number[],
+  residuals0: (x: number[]) => number[],
   maxIter = 120,
   /**
    * How many LEADING coordinates are ANCHORED at `x0` (#1182, [ADR-AG-359](../../docs/06c-decisions-analytic.md#adr-ag-359)):
@@ -1637,6 +1638,12 @@ export function solveLM(
    */
   anchored = 0,
 ): SolveResult {
+  // #2873 (ADR-W-210): one residual evaluation is analytic's unit of work. The rank and the finishing solve below are
+  // handed the bare function, because each meters its own evaluations.
+  const residuals = (v: number[]): number[] => {
+    meterWork();
+    return residuals0(v);
+  };
   const n = x0.length;
   /*
    * A DETERMINED START IS NOT ANCHORED (round #2627, ruling 2026-10-30 "5 A"): with no free direction at the start
@@ -1646,7 +1653,7 @@ export function solveLM(
    */
   /** A figure solve (one that asks to anchor) is always finished by the plain step at the tight tolerance — below. */
   const finish = anchored > 0;
-  if (anchored > 0 && freeRank(x0, residuals) === 0) anchored = 0;
+  if (anchored > 0 && freeRank(x0, residuals0) === 0) anchored = 0;
   let x = [...x0];
   let lambda = 1e-3;
 
@@ -1798,7 +1805,7 @@ export function solveLM(
    * than the loop's tolerance. A determined start (not anchored) is finished the same way.
    */
   if (finish) {
-    const p = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x, residuals, POLISH_ITER));
+    const p = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x, residuals0, POLISH_ITER));
     if (cost(p.values) < f) {
       x = p.values;
       f = cost(x);
@@ -1931,7 +1938,9 @@ function gaussian(A: number[][], n: number): number[] | null {
  */
 export function freeRank(x: number[], equalities: (v: number[]) => number[]): number {
   const n = x.length;
-  if (n === 0 || equalities(x).length === 0) return n;
+  if (n === 0) return n;
+  meterWork(); // #2873: the one evaluation made here; `jacobianRank` meters its own
+  if (equalities(x).length === 0) return n;
   return Math.max(0, n - jacobianRank(x, equalities).rank);
 }
 
@@ -1960,7 +1969,12 @@ export const RANK_REL_TOL = 10 * SOLVE_TOL;
  * Every rank the analytic engine takes goes through here: `freeRank` (the DOF cue, the entailment gate, `freedomOf`)
  * and the locus tracer's `nullDirection` (docs/17 §3 chokepoint registry).
  */
-export function jacobianRank(x: number[], residuals: (v: number[]) => number[]): { rank: number; nullBasis: number[][]; sigma: number[] } {
+export function jacobianRank(x: number[], residuals0: (v: number[]) => number[]): { rank: number; nullBasis: number[][]; sigma: number[] } {
+  // #2873 (ADR-W-210): a rank's residual evaluations are solver work in the same unit as `solveLM`'s.
+  const residuals = (v: number[]): number[] => {
+    meterWork();
+    return residuals0(v);
+  };
   const n = x.length;
   const m = residuals(x).length;
   const identity = (): number[][] => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));

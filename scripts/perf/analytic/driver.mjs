@@ -29,7 +29,8 @@
 // sweep resumes at the next job.
 //
 // COMPARABILITY. Every phase value is a wall-clock timing: comparable only on a QUIET machine, same machine, before
-// vs after. `poolSlices` (background seeds walked) and `verdict` are clock-free and comparable anywhere.
+// vs after. `work` (the work meter's three counts, #2873: all the solver work, the part on the page, the part before the paint),
+// `poolSlices` (background seeds walked) and `verdict` are clock-free and comparable anywhere.
 import * as fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';

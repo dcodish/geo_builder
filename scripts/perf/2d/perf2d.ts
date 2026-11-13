@@ -9,16 +9,21 @@
 // Common: --out <dir> (default reports/perf/2d) · --jobs <file> · --scenarios <file> · --prof-dir <dir> ·
 //         --prod <events.jsonl> · --debug <debug-log.jsonl>. Streams "@@ITEM" / "@@BEGIN" / "@@REC <json>" on stdout.
 //
-// WHAT IT MEASURES. Each slice is attributed to main / worker / bg by the op that runs it in the browser
-// (src/store/geoWork.ts lanes; geoWorker.ts budgets):
+// WHAT IT MEASURES. The actions are src/__tests__/work-meter/driver2d.ts — the ONE driver this harness and the
+// work-meter gate share (#2873); its header lists each action's steps. Each slice is attributed to main / worker / bg
+// by the op that runs it in the browser (src/store/geoWork.ts lanes); this file hands the driver geoWorker.ts's own
+// bodies with its 12 s budget (`workerOps` below), charged to the worker lane:
 //   submit  = decidePreParse/decideFromParse (main, minus the prefold hook = worker 'prefold')
-//             → commitVerdict (main) → render replay (main) → meetsRequirements (main, runViewResolve's gate)
+//             → commitVerdict (main) → render (main) → meetsRequirements (main, runViewResolve's gate)
 //             → [worker autoResolve = meetsRequirements + findValidConfig(…, 12 s) + replay(found)] → render (main)
 //   another = searchAnotherView(facts, seed, _, WORKER_SEARCH_BUDGET_MS) (worker) → render (main)
-//   load    = clearReplayCaches → loadFigureText (refresh audit + smoke replay main; prefold worker) → render → resolve
-//   delete  = removeGroup (seed 0) → render replay (main, cold content) → meetsRequirements (main) → autoResolve (worker)
-//   detect  = detectAll (bg lane, caches cleared first = the detect worker's own cold memo)
-// CORPORA: the issue sequences below, src/__tests__/fixtures, the scenario corpus (scenarios-export.ts), prod sessions
+//   load    = clearReplayCaches → loadFigureText (refresh + smoke replay main; prefold worker) → render → resolve
+//             → auditLoadedFigure (main, App.tsx runLoad)
+//   edit    = runEditCommit(last row, its own text) (main) → render → resolve
+//   delete  = removeGroup (seed 0) → render (main, cold content) → meetsRequirements (main) → autoResolve (worker)
+//   detect  = detectAll (bg lane, caches cleared first = the detect worker's own cold memo), over the figure as it
+//             stood BEFORE the delete
+// CORPORA: the slow corpus (src/__tests__/work-meter/slowCorpus2d.ts: the open speed issues), src/__tests__/fixtures, the scenario corpus (scenarios-export.ts), prod sessions
 // (logs/perf-prod-events.jsonl, else the log-triage pull logs/prod-events-2d.jsonl) and the operator's dev sessions
 // (logs/debug-log.jsonl). A missing input is reported as "no data" and its corpus skipped.
 //
@@ -26,8 +31,12 @@
 // harness code runs, and only the deterministic lane is ever called. An `escalate` verdict stops there; its logged/fixture
 // commands are FOLLOWED and timed separately as the post-LLM tail (dryRunOutcome + commit + resolve).
 //
-// COMPARABILITY: every number here is a wall-clock timing — comparable only on a quiet machine, same machine, before
-// vs after. This harness records no clock-free counter; `outcome` / `clipped` (a budget was hit) are deterministic.
+// COMPARABILITY: every `*_ms` here is a wall-clock timing — comparable only on a quiet machine, same machine, before
+// vs after. `work` { total, page, prePaint } is the work meter's three counts (#2873, ADR-W-210): evaluateCore calls in
+// all, on the page's UI thread, and before the figure can paint. It is clock-free and comparable anywhere, EXCEPT on
+// an action marked `clipped`: this harness runs the browser's clock budgets (--mode production), and where a 12 s
+// search is cut depends on the machine. The suite's gate runs the same driver with NO clock, so its counts are the
+// whole search's and are exact; the two are different measurements of one action. `outcome` is deterministic too.
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,25 +47,12 @@ import { Session } from 'node:inspector';
   throw new Error('perf harness: network disabled (no LLM)');
 };
 
-import { decidePreParse, decideFromParse } from '@/app/decideDeterministic';
-import { commitVerdict } from '@/app/submitPipeline';
-import {
-  useGeoStore,
-  replay,
-  meetsRequirements,
-  findValidConfig,
-  searchAnotherView,
-  getFoldFor,
-  detectAll,
-  clearReplayCaches,
-  dryRunOutcome,
-  groupKey,
-  WORKER_SEARCH_BUDGET_MS,
-  type Fact,
-} from '@/store/geoStore';
+import { replay, meetsRequirements, findValidConfig, searchAnotherView, getFoldFor, detectAll, groupKey, WORKER_SEARCH_BUDGET_MS, type Fact } from '@/store/geoStore';
 import { rowNouns } from '@/store/rowNouns';
-import { loadFigureText } from '@/store/figureLoad';
 import { serializeFigure } from '@/store/figureFile';
+import { createDriver2d, type Snap, type WorkerOps } from '@/__tests__/work-meter/driver2d';
+import { SLOW_CORPUS_2D } from '@/__tests__/work-meter/slowCorpus2d';
+import { inWorkerLane } from '../../../shell/workMeter';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..', '..');
@@ -90,11 +86,11 @@ function corpusRows(flag: string, candidates: string[], what: string): any[] {
     });
 }
 
-type Snap = { facts: Fact[]; seed: number };
 type Step =
   | { k: 'submit'; u: string; locale: 'he' | 'en'; before?: Snap; follow?: any[] | null; occ?: number }
   | { k: 'another'; before?: Snap; occ?: number }
   | { k: 'delete'; before?: Snap; key?: string }
+  | { k: 'edit' }
   | { k: 'clear' }
   | { k: 'undo' }
   | { k: 'redo' }
@@ -120,35 +116,17 @@ function buildJobs(): Item[] {
     const key = finalKey(s);
     if (finals.has(key)) return [];
     finals.add(key);
-    return [{ k: 'load', before: s }, { k: 'presses', n: 6 }, { k: 'delete' }, { k: 'detect' }];
+    return [{ k: 'load', before: s }, { k: 'presses', n: 6 }, { k: 'edit' }, { k: 'delete' }, { k: 'detect' }];
   };
 
-  // 0. known issues / PR figure (thread mode)
+  // 0. known issues / PR figure (thread mode) — the slow corpus the work meter records too (#2873)
   const issue = (id: string, ref: string, us: string[]): Item => ({
     id: `issue:${id}`,
     source: 'issue',
     ref,
-    steps: [...us.map((u) => ({ k: 'submit' as const, u, locale: 'he' as const })), { k: 'presses', n: 6 }, { k: 'load' }, { k: 'delete' }, { k: 'detect' }],
+    steps: [...us.map((u) => ({ k: 'submit' as const, u, locale: 'he' as const })), { k: 'presses', n: 6 }, { k: 'load' }, { k: 'edit' }, { k: 'delete' }, { k: 'detect' }],
   });
-  items.push(
-    issue('2860-tangent-right-triangle', 'PR #2860 / #2831 / #2867', ['נתון מעגל O שרדיוסו 5', 'מנקודה A הוציאו משיק למעגל בנקודה B', 'OA = 13', 'משולש ישר זווית ABD', 'BD = 6']),
-    issue('2481-inscribed-square', '#2481', ['מרובע ABCD', 'AB = 3', 'BC = 4', 'ריבוע ABCD חסום במעגל']),
-    issue('2481-control', '#2481 control / #2359 square analog', ['מרובע ABCD', 'AB = 3', 'BC = 4', 'ABCD ריבוע']),
-    issue('2359-pentagon', '#2359', ['מחומש ABCDE', 'AB = 3', 'BC = 4', 'המחומש משוכלל']),
-    issue('2359-pentagon-ok', '#2359 control', ['מחומש ABCDE', 'המחומש משוכלל']),
-    issue('2295-iso-8', '#2295', ['משולש שווה שוקיים ABC', 'AB = 4', 'BC = 8']),
-    issue('2295-iso-9', '#2295', ['משולש שווה שוקיים ABC', 'AB = 4', 'BC = 9']),
-    issue('2513', '#2513', ['מעגל O', 'ריבוע ABCD חסום במעגל O', 'ריבוע חוסם את מעגל O']),
-    issue('2104-named', '#2104', ['משולש ABC', 'מעגל O', 'AB משיק למעגל בנקודה D', 'BC משיק למעגל בנקודה E', 'CA משיק למעגל בנקודה F']),
-    issue('2104-unnamed', '#2104', ['משולש ABC', 'מעגל O', 'AB משיק למעגל', 'BC משיק למעגל', 'CA משיק למעגל']),
-    issue('2104-list', '#2104', ['משולש ABC', 'מעגל O', 'הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה']),
-    issue('2104-square', '#2104', ['ריבוע ABCD', 'מעגל O', 'AB משיק למעגל בנקודה D', 'BC משיק למעגל בנקודה E', 'CA משיק למעגל בנקודה F']),
-    issue('1768-kite-area', '#1768', ['ABCD דלתון חסום במעגל', 'AB=AD', 'CB=CD', 'E על DC', 'BE⊥DC', 'AC', 'N = חיתוך BE ו-AC', 'שטח משולש NCE = שטח משולש ACD']),
-    issue('2572-chord', '#2572', ['מעגל O ברדיוס 2', 'AB מיתר במעגל', 'AB = 6']),
-    issue('2572-inscribed', '#2572', ['מעגל O ברדיוס 3', 'משולש ABC חסום במעגל O', 'AB = 8']),
-    issue('2601-incircle-reach', '#2601 / #2572 / #2538', ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O', 'AB = 4']),
-    issue('2601-566-arc', '#2601 (the #566 arc figure)', ['משולש ישר זווית ABC', 'משולש ABC חסום במעגל', 'קשת AB = קשת BC']),
-  );
+  items.push(...SLOW_CORPUS_2D.map((q) => issue(q.id, q.ref, q.lines)));
 
   // 1. fixtures (thread mode; the fixture's own group commands are followed when our lane does not commit)
   const fxDir = path.join(REPO, 'src/__tests__/fixtures');
@@ -172,7 +150,7 @@ function buildJobs(): Item[] {
     const steps: Step[] = groups.map((g) => ({ k: 'submit', u: g.facts[0].utterance ?? '', locale, follow: g.facts.map((f) => f.cmd) }));
     const snap = { facts, seed: file.seed ?? 0 };
     finals.add(finalKey(snap));
-    steps.push({ k: 'load', text }, { k: 'presses', n: 6 }, { k: 'delete' }, { k: 'detect' });
+    steps.push({ k: 'load', text }, { k: 'presses', n: 6 }, { k: 'edit' }, { k: 'delete' }, { k: 'detect' });
     items.push({ id: `fixture:${name}`, source: 'fixture', ref: name, steps });
   }
 
@@ -288,7 +266,28 @@ function buildJobs(): Item[] {
 }
 
 // ───────────────────────────── measurement ─────────────────────────────
-let figure: Snap = { facts: [], seed: 0 };
+// The actions themselves are src/__tests__/work-meter/driver2d.ts — the ONE driver this harness and the work-meter gate
+// share. This file gives it the worker's operations as a browser runs them and keeps the session bookkeeping.
+
+/** geoWorker.ts's own bodies, with its 12 s budget, charged to the worker lane: what a browser's worker runs. */
+const workerOps: WorkerOps = {
+  prefold: async (facts, seed) =>
+    inWorkerLane(() => {
+      replay(facts, seed);
+      return getFoldFor(facts);
+    }),
+  autoResolve: async (facts, seed) =>
+    inWorkerLane(() => {
+      if (meetsRequirements(facts, seed)) return 'ok' as const;
+      const found = findValidConfig(facts, seed, WORKER_SEARCH_BUDGET_MS);
+      if (!found) return null;
+      replay(found.facts, found.seed);
+      return { ...found, fold: getFoldFor(found.facts) };
+    }),
+  resample: async (facts, seed) => inWorkerLane(() => searchAnotherView(facts, seed, undefined, WORKER_SEARCH_BUDGET_MS)),
+  detect: async (facts) => inWorkerLane(() => detectAll(facts, rowNouns(facts))),
+};
+const driver = createDriver2d(workerOps, { searchBudgetMs: WORKER_SEARCH_BUDGET_MS });
 let history: Snap[] = [];
 let future: Snap[] = [];
 const loadedFinals = new Set<string>();
@@ -326,177 +325,13 @@ function stopProfile() {
   });
 }
 
-function setStore(s: Snap) {
-  useGeoStore.setState({ facts: s.facts, seed: s.seed });
-}
-function warm(s: Snap) {
-  // what the App has already paid before the student acts: the render replay and the resolve gate (main)
-  try {
-    replay(s.facts, s.seed);
-    meetsRequirements(s.facts, s.seed);
-  } catch {}
-}
-const viewOf = (s: Snap) => {
-  const d = replay(s.facts, s.seed);
-  return { construction: d.construction, positions: d.positions };
-};
-const badStatus = (s: Snap) => {
-  try {
-    const d = replay(s.facts, s.seed);
-    return Object.values(d.status).some((v) => v !== 'ok' && v !== 'disabled');
-  } catch {
-    return true;
-  }
-};
-
-/** render + resolve after a commit/load/delete: returns slices; mutates `figure`. */
-function settle(rec: any, prefix: string) {
-  let t = now();
-  replay(figure.facts, figure.seed);
-  rec[prefix + 'render_main'] = r1(now() - t);
-  t = now();
-  const ok = meetsRequirements(figure.facts, figure.seed);
-  rec[prefix + 'check_main'] = r1(now() - t);
-  if (!ok) {
-    t = now();
-    meetsRequirements(figure.facts, figure.seed); // the worker re-checks first (geoWorker.ts)
-    const found = findValidConfig(figure.facts, figure.seed, WORKER_SEARCH_BUDGET_MS);
-    if (found) replay(found.facts, found.seed);
-    const w = now() - t;
-    rec[prefix + 'autoResolve_worker'] = r1(w);
-    rec[prefix + 'autoResolve'] = found ? 'found' : 'exhausted';
-    if (w >= WORKER_SEARCH_BUDGET_MS - 50) rec.clipped = true;
-    if (found) {
-      figure = { facts: found.facts, seed: found.seed };
-      t = now();
-      replay(figure.facts, figure.seed);
-      rec[prefix + 'render2_main'] = r1(now() - t);
-    }
-  }
-}
-
-function sumSlices(rec: any) {
-  let main = 0,
-    worker = 0;
-  for (const [k, v] of Object.entries(rec)) {
-    if (typeof v !== 'number') continue;
-    if (k.endsWith('_main')) main += v;
-    else if (k.endsWith('_worker')) worker += v;
-  }
-  rec.main_ms = r1(main);
-  rec.worker_ms = r1(worker);
-  rec.total_ms = r1(main + worker);
-}
-
-async function doSubmit(st: Extract<Step, { k: 'submit' }>, rec: any) {
-  if (st.before) figure = st.before;
-  warm(figure);
-  setStore(figure);
-  rec.u = st.u;
-  rec.nfacts = figure.facts.length;
-  const view = viewOf(figure);
-  let prefold = 0;
-  const t0 = now();
-  const pre = decidePreParse(st.u, view, false);
-  let verdict: any = pre;
-  if (pre?.kind === 'store-op') {
-    const s = useGeoStore.getState();
-    const res = pre.op === 'swap' ? s.swap(pre.from, pre.to) : pre.op === 'name-centre' ? s.nameCentre(pre.from, pre.to) : pre.op === 'rename' ? s.rename(pre.from, pre.to) : s.merge(pre.from, pre.to);
-    rec.decide_main = r1(now() - t0);
-    rec.outcome = 'store-op:' + (res.ok ? 'ok' : 'fail');
-    if (res.ok) {
-      const n = useGeoStore.getState();
-      figure = { facts: n.facts, seed: n.seed };
-      settle(rec, '');
-    }
-    sumSlices(rec);
-    return;
-  }
-  if (!pre) {
-    verdict = await decideFromParse({ facts: figure.facts, seed: figure.seed, view, centresShown: false }, st.u, st.locale, {
-      prefold: async (trial, seed) => {
-        const a = now();
-        replay(trial, seed);
-        getFoldFor(trial);
-        prefold += now() - a;
-      },
-    });
-  }
-  const dt = now() - t0;
-  rec.decide_main = r1(dt - prefold);
-  if (prefold) rec.prefold_worker = r1(prefold);
-  rec.outcome = verdict.kind + (verdict.kind === 'refuse' ? ':' + verdict.category : '') + (verdict.kind === 'escalate' ? ':' + (verdict.weak ?? 'nh') : '');
-  if (verdict.kind === 'refuse' || verdict.kind === 'escalate') {
-    const lg = (verdict.logs ?? []).find((l: any) => !l.intermediate) ?? (verdict.logs ?? [])[verdict.logs?.length - 1];
-    rec.detail = String(lg?.result ?? verdict.parseReason ?? '').slice(0, 120);
-  }
-  if (verdict.kind === 'commit' || verdict.kind === 'noop') {
-    let t = now();
-    commitVerdict(verdict, st.u);
-    rec.commit_main = r1(now() - t);
-    const n = useGeoStore.getState();
-    figure = { facts: n.facts, seed: n.seed };
-    settle(rec, '');
-    sumSlices(rec);
-    return;
-  }
-  sumSlices(rec);
-  // not committed by our lane: follow the logged/fixture commands (the post-LLM tail), timed separately
-  if (st.follow && st.follow.length) {
-    try {
-      const t = now();
-      const out = dryRunOutcome(figure.facts, st.follow as any, figure.seed);
-      rec.post_dryrun_main = r1(now() - t);
-      const t2 = now();
-      useGeoStore.getState().executeMany(st.follow as any, st.u);
-      rec.post_commit_main = r1(now() - t2);
-      const n = useGeoStore.getState();
-      figure = { facts: n.facts, seed: n.seed };
-      const sub: any = {};
-      settle(sub, 'post_');
-      Object.assign(rec, sub);
-      rec.followed = out?.produced ? 'ok' : 'not-produced';
-      let pm = 0,
-        pw = 0;
-      for (const [k, v] of Object.entries(rec)) {
-        if (!k.startsWith('post_') || typeof v !== 'number') continue;
-        if (k.endsWith('_main')) pm += v;
-        else if (k.endsWith('_worker')) pw += v;
-      }
-      rec.post_main_ms = r1(pm);
-      rec.post_worker_ms = r1(pw);
-    } catch (e: any) {
-      rec.followed = 'error:' + String(e?.message ?? e).slice(0, 80);
-    }
-  }
-}
-
-function doAnother(rec: any) {
-  warm(figure);
-  rec.nfacts = figure.facts.length;
-  const t = now();
-  const found = searchAnotherView(figure.facts, figure.seed, undefined, WORKER_SEARCH_BUDGET_MS);
-  const w = now() - t;
-  rec.resample_worker = r1(w);
-  if (w >= WORKER_SEARCH_BUDGET_MS - 50) rec.clipped = true;
-  rec.outcome = found ? 'changed' : 'only-config';
-  if (found) {
-    figure = { facts: found.facts, seed: found.seed };
-    const t2 = now();
-    replay(figure.facts, figure.seed);
-    rec.render_main = r1(now() - t2);
-  }
-  sumSlices(rec);
-}
-
 async function runItem(idx: number, item: Item) {
-  clearReplayCaches();
-  useGeoStore.setState({ facts: [], seed: 0 });
-  useGeoStore.temporal.getState().clear();
-  figure = { facts: [], seed: 0 };
+  driver.reset();
   history = [];
   future = [];
   let pressNo = 0;
+  /** The figure the item last built or loaded, before a delete took a row off it: what the background sweep covers. */
+  let whole: Snap = driver.figure();
   for (let si = 0; si < item.steps.length; si++) {
     const st = item.steps[si];
     const base: any = { item: item.id, source: item.source, si, k: st.k };
@@ -504,120 +339,96 @@ async function runItem(idx: number, item: Item) {
     if ((st as any).occ && (st as any).occ > 1) base.occ = (st as any).occ;
     try {
       if (st.k === 'clear') {
-        history.push(figure);
+        history.push(driver.figure());
         future = [];
-        figure = { facts: [], seed: 0 };
+        driver.show({ facts: [], seed: 0 });
         continue;
       }
       if (st.k === 'undo') {
         if (history.length) {
-          future.push(figure);
-          figure = history.pop()!;
+          future.push(driver.figure());
+          driver.show(history.pop()!);
         }
         continue;
       }
       if (st.k === 'redo') {
         if (future.length) {
-          history.push(figure);
-          figure = future.pop()!;
+          history.push(driver.figure());
+          driver.show(future.pop()!);
         }
         continue;
       }
       if (st.k === 'submit') {
-        const prev = figure;
+        const prev = driver.figure();
         begin(idx, si, 'submit');
-        const rec: any = { ...base, k: 'submit' };
-        rec.trail = trail.slice(-12);
-        await doSubmit(st, rec);
+        driver.show(st.before ?? prev);
+        const rec: any = { ...base, k: 'submit', trail: trail.slice(-12), ...(await driver.submit(st.u, st.locale, st.follow)) };
         emit(rec);
         trail.push(st.u);
-        if (figure !== prev) {
+        if (driver.figure() !== prev) {
           history.push(prev);
           future = [];
         }
+        whole = driver.figure();
         continue;
       }
       if (st.k === 'another') {
-        if (st.before) figure = st.before;
-        if (!figure.facts.length) continue;
+        if (st.before) driver.show(st.before);
+        if (!driver.figure().facts.length) continue;
         begin(idx, si, 'another');
-        const rec: any = { ...base, press: ++pressNo, trail: trail.slice(-12) };
-        doAnother(rec);
-        emit(rec);
+        driver.show(driver.figure());
+        emit({ ...base, press: ++pressNo, trail: trail.slice(-12), ...(await driver.another()) });
+        whole = driver.figure();
         continue;
       }
       if (st.k === 'presses') {
-        if (!figure.facts.length) continue;
+        if (!driver.figure().facts.length) continue;
         for (let p = 1; p <= st.n; p++) {
           begin(idx, si, 'another#' + p);
-          const rec: any = { ...base, k: 'another', press: p, trail: trail.slice(-12) };
-          doAnother(rec);
+          driver.show(driver.figure());
+          const rec: any = { ...base, k: 'another', press: p, trail: trail.slice(-12), ...(await driver.another()) };
           emit(rec);
           if (rec.outcome === 'only-config') break;
         }
+        whole = driver.figure();
         continue;
       }
       if (st.k === 'load') {
-        const s = st.before ?? figure;
+        const s = st.before ?? driver.figure();
         if (!s.facts.length && !st.text) continue;
         const text = st.text ?? serializeFigure({ facts: s.facts, seed: s.seed });
         const fk = JSON.stringify(JSON.parse(text).facts.map((f: any) => f.cmd)) + '|' + JSON.parse(text).seed;
         if (loadedFinals.has(fk)) continue;
         loadedFinals.add(fk);
         begin(idx, si, 'load');
-        clearReplayCaches();
-        const rec: any = { ...base, nfacts: s.facts.length, trail: trail.slice(-12) };
-        let pf = 0;
-        const t = now();
-        const out = await loadFigureText(text, {
-          prefold: async (facts, seed) => {
-            const a = now();
-            replay(facts, seed);
-            const f = getFoldFor(facts);
-            pf += now() - a;
-            return f;
-          },
-        });
-        rec.load_main = r1(now() - t - pf);
-        rec.prefold_worker = r1(pf);
-        rec.outcome = out.ok ? 'ok' : 'refused:' + (out as any).reason;
-        if (out.ok) {
-          const n = useGeoStore.getState();
-          figure = { facts: n.facts, seed: n.seed };
-          settle(rec, '');
-        }
-        sumSlices(rec);
-        emit(rec);
+        emit({ ...base, nfacts: s.facts.length, trail: trail.slice(-12), ...(await driver.load(text)) });
+        whole = driver.figure();
+        continue;
+      }
+      if (st.k === 'edit') {
+        if (!driver.figure().facts.some((f) => f.utterance)) continue;
+        begin(idx, si, 'edit');
+        driver.show(driver.figure());
+        const rec = await driver.edit();
+        if (rec) emit({ ...base, trail: trail.slice(-12), ...rec });
+        whole = driver.figure();
         continue;
       }
       if (st.k === 'delete') {
-        const s = st.before ?? figure;
-        const keys = [...new Set(s.facts.map(groupKey))];
-        if (keys.length < 2) continue;
-        const key = st.key ?? keys[0];
+        const s = st.before ?? driver.figure();
+        if (new Set(s.facts.map(groupKey)).size < 2) continue;
         begin(idx, si, 'delete');
-        warm(s);
-        const rec: any = { ...base, nfacts: s.facts.length, trail: trail.slice(-12) };
-        figure = { facts: s.facts.filter((f) => groupKey(f) !== key), seed: 0 };
-        settle(rec, '');
-        sumSlices(rec);
-        emit(rec);
-        if (st.key) figure = s; // anchored: the log re-anchors anyway
+        driver.show(s);
+        const rec = await driver.remove(st.key);
+        if (rec) emit({ ...base, trail: trail.slice(-12), ...rec });
+        if (st.key) driver.show(s); // anchored: the log re-anchors anyway
         continue;
       }
       if (st.k === 'detect') {
-        const s = st.before ?? figure;
+        const s = st.before ?? whole;
         if (!s.facts.length) continue;
         begin(idx, si, 'detect');
-        clearReplayCaches();
-        const rec: any = { ...base, nfacts: s.facts.length };
-        const t = now();
-        detectAll(s.facts, rowNouns(s.facts));
-        rec.detect_bg = r1(now() - t);
-        rec.total_ms = rec.detect_bg;
-        rec.main_ms = 0;
-        rec.worker_ms = 0;
-        emit(rec);
+        emit({ ...base, ...(await driver.detect(s.facts)) });
         continue;
       }
     } catch (e: any) {
@@ -658,7 +469,7 @@ async function main() {
     for (const [i, sis] of want) {
       const max = Math.max(...sis);
       const it = items[i];
-      const steps = it.steps.map((s, si) => (sis.has(si) || (si < max && !(s as any).before && s.k !== 'load' && s.k !== 'detect' && !(s.k === 'delete' && !(s as any).key)) ? s : ({ k: 'skip' } as any)));
+      const steps = it.steps.map((s, si) => (sis.has(si) || (si < max && !(s as any).before && s.k !== 'load' && s.k !== 'detect' && s.k !== 'edit' && !(s.k === 'delete' && !(s as any).key)) ? s : ({ k: 'skip' } as any)));
       for (let r = 1; r <= runs; r++) {
         trail = [];
         confirmRun = r;

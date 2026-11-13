@@ -846,3 +846,26 @@ The images are regenerated, never edited: `scripts/render-icons.mjs` (from each 
 `seo/icon.svg`) and `scripts/render-og.mjs`, which types a figure into the running app and takes the
 app's **own «download image» output** (FR-EX-3's chrome-free export), then lays it beside the icon and
 the name read from the served `<h1>`.
+
+## The work meter ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1, #2873)
+
+`shell/workMeter.ts` is the one counter of solver work for all four builders. It lives in `shell/` because
+four engines need the same counter, lane and phase, and an engine may already import a `shell/` primitive.
+It holds no product knowledge: the caller decides what one unit is (the table is in
+[docs/08](08-testing-strategy.md), "The work meter").
+
+- `meterWork(units = 1)` — called from each builder's innermost solving function. It adds to three counters
+  that only ever grow: `total`, `page` (the unit was charged on the page's UI thread) and `prePaint` (the
+  unit was charged before the action's figure could paint).
+- **The lane.** In a real Worker the global scope says so (`globalThis instanceof WorkerGlobalScope`) and no
+  unit is page work. Everywhere else the lane is `page`, unless the work runs inside `inWorkerLane(fn)`:
+  a worker client's synchronous fallback does that, so under node the work a browser sends to its worker
+  is charged to the worker. `inWorkerLane` is synchronous and restores the lane when `fn` returns or throws.
+- **The phase.** `meterAction()` begins one student action and returns `painted()`, `unpainted()` and
+  `end()`. The action's driver calls `painted()` where the App's figure is on screen; `end()` returns the
+  three counts of the action. No builder marks its paints at run time: the phase is the driver's statement.
+- Nothing in a product reads the counters to decide anything, so the meter cannot change a verdict.
+
+The gate's shared half is `shell/__tests__/work-gate.ts`: the baseline file's format, the comparison, the
+message a fix session reads, and the re-record. Each tree's `__tests__/work-meter-gate.test.ts` hands it the
+counts of its own walk. A fifth builder adds one `meterWork()` call, a driver and a gate file.

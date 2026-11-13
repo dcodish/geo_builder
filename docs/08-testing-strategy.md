@@ -37,6 +37,7 @@ Define how Geo Builder is tested and — critically — **what must pass before 
 | `node scripts/test-tiers.mjs kinds [full\|fast]` | — | instant | The latest run's CPU by kind of test and by tree ([ADR-W-191](06w-decisions-workspace.md#adr-w-191)), from the per-file times every run keeps beside the log |
 | `npm run test:tiers` | — | instant | Which slow files have actually caught something |
 | `npm run test:exams` | the exam corpus: every replayed exam/textbook sequence, all builders (`-- --changed` = only the builders the diff touches) | **~90 s** all four, measured; per builder in [ADR-W-172](06w-decisions-workspace.md#adr-w-172) | A fix round's **per-item** exam check. Not a separate batch gate: every member already runs in `test:full`. Writes `reports/exam-run.json` |
+| `npm run work:check -- <builder>` · `work:record` · `work:report` | one builder's work-meter gate alone · re-record its baseline · the totals | 2-D ~6 min, 3-D ~5 min, analytic ~11 min, complex ~2 s for a whole builder; `--only <fixture>` takes seconds | [The work meter](#the-work-meter-adr-w-210-am-1-2873), below. Every gate already runs in `test:full` |
 | **`npm run test:docs`** | the `DOCS.json` doc-gate set | **~2 s**, 674 tests | **The gate for a DOC-ONLY change** ([ADR-W-041](06w-decisions-workspace.md#adr-w-041)). Anything touching `.ts`/`.tsx` pays `test:full`. Five product tests read a document at runtime — two BYTE-MATCH one against a code table — and `ci.yml` ignores `docs/`, so `.github/workflows/docs.yml` runs this set on the paths CI declines (#905) |
 
 **The split is measured, never hand-written.** `test:full` records the files exceeding 60 s into `reports/test-tiers.json`; `test:fast` derives its `--exclude` list from it. A newly-slow test joins the slow tier by itself — the drift that quietly undid [ADR-280](06-decisions.md#adr-280)'s 3-min suite over two weeks. The file is rewritten only when *membership* changes, so a routine green run leaves the tree clean. Commit it: the fast tier must mean the same thing on every machine.
@@ -95,6 +96,72 @@ are 2-D unless stated; the **structure** around them is workspace-wide:
   asserts the per-version coverage directly, naming any generation that lost it. The rule is the second
   half: it catches every route to the loss, not just the eager generator that revealed it. Implemented in
   3-D; the sibling trees copy the pattern when their corpora gain a second schema version.
+
+## The work meter ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1, #2873)
+
+Every builder counts its solver work in **units, never seconds**, at its innermost solving function
+(`shell/workMeter.ts`), and each tree has a gate that fails when a recorded student action does more work than
+it used to. It is the check behind [docs/17 §7](17-design-rules.md): before it, a change that made a 0.2 s
+press take 6 s was found by the operator's play.
+
+| | 2-D | 3-D | Analytic | Complex |
+| --- | --- | --- | --- | --- |
+| One unit | one `evaluateCore` call | one residual evaluation of `leastSquares` | one residual evaluation of `solveLM`, `jacobianRank` or `scanRoots` | one exact solve of a fold |
+| Gate | `src/__tests__/work-meter-gate.test.ts` | `src3d/__tests__/work-meter-gate.test.ts` | `src-analytic/__tests__/work-meter-gate.test.ts` | `src-complex/__tests__/work-meter-gate.test.ts` |
+| Baseline | `src/__tests__/work-meter/baseline.jsonl` | `src3d/__tests__/work-meter/baseline.jsonl` | `src-analytic/__tests__/work-meter/baseline.jsonl` | `src-complex/__tests__/work-meter/baseline.jsonl` |
+| Gate's wall time, measured 2026-11-13 | about 6 min | about 5 min | about 11 min | under 2 s |
+
+**What a gate does.** It walks **every** fixture of its tree through the student's actions, with the tree's
+action driver (`<tree>/__tests__/work-meter/driver*.ts`, the same code `scripts/perf/` times): re-typing each row
+(`submit#k`), one «הציגו תצורה אחרת» (`another#1`), a cold `load`, an `edit` of the last row to its own text, the
+`delete` of the first row, and in 2-D the background `detect` sweep. Each action gets three counts: `total` (all the
+work), `page` (the part on the page's UI thread, as against a worker) and `prePaint` (the part before the figure can
+paint). The baseline holds one line per figure-action, sorted, so two branches that each add a fixture merge as
+insertions. Nothing is sampled or skipped: a gate is one test file, in the slow tier, run by `npm run test:full` and by
+its product's `test:run:<product>` lane.
+
+**The rule.** An action above its baseline in **any** of the three counts fails, and the message names the
+figure, the action, the numbers and the next step. So does an action with no baseline line, a baseline line the walk
+no longer produces, and a builder whose summed `page` count rose. **The tolerance is zero**: the counts are exact (the
+same code gives the same count on any machine, in any fixture order), so any difference is a real change in what the
+code does. Each gate ends by walking two figures again, after the whole corpus and twice in a row, and asserting
+equal counts — the lock [docs/17 §7](17-design-rules.md)'s fifth rule asks for. A count **below** its baseline is
+printed, never failed.
+
+**When you run `npm run work:record`** (it is the same walk, writing the baseline; it takes the suite lock):
+
+| What happened | Command | Then |
+| --- | --- | --- |
+| You added or changed a fixture | `npm run work:record -- <builder> --only <part of its file name>` (seconds) | commit the new baseline lines with the fixture |
+| You deleted a fixture | `npm run work:record -- <builder>` | commit |
+| The gate printed that counts **fell** | `npm run work:record -- <builder>` | commit: the lower count is now the ceiling |
+| The gate **failed on a rise** | none yet. It is a regression until the cause is known: `scripts/perf/<builder>` times the same action and prints the same counts | remove the extra work; or, when it is the price of a change the operator wants, `npm run work:record -- <builder> --accept-rise` and put the before and after it prints in the change's ADR ([docs/17 §7](17-design-rules.md)) |
+
+`<builder>` is `2d`, `3d`, `analytic`, `complex` or `all`. `npm run work:check -- <builder>` runs one gate alone
+(`--order reverse` or `--order shuffle:<seed>` walks the fixtures in another order), and `npm run work:report` prints
+every builder's totals from the committed baselines. A re-record never writes a rise unless `--accept-rise` is given.
+
+**What the counts are, and are not.**
+- They are work, not time. A unit's cost differs between builders and between figures, so a count is only ever
+  compared with the same action of the same figure. Time is `scripts/perf/`'s job; its records carry the same three
+  counts, so one run gives both.
+- **2-D's gate measures the whole search, not the browser's clipped one.** Under vitest 2-D's clock budgets are off
+  (`import.meta.env.MODE === 'test'`: the search budgets in `replay/core.ts`, and since #2873 the two load budgets in
+  `store/loadAudit.ts`), which is what makes the counts exact. A browser stops a search after 12 s.
+- **2-D's `page` count is a lower bound.** Under node the page and the worker are one module instance and share one
+  memo, so a view the worker searched is a memo hit when the page draws it; a browser's worker has its own caches.
+  The lane is charged by `src/store/geoWork.ts`'s synchronous fallback, which is the work a browser sends to its worker.
+- 3-D, analytic and complex have no worker: every unit is page work today.
+- What is not counted is listed, with its measured size, in [ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1.
+
+**The slow corpus.** The open speed issues' own sequences (`<tree>/__tests__/work-meter/slowCorpus*.ts`) are too slow
+for the suite. They are walked by the same gate on demand, `npm run work:check -- <builder> --slow`, against
+`baseline-slow.jsonl` beside the fixtures' baseline (`work:record … --slow` re-records it). An optimisation session
+runs it before and after.
+
+**Adding a builder:** a `meterWork()` call at its innermost solving function, a driver and a walk under its
+`__tests__/work-meter/`, and a `work-meter-gate.test.ts` that hands them to `shell/__tests__/work-gate.ts`. The script
+finds the gate through `BOUNDARIES.json`'s trees.
 
 ## What we test, per layer
 
