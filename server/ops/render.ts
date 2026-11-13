@@ -112,6 +112,10 @@ h3{margin:4px 0;font-size:.98rem}
 .lede{color:var(--muted);margin:2px 0 0;max-width:80ch}
 .panel{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:12px;min-width:0}
 .panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.panel-head>*{min-width:0;overflow-wrap:anywhere}
+.scroll>table{min-width:620px}
+.panel>*,main>*{min-width:0;max-width:100%}
+.scroll{max-width:100%}
 .note{color:var(--muted);font-size:.84rem}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .tile{background:var(--paper);border:1px solid var(--line);border-top:4px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:2px;text-decoration:none;color:inherit}
