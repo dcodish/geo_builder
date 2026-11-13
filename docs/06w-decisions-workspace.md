@@ -7734,27 +7734,55 @@ Branch `feat/2874-working-indicator`, a feature PR (all four builders + `shell/`
 
 | Action | Before | After |
 | --- | --- | --- |
-| 2-D ordinary submit | «חושב…» 110–125 ms | the same, 150 ms, with the ring |
+| 2-D ordinary submit | «חושב…» 110–125 ms | nothing shown: it is over in 115–130 ms, inside the 0.3 s threshold (below) |
 | 2-D load (hexagon) | indicator first painted at 783 ms | at 28 ms |
 | 2-D delete / toggle of row 2 (hexagon) | about 1 s, nothing shown | «חושב…» for the whole second |
-| 3-D «\|SA\| = 5» on «ריבוע ABCD» · «קטע AS» | 2.3 s frozen, nothing shown | «חושב…» from 14 ms to the figure |
+| 3-D «\|SA\| = 5» on «ריבוע ABCD» · «קטע AS» | 2.3 s frozen, nothing shown | «חושב…» from 0.32 s to the figure |
 | 3-D «הציגו תצורה אחרת», re-enable, edit on that figure | 2.2 s each, nothing shown | shown throughout (the search on its own button) |
 | analytic «x_A > 0» after the rhombus lines | 11.5 s frozen, nothing shown | shown throughout |
 | analytic delete (8.1 s), undo (11.1 s), «הציגו תצורה אחרת» (11.7 s) | nothing shown | shown throughout |
-| complex, any action | nothing shown | «חושב…» for about 65 ms |
+| complex, any action | nothing shown | nothing shown: each is over in 50–65 ms, and would show «חושב…» if it reached 0.3 s |
 
 **The indicator moves while the page's thread is busy — measured, not assumed.** A screencast is fed by the compositor. Recorded around a slow action, with the stretch in which the page ran no animation frame taken as "its thread was busy": 3-D's submit, 2.3 s busy, 132 screencast frames inside it, 130 distinct images of the button; analytic's submit, 11.5 s busy, 682 frames, 662 distinct; analytic's delete, 8.1 s, 476 and 462; 2-D's delete, 0.97 s, 51 and 51. On `main` the same stretch has no change at all.
 
 **What this phase did not take from invariant 2.** No cancellation and no worker client (phase 3); 2-D's search keeps its own ✕. The basis stamp is carried and read by nothing: what a job commits is unchanged, and the hazard recorded above (a verdict committed onto a figure that changed meanwhile) is narrower only because a routed action now waits for the job before it.
 
-**Locks.** `shell/__tests__/work-queue-2874.test.ts` (the count, paint first, one at a time in order, release on a throw, joined work, lanes, the stamp, the guard). `shell/__tests__/fixtures/work-routing-rows.ts` with a thin lock per tree (`work-routing.test.ts`) and the meta-lock `work-routing-meta-2874.test.ts`: a store action nobody classified fails; a free action that writes a basis field fails (read from the store's own `set(…)` calls); a component that reaches a job action through the store fails; and the product's real table is driven under the basis guard. `src/app/__tests__/submit-wedge-2874.test.ts` is the reproduced wedge. Each page arms the basis guard in development: a figure that changes with no job running is reported on the console.
+**Locks.** `shell/__tests__/working-reveal-2874.test.tsx` (the threshold: a working button is off and reads its working label in its FIRST render, carries the whole look in that render, and every reveal is an animation of `opacity` alone as long as the one threshold, with no transition and no delay). `shell/__tests__/work-queue-2874.test.ts` (the count, paint first, one at a time in order, release on a throw, joined work, lanes, the stamp, the guard). `shell/__tests__/fixtures/work-routing-rows.ts` with a thin lock per tree (`work-routing.test.ts`) and the meta-lock `work-routing-meta-2874.test.ts`: a store action nobody classified fails; a free action that writes a basis field fails (read from the store's own `set(…)` calls); a component that reaches a job action through the store fails; a product that draws the working mark itself, past the shell's delayed face, fails; and the product's real table is driven under the basis guard. `src/app/__tests__/submit-wedge-2874.test.ts` is the reproduced wedge. Each page arms the basis guard in development: a figure that changes with no job running is reported on the console.
 
 **Sibling audit.** The class (a working state owned by call sites) was present in all four builders and is removed in all four. Not routed, on purpose, each a registry row with its reason: the ask lanes and the data panels (they read the figure, and 2-D's and analytic's show their own pending state), display choices, the figure's name, complex's drag of a free point.
 
+**Ruled on the first play sheet (2026-11-13), and built in the same PR.** Four questions went to the operator with the sheet, each with a recommendation; his answer to all four: *"i go with your recommendations"*.
+1. *An action pressed while the tool is working waits its turn* (recommended: keep it as built, rather than greying «בטל», delete and the rest). Ruled; nothing to build.
+2. *The indicator is shown only after about 0.3 s, so a fast action shows nothing* (recommended: yes; it changes 2-D's submit too, which blinked «חושב…» on every line). Ruled, and built here: below.
+3. *Asks and the data panel show the indicator too* (recommended: yes, as a follow-up). Ruled; filed as #2886, not built here.
+4. *2-D's second, small «חושב…» under the box* (recommended: leave it in 2-D only for now). Ruled; it stays, and waits for the same 0.3 s.
+
+**The threshold: why the page's thread cannot do the waiting.** In 3-D and analytic the thread that would count 0.3 s is the one that is busy, so a timer on it fires when the work is over. The working look is therefore put in the document and painted in the queue's first paint, INVISIBLE, and revealed by CSS animations of `opacity` alone, as long as the threshold (`WORKING_SHOWN_AFTER_MS` = 300), which the compositor runs by itself like the ring's turn:
+- `WorkingFace` (in `shell/frame/WorkingMark.tsx`) is a button's label. While working, the button's text in the document is the working label at once (what a test and a screen reader read); the idle label is drawn over it from an attribute and the two swap at the threshold. `workingDim` holds the button at full strength until then.
+- **The button has one size.** A change of size is layout, which only the page's thread can do, and on `main` it is half of the blink: «הוסף» grows from 70 to 100 px while it reads «חושב…» and the box beside it shrinks by 30 px. The working label is now centred over the face and may reach into the button's own padding, so the button is 70 px at rest and while working, and «הציגו תצורה אחרת» is 136 px in both. In the English interface the idle label is too short for that: «Add» is 90 px at rest, where it was 64.
+- The submit button and the four «הציגו תצורה אחרת» buttons take the face from the shell; no product draws the mark itself (a fault of the routing lock).
+- **2-D's second signs** (the small «חושב…» under the box, the search's progress and its ✕) change the layout when they arrive, which the compositor cannot delay. They wait for the same threshold on the page's own clock (`useShownWorking`), so they can only be late: on a line the page itself computes they arrive when its thread is free.
+
+**Measured, the threshold** (the branch's dev server, a real browser through the harness; the time is from the moment the button is switched off in the document to the first screencast frame in which most of its pixels differ from its look at rest):
+
+| Action | Worked for | Page thread's longest silence | The working look appears |
+| --- | --- | --- | --- |
+| 3-D «ריבוע ABCD», «קטע AS»; complex «w1 = 3+4i», an undo; analytic «A(1,2)»; 2-D «מעגל O», an undo; «הציגו תצורה אחרת» on a cube, a point, a triangle | 51–129 ms | 17–67 ms | never (at most 3 % of the button's pixels change, the text's anti-aliasing) |
+| 3-D «\|SA\| = 5» | 2.0 s | 2.0 s | at 320 ms, then 103 distinct frames of the ring |
+| 3-D «הציגו תצורה אחרת» on that figure | 2.0 s | 1.9 s | at 332 ms, on its own button |
+| analytic «מרחק נקודה O מהצלע DA הוא √5» | 8.1 s | 8.1 s | at 323 ms, then 448 distinct frames |
+| 2-D «ריבוע חוסם את מעגל O» | 5.6 s | 4.0 s | at 321 ms; the small line under the box at 4.0 s, when the thread is free |
+
+Before this change, on the same branch, every one of the fast actions showed «חושב…» for 65–150 ms.
+
 **What the student will see.**
-- [asked] In every tool, whenever the engine is working on something the student did, the submit button is off and reads «חושב…» from the action until the result is on screen. *"user should know the engine is working and not frozen"*
+- [asked] In every tool, whenever the engine has been working for about 0.3 s on something the student did, the submit button is greyed and reads «חושב…» until the result is on screen. *"user should know the engine is working and not frozen"*
+- [ruled] An action that is over in less than about 0.3 s shows nothing: no «חושב…», no greying, no change in the button's size. This includes 2-D's ordinary lines, which blinked «חושב…» until now. Operator, 2026-11-13, on question 2 above: *"i go with your recommendations"*.
+- [ruled] 2-D keeps its second, small «חושב…» under the box, in 2-D only; it too waits for 0.3 s, and on a line the page itself computes it arrives late, when the page is free. Operator, 2026-11-13, on question 4.
+- [ruled] The buttons no longer change size when they read «חושב…»: «הוסף» stays 70 px wide where it grew to 100, and the box beside it no longer narrows. A button that changed size at the press would be a blink on every fast action, which question 2 rules out.
+- [proposed] In the English interface the «Add» button is wider at rest: 90 px, where it was 64, and the box beside it 25 px narrower. Its working label «Thinking…» does not fit a 64 px button, and a button may not change size while the page computes. The Hebrew interface is unchanged at rest. Waits for his word; the alternative is a button that still changes size in English.
 - [2-D] It is 2-D's indicator, where 2-D shows it: the submit button for an action on the figure, and the «הציגו תצורה אחרת» button itself for that search (measured at `main`, above). Complex gains the wording «חושב…».
 - [asked] A ring beside «חושב…» keeps turning while the page computes. *"working and not frozen"*
 - [2-D] Enter is off while the tool works, and a typed line stays in the box ([ADR-W-198](#adr-w-198)): now during every action, in every tool. Measured in 3-D on the slow figure, with a row re-enabled (2 s) and «M אמצע AB» typed and entered meanwhile: `main` takes the Enter when the page thaws and adds the row; the branch leaves the line in the box, and a second Enter adds it. Saying so on that Enter is #2861 («עדיין עובד…»), ruled and not built here.
-- [proposed] An action pressed while the tool is still working (a delete during a model call, a second undo) runs when the first is done, in the order pressed. During a frozen page that was already so; during a wait on the model or on 2-D's worker it used to run at once. It follows from "one job at a time" (invariant 2) and is listed for his ruling. Measured in 2-D: «משולש ABC», then a file is loaded (8 s in the worker) and «בטל» is pressed while it loads. On `main` the undo runs at once and the session ends on the loaded figure; on the branch it runs after the load and undoes it, ending on the triangle.
+- [ruled] An action pressed while the tool is still working (a delete during a model call, a second undo) runs when the first is done, in the order pressed. During a frozen page that was already so; during a wait on the model or on 2-D's worker it used to run at once. Operator, 2026-11-13, on question 1 above: *"i go with your recommendations"*. Measured in 2-D: «משולש ABC», then a file is loaded (8 s in the worker) and «בטל» is pressed while it loads. On `main` the undo runs at once and the session ends on the loaded figure; on the branch it runs after the load and undoes it, ending on the triangle.
 

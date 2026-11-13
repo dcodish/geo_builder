@@ -97,7 +97,7 @@ import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
 import { ShareSheet } from '../shell/frame/ShareSheet';
 import { loadAnalyticSession } from './app/loadSession';
 import { ANOTHER, MODEL, actAn, armBasisGuardAn, jobStoreAn, workAn } from './app/workAn';
-import { WorkingMark, useLatest, useWorking } from '../shell/frame/WorkingMark';
+import { WorkingFace, useLatest, useWorking, workingDim } from '../shell/frame/WorkingMark';
 
 // #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
 // without the work queue shows up the first time anyone presses it.
@@ -1891,19 +1891,13 @@ export function App() {
           <div style={figureRowStyle}>
             <button
               type="button"
+              className={workingDim(resampling, 0.5)}
               style={lines.length === 0 || resampling ? rowAccentOffStyle : rowAccentStyle}
               disabled={lines.length === 0 || resampling}
               // #2874: one job on its own lane — the button reads «חושב…» and is off while it runs, as 2-D's does
               onClick={() => void workAn.runIfIdle(() => live.current.another(), { lane: ANOTHER })}
             >
-              {resampling ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  {t('thinking')}
-                  <WorkingMark />
-                </span>
-              ) : (
-                t('another')
-              )}
+              <WorkingFace working={resampling} idle={t('another')} busy={t('thinking')} />
             </button>
 
             {/* #1864 (ADR-AG-267): while the tool holds a choice the student has not stated, say so beside the button

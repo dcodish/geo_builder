@@ -18,7 +18,7 @@ import { useRef } from 'react';
 import { color, fs, radius } from '../theme';
 import type { SymbolSpec } from '../symbols';
 import { SymbolRow } from './SymbolRow';
-import { WorkingMark } from './WorkingMark';
+import { WorkingFace, workingDim } from './WorkingMark';
 
 export interface InputAreaProps {
   value: string;
@@ -29,7 +29,9 @@ export interface InputAreaProps {
   /**
    * The product is WORKING on something the student did (#2874, ADR-W-210): the submit button is off, reads
    * `busyLabel`, and carries the moving mark, which keeps turning while the page's own thread is busy. The
-   * product passes its queue's derived state (`useWorking`), never a flag of its own.
+   * product passes its queue's derived state (`useWorking`), never a flag of its own. The button is off at
+   * once; the working LOOK is shown only after `WORKING_SHOWN_AFTER_MS` (ADR-W-210 Am. 2), and the button
+   * has one size at rest and while working.
    */
   busy?: boolean;
   busyLabel?: string;
@@ -122,15 +124,8 @@ export function InputArea({
           dir={boxDir ? boxDir(value) : 'auto'}
           style={box}
         />
-        <button type="submit" disabled={busy} style={busy ? { ...send, opacity: 0.6 } : send}>
-          {busy ? (
-            <span style={busyFace}>
-              {busyLabel ?? submitLabel}
-              <WorkingMark />
-            </span>
-          ) : (
-            submitLabel
-          )}
+        <button type="submit" disabled={busy} className={workingDim(!!busy, 0.6)} style={busy ? { ...send, opacity: 0.6 } : send}>
+          <WorkingFace working={!!busy} idle={submitLabel} busy={busyLabel ?? submitLabel} slack={SEND_PAD_X - 2} />
         </button>
       </form>
       {previewText !== null && (
@@ -172,18 +167,19 @@ const box: CSSProperties = {
   border: `1px solid ${color.borderStrong}`,
   borderRadius: 9,
 };
+/** The submit button's side padding. Its working label may reach into all but 2 px of it (`WorkingFace` slack). */
+const SEND_PAD_X = 18;
 const send: CSSProperties = {
   background: color.primary,
   border: `1px solid ${color.primary}`,
   color: '#fff',
   fontWeight: 600,
   borderRadius: 9,
-  padding: '10px 18px',
+  padding: `10px ${SEND_PAD_X}px`,
   fontSize: fs.control,
   cursor: 'pointer',
   whiteSpace: 'nowrap',
 };
-const busyFace: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6 };
 const previewStyle: CSSProperties = {
   fontFamily: 'ui-monospace, Consolas, monospace',
   fontSize: fs.body,

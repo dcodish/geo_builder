@@ -87,6 +87,12 @@ describe('#2874 meta — the routing lock bites', () => {
     expect(routingFaults(withUi(`import { undoToy } from './store';\nonClick={() => undoToy()}`))).toEqual([expect.stringContaining('names the job function «undoToy»')]);
   });
 
+  it('a product that draws the working mark itself, instead of the shell’s delayed face (ADR-W-210 Am. 2)', () => {
+    const own = `{resampling ? (<span>{t('thinking')}<WorkingMark /></span>) : t('another')}`;
+    expect(routingFaults(withUi(own))).toEqual([expect.stringContaining('App.tsx: draws the working mark itself')]);
+    expect(routingFaults(withUi(`<WorkingFace working={resampling} idle={t('another')} busy={t('thinking')} />`))).toEqual([]);
+  });
+
   it('reading STATE through the store, and calling a free action, are not faults', () => {
     expect(routingFaults(withUi(`const lines = useToyStore((s) => s.lines);\nuseToyStore.getState().setName('x');\nconst n = useToyStore.getState().seed;`))).toEqual([]);
   });

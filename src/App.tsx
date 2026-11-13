@@ -101,7 +101,7 @@ import { circleMenuTitle } from '@/i18n/circleText';
 import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
 import { figureExplainer } from '@/app/studentVocabulary';
 import { ANOTHER, act, armBasisGuard, jobStore, work } from '@/app/work';
-import { WorkingMark, useWorking } from '../shell/frame/WorkingMark';
+import { WorkingFace, useShownWorking, useWorking, workingDim } from '../shell/frame/WorkingMark';
 
 // #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
 // without the work queue shows up the first time anyone presses it.
@@ -190,6 +190,11 @@ export default function App() {
   const thinking = useWorking(work);
   const llmAbortRef = useRef<AbortController | null>(null);
   const resampling = useWorking(work, ANOTHER); // «הציגו תצורה אחרת» is counted on its own lane (see `ANOTHER`)
+  // ADR-W-210 Am. 2 (ruling 2026-11-13): the working look is SHOWN only after about 0.3 s. The two buttons delay
+  // their own look on the compositor (`WorkingFace`); these are the same threshold for 2-D's second signs — the
+  // small line under the box, the search's progress and its ✕ — whose arrival moves the layout.
+  const thinkingShown = useShownWorking(thinking);
+  const resamplingShown = useShownWorking(resampling);
   const [altProgress, setAltProgress] = useState(''); // "show another configuration" search in flight (synchronous; we paint a busy state first)
   const [analysing, setAnalysing] = useState(false); // "view relations" detection in flight (synchronous; paint a busy state first)
   const [computingValues, setComputingValues] = useState(false); // #217: the values panel compute in flight (worker-side)
@@ -1417,23 +1422,17 @@ export default function App() {
               return (
                 <button
                   type="button"
+                  className={workingDim(resampling, 0.5)}
                   style={!canCycle || resampling ? rowAccentOffStyle : alt}
                   disabled={!canCycle || resampling}
                   title={t('actions.anotherHint')}
                   onClick={() => void runResample()}
                 >
-                  {resampling ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                      {t('input.loading')}
-                      <WorkingMark />
-                    </span>
-                  ) : (
-                    t('actions.another')
-                  )}
+                  <WorkingFace working={resampling} idle={t('actions.another')} busy={t('input.loading')} />
                 </button>
               );
             })()}
-            {resampling && (
+            {resamplingShown && (
               <span style={{ fontSize: 12, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {altProgress && <span>({altProgress})</span>}
                 {/* #41: real preemption — terminate the worker; the in-flight promise rejects {cancelled} */}
@@ -1449,7 +1448,7 @@ export default function App() {
             )}
             {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
             {/* #973: the same choices, as one quiet line beside the button that cycles them — the row notes carry the detail. */}
-            {unstated.length > 0 && !resampling && (
+            {unstated.length > 0 && !resamplingShown && (
               <span data-testid="unstated-choice-cue" style={{ fontSize: 12, color: '#b45309' }} title={unstated.map((c) => unstatedChoiceText(c, t)).join('\n')}>
                 {t('steps.unstatedTitle')}
               </span>
@@ -1500,8 +1499,8 @@ export default function App() {
             >
             {/* No example strip above the box (operator ruling 2026-08-18: "expensive screen
                 space"): the examples live on the CLEAN CANVAS (QuickChips) and in עזרה. */}
-            {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
-            {thinking && llmAbortRef.current && (
+            {thinkingShown && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
+            {thinkingShown && llmAbortRef.current && (
               <button
                 type="button"
                 style={{ fontSize: 12, border: 'none', background: 'none', color: '#64748b', cursor: 'pointer', textDecoration: 'underline' }}

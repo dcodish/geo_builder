@@ -1,6 +1,6 @@
 {
  "name": "feat-2874",
- "title": "#2874 — every tool shows that it is working, and the indicator keeps moving (PR, port 5174)",
+ "title": "#2874 — every tool shows that it is working once it has worked 0.3 s, and the indicator keeps moving (PR, port 5174)",
  "cases": [
   {
    "id": "T1",
@@ -8,20 +8,20 @@
    "product": "3d",
    "base": "http://localhost:5174",
    "path": "/3d.html",
-   "title": "3-D: a slow line shows «חושב…» with a turning ring, from Enter until the figure appears",
+   "title": "3-D: a slow line shows «חושב…» with a turning ring after a third of a second, until the figure appears",
    "lines": [
     "ריבוע ABCD",
     "קטע AS",
     "|SA| = 5"
    ],
-   "lookFor": "Type the three lines. On the third («|SA| = 5», about 2–4 seconds): from the moment you press Enter the «הוסף» button is grey, reads «חושב…», and the small ring beside the word KEEPS TURNING the whole time, until the figure is redrawn. Then press «הציגו תצורה אחרת»: now that button itself is grey and reads «חושב…» with the turning ring, until the figure changes.",
+   "lookFor": "Type the three lines. The first two are quick and the «הוסף» button does not change at all. On the third («|SA| = 5», about 2 seconds): a third of a second after Enter the «הוסף» button turns grey and reads «חושב…», and the small ring beside the word KEEPS TURNING until the figure is redrawn. The button keeps its size. Then press «הציגו תצורה אחרת»: now that button itself turns grey and reads «חושב…» with the turning ring, until the figure changes.",
    "before": "The page freezes for 2–4 seconds with nothing on it changing: no «חושב…», no motion.",
    "expectRows": [
     "ריבוע ABCD",
     "קטע AS",
     "|SA| = 5"
    ],
-   "_probe": "motion probe 2026-11-13, PR port: «|SA| = 5» kept the page thread busy 2.2 s; 125 screencast frames arrived inside that stretch, 123 distinct images of the button (the ring turning). «הציגו תצורה אחרת»: 2.2 s busy, 123 frames, 120 distinct. On main: 0 frames in the same stretch."
+   "_probe": "reveal probe 2026-11-13, PR port (the time from the button being switched off in the document to the first screencast frame in which most of its pixels differ from its look at rest): «ריבוע ABCD» 70 ms and «קטע AS» 53 ms, nothing shown; «|SA| = 5» worked 2.0 s with the page thread silent for 2.0 s, the look appeared at 320 ms, then 103 distinct frames of the ring; «הציגו תצורה אחרת» 2.0 s, the look at 332 ms on its own button, 93 distinct frames. «הוסף» is 70 px wide at rest and while working (on main it grows to 100)."
   },
   {
    "id": "T2",
@@ -29,11 +29,11 @@
    "product": "2d",
    "base": "http://localhost:5174",
    "path": "/",
-   "title": "2-D: «בטל» pressed while a file is still loading waits for the load, then undoes it",
+   "title": "2-D: «בטל» pressed while a file is still loading waits for the load, then undoes it (ruled 2026-11-13)",
    "lines": [
     "משולש ABC"
    ],
-   "lookFor": "A RULING IS NEEDED HERE. Type the line. Press «טען» and choose src/__tests__/fixtures/hexagon-regular-by-angles-2797.geo.json (it loads for about 8 seconds, «חושב…» with the ring). WHILE it still says «חושב…», press «בטל». On this build the press waits its turn: the hexagon appears, and then the undo takes it back, so you end on the triangle ABC. Is that what «בטל» should do during a load?",
+   "lookFor": "RULED 2026-11-13: an action pressed while the tool works waits its turn. This is that ruling on screen. Type the line. Press «טען» and choose src/__tests__/fixtures/hexagon-regular-by-angles-2797.geo.json (it loads for about 8 seconds, «חושב…» with the ring). WHILE it still says «חושב…», press «בטל». The hexagon appears, and then the undo takes it back, so you end on the triangle ABC.",
    "before": "On prod the same press runs at once: the triangle disappears while the file is still loading, and you end on the hexagon.",
    "expectRows": [
     "משולש ABC"
@@ -61,7 +61,7 @@
     }
    ],
    "cycles": 1,
-   "lookFor": "Un-ticking row 3 is quick. Ticking it again takes about 2 seconds, and for all of it «הוסף» reads «חושב…» with the ring; the three rows are there at the end. «הציגו תצורה אחרת» shows «חושב…» on its own button.",
+   "lookFor": "Un-ticking row 3 is quick and shows nothing. Ticking it again takes about 2 seconds: after a third of a second «הוסף» reads «חושב…» with the ring, until the figure; the three rows are there at the end. «הציגו תצורה אחרת» shows «חושב…» on its own button.",
    "before": "Each of these froze the page for about 2 seconds with nothing shown.",
    "expectRows": [
     "ריבוע ABCD",
@@ -81,8 +81,8 @@
     "קובייה ABCD",
     "M אמצע BB'"
    ],
-   "lookFor": "The cube and M on the edge BB′, both rows green. The button blinks «חושב…» for a moment on each line, no longer than 2-D does on its own lines.",
-   "before": "unchanged (a regression guard); the blink is new in 3-D.",
+   "lookFor": "The cube and M on the edge BB′, both rows green. The «הוסף» button does not change at all on either line: no «חושב…», no greying.",
+   "before": "unchanged (a regression guard).",
    "expectRows": [
     "קובייה ABCD",
     "M אמצע BB'"
@@ -90,7 +90,7 @@
    "expectFigure": [
     "M"
    ],
-   "_probe": "timeline probe: each fast action shows «חושב…» for 65–70 ms (2-D submit on main: 110–125 ms)."
+   "_probe": "reveal probe 2026-11-13, PR port (the time from the button being switched off in the document to the first screencast frame in which most of its pixels differ from its look at rest): a fast 3-D line works 53–70 ms and shows nothing (at most 2 % of the button's pixels change, the text's anti-aliasing)."
   },
   {
    "id": "T5",
@@ -137,7 +137,7 @@
     "קטע AS",
     "|SA| = 5"
    ],
-   "lookFor": "Un-tick row 3 and tick it again; while «חושב…» shows (about 2 seconds) type «M אמצע AB» and press Enter. Enter is off while the tool works: the line stays in the box, and a second Enter after «חושב…» is gone adds it.",
+   "lookFor": "Un-tick row 3 and tick it again; while «חושב…» shows (about 2 seconds) type «M אמצע AB» and press Enter. Enter is off while the tool works, from the tick itself: the line stays in the box, and a second Enter after «חושב…» is gone adds it.",
    "before": "The page was frozen and showed nothing; the Enter was taken when it thawed, and the line was added.",
    "expectRows": [
     "ריבוע ABCD",
@@ -161,12 +161,12 @@
     "מרחק נקודה O מהצלע DA הוא √5",
     "x_A > 0"
    ],
-   "lookFor": "Every line is accepted (six rows). The last two take about 8 and 12 seconds; for all of that time «הוסף» reads «חושב…» and the ring turns.",
+   "lookFor": "Every line is accepted (six rows). The last two take about 8 and 12 seconds; a third of a second into each, «הוסף» reads «חושב…» and the ring turns until the figure.",
    "before": "The page froze for 8–12 seconds per line with nothing shown.",
    "expect": [
     "6 נתונים"
    ],
-   "_probe": "motion probe: «x_A > 0» kept the page thread busy 11.8 s; 702 screencast frames inside it, 681 distinct images of the button."
+   "_probe": "reveal probe 2026-11-13, PR port (the time from the button being switched off in the document to the first screencast frame in which most of its pixels differ from its look at rest): «מרחק נקודה O מהצלע DA הוא √5» worked 8.1 s with the page thread silent for 8.1 s; the look appeared at 323 ms, then 448 distinct frames of the ring."
   },
   {
    "id": "T9",
@@ -246,20 +246,20 @@
    "product": "2d",
    "base": "http://localhost:5174",
    "path": "/",
-   "title": "2-D: the slow line shows «חושב…» as today, and now the ring turns",
+   "title": "2-D: the slow line shows «חושב…» as today, a third of a second in, and now the ring turns",
    "lines": [
     "מעגל O",
     "ריבוע ABCD חסום במעגל O",
     "ריבוע חוסם את מעגל O"
    ],
-   "lookFor": "Three rows. The third line takes about 5 seconds: «הוסף» reads «חושב…» as it does today, and the ring beside it turns the whole time.",
+   "lookFor": "Three rows. The first two lines are quick and «הוסף» does not change. The third takes about 5 seconds: a third of a second after Enter «הוסף» reads «חושב…», and the ring beside it turns the whole time. The small «חושב…» under the box arrives late on this line, near the end.",
    "before": "«חושב…» was shown, standing still for about 4 seconds while the page computed.",
    "expectRows": [
     "מעגל O",
     "ריבוע ABCD חסום במעגל O",
     "ריבוע חוסם את מעגל O"
    ],
-   "_probe": "motion probe: 3.9 s with the page thread busy; 228 screencast frames inside it, 224 distinct. Timeline as measured on main: «חושב…» 8–16 ms after Enter, cleared with the figure."
+   "_probe": "reveal probe 2026-11-13, PR port (the time from the button being switched off in the document to the first screencast frame in which most of its pixels differ from its look at rest): worked 5.6 s, the page thread silent for 4.0 s of it; the look appeared at 321 ms, then 304 distinct frames. The small line under the box arrived at 4.0 s, when the thread was free (it is counted on the page's own clock)."
   },
   {
    "id": "T13",
@@ -306,7 +306,7 @@
    "product": "2d",
    "base": "http://localhost:5174",
    "path": "/",
-   "title": "2-D: deleting a row and «בטל» now show «חושב…»",
+   "title": "2-D: deleting a row and «בטל» still work, and show «חושב…» only when they are slow",
    "lines": [
     "משולש ABC",
     "נקודה D על BC"
@@ -320,7 +320,7 @@
      "click": "בטל"
     }
    ],
-   "lookFor": "The row goes and comes back; both rows at the end. Each press blinks «חושב…» on «הוסף» (on a heavy figure it stays for the whole wait).",
+   "lookFor": "The row goes and comes back; both rows at the end. Neither press changes the «הוסף» button on this small figure (on a heavy figure it reads «חושב…» from a third of a second until the figure).",
    "before": "Nothing was shown for a delete or an undo (about 1 second frozen on the hexagon file).",
    "expectRows": [
     "משולש ABC",
@@ -334,7 +334,7 @@
    "product": "2d",
    "base": "http://localhost:5174",
    "path": "/",
-   "title": "2-D: editing a row in place still works, and shows «חושב…»",
+   "title": "2-D: editing a row in place still works",
    "lines": [
     "משולש ABC",
     "נקודה D על BC"
@@ -382,7 +382,7 @@
    "product": "complex",
    "base": "http://localhost:5174",
    "path": "/complex.html",
-   "title": "Complex: lines, a row off and on — nothing broke, and the blink is short",
+   "title": "Complex: lines, a row off and on — nothing broke, and nothing blinks",
    "lines": [
     "w1 = 3+4i",
     "w2 = 2cis150",
@@ -397,15 +397,15 @@
      "toggle": 4
     }
    ],
-   "lookFor": "Four rows and the five roots on their ring. Each action blinks «חושב…» on «הוסף» for a moment (about 65 ms), shorter than 2-D blinks on its own lines.",
-   "before": "Complex showed no indicator at all.",
+   "lookFor": "Four rows and the five roots on their ring. No action changes the «הוסף» button: each is over in about 60 ms.",
+   "before": "unchanged (a regression guard): complex showed no indicator, and shows none for an action this fast.",
    "expectRows": [
     "w1 = 3+4i",
     "w2 = 2cis150",
     "w = w1*w2",
     "z^5 = w^2"
    ],
-   "_probe": "timeline probe: every action (submit, show another, toggle, delete, undo) shows «חושב…» for 65–70 ms; no page error."
+   "_probe": "reveal probe 2026-11-13, PR port (the time from the button being switched off in the document to the first screencast frame in which most of its pixels differ from its look at rest): a complex submit works 54–65 ms and an undo 64 ms; nothing shown."
   },
   {
    "id": "T19",
@@ -450,6 +450,47 @@
     "w2 = 2cis150",
     "w = w1*w2"
    ]
+  },
+  {
+   "id": "T21",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "title": "2-D: an ordinary line no longer blinks «חושב…»",
+   "lines": [
+    "ריבוע ABCD",
+    "נקודה G על AD",
+    "זווית GBA = 37"
+   ],
+   "lookFor": "Type the three lines, watching the «הוסף» button. It does not change on any of them: no «חושב…», no greying, and the box beside it does not narrow for a moment. The figure is the square, G on AD and the 37° angle, as always.",
+   "before": "On every line «הוסף» blinks «חושב…» for about a tenth of a second, grows wider, and the box beside it narrows.",
+   "expectRows": [
+    "ריבוע ABCD",
+    "נקודה G על AD",
+    "∠GBA = 37"
+   ],
+   "expectFigure": [
+    "G"
+   ],
+   "_probe": "reveal probe 2026-11-13, PR port (the time from the button being switched off in the document to the first screencast frame in which most of its pixels differ from its look at rest): 2-D «מעגל O» worked 129 ms and «ריבוע ABCD חסום במעגל O» 115 ms; nothing shown. On main the same lines show «חושב…» for 110–125 ms and «הוסף» grows from 70 to 100 px."
+  },
+  {
+   "id": "T22",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "title": "English interface: the «Add» button is wider at rest (needs your word)",
+   "lines": [
+    "משולש ABC"
+   ],
+   "lookFor": "A RULING IS NEEDED HERE. Press «English» at the top. The «Add» button is 90 px wide, where it was 64, and the box beside it is 25 px narrower. It is so that the button does not change size when it reads «Thinking…». The Hebrew «הוסף» is exactly as wide as before. Is the wider «Add» acceptable?",
+   "before": "«Add» is 64 px wide at rest and grows when it reads «Thinking…».",
+   "expectRows": [
+    "משולש ABC"
+   ],
+   "_probe": "width probe 2026-11-13: main «Add» 64.3 px, PR 89.6 px, in all four builders; Hebrew «הוסף» 70 px and «הציגו תצורה אחרת» 136.4 px on both."
   }
  ]
 }

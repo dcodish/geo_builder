@@ -70,7 +70,7 @@ import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
 import { derive3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
 import { ANOTHER, MODEL, act3, armBasisGuard3, jobStore3, work3 } from './app/work3';
-import { WorkingMark, useWorking } from '../shell/frame/WorkingMark';
+import { WorkingFace, useWorking, workingDim } from '../shell/frame/WorkingMark';
 
 // #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
 // without the work queue shows up the first time anyone presses it.
@@ -1086,6 +1086,7 @@ export default function App3() {
             {/* #2874: one job on its own lane — the button reads «חושב…» and is off while it runs, as 2-D's does */}
             <button
               type="button"
+              className={workingDim(resampling, 0.5)}
               style={facts.length === 0 || resampling ? rowAccentOffStyle : rowAccentStyle}
               disabled={facts.length === 0 || resampling}
               onClick={() => {
@@ -1093,14 +1094,7 @@ export default function App3() {
                 void work3.runIfIdle(() => jobStore3().resample(), { lane: ANOTHER });
               }}
             >
-              {resampling ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  {t('input.thinking')}
-                  <WorkingMark />
-                </span>
-              ) : (
-                t('actions.another')
-              )}
+              <WorkingFace working={resampling} idle={t('actions.another')} busy={t('input.thinking')} />
             </button>
             <span style={rowSpacerStyle} />
             <button type="button" style={canUndo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo3} onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); void act3.undo(); }}>

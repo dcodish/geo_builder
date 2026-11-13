@@ -52,7 +52,7 @@ import { PolarPlane } from './render/PolarPlane';
 import { useStore } from 'zustand';
 import { useComplexStore } from './store/useComplexStore';
 import { ANOTHER, armBasisGuardCx, jobStoreCx, workCx } from './app/workCx';
-import { WorkingMark, useLatest, useWorking } from '../shell/frame/WorkingMark';
+import { WorkingFace, useLatest, useWorking, workingDim } from '../shell/frame/WorkingMark';
 
 // #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
 // without the work queue shows up the first time anyone presses it.
@@ -1051,18 +1051,12 @@ export function App() {
             <div className="figure-actions" style={figureRowStyle}>
               {/* nothing to cycle when the givens determine the figure completely (ADR-CX-020) */}
               <button
+                className={workingDim(resampling, 0.5)}
                 style={(derived2 ? !derived2.canCycle : false) || resampling ? rowAccentOffStyle : rowAccentStyle}
                 onClick={showAnotherLogged}
                 disabled={(derived2 ? !derived2.canCycle : false) || resampling}
               >
-                {resampling ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    {t('thinking')}
-                    <WorkingMark />
-                  </span>
-                ) : (
-                  t('anotherConfig')
-                )}
+                <WorkingFace working={resampling} idle={t('anotherConfig')} busy={t('thinking')} />
               </button>
               {/* #742: the row's buttons DISABLE on an empty figure, never hide (operator ruling —
                   one row behaviour in every builder; the empty canvas is blank, so the view toggle

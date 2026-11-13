@@ -6,7 +6,7 @@
  * checks live here once, each builder's thin lock hands over its own store, registry and sources, and the
  * meta-lock feeds broken stubs to the same function.
  *
- * It is a guard on the CLASS, not a list of today's actions. Three things can go wrong when someone adds
+ * It is a guard on the CLASS, not a list of today's actions. Four things can go wrong when someone adds
  * an action, and each is a fault here:
  *
  * 1. **A store action nobody classified.** The store's functions are read at RUNTIME; each must be a job
@@ -18,6 +18,9 @@
  *    outside `store/` and `app/` is scanned for the store spellings a component uses (a selector, a
  *    `getState()` call, a destructured hook) naming a job action, and for a job function imported from
  *    beside the store. A component calls the product's queued table (`act`) instead.
+ * 4. **A product that draws the working look itself** (ADR-W-210 Am. 2). The look is shown only after the
+ *    threshold, and only the shell's `WorkingFace` can do that while the page's thread is busy. A product
+ *    source that renders `<WorkingMark` shows it from the first frame, so a fast action blinks again.
  *
  * What a source scan cannot see (a store handle passed around under another name) the basis guard does,
  * at run time: `watchBasis` reports a figure that changed with no job running. Each page arms it in
@@ -147,6 +150,7 @@ export function routingFaults(s: RoutingSubject): string[] {
       if (jobs.has(member)) faults.push(`${file}: reaches the job action «${member}» through ${s.storeName} — call the queued table instead`);
     for (const fn of s.standaloneJobs ?? [])
       if (new RegExp(String.raw`\b${fn}\b`).test(text)) faults.push(`${file}: names the job function «${fn}» — call the queued table instead`);
+    if (/<WorkingMark\b/.test(text)) faults.push(`${file}: draws the working mark itself — render the shell's WorkingFace, which shows it only after the threshold`);
   }
   return faults;
 }
