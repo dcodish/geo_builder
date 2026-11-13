@@ -7527,6 +7527,9 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 >
 > "we must fix this for all tools. user should know the engine is working and not frozen"
 
+2026-11-13, in chat, on a search that is cut off before it finishes (as against one that finishes and finds nothing):
+> "we should say honestly that a solution was not found and if we should continue searching"
+
 **Requirements:** [docs/03](03-nonfunctional-requirements.md) NFR-PF-1 is the promise this serves; it is not amended here (phase 0 adds the measured budgets) · **Design:** none yet: each phase edits [docs/04w](04w-design-shell.md) and its builder's design doc in its own commit
 
 **Why (measured, 2026-11-13, `main` @ c9d2ce02; the map and the sizing sheets are on #2867).**
@@ -7584,6 +7587,6 @@ Phase 2 precedes phase 3 because a worker result has to be adopted into a conten
 **What the student will see.**
 - [asked] Every tool shows that the engine is working; the page never looks frozen. *"user should know the engine is working and not frozen"*
 - [2-D] The indicator is 2-D's «חושב…» on the submit button, and input while busy follows [ADR-W-198](#adr-w-198) and the #2861 ruling, in every tool.
-- [proposed] When a search reaches its limit the tool says it could not decide, instead of refusing the line or saying «אין תצורה אחרת — הצורה נקבעה». The wording, and whether the student may ask it to keep going, need a ruling.
+- [asked] When a search is cut off before it finishes, the tool says that no solution was found and asks whether to keep searching, instead of refusing the line or saying «אין תצורה אחרת — הצורה נקבעה». *"we should say honestly that a solution was not found and if we should continue searching"* (2026-11-13). A search that finishes and finds nothing keeps today's refusal.
 - [proposed] The longest a student may wait before that outcome. Needs a number.
 - [proposed] In 3-D, after a figure is redrawn (another configuration, load, delete), the values panel and the crossing dots may show as pending for a moment, as analytic's values do.
