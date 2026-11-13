@@ -33,6 +33,7 @@ import { groupKey, replay, useGeoStore } from '@/store/geoStore';
 import { findValidConfig, meetsRequirements } from '@/replay/core';
 import { runSetGroupEnabled, runToggleFact } from '@/app/editPipeline';
 import { runSubmit, type SubmitDeps } from '@/app/submitPipeline';
+import { createWorkQueue } from '../../../shell/work';
 
 const LINES = ['משולש ABC', 'גובה AD במשולש ABC', 'AB = 10', 'AD = 7'];
 const st = () => useGeoStore.getState();
@@ -59,15 +60,13 @@ function submitDeps(): SubmitDeps {
       setRenameNote: () => {},
       setLlmDropped: () => {},
       clearText: () => {},
-      setBusy: () => {},
     },
     view: () => {
       const s = st();
       const d = replay(s.facts, s.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit,
     llmAbortRef: { current: null },
     explainError: (raw) => raw ?? '',

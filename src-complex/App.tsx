@@ -51,6 +51,12 @@ import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { useStore } from 'zustand';
 import { useComplexStore } from './store/useComplexStore';
+import { ANOTHER, armBasisGuardCx, jobStoreCx, workCx } from './app/workCx';
+import { WorkingFace, useLatest, useWorking, workingDim } from '../shell/frame/WorkingMark';
+
+// #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
+// without the work queue shows up the first time anyone presses it.
+if (import.meta.env.DEV) armBasisGuardCx((message) => console.error(message));
 import { SYMBOLS } from './ui/symbols';
 import { AskText } from './ui/askText';
 import { RadicalText } from './render/radicalText';
@@ -76,18 +82,19 @@ export function App() {
     lastError,
     lastNote,
     loadAudit,
-    removeLine,
     display,
     toggleDisplay,
     setView,
-    nextConfig,
-    clearAll,
     serialize,
     setLoadAudit,
-    undo,
-    redo,
   } = useComplexStore();
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // #2874 (ADR-W-210): the tool is WORKING on something the student did — the work queue's derived state.
+  // Every action that re-folds the figure is a job on `workCx`: counted from the click, run after this
+  // state has been painted, and released in a `finally`.
+  const working = useWorking(workCx);
+  /** «הציגו תצורה אחרת» is counted on its own lane and shown on its own button, as 2-D shows it. */
+  const resampling = useWorking(workCx, ANOTHER);
 
   /**
    * #2241 (ADR-W-150) — the store ACTIONS, logged at the App boundary beside `submitCounted`, in the
@@ -107,18 +114,26 @@ export function App() {
     const s = useComplexStore.getState();
     logAction('load', `${s.lines.length} lines`, ok ? (s.loadAudit ? `${s.loadAudit.failed.length} failed` : 'ok') : 'refused');
   };
-  const undoLogged = () => {
-    undo();
-    logAction('undo', fingerprintNow());
-  };
-  const redoLogged = () => {
-    redo();
-    logAction('redo', fingerprintNow());
-  };
-  const showAnotherLogged = () => {
-    nextConfig();
-    logAction('show-another');
-  };
+  // #2874: each re-folds the figure — a job
+  const undoLogged = () =>
+    void workCx.run(() => {
+      jobStoreCx().undo();
+      logAction('undo', fingerprintNow());
+    });
+  const redoLogged = () =>
+    void workCx.run(() => {
+      jobStoreCx().redo();
+      logAction('redo', fingerprintNow());
+    });
+  /** One job on its own lane: the button reads «חושב…» and is off while it runs, as 2-D's does. */
+  const showAnotherLogged = () =>
+    void workCx.runIfIdle(
+      () => {
+        jobStoreCx().nextConfig();
+        logAction('show-another');
+      },
+      { lane: ANOTHER },
+    );
 
   const saveFile = () => {
     const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: 'application/json' });
@@ -209,7 +224,8 @@ export function App() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    void file.text().then((txt) => {
+    // #2874: a load re-folds the whole figure — one job (the longest wait this builder has)
+    void file.text().then((txt) => workCx.run(() => {
       let parsed: unknown;
       try {
         parsed = JSON.parse(txt);
@@ -243,7 +259,7 @@ export function App() {
       if (!loaded) useComplexStore.setState({ lastError: { key: 'parse-error', detail: file.name } });
       // the FILENAME names the figure (the #42 rule) — any name embedded in the file is provenance
       else useComplexStore.getState().setName(figureNameFromFileName(file.name, 'complex'));
-    });
+    }));
   };
   /**
    * #1238 (ADR-W-068) — the continue-or-start-fresh OFFER. ADR-W-046 stands: the builder opens
@@ -256,11 +272,13 @@ export function App() {
   /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
 
-  const openLinkCx = (payload: string) => {
-    const r = openSharedComplex(payload);
-    logLoad(r === true);
-    if (r !== true) setShareError(r);
-  };
+  // #2874: opening a link is a load — one job
+  const openLinkCx = (payload: string) =>
+    void workCx.run(() => {
+      const r = openSharedComplex(payload);
+      logLoad(r === true);
+      if (r !== true) setShareError(r);
+    });
 
   useEffect(() => {
     // A link outranks the session offer and is never shown beside it. #1373: SUBSCRIBED, not read
@@ -345,14 +363,18 @@ export function App() {
 
   const acceptOffer = () => {
     if (!offer) return;
-    const ok = restoreSessionCx(offer.payload);
-    logLoad(ok);
-    setOffer(null);
-    // Refused: name it in this product's own error voice, then stop offering what cannot open.
-    if (!ok) {
-      useComplexStore.setState({ lastError: { key: 'parse-error', detail: t('sessionOffer') } });
-      forgetSessionCx();
-    }
+    const payload = offer.payload;
+    // #2874: restoring is loading — one job
+    void workCx.run(() => {
+      const ok = restoreSessionCx(payload);
+      logLoad(ok);
+      setOffer(null);
+      // Refused: name it in this product's own error voice, then stop offering what cannot open.
+      if (!ok) {
+        useComplexStore.setState({ lastError: { key: 'parse-error', detail: t('sessionOffer') } });
+        forgetSessionCx();
+      }
+    });
   };
 
   const declineOffer = () => {
@@ -448,12 +470,13 @@ export function App() {
    * The ask ANSWERS need nothing here: `askRows` is derived from `queries` in the store, so the store
    * action already retires them. That is the shape analytic lacks, and the reason #1110 is its alone.
    */
-  const clearSession = () => {
-    clearAll();
-    logAction('clear');
-    setInput('');
-    setAskText('');
-  };
+  const clearSession = () =>
+    void workCx.run(() => {
+      jobStoreCx().clearAll();
+      logAction('clear');
+      setInput('');
+      setAskText('');
+    });
   /**
    * THE `n` STEPPER — display state, and nowhere else (ADR-CX-001 D3).
    *
@@ -546,8 +569,36 @@ export function App() {
   /** #1778 (ADR-W-125): a pasted PARAGRAPH is submitted one sentence at a time, one row each. */
   const submit = () => {
     if (input.trim() === '') return;
-    void submitTyped(input, (sentence) => (submitCounted(sentence) ? 'consumed' : 'kept'), setInput);
+    // #2874: a submit is ONE job. While the tool works a submit is not taken: Enter is off and the line
+    // stays in the box (ADR-W-198).
+    void workCx.runIfIdle(() => submitTyped(input, (sentence) => (submitCounted(sentence) ? 'consumed' : 'kept'), setInput));
   };
+  /** A line sent by a click (a chip, the guide's «try», the example): the same one job, never beside another submit. */
+  const submitLines = (rawLines: readonly string[]) => void workCx.runIfIdle(() => rawLines.forEach((l) => submitCounted(l)));
+
+  /**
+   * #2874 — THE JOB BODIES of the row actions, kept as the LATEST render defines them (`useLatest`): a job
+   * runs after the paint and after any job asked for before it, so it reads `lines` and `disabled` as they
+   * are THEN, never as they were at the click.
+   */
+  const live = useLatest({
+    toggleRow: (id: string) => {
+      const i = Number(id);
+      const unmuting = disabled.includes(i);
+      const ok = toggleLine(i);
+      logAction('toggle', `${i}:${unmuting ? 'on' : 'off'}`, ok ? undefined : (useComplexStore.getState().lastError?.key ?? 'refused'));
+    },
+    editRow: (id: string, next: string): boolean => {
+      const ok = editLine(Number(id), next);
+      // an edit rewrites a line in place, so a replay without it diverges silently
+      if (ok) logAction('edit', `${id}:${next}`);
+      return ok;
+    },
+    deleteRow: (id: string) => {
+      logAction('delete', `${id}:${lines[Number(id)] ?? ''}`);
+      jobStoreCx().removeLine(Number(id));
+    },
+  });
 
   /**
    * THE QUICK COMMANDS (D9b + A3): the operator's curated list when one is saved, the built-in
@@ -754,7 +805,7 @@ export function App() {
                 hint={t('emptyHintChips')}
                 commands={quickCommands}
                 display={(c) => complexBidi.inputPreview(c) ?? c}
-                onPick={(c) => submitCounted(c)}
+                onPick={(c) => submitLines([c])}
               />
             ) : undefined
           }
@@ -768,6 +819,8 @@ export function App() {
               onSubmit={submit}
               placeholder={t('inputPlaceholder')}
               submitLabel={t('add')}
+              busy={working}
+              busyLabel={t('thinking')}
               symbols={SYMBOLS}
               symbolTitle={(s) => (s.titleKey ? t(s.titleKey) : s.label)}
               /**
@@ -859,25 +912,13 @@ export function App() {
               }))}
               textDir={complexBidi.textDir}
               emptyHint={t('emptyHint')}
-              onToggle={(id) => {
-                const i = Number(id);
-                const unmuting = disabled.includes(i);
-                const ok = toggleLine(i);
-                logAction('toggle', `${i}:${unmuting ? 'on' : 'off'}`, ok ? undefined : (useComplexStore.getState().lastError?.key ?? 'refused'));
-              }}
+              onToggle={(id) => void workCx.run(() => live.current.toggleRow(id))}
               toggleLabel={t('factToggle')}
               editValueOf={(id) => lines[Number(id)]}
-              onEditCommit={(id, next) => {
-                const ok = editLine(Number(id), next);
-                // an edit rewrites a line in place, so a replay without it diverges silently
-                if (ok) logAction('edit', `${id}:${next}`);
-                return ok;
-              }}
+              // #2874: an edit re-folds the figure — a job; the editor waits for its answer
+              onEditCommit={(id, next) => workCx.run(() => live.current.editRow(id, next))}
               editLabel={t('factEdit')}
-              onDelete={(id) => {
-                logAction('delete', `${id}:${lines[Number(id)] ?? ''}`);
-                removeLine(Number(id));
-              }}
+              onDelete={(id) => void workCx.run(() => live.current.deleteRow(id))}
               deleteLabel={t('factDelete')}
               symbols={SYMBOLS}
               symbolTitle={(sy) => (sy.titleKey ? t(sy.titleKey) : sy.label)}
@@ -886,7 +927,7 @@ export function App() {
                 /* #739: נקה הכל moved to the under-canvas row (the one place it lives in every
                    tool); the footer keeps the example and the count. */
                 <>
-                  <button onClick={() => EXAMPLE_LINES.forEach((l) => submitCounted(l))}>{t('example')}</button>
+                  <button onClick={() => submitLines(EXAMPLE_LINES)}>{t('example')}</button>
                   <span className="count">{t('factCount', { count: lines.length })}</span>
                 </>
               }
@@ -1009,8 +1050,13 @@ export function App() {
                 spacer before the session ops), replacing this tree's bare buttons. */}
             <div className="figure-actions" style={figureRowStyle}>
               {/* nothing to cycle when the givens determine the figure completely (ADR-CX-020) */}
-              <button style={(derived2 ? !derived2.canCycle : false) ? rowAccentOffStyle : rowAccentStyle} onClick={showAnotherLogged} disabled={derived2 ? !derived2.canCycle : false}>
-                {t('anotherConfig')}
+              <button
+                className={workingDim(resampling, 0.5)}
+                style={(derived2 ? !derived2.canCycle : false) || resampling ? rowAccentOffStyle : rowAccentStyle}
+                onClick={showAnotherLogged}
+                disabled={(derived2 ? !derived2.canCycle : false) || resampling}
+              >
+                <WorkingFace working={resampling} idle={t('anotherConfig')} busy={t('thinking')} />
               </button>
               {/* #742: the row's buttons DISABLE on an empty figure, never hide (operator ruling —
                   one row behaviour in every builder; the empty canvas is blank, so the view toggle
@@ -1202,7 +1248,7 @@ export function App() {
               description: i18n.language === 'he' ? e.descHe : e.descEn,
               onTry: () => {
                 setManualOpen(false);
-                submitCounted(raw); // the RAW sentence is what the grammar reads — never the isolated form
+                submitLines([raw]); // the RAW sentence is what the grammar reads — never the isolated form
               },
             };
           }),

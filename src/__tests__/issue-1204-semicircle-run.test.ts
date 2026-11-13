@@ -26,6 +26,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { parse, buildParseCtx } from '@/parser';
 import { useGeoStore, replay } from '@/store/geoStore';
 import { runSubmit, type SubmitDeps } from '@/app/submitPipeline';
+import { createWorkQueue } from '../../shell/work';
 
 function harness() {
   const notes: string[] = [];
@@ -37,15 +38,13 @@ function harness() {
       setRenameNote: () => {},
       setLlmDropped: () => {},
       clearText: () => {},
-      setBusy: () => {},
     },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => raw ?? '',

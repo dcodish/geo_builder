@@ -47,9 +47,9 @@ export interface Figure3Props {
    *  operator's ruling ("the same interface as the 2d tool has"). Returns the refusal so the popover can
    *  say WHY nothing happened. Absent = points are not clickable and no menu exists, so this component
    *  stays a pure view for every caller that does not wire it (the #483 contract). */
-  onRenamePoint?: (from: string, to: string) => LetterRenameResult;
+  onRenamePoint?: (from: string, to: string) => LetterRenameResult | Promise<LetterRenameResult>; // #2874: awaitable — the rename is a job on the work queue
   /** #1302 / #1631: exchange two letters — the popover's offer on a taken letter. Absent = no offer. */
-  onSwapPoints?: (a: string, b: string) => LetterSwapResult;
+  onSwapPoints?: (a: string, b: string) => LetterSwapResult | Promise<LetterSwapResult>;
   /** Localised strings for that popover (i18n-injected, like `resetLabel` — this file carries no
    *  translation layer of its own). */
   renameText?: { title: string; placeholder: string; apply: string; taken: string; bad: string; takenBy?: string; swapLetters?: string };

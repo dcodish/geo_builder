@@ -14,7 +14,7 @@
  * The caller MOUNTS it per opening (a fresh `key` per point click), so the typed text, the note and the
  * offer never leak from one point to the next — 2-D's `openMenu` reset, made structural.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { color } from '../theme';
 import { afterRename, afterSwap, fillLetters, swapOffered, typedLetter, type LetterHolderView, type LetterRenameResult, type LetterSwapResult } from './letterOffer';
@@ -44,10 +44,12 @@ export interface LetterPopoverProps {
   title: ReactNode;
   /** the clicked point's label — what `onRename`/`onSwap` receive as their first letter */
   label: string;
-  /** absent = no letter input (2-D: a hidden point shows only «show label») */
-  onRename?: (from: string, to: string) => LetterRenameResult;
-  /** absent = no swap offer, even on a taken letter */
-  onSwap?: (a: string, b: string) => LetterSwapResult;
+  /** absent = no letter input (2-D: a hidden point shows only «show label»). The answer may be a promise
+   *  (#2874, ADR-W-210): a rename is a job on the product's work queue. The popover stays as it is while
+   *  the answer is pending, and a second press is not sent. */
+  onRename?: (from: string, to: string) => LetterRenameResult | Promise<LetterRenameResult>;
+  /** absent = no swap offer, even on a taken letter. Awaitable, like `onRename`. */
+  onSwap?: (a: string, b: string) => LetterSwapResult | Promise<LetterSwapResult>;
   strings: LetterPopoverStrings;
   onClose: () => void;
   /** the longest label the product can type (2-D 3 — `C12`; 3-D 4 — `C12'`) */
@@ -81,10 +83,19 @@ export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, st
   const [note, setNote] = useState<'taken' | 'bad' | null>(null);
   const [takenBy, setTakenBy] = useState<{ holder: LetterHolderView; to: string } | null>(null);
 
-  function apply() {
+  const pending = useRef(false);
+
+  async function apply() {
     const to = typedLetter(value);
-    if (!to || !onRename) return;
-    const out = afterRename(onRename(label, to), to);
+    if (!to || !onRename || pending.current) return;
+    pending.current = true;
+    let res: LetterRenameResult;
+    try {
+      res = await onRename(label, to);
+    } finally {
+      pending.current = false;
+    }
+    const out = afterRename(res, to);
     if (out.close) return onClose();
     setNote(out.note);
     setTakenBy(out.takenBy);
@@ -98,9 +109,16 @@ export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, st
    * renamed onto the freed letter; operator ruling 2026-09-18: *"deleting a phase is a capability I do not
    * want to have automatically done as users will not expect the consequences."* A swap destroys nothing.
    */
-  function swap() {
-    if (!takenBy || !onSwap) return;
-    const out = afterSwap(onSwap(label, takenBy.to));
+  async function swap() {
+    if (!takenBy || !onSwap || pending.current) return;
+    pending.current = true;
+    let res: LetterSwapResult;
+    try {
+      res = await onSwap(label, takenBy.to);
+    } finally {
+      pending.current = false;
+    }
+    const out = afterSwap(res);
     if (out.close) return onClose();
     setNote(out.note);
   }
@@ -145,12 +163,12 @@ export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, st
                 if (takenBy) setTakenBy(null);
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') apply();
+                if (e.key === 'Enter') void apply();
                 if (e.key === 'Escape') onClose();
               }}
               style={{ width: 64, padding: '3px 6px', fontSize: 13, borderRadius: 6, border: `1px solid ${color.borderStrong}`, textTransform: 'uppercase' }}
             />
-            <button type="button" style={letterPopoverBtn} title={strings.apply} aria-label={strings.apply} onClick={apply}>
+            <button type="button" style={letterPopoverBtn} title={strings.apply} aria-label={strings.apply} onClick={() => void apply()}>
               ✓
             </button>
           </div>
@@ -161,7 +179,7 @@ export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, st
             {/* #238: the holder, in the student's OWN wording — a step row they can recognise. */}
             <span>{fillLetters(strings.takenBy, { what: takenBy.holder.text })}</span>
             {onSwap && swapOffered(takenBy.holder) && (
-              <button type="button" data-testid={testId ? `${testId}-swap` : undefined} style={{ ...letterPopoverBtn, textAlign: 'start' }} onClick={swap}>
+              <button type="button" data-testid={testId ? `${testId}-swap` : undefined} style={{ ...letterPopoverBtn, textAlign: 'start' }} onClick={() => void swap()}>
                 {fillLetters(strings.swapLetters, { a: label, b: takenBy.to })}
               </button>
             )}

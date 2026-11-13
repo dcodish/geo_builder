@@ -4,8 +4,8 @@
  * tests and was only hand-mirrored by the scenario harness).
  *
  * This is a FAITHFUL move of App's `submit()`: the store is the same singleton (`useGeoStore`),
- * and everything UI-side (notes, busy spinner, text field, the display view the parser context
- * reads, post-commit auto-resolve) is injected via {@link SubmitDeps}. The pipeline owns the
+ * and everything UI-side (notes, text field, the display view the parser context reads, post-commit
+ * auto-resolve) is injected via {@link SubmitDeps}, with the work queue the submit runs on as a job (#2874). The pipeline owns the
  * ROUTING: store-ops (swap/rename/merge/name-centre) before the parser; the deterministic grammar
  * with the #186 circle auto-bind loop; the clarification refusals; the honesty-gate battery; the
  * dry-run gates; and the LLM second attempt with the same gate battery on its output (ADR-240).
@@ -56,6 +56,7 @@ import { renderNote } from './renderNote';
 import { studentVocabulary } from './studentVocabulary';
 import { boxAfterSubmit, splitSentences, submitSentences, type BoxUpdate, type SentenceOutcome } from '../../shell/sentences';
 import type { CevianHost } from '../../shell/cevianHost';
+import type { Job, WorkQueue } from '../../shell/work';
 
 export interface SubmitUi {
   setInputNote(msg: string): void;
@@ -76,7 +77,6 @@ export interface SubmitUi {
    * only when `editText` is absent.
    */
   setText?(text: string): void;
-  setBusy(busy: boolean): void;
   /**
    * #1467 (ADR-769, ADR-W-162): the «נוצרה נקודה חדשה …» notice — the points the committed line created by reference,
    * and the row (its group key) whose removal is the notice's ✕. Null clears it. Optional: a headless driver omits it.
@@ -97,19 +97,23 @@ export interface SubmitDeps {
   /** The DISPLAY view (construction+positions incl. the ADR-293 never-blank fallback) — what the
    *  parser context and the LLM figure context read. NOT necessarily the raw current replay. */
   view(): { construction: Construction; positions: Map<Id, Vec> };
-  /** A submit is already in flight (E3) — chips/enter can't race a second one. */
-  isBusy(): boolean;
+  /**
+   * #2874 (ADR-W-210 phase 1): THE WORK QUEUE. A submit is one job on it — the working indicator is the queue's
+   * derived state, painted before the solve and released in a `finally`, so no exit of this pipeline can leave the
+   * tool busy. While the queue works a submit is not taken (E3; Enter is off, ADR-W-198): chips and Enter cannot
+   * race a second one. The App passes the page's queue; a test passes `createWorkQueue()`, whose paint resolves at once.
+   */
+  work: WorkQueue<unknown>;
   /**
    * #2362 ([ADR-748](../../docs/06-decisions.md#adr-748)): «הציגו מרכזי מעגלים» is on as the line is typed — the store's
    * display preference (ADR-059), read at the seam and written into the line's facts, never read by replay. Optional:
    * absent = off, the product default.
    */
   centresShown?(): boolean;
-  /** Two animation frames so the spinner paints before a heavy synchronous solve. */
-  nextPaint(): Promise<void>;
-  /** The post-commit auto-resolve (worker config search + view rewrite, one undo entry). A paragraph's chain
-   *  awaits it before its next sentence (#1778), so the next sentence reads the figure the search settled. */
-  resolveAfterCommit(): void;
+  /** The post-commit auto-resolve (worker config search + view rewrite, one undo entry). It belongs to the
+   *  submit's job (`job.join`): the tool stays working until the search settles. A paragraph's chain awaits it
+   *  before its next sentence (#1778), so the next sentence reads the figure the search settled. */
+  resolveAfterCommit(): unknown;
   /** Shared abort slot so the UI's cancel button reaches the in-flight LLM call. */
   llmAbortRef: { current: AbortController | null };
   /** Humanized engine error + retry hint (display-layer concern, injected). `said` is the student's
@@ -160,12 +164,19 @@ function commitLine(batch: AnyCommand[], statements: readonly AnyCommand[], utte
  */
 export async function runSubmit(utterance: string, submitDeps: SubmitDeps): Promise<void> {
   const deps: BoxDeps = { ...submitDeps, ui: boxUi(submitDeps.ui, utterance) };
+  if (deps.work.working()) return; // the tool is working (E3) — chips/enter can't race a second submit; the line stays in the box
   const sentences = splitSentences(utterance);
-  if (!sentences) return runSentence(utterance, deps);
-  if (deps.isBusy()) return; // a submit is already in flight (E3)
-  const box = await submitSentences(sentences, (text, i) => chainSentence(text, i, deps));
-  if (box) deps.ui.setText?.(box);
-  else deps.ui.clearText();
+  if (!sentences) {
+    const pre = openSentence(utterance, deps);
+    if (pre === 'answered') return; // a format guide: answered at once, no solve, nothing to wait for
+    return deps.work.run((job) => runSentence(utterance, deps, job, pre));
+  }
+  // a pasted paragraph is ONE student action: one job, its sentences in order inside it
+  await deps.work.run(async (job) => {
+    const box = await submitSentences(sentences, (text, i) => chainSentence(text, i, deps, job));
+    if (box) deps.ui.setText?.(box);
+    else deps.ui.clearText();
+  });
 }
 
 /** The UI as the pipeline's sentences write it: the box's two writes always present. */
@@ -198,15 +209,15 @@ function boxUi(ui: SubmitUi, submitted: string): BoxUi {
  * the caller's display view is the one painted before the paste — and the post-commit search is awaited, so
  * it never sees a figure mid-rewrite.
  */
-async function chainSentence(text: string, i: number, deps: BoxDeps): Promise<SentenceOutcome> {
+async function chainSentence(text: string, i: number, deps: BoxDeps, job: Job): Promise<SentenceOutcome> {
   let outcome: SentenceOutcome = 'kept';
-  let settling: void | Promise<void> = undefined;
+  let settling: unknown = undefined;
   const storeView = () => {
     const st = useGeoStore.getState();
     const d = replay(st.facts, st.seed);
     return { construction: d.construction, positions: d.positions };
   };
-  await runSentence(text, {
+  const own: BoxDeps = {
     ...deps,
     ui: {
       ...deps.ui,
@@ -217,23 +228,74 @@ async function chainSentence(text: string, i: number, deps: BoxDeps): Promise<Se
         outcome = { prefill };
       },
     },
-    isBusy: () => false,
     view: i === 0 ? deps.view : storeView,
     resolveAfterCommit: () => {
       settling = deps.resolveAfterCommit();
     },
-  });
+  };
+  const pre = openSentence(text, own);
+  if (pre !== 'answered') {
+    if (i > 0) await job.paint(); // the rows a paragraph has built so far are painted before its next sentence solves
+    await runSentence(text, own, job, pre);
+  }
   await settling;
   return outcome;
 }
 
-async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
-  const { t, locale, ui } = deps;
-  if (deps.isBusy()) return; // a submit is already in flight (E3) — chips/enter can't race a second one
+/** A store operation the pre-parse read off the sentence (a swap, a rename, a merge, a centre's name). */
+type StoreOp = Extract<NonNullable<ReturnType<typeof decidePreParse>>, { kind: 'store-op' }>;
+
+/** The pipeline's log line for one sentence. */
+const sentenceLog = (utterance: string, locale: 'he' | 'en') => (e: DecideLog) => logDebug({ kind: 'input', utterance, locale, ...e });
+
+/**
+ * #1849 (ADR-602): a refusal at the door names the OTHER side too, when the fold could name one. The dry run's
+ * status carries the same `[vs #i]` tail the banner resolves (ADR-508), indexed into the committed facts the
+ * trial array shares — so the note says «AC = 8» סותר את «משולש ABC» instead of «AC = 8» against "an earlier given".
+ * #2173 (ADR-726): a step's second tip (`also`) is shown after the first, on the same line.
+ * #2201 phase 3b (ADR-W-130 Am. 1): one rendering for both kinds of note (`renderNote`), and the key note's params
+ * pass the same provenance check as a refusal's values, against the figure the student is looking at.
+ */
+const sentenceNote =
+  (utterance: string, deps: BoxDeps) =>
+  (n: DecideNote): string => {
+    const facts = useGeoStore.getState().facts;
+    return renderNote(n, {
+      t: deps.t,
+      said: utterance,
+      explain: (raw) => deps.explainError(raw, utterance, otherUtteranceForError(useGeoStore.getState().facts, raw)),
+      vocab: studentVocabulary(deps.view().construction, [...facts.filter((f) => f.enabled).map((f) => f.utterance), utterance]),
+      circles: circleRefs(deps.view().construction), // #2305 M3 (ADR-760): a question's circles named by the seam
+    });
+  };
+
+/**
+ * THE DOOR of one sentence, before any job: the last line's notes are cleared, and the pre-parse runs. A FORMAT
+ * guide (LaTeX, a negation) is answered here and now — no solve, so no job and no working indicator — and the
+ * door says `'answered'`. Anything else goes on to {@link runSentence} inside a job, carrying the store operation
+ * the pre-parse read, if it read one.
+ */
+function openSentence(utterance: string, deps: BoxDeps): 'answered' | StoreOp | null {
+  const { ui } = deps;
   ui.setInputNote('');
   ui.setLlmDropped([]);
   ui.setRenameNote('');
   ui.setCreatedNotice?.(null); // #1467: the notice speaks for the last line only
+  const pre = decidePreParse(utterance, deps.view(), deps.centresShown?.());
+  if (!pre || pre.kind === 'store-op') return pre;
+  // a pre-parse FORMAT guide (LaTeX, a negation): answered before the working indicator is painted
+  const log = sentenceLog(utterance, deps.locale);
+  for (const e of pre.logs) log(e);
+  if (pre.kind === 'refuse') ui.setInputNote(sentenceNote(utterance, deps)(pre.note));
+  return 'answered';
+}
+
+/**
+ * One sentence, INSIDE its job (#2874, ADR-W-210): the queue has already painted the working indicator, and it
+ * releases it when this returns or throws, after the post-commit search this joins to the job.
+ */
+async function runSentence(utterance: string, deps: BoxDeps, job: Job, pre: StoreOp | null): Promise<void> {
+  const { t, locale, ui } = deps;
   const store = () => useGeoStore.getState();
   const parseCtxNow = () => {
     const v = deps.view();
@@ -245,25 +307,12 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
    * — the store operation, the auto-binds, the commit — and shows its note. The branch comments live
    * with the decision now.
    */
-  const log = (e: DecideLog) => logDebug({ kind: 'input', utterance, locale, ...e });
-  // #1849 (ADR-602): a refusal at the door names the OTHER side too, when the fold could name one. The dry run's
-  // status carries the same `[vs #i]` tail the banner resolves (ADR-508), indexed into the committed facts the
-  // trial array shares — so the note says «AC = 8» סותר את «משולש ABC» instead of «AC = 8» against "an earlier given".
-  // #2173 (ADR-726): a step's second tip (`also`) is shown after the first, on the same line.
-  // #2201 phase 3b (ADR-W-130 Am. 1): one rendering for both kinds of note (`renderNote`), and the key note's params
-  // pass the same provenance check as a refusal's values, against the figure the student is looking at.
-  const noteText = (n: DecideNote): string =>
-    renderNote(n, {
-      t,
-      said: utterance,
-      explain: (raw) => deps.explainError(raw, utterance, otherUtteranceForError(store().facts, raw)),
-      vocab: studentVocabulary(deps.view().construction, [...store().facts.filter((f) => f.enabled).map((f) => f.utterance), utterance]),
-      circles: circleRefs(deps.view().construction), // #2305 M3 (ADR-760): a question's circles named by the seam
-    });
+  const log = sentenceLog(utterance, locale);
+  const noteText = sentenceNote(utterance, deps);
 
-  const pre = decidePreParse(utterance, deps.view(), deps.centresShown?.());
-  if (pre?.kind === 'store-op') {
-    // A store operation is not geometry: it runs here, before the parser, and never enters the figure.
+  if (pre) {
+    // A store operation is not geometry: it runs here, before the parser, and never enters the figure. It re-solves
+    // the figure all the same, so it runs inside the job like any other line (#2874).
     const { op, from, to } = pre;
     const res =
       op === 'swap' ? store().swap(from, to)
@@ -282,20 +331,11 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
     else ui.setRenameNote(t(`input.${op === 'swap' ? 'swap' : op === 'merge' ? 'merge' : 'rename'}_${res.reason}`, { from, to }));
     return;
   }
-  if (pre) {
-    // a pre-parse FORMAT guide (LaTeX, a negation): answered before the spinner is painted
-    for (const e of pre.logs) log(e);
-    if (pre.kind === 'refuse') ui.setInputNote(noteText(pre.note));
-    return;
-  }
   // From here on the path runs SYNCHRONOUS solves — the dry-run, the commit replay, and (last) the
   // LLM call — that can take a few seconds on a hard/over-constrained figure (e.g. an impossible
-  // "AD>BC"), freezing the UI. Paint the "thinking" state FIRST and yield a frame so the spinner is
-  // visible from the moment Submit is pressed until the answer (operator) — the same treatment the
-  // "show another configuration" path already gets. Cleared on every synchronous exit below; the
-  // commit paths hand off to `resolveAfterCommit`, which owns the spinner through any auto-resolve.
-  ui.setBusy(true);
-  await deps.nextPaint();
+  // "AD>BC"), freezing the UI. The job's queue painted the working state FIRST (the operator: visible
+  // from the moment Submit is pressed until the answer), and it clears it on every exit below, a throw
+  // included; the commit paths join `resolveAfterCommit` to the job, so it stays through any auto-resolve.
   const st0 = store();
   const verdict = await decideFromParse({ facts: st0.facts, seed: st0.seed, view: deps.view(), centresShown: deps.centresShown?.() }, utterance, locale, {
     // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
@@ -325,7 +365,6 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
       ui.setInputNote(noteText(verdict.note));
       // #1611: a taught sentence that was PROVED to build replaces the text; any other refusal keeps it
       if (verdict.prefill !== undefined) ui.setText?.(verdict.prefill);
-      ui.setBusy(false);
       return; // keep the text so the student can edit it
     case 'commit':
       // One utterance → one BATCH commit (one group id, one set, ONE undo entry — E4/STO-4).
@@ -337,14 +376,13 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
       for (const e of verdict.logs) log(e);
       if (verdict.note) ui.setInputNote(noteText(verdict.note));
       ui.clearText();
-      deps.resolveAfterCommit();
+      job.join(deps.resolveAfterCommit());
       return;
     case 'noop':
       commitVerdict(verdict, utterance); // #1697: a naming that changed the figure is a row that owns it
       for (const e of verdict.logs) log(e);
       if (verdict.note) ui.setInputNote(noteText(verdict.note));
       ui.clearText();
-      ui.setBusy(false);
       return;
     case 'escalate':
       for (const e of verdict.logs) log(e);
@@ -352,9 +390,9 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   }
   const weak = verdict.weak;
   // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
-  // using the current figure as context. The spinner is already up (painted at the top of submit) and
-  // stays up across the network call AND the post-LLM dry-run/commit below; it's cleared on the
-  // not-understood return and by `resolveAfterCommit` on success.
+  // using the current figure as context. The working state is already up (the job painted it first) and
+  // stays up across the network call AND the post-LLM dry-run/commit below; the queue clears it when the
+  // job ends — on the not-understood return, and after the joined `resolveAfterCommit` on success.
   const boundView = () => {
     if (!bindCmds.length) return deps.view();
     const st = store();
@@ -377,7 +415,7 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
     v.construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
   );
   // Abortable + bounded (E3/STO-3): a hung proxy aborts after ~15 s, and the student can cancel —
-  // either way the spinner clears instead of hanging forever.
+  // either way the job ends and the working state clears instead of hanging forever.
   const controller = new AbortController();
   deps.llmAbortRef.current = controller;
   const timeout = setTimeout(() => controller.abort(), 15_000);
@@ -405,7 +443,6 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   if (out === null && controller.signal.aborted) {
     logDebug({ kind: 'input', utterance, locale, source: 'limit', result: 'aborted-or-timeout', intermediate: true });
     ui.setInputNote(t('input.serviceBusy'));
-    ui.setBusy(false);
     return;
   }
   // The proxy is throttling (global daily cost ceiling or per-IP limit) — NOT a parse failure. Show a
@@ -414,7 +451,6 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   if (out?.busy) {
     logDebug({ kind: 'input', utterance, locale, source: 'limit', result: out.busy });
     ui.setInputNote(t('input.serviceBusy'));
-    ui.setBusy(false);
     return;
   }
   // RE-READ the store after the await (E3/STO-3): the dry-run below must run against the CURRENT
@@ -448,7 +484,6 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
     if (scope) {
       logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${scope.category}` });
       ui.setInputNote(t(scope.messageKey));
-      ui.setBusy(false);
       return;
     }
     // A genuine gap — but if the input packed several statements into one line (a shape AND a point AND an
@@ -458,14 +493,12 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
     if (looksCompound(utterance)) {
       logDebug({ kind: 'input', utterance, locale, source: 'llm', result: 'not-understood-compound' });
       ui.setInputNote(t('input.tooManyParts'));
-      ui.setBusy(false);
       return;
     }
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: out && out.built.length ? 'built-nothing' : 'not-understood' });
     // "produced nothing even after a retry" gets the explicit problem message; pure out-of-grammar
     // (the grammar never matched) keeps the gentler "couldn't read that — try an example".
     ui.setInputNote(t(weak ? 'input.producedNothing' : 'suite.refusal.notUnderstood'));
-    ui.setBusy(false);
     return;
   }
   // #779 — the convention nudge holds on the LLM path too (the ADR-240 pattern: the second attempt
@@ -478,7 +511,6 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
     if (fold) {
       logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:lowercase-labels', commands: llmCmds });
       ui.setInputNote(t('input.scope.lowercase-labels', { corrected: fold.corrected }));
-      ui.setBusy(false);
       return;
     }
   }
@@ -561,7 +593,6 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   if (stillDropped.length > 0) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });
     ui.setInputNote(t('input.labelsDropped', { labels: stillDropped.join(', ') }));
-    ui.setBusy(false);
     return;
   }
   // The MIRROR gate (#255): every gate above asks what the decomposition LOST. None asked what it
@@ -587,7 +618,6 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   if (invented.length > 0) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `invented-labels:${invented.join(',')}`, commands: llmCmds });
     ui.setInputNote(t('input.labelsInvented', { labels: invented.join(', ') }));
-    ui.setBusy(false);
     return;
   }
   // #2518 (ADR-784): the impossible-side refusal holds on this lane too (the ADR-240 pattern); the offer is built from
@@ -596,7 +626,6 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   if (wrongSide) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: wrongSide.result, commands: llmCmds });
     ui.setInputNote(t(wrongSide.messageKey, wrongSide.params));
-    ui.setBusy(false);
     return;
   }
   // The LLM understood the (often Hebrew) input and decomposed it into canonical steps; show it as
@@ -613,5 +642,5 @@ async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out!.built.map((g) => g.step), dropped: out!.dropped, commands: llmCmds, ...(out!.restored ? { restored: out!.restored } : {}) });
   ui.setLlmDropped(out!.dropped);
   ui.clearText();
-  deps.resolveAfterCommit();
+  job.join(deps.resolveAfterCommit());
 }

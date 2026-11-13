@@ -28,6 +28,7 @@ import { replay, useGeoStore } from '@/store/geoStore';
 import { classifyOutOfScope } from '@/parser';
 import i18n from '@/i18n';
 import { studentFacingViolations } from '../../../shell/studentText';
+import { createWorkQueue } from '../../../shell/work';
 
 function makeDeps(locale: 'he' | 'en') {
   const calls = { notes: [] as string[], cleared: 0 };
@@ -35,14 +36,13 @@ function makeDeps(locale: 'he' | 'en') {
   const deps: SubmitDeps = {
     t,
     locale,
-    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++, setBusy: () => {} },
+    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++ },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => String(raw),

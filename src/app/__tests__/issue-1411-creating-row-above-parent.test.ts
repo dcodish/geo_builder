@@ -28,6 +28,7 @@ import { humanizeError } from '@/i18n/humanizeError';
 import { foldStats, groupKey, replay, useGeoStore, type Fact } from '@/store/geoStore';
 import { runSubmit, type SubmitDeps } from '@/app/submitPipeline';
 import type { Vec } from '@/engine';
+import { createWorkQueue } from '../../../shell/work';
 
 const st = () => useGeoStore.getState();
 const notes: string[] = [];
@@ -41,15 +42,13 @@ function deps(): SubmitDeps {
       setRenameNote: () => {},
       setLlmDropped: () => {},
       clearText: () => {},
-      setBusy: () => {},
     },
     view: () => {
       const s = st();
       const d = replay(s.facts, s.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => raw ?? '',

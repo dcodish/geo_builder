@@ -20,6 +20,7 @@ import { POLYGON_NAME_ARITY } from '@/parser/parse';
 import { isGeoPoint } from '@/engine';
 import i18n from '@/i18n';
 import { NEAR_MISS_ROWS } from '../../../shell/__tests__/fixtures/honesty-rows';
+import { createWorkQueue } from '../../../shell/work';
 
 let modelCalls = 0;
 let canned: string[] = [];
@@ -44,14 +45,13 @@ function makeDeps() {
   const deps: SubmitDeps = {
     t,
     locale: 'he',
-    ui: { setInputNote: (m) => { if (m) notes.push(m); }, setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => cleared++, setBusy: () => {} },
+    ui: { setInputNote: (m) => { if (m) notes.push(m); }, setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => cleared++ },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => String(raw),

@@ -50,7 +50,7 @@ reading, with one implementation and two consumers.
 
 | Layer | Modules | What they are |
 |---|---|---|
-| **Primitives** | `theme.ts` · `bidi.ts` · `i18n.ts` · `format.ts` · `math.tsx` · `symbols.ts` · `save.ts` · `switcherConfig.ts` | Pure, no React, no product knowledge. Design tokens, bidi isolation, the i18n bootstrap, number/math display, the save envelope, the config overlay merge |
+| **Primitives** | `theme.ts` · `bidi.ts` · `i18n.ts` · `format.ts` · `math.tsx` · `symbols.ts` · `save.ts` · `switcherConfig.ts` · `work.ts` (the work queue, below) | Pure, no React, no product knowledge. Design tokens, bidi isolation, the i18n bootstrap, number/math display, the save envelope, the config overlay merge |
 | **Frame** | `AppFrame` · `Workbench` · `Switcher` · `InputArea` · `FactList` · `DataPanel` · `AskLane` · `SymbolRow` · `QuickChips` · `Banner` (`error`, `notice`, `info`) · `InfoNote` (the ⓘ on the `info` strip, [ADR-W-180](06w-decisions-workspace.md#adr-w-180); `NarrowingNote` is its name for the narrowing family) · `ManualScreen` · `Modal` · `ToolButton` · `FigureName` | React components implementing the D1–D10 rulings ([02w, *Suite rulings*](02w-requirements-workspace.md), moved from docs/28 §4a), each taking its product-shaped content as a slot |
 | **Export** | `export/svgToPng.ts` · `export/questionDoc.ts` | The shared output paths behind "save image" and "download question" — four consumers: every builder hands `questionDoc` its own givens list and bidi segmenter ([ADR-W-126](06w-decisions-workspace.md#adr-w-126)) |
 | **Also in the tree** | `ticks.ts` · `proofTarget.ts` · `studentText.ts` · `conjunction.ts` · `indexedName.ts` · `marks.ts` · `displayMode.ts` · `mathExpr.ts` · `usageLog.ts` · `session/` · `llm/` · `seo/` · frame: `LetterPopover` · `SegmentMenu` · `ResumeOffer` · `ShareSheet` | Not yet described in a section of their own: the primitives above plus the session, LLM-harness and site-metadata folders, and the frame pieces named |
@@ -481,6 +481,44 @@ The model is never called. **The meta-lock** runs the same checks against an ora
 
 ## The frame's surfaces
 
+### The work queue and the working indicator ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 2, #2874)
+
+**One job per student action; the working state is counted, never set.** `shell/work.ts` is pure (no React, no builder, no string):
+
+- `createWorkQueue({ paint?, basis?, sameBasis? })` → `run(work, { lane?, paint? })`, `runIfIdle(…)`, `working(lane?)`, `inJob()`, `subscribe`, `idle()`.
+- **A job's life:** counted the moment it is asked for → waits for a paint (the indicator is on screen) → runs after every earlier job of its lane → its joined work settles → waits for the paint that shows what it produced → released, in a `finally`. In a builder that solves inside the React render, the heavy part runs after the store update the job made, which is why the closing paint is part of the job.
+- **`working(lane)` is the lane's count.** Nothing sets or clears it, so no exit can leave a tool working and none can forget to say so.
+- **Lanes** are named serial queues. `interactive` (the default) is the student's actions; a builder names others for work shown elsewhere (`another`: «הציגו תצורה אחרת», on its own button) or nested in a job that has already painted (`model`: the model call inside a submit, `paint: false`).
+- **The job handle:** `basis` and `stale()` (the stamp of the facts and seed the action was started for; carried, read by nothing in phase 1), `join(promise)` (work started and not awaited belongs to the job), `paint()` (a long job shows progress).
+- **`paint` is injected.** In a browser it is two animation frames, and resolves at once in a hidden tab. With no `requestAnimationFrame` (node, the suite) it resolves at once: a job is one promise, and tests that call an engine or a store directly are untouched.
+- `queuedActions(queue, state, names)` turns the listed store actions into jobs (same arguments, the result in a promise), reading the action from the store when the job runs. `watchBasis(queue, onChange, onFault)` is the basis guard: a figure whose basis changes with no job running is a fault.
+
+**The indicator** is `shell/frame/WorkingMark.tsx`. `InputArea`'s `busy` turns the submit button off, shows `busyLabel` and mounts `WorkingMark`: a ring turned by a CSS animation of `transform` alone, on its own layer (`will-change`), which the browser's compositor keeps running while the page's thread is busy (under «reduce motion», a fade of `opacity`). Its keyframes go into the document head, never into the button, where a `<style>` element would become part of the button's text. `useWorking(queue, lane)` reads the derived state (`useSyncExternalStore`). `useLatest(value)` keeps a component's job bodies as the latest render defines them: a job runs after the paint and after earlier jobs, so a body that closed over the render it was clicked in would act on a figure an earlier job has changed.
+
+**The working look is shown only after `WORKING_SHOWN_AFTER_MS` (300), and the page's thread is not what waits** (ADR-W-210 Am. 2, operator ruling 2026-11-13). In 3-D and analytic the thread that would count the 0.3 s is the one that is busy. So everything a working button changes is in the document from the queue's FIRST paint, invisible, and is revealed by CSS animations of `opacity` alone as long as the threshold, which the compositor runs like the ring's turn:
+
+- `WorkingFace({ working, idle, busy, slack? })` is a button's label. While working, the element's text is the busy label at once (what a test and a screen reader read); the idle label is drawn over it by a pseudo-element from `data-idle`, and the two swap at the threshold.
+- `workingDim(working, 0.6 | 0.5)` is the class that holds a working button at full strength until the threshold; the strength it greys to stays in the button's own style.
+- **A button has one size, at rest and while working**, because a change of size is layout, which only the page's thread can do. The working label is centred over the face (out of the flow), and the face reserves its width less the `slack` the button's own padding lends it (`InputArea` lends all but 2 px of the submit button's side padding, so «הוסף» keeps the width it always had).
+- `useShownWorking(working)` is the same threshold on the page's own clock, for a second sign whose arrival moves the layout (2-D's small line under the box, its search progress and ✕). It can only be late when the thread is busy; the button never is.
+- A product never renders `WorkingMark` itself: the routing lock fails a product source that does, because a mark drawn outside the face shows from the first frame.
+- Rule for a new reveal: one keyframe animation of `opacity`, as long as the threshold, holding its first value to the end. No `transition`, no `animation-delay`, no property that needs layout or paint (`shell/__tests__/working-reveal-2874.test.tsx`).
+
+**Two contracts are awaitable**, for all four builders: `FactList`'s `onEditCommit` and `LetterPopover`'s `onRename` / `onSwap` accept a promise. The editor and the popover stay open while it is pending; a second commit of the same edit is not sent.
+
+**Each builder's seam** is one module in its `app/`: the queue (with the builder's basis), the routing registry (`JOB_ACTIONS…`: the store actions that write the basis; `FREE_ACTIONS…`: the rest, each with why), the queued table (`act…`, derived from the job list), and `jobStore…()` for code already inside a job.
+
+| Builder | Module | Basis | How the App routes |
+| --- | --- | --- | --- |
+| 2-D | `src/app/work.ts` | `facts`, `seed` | `runSubmit` takes the queue (`SubmitDeps.work`) and is one job; the edit, the toggle and the load run as jobs that `join` the post-commit search; the rest through `act` |
+| 3-D | `src3d/app/work3.ts` | `facts`, `seed` | the submit (decision, dispatch, model call) is one job; the rest through `act3` |
+| Analytic | `src-analytic/app/workAn.ts` | `lines`, `disabled`, `seed`, `seedNames`, `hosts` | the submit is one job; the row actions and the letter popovers are job bodies kept by `useLatest` |
+| Complex | `src-complex/app/workCx.ts` | `lines`, `disabled`, `seed` | the same shape; its fold stays on the page's thread (ADR-W-210's exception) |
+
+A submit asks with `runIfIdle`: while the lane works it is not taken, and the line stays in the box (ADR-W-198).
+
+**The cross-product lock** is `shell/__tests__/fixtures/work-routing-rows.ts` ("How a cross-product wiring guard is written", above), and it guards the class, not a list of today's actions. A store's functions are read at run time, so a new action with no class fails; each free action's `set(…)` calls are read from the store's source, so one that writes a basis field fails; every source of the tree outside `store/` and `app/` is scanned for the hook spellings a component uses (a selector, `getState()`, a destructured hook) naming a job action; and the product's real table is driven under the basis guard. The meta-lock is `work-routing-meta-2874.test.ts`. What the scan cannot see (a store handle passed around under another name) the basis guard reports at run time: each page arms it in development.
+
 ### The created-points notice ([ADR-W-162](06w-decisions-workspace.md#adr-w-162), #1467)
 
 `shell/frame/CreatedNotice.tsx` is a string-free `Banner kind="notice"` whose dismiss is the undo: ✕ (accessible
@@ -536,7 +574,7 @@ catalog's section display the rows a student was told to look for?"* lives in th
 
 ### One wording per role, and the first-visit About ([ADR-W-098](06w-decisions-workspace.md#adr-w-098))
 
-Shell holds no strings, so the suite vocabulary is held by a lock, not a module: `shell/__tests__/suite-vocabulary.test.ts` maps nine roles (determined, DOF count, busy, ask, undo, redo, clear-all, show-another, About) to each product's key(s), reads the four locales by file, and requires one wording per role in each language, anchored to the operator's ruled text. A product without a surface (complex has no busy state) is recorded as absent with its reason. The first-visit About is `AppFrameAbout.autoOpenKey`: opt-in, one localStorage key per product, written on close. 2-D's first-visit About uses it under the `geo_intro_seen` key.
+Shell holds no strings, so the suite vocabulary is held by a lock, not a module: `shell/__tests__/suite-vocabulary.test.ts` maps nine roles (determined, DOF count, busy, ask, undo, redo, clear-all, show-another, About) to each product's key(s), reads the four locales by file, and requires one wording per role in each language, anchored to the operator's ruled text. A product without a surface is recorded as absent with its reason (none lacks the busy state since #2874). The first-visit About is `AppFrameAbout.autoOpenKey`: opt-in, one localStorage key per product, written on close. 2-D's first-visit About uses it under the `geo_intro_seen` key.
 
 ### The current tool is in view on a phone ([ADR-W-097](06w-decisions-workspace.md#adr-w-097))
 
@@ -595,8 +633,8 @@ are good: that stays reviewed prose, per product and per locale.
 | --- | --- |
 | `x`, `y`, `bounds` | the anchor (the click) and the canvas size, in px of the positioned container. Placed by **physical** `left`/`top`, clamped into the canvas, never a logical inset (under RTL that mirrors the menu, 2-D F1/REN-1) |
 | `title`, `label` | the header, and the letter the callbacks receive first |
-| `onRename?(from, to)` | returns `{ok:true}` or `{ok:false, reason, holder?}`. `reason:'taken'` with a `holder: {text, onHighlight?}` shows the holder line and the swap offer. Any other reason (including a product's own, such as `busy`) shows the "invalid" note. Absent means no letter box |
-| `onSwap?(a, b)` | returns `{ok}`; absent means no offer |
+| `onRename?(from, to)` | returns `{ok:true}` or `{ok:false, reason, holder?}`, or a promise of one (a rename is a job on the product's work queue, #2874; the popover stays as it is while the answer is pending and a second press is not sent). `reason:'taken'` with a `holder: {text, onHighlight?}` shows the holder line and the swap offer. Any other reason (including a product's own, such as `busy`) shows the "invalid" note. Absent means no letter box |
+| `onSwap?(a, b)` | returns `{ok}`, or a promise of it; absent means no offer |
 | `strings` | `placeholder`, `apply`, `taken`, `bad`, `takenBy` (`{{what}}`), `swapLetters` (`{{a}}`, `{{b}}`) — all from the caller |
 | `maxLength` | the longest typed label (2-D 3, 3-D 4 for `C1'`) |
 | `children` | the product's own items below the letter block (2-D: hide/show label) |

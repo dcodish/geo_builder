@@ -33,6 +33,7 @@ import { SCENARIOS_1 } from '@/__tests__/scenarios-corpus-1';
 import { SCENARIOS_2 } from '@/__tests__/scenarios-corpus-2';
 import { SCENARIOS_3 } from '@/__tests__/scenarios-corpus-3';
 import { SCENARIOS_4 } from '@/__tests__/scenarios-corpus-4';
+import { createWorkQueue } from '../../../shell/work';
 
 function makeDeps(locale: 'he' | 'en') {
   const calls = { notes: [] as string[], cleared: 0 };
@@ -40,14 +41,13 @@ function makeDeps(locale: 'he' | 'en') {
   const deps: SubmitDeps = {
     t,
     locale,
-    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++, setBusy: () => {} },
+    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++ },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => String(raw),

@@ -68,7 +68,13 @@ import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
-import { derive3, redo3, undo3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
+import { derive3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
+import { ANOTHER, MODEL, act3, armBasisGuard3, jobStore3, work3 } from './app/work3';
+import { WorkingFace, useWorking, workingDim } from '../shell/frame/WorkingMark';
+
+// #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
+// without the work queue shows up the first time anyone presses it.
+if (import.meta.env.DEV) armBasisGuard3((message) => console.error(message));
 import { letterRename3 } from './store/rename3';
 import type { LetterRenameResult } from '../shell/frame/letterOffer';
 import { planeChipsByFact } from './store/planeChips';
@@ -143,16 +149,6 @@ export default function App3() {
   const lastError = useGeo3((s) => s.lastError);
   const lastNotice = useGeo3((s) => s.lastNotice); // #613 — the statement succeeded and added nothing
   const lastCreated = useGeo3((s) => s.lastCreated); // #1467 (ADR-3D-382): the points the last line created by reference
-  const submit = useGeo3((s) => s.submit);
-  const dispatchVerdict = useGeo3((s) => s.dispatchVerdict);
-  const toggle = useGeo3((s) => s.toggle);
-  const remove = useGeo3((s) => s.remove);
-  const replaceFact = useGeo3((s) => s.replaceFact);
-  const rename = useGeo3((s) => s.rename);
-  const swap = useGeo3((s) => s.swap);
-  const clear = useGeo3((s) => s.clear);
-  const resample = useGeo3((s) => s.resample);
-  const loadFigure = useGeo3((s) => s.loadFigure);
   const queries = useGeo3((s) => s.queries);
   const addQuery = useGeo3((s) => s.addQuery);
   const removeQuery = useGeo3((s) => s.removeQuery);
@@ -164,13 +160,19 @@ export default function App3() {
   const toggleDihedralShown = useGeo3((s) => s.toggleDihedralShown);
   const reportLoadError = useGeo3((s) => s.reportLoadError);
 
-  const submitSteps = useGeo3((s) => s.submitSteps);
-
   const [text, setText] = useState('');
   // steps display: vector notation moved to src3d/render/notation.ts (#312 — the boundary-class
   // fix lives there, unit-tested; the stored utterance stays untouched).
   // the palette's insert lives in shell/InputArea now (wrap-selection, applySymbol — B4)
-  const [busy, setBusy] = useState(false);
+  // #2874 (ADR-W-210): the tool is WORKING on something the student did — the work queue's derived state,
+  // never a flag set here. Every action that re-solves the figure is a job on `work3`: counted from the
+  // click, run only after this state has been painted (3-D solves on the page's own thread, in the handler
+  // and in the render), and released in a `finally` after the paint that shows the result.
+  const working = useWorking(work3);
+  /** «הציגו תצורה אחרת» is counted on its own lane and shown on its own button, as 2-D shows it. */
+  const resampling = useWorking(work3, ANOTHER);
+  /** The model is being asked (a lane nested in the submit's job): the last line's notices wait for its answer. */
+  const asking = useWorking(work3, MODEL);
   // #73 (ADR-3D-040): the guidance register's what-to-do-instead note (shown in place of an error)
   const [guidanceNote, setGuidanceNote] = useState<string | null>(null);
   const [loadNote, setLoadNote] = useState<string | null>(null); // #309: a loaded file that does not rebuild
@@ -328,12 +330,16 @@ export default function App3() {
     const f = e.target.files?.[0];
     e.target.value = ''; // allow re-loading the same file
     if (!f) return;
-    const r = deserializeFigure3(await f.text());
-    if (r.ok) {
-      loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode, r.dihedralShown);
-      setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
-      noteLoadOutcome(r.facts, r.seed);
-    } else reportLoadError(r.reason);
+    const text = await f.text();
+    // #2874: a load re-solves the whole figure — one job, the parse and the load audit included
+    await work3.run(() => {
+      const r = deserializeFigure3(text);
+      if (r.ok) {
+        jobStore3().loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode, r.dihedralShown);
+        setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
+        noteLoadOutcome(r.facts, r.seed);
+      } else reportLoadError(r.reason);
+    });
   };
 
   /**
@@ -370,15 +376,17 @@ export default function App3() {
   /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
 
-  const openLink3 = (payload: string) => {
-    const r = openShared3(payload);
-    if (r.ok) {
-      setFigureName(r.name ?? ''); // a link has no filename to take the name from
-      noteLoadOutcome(r.facts, r.seed);
-    } else {
-      setShareError(r.reason === 'too-large' ? 'too-large' : 'broken');
-    }
-  };
+  // #2874: opening a link is a load — one job
+  const openLink3 = (payload: string) =>
+    void work3.run(() => {
+      const r = openShared3(payload);
+      if (r.ok) {
+        setFigureName(r.name ?? ''); // a link has no filename to take the name from
+        noteLoadOutcome(r.facts, r.seed);
+      } else {
+        setShareError(r.reason === 'too-large' ? 'too-large' : 'broken');
+      }
+    });
 
   useEffect(() => {
     // #1372: a link OUTRANKS the session offer and is never shown beside it — the student who tapped
@@ -465,16 +473,20 @@ export default function App3() {
 
   const acceptOffer = () => {
     if (!offer) return;
-    const r = restoreSession3(offer.payload);
-    setOffer(null);
-    if (r.ok) {
-      setFigureName(r.name ?? ''); // a restored session has no filename to take its name from
-      noteLoadOutcome(r.facts, r.seed);
-    } else {
-      // Refused and NAMED, exactly as a stale file is — then stop offering what cannot open.
-      reportLoadError(r.reason);
-      forgetSession3();
-    }
+    const payload = offer.payload;
+    // #2874: restoring is loading — one job
+    void work3.run(() => {
+      const r = restoreSession3(payload);
+      setOffer(null);
+      if (r.ok) {
+        setFigureName(r.name ?? ''); // a restored session has no filename to take its name from
+        noteLoadOutcome(r.facts, r.seed);
+      } else {
+        // Refused and NAMED, exactly as a stale file is — then stop offering what cannot open.
+        reportLoadError(r.reason);
+        forgetSession3();
+      }
+    });
   };
 
   const declineOffer = () => {
@@ -524,14 +536,15 @@ export default function App3() {
    * session-INDEPENDENT — 2-D's rule, kept identical here — and clearing a figure is not a request to
    * put the panels back the way they started.
    */
-  const clearAll = () => {
-    logDebug3({ kind: 'action', action: 'clear' });
-    clear();
-    setText('');
-    setGuidanceNote(null);
-    setQueryText('');
-    setLoadNote(null);
-  };
+  const clearAll = () =>
+    void work3.run(() => {
+      logDebug3({ kind: 'action', action: 'clear' });
+      jobStore3().clear();
+      setText('');
+      setGuidanceNote(null);
+      setQueryText('');
+      setLoadNote(null);
+    });
 
   /**
    * #483 — clicking an offered ℓ∩π crossing NAMES it. Deliberately routed through the ordinary
@@ -541,34 +554,36 @@ export default function App3() {
    */
   /** #578: the canvas half of the rename. One store action for both entry points — the text command is
    *  intercepted in `submit`, this is the click — so a refusal reads the same either way. */
-  const onRenamePoint = (from: string, to: string): LetterRenameResult => {
-    if (busy) return { ok: false, reason: 'busy' };
-    const res = rename(from, to);
+  const onRenamePoint = async (from: string, to: string): Promise<LetterRenameResult> => {
+    if (asking) return { ok: false, reason: 'busy' };
+    const res = await act3.rename(from, to); // #2874: a rename re-solves the figure — a job
     logDebug3({ kind: 'action', action: 'rename', detail: `${from}->${to}:${res.ok ? 'ok' : res.reason}` });
     return letterRename3(res); // #1631: a taken letter carries its holder, which the popover quotes and offers to swap
   };
   /** #1302 / #1631: the popover's swap offer — the same store action the typed «החלף בין A ל-B» reaches. */
-  const onSwapPoints = (a: string, b: string) => {
-    if (busy) return { ok: false };
-    const res = swap(a, b);
+  const onSwapPoints = async (a: string, b: string) => {
+    if (asking) return { ok: false };
+    const res = await act3.swap(a, b);
     logDebug3({ kind: 'action', action: 'swap', detail: `${a}<->${b}:${res.ok ? 'ok' : res.reason}` });
     return { ok: res.ok };
   };
 
   const onNameCrossing = (k: { line: string; plane: string }) => {
-    if (busy) return;
+    if (asking) return;
     const id = nextFreeLabel3(derived.construction);
     if (!id) return; // A–Z exhausted — no name to give, so no silent renaming of something else
     setGuidanceNote(null);
     setLoadNote(null);
     const utterance = crossingUtterance3({ ...k, point: { x: 0, y: 0, z: 0 } }, id, i18n.language !== 'en');
-    submit(utterance);
-    logDebug3({
-      kind: 'input',
-      utterance,
-      locale: i18n.language,
-      source: 'parser',
-      result: useGeo3.getState().lastError?.code ?? 'ok',
+    void work3.run(() => {
+      jobStore3().submit(utterance);
+      logDebug3({
+        kind: 'input',
+        utterance,
+        locale: i18n.language,
+        source: 'parser',
+        result: useGeo3.getState().lastError?.code ?? 'ok',
+      });
     });
   };
 
@@ -576,10 +591,12 @@ export default function App3() {
   // click and see it BUILD, no data entry) and rides the identical path — parser, guidance
   // short-circuits, LLM escalation, logging.
   const submitText = async (raw = text) => {
-    if (!raw.trim() || busy) return;
+    if (!raw.trim()) return;
+    // #2874: a submit is ONE job, its model call included. While the tool works a submit is not taken: Enter
+    // is off and the line stays in the box (ADR-W-198), now for every action the tool is working on.
     // #1778 (ADR-W-125): a pasted PARAGRAPH is submitted one sentence at a time, one row each; the box keeps
     // what is left when a sentence is not taken.
-    await submitTyped(raw, submitSentence3, setText);
+    await work3.runIfIdle(() => submitTyped(raw, submitSentence3, setText));
   };
 
   /** One sentence through the 3-D submit. Reads the LIVE store, so a paragraph's next sentence sees this one's row. */
@@ -600,7 +617,7 @@ export default function App3() {
       useGeo3.setState({ lastError: null });
       return 'kept';
     }
-    dispatchVerdict(v);
+    jobStore3().dispatchVerdict(v);
     let err = useGeo3.getState().lastError;
     // #2062 (ADR-3D-480): the exam's membership question points at a panel row — open the panel and highlight it
     if (err?.code === 'answer-in-panel') {
@@ -610,20 +627,17 @@ export default function App3() {
     logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
     // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
     if (err?.code === 'not-understood') {
-      setBusy(true);
-      try {
-        // #2231 (ADR-W-189): the ask, the one retry and the sequence gate, reachable from a test
-        const { steps, restored, retry } = await escalate3Flow(useGeo3.getState(), raw, escalate3);
-        if (retry) logDebug3(nameRetryEvent(retry));
-        if (steps) submitSteps(raw, steps);
-        err = useGeo3.getState().lastError;
-        // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
-        // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
-        // for the dev trace; the lean sink reads `commands`, mirroring the 2-D #84 field).
-        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, ...(restored.length > 0 ? { restored } : {}), result: err ? err.code : 'ok' });
-      } finally {
-        setBusy(false);
-      }
+      // #2231 (ADR-W-189): the ask, the one retry and the sequence gate, reachable from a test.
+      // #2874: the wait for the model is counted on the queue's MODEL lane (nested in this submit's job,
+      // which has already painted) and released in the queue's `finally`.
+      const { steps, restored, retry } = await work3.run(() => escalate3Flow(useGeo3.getState(), raw, escalate3), { lane: MODEL, paint: false });
+      if (retry) logDebug3(nameRetryEvent(retry));
+      if (steps) jobStore3().submitSteps(raw, steps);
+      err = useGeo3.getState().lastError;
+      // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
+      // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
+      // for the dev trace; the lean sink reads `commands`, mirroring the 2-D #84 field).
+      logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, ...(restored.length > 0 ? { restored } : {}), result: err ? err.code : 'ok' });
     }
     if (err) return 'kept';
     setGuidanceNote(null);
@@ -790,7 +804,7 @@ export default function App3() {
             onSubmit={() => void submitText()}
             placeholder={t('input.placeholder')}
             submitLabel={t('input.add')}
-            busy={busy}
+            busy={working}
             busyLabel={t('input.thinking')}
             symbols={SYMBOL_SPECS_3}
             /**
@@ -836,7 +850,7 @@ export default function App3() {
 
           {/* #309 (ADR-3D-087): a file that deserializes cleanly but does not REBUILD must say so —
               it used to load "successfully" onto a blank canvas. Persists until the next submit. */}
-          {loadNote && !busy && (
+          {loadNote && !asking && (
             <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {loadNote}
             </div>
@@ -844,7 +858,7 @@ export default function App3() {
           {/* #305 (ADR-3D-090): a NON-error build notice — the step committed, and the figure was
               adjusted so the statement could hold («ישרה» over a non-cyclic base). Distinct from the
               amber error strip: nothing failed, so it reads as information, not a warning. */}
-          {!busy && notices.map((n, i) => n.kind === 'narrowed' ? (
+          {!asking && notices.map((n, i) => n.kind === 'narrowed' ? (
             // #1996 (ADR-3D-343): the givens forced a narrower kind — the cross-builder family, on its one face (#2266)
             <div key={`notice-${i}`} data-testid="narrowed-note">
               <NarrowingNote>{narrowingText3(n.note, t as NarrowTranslate)}</NarrowingNote>
@@ -875,7 +889,7 @@ export default function App3() {
           ))}
           {/* #1595 (ADR-3D-404, ADR-W-176): two letters on one dot are accepted, and the page says so — 2-D's ADR-123
               sentence through the suite key, read from the DRAWN figure, so it holds while the drawing has the pair. */}
-          {!busy && derived.coincidences.length > 0 && (
+          {!asking && derived.coincidences.length > 0 && (
             <div data-testid="converge-note">
               <InfoNote>{convergeText(derived.coincidences, t as ConvergeTranslate)}</InfoNote>
             </div>
@@ -883,7 +897,7 @@ export default function App3() {
           {/* #1918 (ADR-3D-313): the amber MISMATCH banner — 2-D's `figure.mismatch` (ADR-165), copied: a declared
               trapezoid the drawing shows with both pairs parallel. Derived per render, so it holds while the
               drawing is a parallelogram and clears on the edit, mute or delete that makes it a trapezoid again. */}
-          {!busy && derived.shapeWarnings.length > 0 && (
+          {!asking && derived.shapeWarnings.length > 0 && (
             <Banner kind="notice">
               <div style={{ fontWeight: 600, marginBottom: 4 }}>⚠ {t('warn.mismatch')}</div>
               <ul style={{ margin: 0, paddingInlineStart: 18 }}>
@@ -894,29 +908,29 @@ export default function App3() {
             </Banner>
           )}
           {/* #1467 (ADR-W-162): shown while its line is still the last row — any later row, ✕, undo or edit retires it */}
-          {lastCreated && !lastError && !busy && facts[facts.length - 1]?.id === lastCreated.factId && (
+          {lastCreated && !lastError && !asking && facts[facts.length - 1]?.id === lastCreated.factId && (
             <CreatedNotice
               text={t(createdNoticeTextOf({ names: lastCreated.ids, circle: lastCreated.circle }).key, createdNoticeTextOf({ names: lastCreated.ids, circle: lastCreated.circle }).params)}
               undoLabel={t(CREATED_NOTICE_KEYS.undo)}
               onUndo={() => {
                 logDebug3({ kind: 'action', action: 'delete', detail: lastCreated.factId });
-                remove(lastCreated.factId);
+                void act3.remove(lastCreated.factId);
               }}
             />
           )}
-          {lastNotice && !lastError && !busy && (
+          {lastNotice && !lastError && !asking && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {lastNotice.code === 'already-held'
                 ? t('suite.notice.alreadyHeld') /* #2790 (ADR-3D-484, ADR-W-204): the suite's held-row notice, 2-D's sentence */
                 : t('notice.vertexAngleReadAs', { angles: lastNotice.angles }) /* #1942: 2-D's «הובן כ-∠CAB» */}
             </div>
           )}
-          {guidanceNote && !lastError && !busy && (
+          {guidanceNote && !lastError && !asking && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {guidanceNote}
             </div>
           )}
-          {lastError && !busy && (
+          {lastError && !asking && (
             <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {errorText3(t, lastError)}
             </div>
@@ -998,17 +1012,17 @@ export default function App3() {
             }))}
             textDir={textDir3}
             emptyHint={t('facts.empty')}
-            onToggle={toggle}
+            onToggle={(id) => void act3.toggle(id)}
             toggleLabel={t('facts.toggleTitle')}
             editValueOf={(id) => facts.find((f) => f.id === id)?.utterance ?? ''}
             onEditCommit={(id, next) => {
               logDebug3({ kind: 'action', action: 'edit', detail: id }); // #182: a reported session replays edits
-              return replaceFact(id, next);
+              return act3.replaceFact(id, next); // #2874: an edit re-solves the figure — a job; the editor waits for its answer
             }}
             editLabel={t('facts.edit')}
             symbols={SYMBOL_SPECS_3}
             symbolsToggleTitle={t('palette.show')}
-            onDelete={(id) => { logDebug3({ kind: 'action', action: 'delete', detail: id }); remove(id); }} // #182: so a reported session replays deletions
+            onDelete={(id) => { logDebug3({ kind: 'action', action: 'delete', detail: id }); void act3.remove(id); }} // #182: so a reported session replays deletions
             deleteLabel={t('facts.delete')}
           />
 
@@ -1069,14 +1083,24 @@ export default function App3() {
           <div style={figureRowStyle}>
             {/* #182: each store interaction logs one lean `action` line so a reported prod session
                 replays end-to-end (the 2-D #84/#189 mirror — delete logs at its own button above). */}
-            <button type="button" style={facts.length === 0 ? rowAccentOffStyle : rowAccentStyle} disabled={facts.length === 0} onClick={() => { logDebug3({ kind: 'action', action: 'show-another' }); resample(); }}>
-              {t('actions.another')}
+            {/* #2874: one job on its own lane — the button reads «חושב…» and is off while it runs, as 2-D's does */}
+            <button
+              type="button"
+              className={workingDim(resampling, 0.5)}
+              style={facts.length === 0 || resampling ? rowAccentOffStyle : rowAccentStyle}
+              disabled={facts.length === 0 || resampling}
+              onClick={() => {
+                logDebug3({ kind: 'action', action: 'show-another' });
+                void work3.runIfIdle(() => jobStore3().resample(), { lane: ANOTHER });
+              }}
+            >
+              <WorkingFace working={resampling} idle={t('actions.another')} busy={t('input.thinking')} />
             </button>
             <span style={rowSpacerStyle} />
-            <button type="button" style={canUndo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo3} onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); undo3(); }}>
+            <button type="button" style={canUndo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo3} onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); void act3.undo(); }}>
               {t('actions.undo')}
             </button>
-            <button type="button" style={canRedo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo3} onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); redo3(); }}>
+            <button type="button" style={canRedo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo3} onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); void act3.redo(); }}>
               {t('actions.redo')}
             </button>
             <button type="button" style={facts.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle} disabled={facts.length === 0} onClick={clearAll}>
@@ -1366,12 +1390,13 @@ export default function App3() {
                 // each its own row, then the example; a line that is not taken stops the chain (the lock makes that
                 // unreachable). On a figure the click submits the example alone.
                 const lines = guideTryLines3(c, lang, useGeo3.getState().facts.length);
-                void (async () => {
+                // #2874: the lines an example needs and the example itself are ONE student action — one job
+                void work3.runIfIdle(async () => {
                   for (const line of lines.slice(0, -1)) {
-                    if (busy || (await submitSentence3(line)) !== 'consumed') return;
+                    if ((await submitSentence3(line)) !== 'consumed') return;
                   }
-                  await submitText(raw);
-                })();
+                  if (raw.trim()) await submitTyped(raw, submitSentence3, setText);
+                });
               },
             };
           }),
