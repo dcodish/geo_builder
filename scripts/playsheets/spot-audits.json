@@ -207,7 +207,7 @@
         "קטע AS",
         "|SA| = 5"
       ],
-      "lookFor": "Un-ticking row 3 is quick. Ticking it again takes about 2 seconds, and for all of it «הוסף» reads «חושב…» with the ring; the three rows are there at the end. «הציגו תצורה אחרת» shows «חושב…» on its own button."
+      "lookFor": "Un-ticking row 3 is quick and shows nothing. Ticking it again takes about 2 seconds: after a third of a second «הוסף» reads «חושב…» with the ring, until the figure; the three rows are there at the end. «הציגו תצורה אחרת» shows «חושב…» on its own button."
     },
     {
       "sheet": "feat-2874",
@@ -222,7 +222,20 @@
         "קטע AS",
         "|SA| = 5"
       ],
-      "lookFor": "Un-tick row 3 and tick it again; while «חושב…» shows (about 2 seconds) type «M אמצע AB» and press Enter. Enter is off while the tool works: the line stays in the box, and a second Enter after «חושב…» is gone adds it."
+      "lookFor": "Un-tick row 3 and tick it again; while «חושב…» shows (about 2 seconds) type «M אמצע AB» and press Enter. Enter is off while the tool works, from the tick itself: the line stays in the box, and a second Enter after «חושב…» is gone adds it."
+    },
+    {
+      "sheet": "feat-2874",
+      "id": "T2",
+      "kind": "2d:assertion",
+      "queued": "2026-11-13",
+      "product": "2d",
+      "base": "http://localhost:5174",
+      "path": "/",
+      "lines": [
+        "משולש ABC"
+      ],
+      "lookFor": "RULED 2026-11-13: an action pressed while the tool works waits its turn. Type the line. Press «טען» and choose src/__tests__/fixtures/hexagon-regular-by-angles-2797.geo.json (it loads for about 8 seconds). WHILE it still says «חושב…», press «בטל». The hexagon appears, and then the undo takes it back, so the session ends on the triangle ABC."
     }
   ],
   "results": [

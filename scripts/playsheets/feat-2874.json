@@ -25,7 +25,7 @@
   },
   {
    "id": "T2",
-   "class": "play",
+   "class": "verified",
    "product": "2d",
    "base": "http://localhost:5174",
    "path": "/",
@@ -33,7 +33,7 @@
    "lines": [
     "משולש ABC"
    ],
-   "lookFor": "RULED 2026-11-13: an action pressed while the tool works waits its turn. This is that ruling on screen. Type the line. Press «טען» and choose src/__tests__/fixtures/hexagon-regular-by-angles-2797.geo.json (it loads for about 8 seconds, «חושב…» with the ring). WHILE it still says «חושב…», press «בטל». The hexagon appears, and then the undo takes it back, so you end on the triangle ABC.",
+   "lookFor": "RULED 2026-11-13: an action pressed while the tool works waits its turn. Type the line. Press «טען» and choose src/__tests__/fixtures/hexagon-regular-by-angles-2797.geo.json (it loads for about 8 seconds). WHILE it still says «חושב…», press «בטל». The hexagon appears, and then the undo takes it back, so the session ends on the triangle ABC.",
    "before": "On prod the same press runs at once: the triangle disappears while the file is still loading, and you end on the hexagon.",
    "expectRows": [
     "משולש ABC"
