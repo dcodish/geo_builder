@@ -1,5 +1,5 @@
 {
-  "$comment": "The teaching plan (#2868, ADR-W-208), moved here from the roadmap page's database (plan/current, version 31, 2026-11-13). The management page reads it from GitHub; a pull from the page is a commit to this file. name/goal are the page's Hebrew; nameEn, why, done and schedule are the plan's original English record.",
+  "$comment": "The teaching plan (#2868, ADR-W-209), moved here from the roadmap page's database (plan/current, version 31, 2026-11-13). The management page reads it from GitHub; a pull from the page is a commit to this file. name/goal are the page's Hebrew; nameEn, why, done and schedule are the plan's original English record.",
   "title": "תוכנית ההוראה",
   "start": "2026-10-27",
   "end": "2026-12-20",

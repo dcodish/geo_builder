@@ -1,5 +1,5 @@
 /**
- * Per-question verdicts of the two analytic exam corpora, for unit readiness (#2868 Addition A, ADR-W-208).
+ * Per-question verdicts of the two analytic exam corpora, for unit readiness (#2868 Addition A, ADR-W-209).
  * Run by `scripts/ops/readiness.mjs` through vite-node; prints JSON on stdout.
  *
  * The SAME readings as the ratchets, per question instead of summed:

@@ -1,5 +1,5 @@
 /**
- * The management console's GitHub client (#2868, ADR-W-208).
+ * The management console's GitHub client (#2868, ADR-W-209).
  *
  * GitHub is the record: the console keeps no copy of it. Every page view reads through this client, which
  * caches GET responses for a few minutes so a page load stays inside the REST rate limit (the open queue
@@ -85,10 +85,14 @@ export function makeGh(opts: GhOpts): GhClient {
     async getAll<T>(path: string, maxPages = 10): Promise<T[]> {
       const out: T[] = [];
       const sep = path.includes('?') ? '&' : '?';
-      for (let page = 1; page <= maxPages; page++) {
-        const rows = await get<T[]>(`${path}${sep}per_page=100&page=${page}`);
-        out.push(...rows);
-        if (rows.length < 100) break;
+      // Four pages in flight at a time: a cold view of ~1,000 recent issues is one round trip per batch.
+      for (let first = 1; first <= maxPages; first += 4) {
+        const pages = Array.from({ length: Math.min(4, maxPages - first + 1) }, (_, k) => first + k);
+        const batch = await Promise.all(pages.map((page) => get<T[]>(`${path}${sep}per_page=100&page=${page}`)));
+        for (const rows of batch) {
+          out.push(...rows);
+          if (rows.length < 100) return out;
+        }
       }
       return out;
     },

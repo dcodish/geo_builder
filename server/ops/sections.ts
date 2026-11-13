@@ -1,5 +1,5 @@
 /**
- * The management console's sections (#2868, ADR-W-208), one per question the operator asks. Pure over a
+ * The management console's sections (#2868, ADR-W-209), one per question the operator asks. Pure over a
  * Snapshot and the date: no I/O, no clock, so each is tested with recorded data.
  *
  * Judgement (dossiers, triage clusters, the readiness measure) is written by sessions into issues and repo

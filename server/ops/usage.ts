@@ -1,5 +1,5 @@
 /**
- * Section 6 · usage, and what real users failed at this week (#2868 Addition B, ADR-W-208).
+ * Section 6 · usage, and what real users failed at this week (#2868 Addition B, ADR-W-209).
  *
  * Reads the event logs the server already owns, through the dashboards' own classifiers (one reading of an
  * event per builder, never a copy). A line "failed" when the builder did not understand it or the AI had to
@@ -71,9 +71,10 @@ export function builderUsage(
   issues: Issue[],
   mine: Set<string>,
   now: Date,
+  days = 7,
 ): BuilderUsage {
-  const t0 = new Date(now.getTime() - 7 * 864e5).toISOString();
-  const tPrev = new Date(now.getTime() - 14 * 864e5).toISOString();
+  const t0 = new Date(now.getTime() - days * 864e5).toISOString();
+  const tPrev = new Date(now.getTime() - 2 * days * 864e5).toISOString();
   const empty = { visitors: 0, sessions: 0, submits: 0, failed: 0 };
   if (!events) return { builder: b, hasLog: false, week: empty, prevWeek: empty, mine: { sessions: 0, submits: 0 }, groups: [], verdictsAge: vm?.generatedAt ?? null };
   const stats = (from: string, to: string) => {

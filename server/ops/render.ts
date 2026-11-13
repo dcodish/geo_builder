@@ -1,5 +1,5 @@
 /**
- * The management console's HTML (#2868, ADR-W-208). Hebrew, right to left; GitHub's own terms (issue, PR,
+ * The management console's HTML (#2868, ADR-W-209). Hebrew, right to left; GitHub's own terms (issue, PR,
  * commit, deploy, label) stay in English (operator, 2026-11-13). Server-rendered strings with plain HTML forms:
  * no script, so the page works on a phone and passes a strict CSP.
  *
@@ -97,6 +97,7 @@ const CSS = `
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
 a{color:var(--accent);text-underline-offset:2px}
 .top{background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+@media (max-width:640px){.top{position:static}}
 .top .in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;gap:8px 18px;align-items:center;flex-wrap:wrap}
 .brand{font-weight:700;margin-inline-end:6px}
 nav{display:flex;gap:4px;flex-wrap:wrap}
@@ -374,9 +375,11 @@ ${b.threads ? `<p class="note">${linkify(f.base, b.threads)}</p>` : ''}</section
 
 const trend = (a: number, b: number) => (b === 0 ? (a ? '↑' : '') : a > b ? `↑ ${Math.round(((a - b) / b) * 100)}%` : a < b ? `↓ ${Math.round(((b - a) / b) * 100)}%` : '=');
 
-export function usagePage(f: Frame, us: BuilderUsage[], mineCount: number, now: string): string {
+export function usagePage(f: Frame, us: BuilderUsage[], mineCount: number, now: string, days = 7): string {
+  const span = days === 7 ? '7 ימים' : `${days} ימים`;
+  const pick = `<div class="btns">${[7, 30].map((d) => `<a class="chip${d === days ? ' good' : ''}" href="${f.base}/usage${d === 7 ? '' : '?days=30'}">${d === 7 ? 'השבוע' : '30 ימים'}</a>`).join('')}</div>`;
   const cards = `<div class="tiles">${us.map((u) => `<div class="tile"><span class="l"><b>${esc(u.builder.he)}</b></span>${u.hasLog
-    ? `<span class="n">${u.week.visitors}</span><span class="l">מבקרים ב-7 ימים ${esc(trend(u.week.visitors, u.prevWeek.visitors))} · ${u.week.sessions} sessions · ${u.week.submits} שורות · ${u.week.failed} נכשלו</span>`
+    ? `<span class="n">${u.week.visitors}</span><span class="l">מבקרים ב-${span} ${esc(trend(u.week.visitors, u.prevWeek.visitors))} · ${u.week.sessions} sessions · ${u.week.submits} שורות · ${u.week.failed} נכשלו</span>`
     : '<span class="l">אין לכלי הזה יומן אירועים בשרת הזה.</span>'}</div>`).join('')}</div>`;
   const tables = us.filter((u) => u.hasLog).map((u) => {
     const rows = u.groups.slice(0, 60).map((g) => {
@@ -388,10 +391,10 @@ export function usagePage(f: Frame, us: BuilderUsage[], mineCount: number, now: 
         : '';
       return `<tr><td><span class="lines" style="display:inline-block;padding:2px 6px">${esc(g.line)}</span></td><td>${esc(FAILED_LABEL[g.outcome] ?? g.outcome)}</td><td class="n">${g.sessions.length}</td><td class="n">${g.count}</td><td>${still}</td><td>${issue}</td><td>${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">timeline</a>` : '—'}</td><td>${fileForm}</td></tr>`;
     }).join('');
-    return `<section class="panel"><div class="panel-head"><h2>${esc(u.builder.he)}: מה משתמשים אמיתיים לא הצליחו השבוע</h2><span class="note">${u.verdictsAge ? `«עובד היום» לפי מפת ה-triage מ-${fmtDay(u.verdictsAge)}` : 'אין מפת triage: לא ידוע אם השורות עדיין נכשלות'}${u.mine.submits ? ` · ${u.mine.submits} שורות שלך הוצאו מהספירה` : ''}</span></div>
-${rows ? `<div class="scroll"><table><thead><tr><th>השורה</th><th>מה קרה</th><th class="n">sessions</th><th class="n">פעמים</th><th>היום</th><th>issue</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${u.groups.length > 60 ? `<p class="note">ועוד ${u.groups.length - 60} שורות.</p>` : ''}` : '<p class="empty">אף שורה לא נכשלה השבוע.</p>'}</section>`;
+    return `<section class="panel"><div class="panel-head"><h2>${esc(u.builder.he)}: מה משתמשים אמיתיים לא הצליחו (${span})</h2><span class="note">${u.verdictsAge ? `«עובד היום» לפי מפת ה-triage מ-${fmtDay(u.verdictsAge)}` : 'אין מפת triage: לא ידוע אם השורות עדיין נכשלות'}${u.mine.submits ? ` · ${u.mine.submits} שורות שלך הוצאו מהספירה` : ''}</span></div>
+${rows ? `<div class="scroll"><table><thead><tr><th>השורה</th><th>מה קרה</th><th class="n">sessions</th><th class="n">פעמים</th><th>היום</th><th>issue</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${u.groups.length > 60 ? `<p class="note">ועוד ${u.groups.length - 60} שורות.</p>` : ''}` : `<p class="empty">אף שורה לא נכשלה ב-${span}.</p>`}</section>`;
   }).join('');
-  return page(f, '/usage', 'שימוש', `7 הימים האחרונים מול 7 הימים שלפניהם. ${mineCount ? `המכשירים שמהם נכנסת לדף הזה (${mineCount}) לא נספרים.` : 'עדיין לא זוהה מכשיר שלך: הכניסה לדף הזה מסמנת את המכשיר שלך.'} עודכן ${fmtTime(now)}.`, cards + tables);
+  return page(f, '/usage', 'שימוש', `${span} האחרונים מול ${span} שלפניהם. ${mineCount ? `המכשירים שמהם נכנסת לדף הזה (${mineCount}) לא נספרים.` : 'עדיין לא זוהה מכשיר שלך: הכניסה לדף הזה מסמנת את המכשיר שלך.'} עודכן ${fmtTime(now)}.`, pick + cards + tables);
 }
 
 // ── 7 · cost ─────────────────────────────────────────────────────────────────
@@ -438,6 +441,17 @@ ${opts.totp ? '<label>קוד מאפליקציית האימות<input type="text"
 }
 
 /** The dry-run page: what an action WOULD write, nothing sent. */
-export function dryRunText(writes: { op: string }[]): string {
-  return `מצב ניסיון: הפעולה תקינה ולא נשלחה. היא הייתה כותבת: ${writes.map((w) => w.op).join(', ')}.`;
+export function dryRunText(writes: { op: string; issue?: number; labels?: string[]; label?: string; path?: string; title?: string }[]): string {
+  const what = writes.map((w) => {
+    switch (w.op) {
+      case 'comment': return `תגובה ב-#${w.issue}`;
+      case 'addLabels': return `label ${w.labels?.join(', ')} ל-#${w.issue}`;
+      case 'removeLabel': return `הסרת label ${w.label} מ-#${w.issue}`;
+      case 'close': return `סגירת #${w.issue} כ-not planned`;
+      case 'create': return `issue חדש «${w.title}»`;
+      case 'editJson': return `commit ל-${w.path}`;
+      default: return w.op;
+    }
+  });
+  return `מצב ניסיון: הפעולה תקינה ולא נשלחה. היא הייתה כותבת: ${what.join(' · ')}.`;
 }

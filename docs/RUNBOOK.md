@@ -274,6 +274,17 @@ curl -s  https://themathbible.com/sitemap.xml | grep -c '<loc>'    # one per pub
 curl -sI https://themathbible.com/g/aaaaaaaaaaaa | grep -i x-robots-tag   # noindex
 ```
 
+### The management console is a DEPLOY STEP ([ADR-W-209](06w-decisions-workspace.md#adr-w-209), #2868)
+
+`https://themathbible.com/geo-builder/management` is served by the same proxy (`/management` tail). Turning it on, once:
+1. **Apache:** the two `/geo-builder/management` lines in `deploy/apache-geo-builder.conf` go into Plesk's directives field like every other proxy line (the preflight's route check reports it BROKEN until they do).
+2. **Env file** (`geo-proxy.env`, beside the other secrets): the console's own login, its own cookie secret (never the admin one), the GitHub token, the second-factor secret, and `MGMT_WRITES` (`off` until the operator has logged in once; then `on`). Names: `server/standalone.ts`'s header. The values go to the operator in chat, never into the repo.
+3. **The GitHub token** is fine-grained, for this repository only: Issues read/write, Pull requests read/write, Contents read/write (contents write is used for `ops/plan.json` and the spot-audit ledger). The operator creates it in GitHub's settings; rotate it the same way (new token, swap the env line, restart, revoke the old).
+4. **The second factor:** a base32 secret the operator adds to his authenticator app (an `otpauth://totp/…` QR or the secret typed in). Without it the console is read-only.
+5. Restart `geo-proxy.service`; the console's state file (his devices, his last visit) is created beside the event logs on first login.
+
+**Unit readiness** (`ops/readiness.json`) is not a deploy step: a session runs `npm run ops:readiness` and commits the file; the console reads it from GitHub.
+
 ## Verify (every deploy)
 
 - `ssh deploy@themathbible.com 'curl -s http://127.0.0.1:8788/healthz'` → `ok`

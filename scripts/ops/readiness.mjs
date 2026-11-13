@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * UNIT READINESS — measure each teaching unit's questions and write `ops/readiness.json` (#2868 Addition A,
- * ADR-W-208). The management page reads that file from GitHub; the server cannot run tests.
+ * ADR-W-209). The management page reads that file from GitHub; the server cannot run tests.
  *
  *   npm run ops:readiness            (takes the suite lock; ~3 min)
  *   node scripts/ops/readiness.mjs --dry   (prints, writes nothing)

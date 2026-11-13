@@ -1,5 +1,5 @@
 /**
- * The management console's routes (#2868, ADR-W-208): `…/management`, behind its own login.
+ * The management console's routes (#2868, ADR-W-209): `…/management`, behind its own login.
  *
  *   GET  /                 what needs me (decisions, tests, PRs, plans) — answerable
  *   GET  /since?from=ISO   what happened since the last visit
@@ -215,6 +215,7 @@ export async function handleManagement(req: IncomingMessage, res: ServerResponse
     case '/cost':
       return send(res, 200, costPage(frame, cost(ctx)));
     case '/usage': {
+      const days = url.searchParams.get('days') === '30' ? 30 : 7;
       const mine = new Set(st.mine);
       const issues = [...snap.open, ...snap.parked];
       const us = await Promise.all(
@@ -222,10 +223,10 @@ export async function handleManagement(req: IncomingMessage, res: ServerResponse
           const file = opts.eventLogs[b.id];
           const events = file && existsSync(file) ? await readEvents(file) : null;
           const vm = file ? await readVerdicts(join(dirname(file), `verdicts-${b.id}.json`)) : null;
-          return builderUsage(b, events, vm, issues, mine, now);
+          return builderUsage(b, events, vm, issues, mine, now, days);
         }),
       );
-      return send(res, 200, usagePage(frame, us, mine.size, snap.asOf));
+      return send(res, 200, usagePage(frame, us, mine.size, snap.asOf, days));
     }
     case '/issue': {
       const n = Number(url.searchParams.get('n'));

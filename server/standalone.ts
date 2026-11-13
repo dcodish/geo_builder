@@ -26,7 +26,7 @@
  *   ADMIN_3D_BASE (3-D dashboard base path; default /3d-builder/admin, proxied to the /admin3 tail)
  *   ADMIN_ANALYTIC_BASE (analytic dashboard base path; default /analytic-builder/admin, proxied to the
  *                 /admin-analytic tail — #1362)
- *   MGMT_USERNAME / MGMT_PASSWORD / MGMT_COOKIE_SECRET  (the management console's OWN login — #2868, ADR-W-208;
+ *   MGMT_USERNAME / MGMT_PASSWORD / MGMT_COOKIE_SECRET  (the management console's OWN login — #2868, ADR-W-209;
  *                 never the shared admin password; any missing ⇒ the console is disabled)
  *   MGMT_TOTP_SECRET (base32 second factor; without it the console is read-only)
  *   MGMT_GITHUB_TOKEN (fine-grained, this repo only: issues + pull requests read/write, contents write)

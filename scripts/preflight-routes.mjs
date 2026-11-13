@@ -101,6 +101,15 @@ const SHAPES = [
     // Unauthenticated, every dashboard mount answers its login page — a form posting to `<base>/login`.
     routed: (s, _h, body) => s === 200 && /action="[^"]*\/login"/.test(body),
   },
+  {
+    kind: 'management console',
+    match: (t) => t.startsWith('/management'),
+    suffix: '',
+    expect: '200 login form',
+    // #2868: unauthenticated, the console answers its own login page (titled «ניהול Geo Builder»), also when it
+    // is not configured and shows only that it is off. Apache's static 404 or the builder's index.html never do.
+    routed: (s, _h, body) => s === 200 && /<title>כניסה · ניהול Geo Builder<\/title>/.test(body),
+  },
 ];
 
 /** The probe for one conf route, or `null` when no handler shape matches its backend tail. */

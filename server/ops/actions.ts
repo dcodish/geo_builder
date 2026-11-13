@@ -1,5 +1,5 @@
 /**
- * Answering on the page (#2868 step 2, ADR-W-208): a FIXED allow-list of actions, each validated here and
+ * Answering on the page (#2868 step 2, ADR-W-209): a FIXED allow-list of actions, each validated here and
  * turned into the GitHub writes that record it in its permanent home. No pass-through to the GitHub API.
  *
  * Every comment states that it came from the page, with the time. The server never merges, deploys, closes a

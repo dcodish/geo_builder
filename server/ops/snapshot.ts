@@ -1,5 +1,5 @@
 /**
- * What the management console reads when a page opens (#2868, ADR-W-208): GitHub's record of the project,
+ * What the management console reads when a page opens (#2868, ADR-W-209): GitHub's record of the project,
  * fetched through the cached client, plus the repo files the sessions write for it (`ops/*.json`, the play
  * sheets' spot-audit queue, the deploy log).
  *

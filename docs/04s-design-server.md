@@ -254,3 +254,26 @@ follows (clear, delete, mute, show-another, and undo/redo with the fingerprint o
 a session from a build that logged no actions is degraded from its first row, decided per session from its
 `rel` commit. No product is silent today; the silent rule stays, locked with an injected registry. Complex
 has no dashboard profile yet.
+
+## The management console ([ADR-W-209](06w-decisions-workspace.md#adr-w-209), #2868)
+
+The operator's page at `/geo-builder/management` (Apache: `ProxyPass /geo-builder/management → :8788/management`, in `deploy/apache-geo-builder.conf`). `standalone.ts` dispatches any path containing `/management` to `server/ops/handler.ts`, before the `/admin` tails.
+
+| Module | What it does |
+| --- | --- |
+| `server/ops/github.ts` | REST client over an injected `fetch`: cached GETs (3 min), `getAll` by page number, `file(path, ref)` via the raw contents API, `send` for writes (drops the cache). |
+| `server/ops/snapshot.ts` | Loads one view's data in parallel: open issues, every issue updated since the plan began, the icebox, open PRs, commits on `main` (21 days), the newest `prod/*` tag and `compare/<tag>...main`, `docs/DEPLOY-LOG.md`, the `fix-round` issues (search API), and the repo files `ops/plan.json`, `ops/units.json`, `ops/readiness.json`, `ops/directions.json`, `scripts/playsheets/spot-audits.json` at `MGMT_REF`. A part that fails is named in `errors`; the page marks it, never shows it as zero. |
+| `server/ops/sections.ts` | Pure: one builder per screen (`needsMe`, `sinceLast`, `pace`, `live`, `backlog`, `cost`) plus the parsers (dossier options, PR play blocks, `[proposed]` lines, round ledger lines). |
+| `server/ops/usage.ts` | Pure: per builder, the window's visitors, sessions, lines and failures, and the failed lines grouped, through the dashboards' own classifiers (`PROFILE_*.classify`, `outcomeOfComplex`) and verdict maps. |
+| `server/ops/actions.ts` | The allow-list: `planAction(form, now)` → the writes (pure), `runWrites(gh, writes, ref)` performs them; `applyEdit` is the pure JSON edit a file commit carries (`pull`, `recordAudit` from `scripts/lib/case-closure.mjs`). |
+| `server/ops/auth.ts` | Its own stateless session cookie `geo_mgmt` (8 h, path-scoped), the CSRF token (HMAC of the session), RFC 6238 TOTP. |
+| `server/ops/render.ts` | Hebrew RTL HTML strings, plain forms, no script. |
+| `server/ops/handler.ts` | Routes, login, CSRF + same-origin check, write mode (`off`/`dry`/`on`; `on` needs the TOTP secret), the small state file (the operator's device hashes, the last visit) beside the event logs. |
+
+**Env:** `MGMT_USERNAME` (default `ADMIN_USERNAME`), `MGMT_PASSWORD`, `MGMT_COOKIE_SECRET` (must differ from the admin secret), `MGMT_TOTP_SECRET` (base32), `MGMT_GITHUB_TOKEN`, `MGMT_WRITES`, `MGMT_REF` (default `main`), `MGMT_BASE` (default `/geo-builder/management`), `MGMT_STATE`. Missing username, password or secret ⇒ the console answers only "off". No token ⇒ 503 on every screen.
+
+**Response headers:** `content-security-policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'…`, `cache-control: no-store`, `x-frame-options: DENY`. The pages carry no script.
+
+**Unit readiness** is measured off the server: `npm run ops:readiness` (`scripts/ops/readiness.mjs`, with `scripts/ops/measure-corpus.ts` under vite-node) writes `ops/readiness.json`, which a session commits; the console reads it from GitHub and states its age and commit.
+
+**Tests:** `server/__tests__/management-2868.test.ts` (section builders over recorded data, the allow-list and its refusals, writes against a fake GitHub, TOTP against RFC 6238's vector, the routes, the readiness rules). The deploy preflight probes the route like a dashboard mount (`scripts/preflight-routes.mjs`, shape "management console").
