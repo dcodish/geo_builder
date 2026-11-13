@@ -220,7 +220,11 @@ Each item, inside its stream:
    [ADR-W-191](../../../docs/06w-decisions-workspace.md#adr-w-191)); the
    regression lock per standing rule 4 (fixtures-first — a `.geo.json` fixture when the essence
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
-   is needed); `tsc -b` + build clean; **`npm run test:fast -- --changed` green** (only the test trees the
+   is needed); **a new or changed fixture has its solver work recorded in the same commit**
+   (`npm run work:record -- <builder> --only <part of the file name>`, seconds), or the batch's full suite
+   fails on that product's work-meter gate, and a gate that fails on a **rise** is a regression until its
+   cause is known (docs/22 §3, [ADR-W-210](../../../docs/06w-decisions-workspace.md#adr-w-210) Am. 1);
+   `tsc -b` + build clean; **`npm run test:fast -- --changed` green** (only the test trees the
    diff can break, read from BOUNDARIES.json, [ADR-W-190](../../../docs/06w-decisions-workspace.md#adr-w-190);
    and without the case files the diff did not touch, which replay whole figures and run in the batch's full
    suite, [ADR-W-191](../../../docs/06w-decisions-workspace.md#adr-w-191): a 2-D item ~13 CPU-minutes,
