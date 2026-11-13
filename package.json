@@ -27,6 +27,7 @@
     "test:tiers": "node scripts/test-tiers.mjs report",
     "test:exams": "node scripts/test-exams.mjs",
     "test:locked": "node scripts/suite-lock.mjs",
+    "ops:readiness": "node scripts/suite-lock.mjs node scripts/ops/readiness.mjs",
     "check:siblings": "node scripts/check-sibling-safety.mjs",
     "smoke:visual": "node scripts/visual-smoke.mjs",
     "test:docs": "node scripts/doc-gate.mjs",

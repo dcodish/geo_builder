@@ -26,6 +26,11 @@
  *   ADMIN_3D_BASE (3-D dashboard base path; default /3d-builder/admin, proxied to the /admin3 tail)
  *   ADMIN_ANALYTIC_BASE (analytic dashboard base path; default /analytic-builder/admin, proxied to the
  *                 /admin-analytic tail — #1362)
+ *   MGMT_USERNAME / MGMT_PASSWORD / MGMT_COOKIE_SECRET  (the management console's OWN login — #2868, ADR-W-209;
+ *                 never the shared admin password; any missing ⇒ the console is disabled)
+ *   MGMT_GITHUB_TOKEN (fine-grained, this repo only: issues + pull requests read/write, contents write)
+ *   MGMT_WRITES  (off | dry | on; default off)   MGMT_REF (branch the ops files are read from; default main)
+ *   MGMT_BASE    (default /geo-builder/management)   MGMT_STATE (default beside events.jsonl: management-state.json)
  *
  * A `tool:'3d'` tag in a POST /api/log body routes the event to the 3-D file; the 3-D dashboard is
  * served on the /admin3 path tail (Apache maps /3d-builder/admin -> /admin3, since the prefix is stripped).
@@ -44,6 +49,8 @@ import { handleConfigRead } from './adminConfig';
 // never follows a builder's own prefix.
 import { handleShare, handleSharePage } from './shareStore';
 import { serveSafely } from './http';
+import { handleManagement } from './ops/handler';
+import { makeGh } from './ops/github';
 
 const PORT = Number(process.env.PORT ?? 8788);
 const HOST = process.env.HOST ?? '127.0.0.1';
@@ -73,6 +80,15 @@ const admin3Base = process.env.ADMIN_3D_BASE || '/3d-builder/admin';
 // #1362 — the analytic dashboard, on its own DISTINCT tail for the same reason as /admin3: Apache strips
 // the prefix, and a bare /admin would be the 2-D dashboard serving 2-D data under the analytic prefix.
 const adminAnalyticBase = process.env.ADMIN_ANALYTIC_BASE || '/analytic-builder/admin';
+
+// #2868 — the management console. Its own credentials: it WRITES to GitHub, so the dashboards' shared
+// password (#2762) is shared with other pages, and this one writes. Username + password (operator, 2026-11-13).
+const mgmtWrites = (['on', 'dry'] as const).find((m) => m === process.env.MGMT_WRITES) ?? 'off';
+const mgmtGh = process.env.MGMT_GITHUB_TOKEN ? makeGh({ token: process.env.MGMT_GITHUB_TOKEN, repo: 'dcodish/geo_builder' }) : null;
+const mgmtCookieSecret =
+  process.env.MGMT_COOKIE_SECRET && process.env.MGMT_COOKIE_SECRET !== DEFAULT_SALT && process.env.MGMT_COOKIE_SECRET !== adminCookieSecret
+    ? process.env.MGMT_COOKIE_SECRET
+    : '';
 
 if (!apiKey) {
   console.error('[geo-proxy] WARNING: ANTHROPIC_API_KEY is not set — /api/parse will return 503.');
@@ -119,6 +135,21 @@ async function dispatch(req: IncomingMessage, res: ServerResponse): Promise<void
     // A3 (#662): the PUBLIC curation read — unauthenticated by design; 204 = "use your static
     // roster" (the degraded path). Config lives beside the events files.
     return handleConfigRead(req, res, { dir: dirname(eventsLogPath()) });
+  }
+  // #2868: the management console, before every `/admin` tail (its own path, its own login).
+  if (path.includes('/management')) {
+    return handleManagement(req, res, {
+      username: process.env.MGMT_USERNAME || adminUsername,
+      password: process.env.MGMT_PASSWORD || '',
+      cookieSecret: mgmtCookieSecret,
+      base: process.env.MGMT_BASE || '/geo-builder/management',
+      gh: mgmtGh,
+      writes: mgmtWrites,
+      ref: process.env.MGMT_REF || 'main',
+      eventLogs: { '2d': eventsLogPath(), '3d': events3LogPath(), analytic: eventsLogPathForId('analytic'), complex: eventsLogPathForId('complex') },
+      ipSalt,
+      stateFile: process.env.MGMT_STATE || `${dirname(eventsLogPath())}/management-state.json`,
+    });
   }
   // #1362: the analytic tail, before `/admin` for the same substring reason as `/admin3` below.
   if (path.includes('/admin-analytic')) {
