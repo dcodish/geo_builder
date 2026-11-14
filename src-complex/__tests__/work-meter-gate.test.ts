@@ -24,6 +24,7 @@ import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { walkFixtureCx, type WalkPlanCx } from './work-meter/walkCx';
+import { CEILING_CX } from '../app/workCx';
 import { firstDifference, openWorkGate, walkOrder, type MeasuredAction } from '../../shell/__tests__/work-gate';
 
 const DIR = join(__dirname, 'fixtures');
@@ -47,11 +48,25 @@ function walk(figure: string): MeasuredAction[] {
 }
 
 describe('work meter — complex: no recorded student action does more solver work than its baseline', () => {
+  /** The dearest action walked, for the ceiling's own lock below. */
+  let dearest = { figure: '', action: '', page: 0 };
   for (const figure of walkOrder(corpus).filter(gate.wants)) {
     it(figure, () => {
-      gate.check(figure, walk(figure));
+      const actions = walk(figure);
+      // #2890 (ADR-CX-091): complex stays on the page's thread UNDER A CEILING, and this is where it is asserted
+      for (const a of actions) {
+        if (a.work.page > dearest.page) dearest = { figure, action: a.action, page: a.work.page };
+        expect(a.work.page, `«${figure}» ${a.action}${a.label ? ` («${a.label}»)` : ''} charges ${a.work.page} units to the page: over complex's work ceiling of ${CEILING_CX} an action (src-complex/app/workCx.ts, ADR-CX-091)`).toBeLessThanOrEqual(CEILING_CX);
+      }
+      gate.check(figure, actions);
     }, 900_000);
   }
+
+  it('the ceiling was held against real work: the dearest action walked charged the page, and all of it is page work', () => {
+    // a gate that compares zeros would pass by checking nothing (docs/17 §9): complex has no worker, so every unit is the page's
+    expect(dearest.page, `the dearest action walked (${dearest.figure} ${dearest.action})`).toBeGreaterThan(0);
+    for (const figure of gate.walkedByCost()) for (const a of gate.measured(figure)!) expect(a.work.page, `${figure} ${a.action}`).toBe(a.work.total);
+  });
 
   // docs/17 §7: a work count's lock runs a figure again, warm and after other figures, and asserts EQUAL WORK.
   it('the counts are reproducible: a second walk of a figure, after every other figure, counts the same', () => {
