@@ -1061,6 +1061,10 @@ export function allConstraints(c: Construction): Set<Constraint> {
  */
 const dofMemo = new WeakMap<Construction, { n: number; cell: WorkCell }>();
 registerLedger((c) => dofMemo.get(c as Construction)?.cell);
+/** #2890 ([ADR-830](docs/06-decisions.md#adr-830)): adopt a settled DOF count of `c`, computed in another heap. */
+export function adoptDofCount(c: Construction, n: number, units = 0): void {
+  if (!dofMemo.has(c)) dofMemo.set(c, { n, cell: { own: units, deps: [], charged: 0 } });
+}
 export function freeDofCount(c: Construction): number {
   const hit = dofMemo.get(c);
   if (hit && chargeHit(hit.cell)) return hit.n; // #1605 (ADR-582): the rank's evaluateCore calls are charged on a hit

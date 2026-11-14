@@ -68,7 +68,7 @@ export async function walkFixture2d(driver: Driver2d, text: string, plan: WalkPl
     for (let k = 0; k < groups.length; k++) await run(`submit#${k + 1}`, () => submit(groups[k]));
   } else if (plan.submits === 'last' && groups.length > 0) {
     const last = groups[groups.length - 1];
-    driver.show({ facts: facts.slice(0, facts.length - last.facts.length), seed: 0 });
+    await driver.show({ facts: facts.slice(0, facts.length - last.facts.length), seed: 0 });
     await run(`submit#${groups.length}`, () => submit(last));
   }
   await onLoaded(driver, text, plan, run);

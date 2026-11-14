@@ -16,4 +16,4 @@ import { WORKER_SEARCH_BUDGET_MS } from '@/replay/core';
 import { serveWorker } from '../../shell/workerHost';
 import { geoOps, takeCheckpoint } from './geoOps';
 
-serveWorker(geoOps({ searchBudgetMs: WORKER_SEARCH_BUDGET_MS, transplant: true }), { seed: takeCheckpoint });
+serveWorker(geoOps({ searchBudgetMs: WORKER_SEARCH_BUDGET_MS, crossing: true }), { seed: takeCheckpoint });

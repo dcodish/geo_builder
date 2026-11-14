@@ -19,7 +19,7 @@ vi.mock('@/parser/llm', () => ({ llmParse: async () => null }));
 
 import { runSubmit, type SubmitDeps } from '../submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
-import { geoWork } from '@/store/geoWork';
+import { geoJobs } from '@/store/geoWork';
 import { createWorkQueue } from '../../../shell/work';
 
 function makeDeps(): SubmitDeps {
@@ -45,9 +45,10 @@ describe('#2874 — a submit that throws leaves the tool idle', () => {
     useGeoStore.temporal.getState().clear();
   });
 
-  it('a prefold that rejects (not a cancel): the submit rejects, the queue is idle, and the next submit commits', async () => {
+  // #2890 (ADR-830): the worker call a submit makes is now the whole decision (`geoJobs.decide`), where it was the prefold
+  it('a worker call that rejects (not a cancel): the submit rejects, the queue is idle, and the next submit commits', async () => {
     const deps = makeDeps();
-    const prefold = vi.spyOn(geoWork, 'prefold').mockRejectedValueOnce(new Error('the worker crashed'));
+    const prefold = vi.spyOn(geoJobs, 'decide').mockRejectedValueOnce(new Error('the worker crashed'));
     await expect(runSubmit('משולש ABC', deps)).rejects.toThrow('the worker crashed');
     prefold.mockRestore();
     expect(deps.work.working(), 'not left working').toBe(false);

@@ -1565,6 +1565,18 @@ export function drivenConstraintsOf(c: Construction): Constraint[] {
 const evalMemo = new WeakMap<Construction, { r: EvalResult; cell: WorkCell }>();
 registerLedger((c) => evalMemo.get(c as Construction)?.cell);
 
+/**
+ * #2890 ([ADR-830](docs/06-decisions.md#adr-830)) — ADOPT a settled evaluation of `c`: one computed in another heap (a
+ * worker) and received WITH `c`, in one structured clone. The page's readers then hit it as if it had been computed
+ * here. Its ledger is flat (the work it saved), as a transplanted fold's is (ADR-584). Never overwrites an entry.
+ */
+export function adoptEvaluate(c: Construction, r: EvalResult, units = 0): void {
+  if (!evalMemo.has(c)) evalMemo.set(c, { r, cell: { own: units, deps: [], charged: 0 } });
+}
+/** #2890 (ADR-830): adopt the settled baked construction of `c` (see {@link adoptEvaluate}). */
+export function adoptResolved(c: Construction, r: Construction, units = 0): void {
+  if (!resolvedMemo.has(c)) resolvedMemo.set(c, { r, cell: { own: units, deps: [], charged: 0 } });
+}
 export function evaluate(c: Construction): EvalResult {
   const hit = evalMemo.get(c);
   // #1605 (ADR-582): a hit is charged the work it saved; one a work budget cannot afford is recomputed
