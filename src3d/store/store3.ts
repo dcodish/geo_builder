@@ -237,6 +237,7 @@ function readSegmentEquation3(prefix: readonly Fact3[], at: number): SegmentEqua
     !asVector ? 'length' : asLength ? (sameFigure(asVector, asLength) ? 'length' : 'ask') : 'vector';
   if (readingMemo3.size > 500) readingMemo3.delete(readingMemo3.keys().next().value as string);
   readingMemo3.set(key, out);
+  if (storeJournal3) storeJournal3.readings.push([key, out]);
   return out;
 }
 
@@ -896,6 +897,13 @@ export function derive3(facts: Fact3[], seed: Seed3): Derived3 {
     return hit.out;
   }
   const out = derive3Uncached(facts, seed);
+  if (storeJournal3) storeJournal3.derives.push({ facts: list as Fact3[], seed, out });
+  keepDerive3(key, out);
+  return out;
+}
+
+/** The derive memo's write: the newest entry in, the least recently used out. */
+function keepDerive3(key: string, out: Derived3): void {
   deriveMemo3.set(key, { out, used: ++deriveTick3 });
   if (deriveMemo3.size > DERIVE_MEMO_ENTRIES) {
     let oldest = key;
@@ -909,7 +917,42 @@ export function derive3(facts: Fact3[], seed: Seed3): Derived3 {
     deriveMemo3.delete(oldest);
     deriveMemoStats3.dropped++;
   }
-  return out;
+}
+
+/**
+ * #2890 ([ADR-3D-492](../../docs/06b-decisions-3d.md#adr-3d-492) part 2) — THE STORE'S HALF OF A JOB'S JOURNAL: every
+ * derive and every segment-equation reading written into this file's two content-keyed memos while a recording is on
+ * (`store/journal3.ts` is the one caller), and the way a journal's entries are taken in: under the key `derive3` and
+ * `readSegmentEquation3` would themselves use, an entry already held kept.
+ */
+export interface StoreJournal3 {
+  derives: { facts: Fact3[]; seed: Seed3; out: Derived3 }[];
+  readings: [key: string, reading: SegmentEquationReading3][];
+}
+let storeJournal3: StoreJournal3 | null = null;
+export function recordStoreJournal3(on: boolean): void {
+  if (on && storeJournal3) throw new Error('a journal is already being recorded');
+  storeJournal3 = on ? { derives: [], readings: [] } : null;
+}
+export function takeStoreJournal3(): StoreJournal3 {
+  if (!storeJournal3) throw new Error('no journal is being recorded');
+  const taken = storeJournal3;
+  storeJournal3 = { derives: [], readings: [] };
+  return taken;
+}
+export function adoptStoreJournal3(j: StoreJournal3): void {
+  for (const d of j.derives) {
+    const list = factLists3.of(d.facts);
+    let id = factListIds3.get(list);
+    if (id === undefined) factListIds3.set(list, (id = ++nextFactListId3));
+    const key = `${id}|${seedKey3(d.seed)}`;
+    if (!deriveMemo3.has(key)) keepDerive3(key, d.out);
+  }
+  for (const [key, reading] of j.readings) {
+    if (readingMemo3.has(key)) continue;
+    if (readingMemo3.size > 500) readingMemo3.delete(readingMemo3.keys().next().value as string);
+    readingMemo3.set(key, reading);
+  }
 }
 
 /** #1566 (ADR-3D-399): a solid the mint pass created for a row — the declaration it applies, and the points that made. */
@@ -2594,13 +2637,14 @@ export interface Geo3State {
   /** #1467 (ADR-3D-382): the points the last recorded line created by reference, and that line's fact id — what the
    *  «נוצרה נקודה חדשה …» notice names; its ✕ removes the fact. Null after any other verdict. */
   lastCreated: { factId: string; ids: readonly string[]; circle?: string } | null;
-  submit: (utterance: string) => void;
+  /** #2890 (ADR-3D-492): `newId` — the new row's id, when the caller has drawn it (two heaps running one action must name the row alike). */
+  submit: (utterance: string, newId?: () => string) => void;
   /** #1692 (ADR-3D-305): DISPATCH a verdict already decided by `decideSubmit3` (or by the App's
    *  `decideDeterministic3`, which wraps it). `submit` is exactly `dispatchVerdict(decideSubmit3(...))`; the App
    *  asks the decision itself, so its pre-LLM registers sit in ONE pure function the triage replay can call. */
   dispatchVerdict: (v: Verdict3) => void;
   /** Add ONE fact from LLM-normalised canonical lines (each re-parsed deterministically; all-or-nothing). */
-  submitSteps: (utterance: string, steps: string[]) => void;
+  submitSteps: (utterance: string, steps: string[], newId?: () => string) => void;
   toggle: (factId: string) => void;
   remove: (factId: string) => void;
   /** Edit a fact IN PLACE (B5 #670, docs/28 §4a D6): re-parse the new text and run it through the
@@ -3379,9 +3423,9 @@ export const useGeo3 = create<Geo3State>()(
       lastNotice: null,
       lastCreated: null,
 
-      submit: (utterance) => {
+      submit: (utterance, newId) => {
         // #1394: DECIDED, then dispatched — every branch lives in `decideSubmit3`, pure over the state.
-        get().dispatchVerdict(decideSubmit3(get(), utterance));
+        get().dispatchVerdict(decideSubmit3(get(), utterance, newId));
       },
 
       dispatchVerdict: (v) => {
@@ -3422,10 +3466,10 @@ export const useGeo3 = create<Geo3State>()(
         }
       },
 
-      submitSteps: (utterance, steps) => {
+      submitSteps: (utterance, steps, newId) => {
         // #1692: decided by `decideSteps3` (pure — the triage replay follows an LLM step through the same
         // function), then dispatched like every other verdict.
-        get().dispatchVerdict(decideSteps3(get(), utterance, steps));
+        get().dispatchVerdict(decideSteps3(get(), utterance, steps, newId));
       },
 
       toggle: (factId) => {

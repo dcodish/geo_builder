@@ -872,12 +872,14 @@ a solve can reach, so it belongs to the solver, never to a key.
 **The pivot's lazy values are plain cells (#2890, [ADR-3D-492](06b-decisions-3d.md#adr-3d-492); [ADR-W-210](06w-decisions-workspace.md#adr-w-210) phase 3).**
 A resolved figure is plain data: `structuredClone` takes it whole, and `RESOLVED_CROSSES3` (`engine/evaluate.ts`)
 fails `tsc` when a function is added to `Resolved3` at any depth. The three values a reader may ask of the pivot's
-outcome after the solve (`scalarConsumed`, `placementFreedom`, `heldPins`) are each a CELL, `{ v }`
-(`engine/lazy3.ts`): the value once computed, `null` until then. How to compute a cell stays in the heap that
-solved the figure, in a table keyed by the cell object. A copy of the pivot shares the cell. `heldPins` names each
-pin by its place in `c.scalarPins`, never by the pin object.
+outcome after the solve (`scalarConsumed`, `placementFreedom`, `heldPins`) are each a CELL on the figure, the
+marker `{ lazy: true }` (`engine/lazy3.ts`). The value once computed, and how to compute it, are kept BESIDE the
+figure in the heap that solved it, keyed by the cell object. **A cell never holds its value**: a figure must be the
+same data whether or not a reader has asked yet, or a comparison of two figures depends on what was read before (the
+compute-once lock failed on exactly that). A copy of the pivot shares the cell. `heldPins` names each pin by its
+place in `c.scalarPins`, never by the pin object.
 - **One reader**, `lazyValue3`, behind `scalarConsumed3(resolved)` and `placementFreedom3(resolved)`; never read
-  `pivot.<name>.v` at a call site. In order: the cell's value; computed here, where this heap solved the figure; the
+  the cell at a call site. In order: the value this heap has in hand; computed here, where this heap solved the figure; the
   value that FOLLOWED the figure (`keepLazyValue3`), addressed by the construction's content, the resolve key and the
   name; and last the figure SOLVED AGAIN here, counted (`lazyStats3.solvedAgain`). Never a default: the DOF line's
   `?? c.scalarPins.length` is for a pivot with no solution, so an absent value read as `undefined` would print a wrong
@@ -888,6 +890,35 @@ pin by its place in `c.scalarPins`, never by the pin object.
   origins are written first: they are part of its content.
 - Nothing is forced before a figure crosses. Forcing every lazy on every figure was measured at 8.4 % of a load's work
   and up to 1.4 s on one figure, almost all of it `placementFreedom` on samples nobody reads.
+
+**A job's journal, and its adoption (#2890, [ADR-3D-492](06b-decisions-3d.md#adr-3d-492) part 2).** The memos above can
+be filled from outside the heap. `store/journal3.ts`:
+- `recordJournal3()` notes every entry WRITTEN into a content-keyed memo while it is on, in the order written: a
+  derive, a resolved figure (also when a construction object takes its content's answer as its own), a seed's verdict,
+  a ring-reach value, a segment-equation reading, and every lazy value in hand, addressed like its figure (a cell
+  carries none): those of the figures in the take, and those computed since on a figure an earlier take carried.
+  `take()` returns what was written since the take before, as plain data: a job is handed over in stages (the
+  figure, then the values), and a value computed in a later stage on an earlier stage's figure follows by content.
+- `adoptJournal3(journal)` puts each entry into the memo its own function reads, under the key that function builds.
+  An entry already held is kept. Nothing is applied as a result: the adopting heap then runs its OWN store action and
+  readers, and every solve is a hit. An entry that is missing is solved there and counted, never read as a default.
+- **A memo added to this tree joins the journal** (its write noted, its adoption written), or the adopting heap solves
+  what the solving heap solved. `__tests__/two-heaps-2890.test.ts` is what catches it: it walks every fixture on two
+  heaps (two module instances) in step and asserts that the second solves 0 units, with 0 derives and 0 resolves not
+  answered from a memo.
+- **Beside its entries a journal carries** each construction's pin origins, as an array aligned with `c.scalarPins`
+  in the same message (a clone's pin objects are new, and a construction without its origins is "not settled": it
+  keeps the identity rule and nothing adopted is found under it). **The new row's id is the caller's**
+  (`store.submit(text, newId)`, `submitSteps`, `decideDeterministic3`): it is part of the derive's key, and two heaps
+  running one submit must name the row alike. **One take is one message**: its entries share objects, and a clone keeps
+  that only inside one `structuredClone`.
+- **An adopted answer is not dropped for the memo's bound on arrival.** The solving heap wrote its answers in the
+  order the action asked for them and dropped the oldest; they all arrive at once, after it has finished, and the
+  adopting heap's action then asks from the start. The surplus goes when the next journal arrives
+  (`releaseAdopted3`).
+- The walk is a sequence of steps (`stepsOfFixture3`, `stepsOfLines3`) so that two heaps can take them in turn; a new
+  session is a step of its own. The driver's render says where the figure ends and the values begin (`stages3`): the
+  derive, the DOF line, the chips and the scene, then the data panel.
 
 **A pin symbol's admissible roots are one set (#1769, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395)).** One
 root predicate decides whether a candidate joins the pool: `collect` admits it only when it is exact on the primary

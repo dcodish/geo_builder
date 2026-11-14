@@ -53,7 +53,7 @@ import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } fr
 import type { Claim3, Construction3, Determination3, Id, LinExpr, Operand3, PointDef, Positions3, Requirement3, SolidKind, SolidObj } from './types';
 import { claimHoldsAt3, claimResidual3, claimSeeds, residualHolds3 } from './claims';
 import { ContentTable } from './content3';
-import { computeHere3, computesHere3, lazy3, type Lazy3 } from './lazy3';
+import { computeHere3, computesHere3, forgetLazy3, holdLazy3, lazy3, lazyHeld3, type Lazy3, type Uncloneable3 } from './lazy3';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
@@ -1273,6 +1273,7 @@ function ringReachValue3(c: Construction3, seed: number): number | null {
     }
   }
   per.set(seed, out);
+  if (engineJournal3) engineJournal3.reaches.push({ figure: c, seed, out });
   return out;
 }
 
@@ -2140,18 +2141,24 @@ function ownResolves3(figure: Construction3): Map<string, Resolved3> {
   if (!own) resolveMemo3.set(figure, (own = new Map()));
   return own;
 }
-/** An answer the content already has, taken into the object's own. */
-function sharedResolve3(own: Map<string, Resolved3>, c: Construction3, key: string): Resolved3 | undefined {
+/** An answer the content already has, taken into the object's own. `home`: where the figure's solve lives (the journal's). */
+function sharedResolve3(figure: Construction3, own: Map<string, Resolved3>, c: Construction3, key: string, home: () => ResolvedHome3): Resolved3 | undefined {
   const hit = sharedResolves3.get(c)?.get(key);
-  if (hit) keepResolve3(own, key, hit);
+  if (hit) {
+    keepResolve3(own, key, hit);
+    if (engineJournal3) journalResolve3(figure, key, home(), hit);
+  }
   return hit;
 }
-/** A new answer: the object's own, and the content's. */
-function rememberResolve3(own: Map<string, Resolved3>, c: Construction3, key: string, out: Resolved3): Resolved3 {
+/** A new answer: the object's own, and the content's. Its lazy cells are given their home. */
+function rememberResolve3(figure: Construction3, own: Map<string, Resolved3>, c: Construction3, key: string, home: () => ResolvedHome3, out: Resolved3): Resolved3 {
+  const at = home();
+  homeLazies3(out, at);
   keepResolve3(own, key, out);
   let shared = sharedResolves3.get(c);
   if (!shared) sharedResolves3.set(c, (shared = new Map()));
   keepResolve3(shared, key, out);
+  if (engineJournal3) journalResolve3(figure, key, at, out);
   return out;
 }
 /**
@@ -2159,8 +2166,8 @@ function rememberResolve3(own: Map<string, Resolved3>, c: Construction3, key: st
  *
  * The pivot's outcome holds three values a reader may ask for after the solve (`scalarConsumed`, `heldPins`,
  * `placementFreedom`), each a plain cell (`engine/lazy3.ts`). {@link lazyValue3} is the one reader:
- *  1. the cell has its value: that is the answer;
- *  2. this heap solved the figure: it computes the value, as the closure did, and keeps it in the cell;
+ *  1. this heap has the value in hand (it computed it, or took it in): that is the answer;
+ *  2. this heap solved the figure: it computes the value, as the closure did, and keeps it;
  *  3. this heap did NOT solve the figure (it was put in the memo by {@link keepResolved3}) and the value has FOLLOWED
  *     the figure ({@link keepLazyValue3}): that is the answer. A value is addressed like the figure it belongs to (the
  *     construction's content, the resolve key, the value's name): `resolve3` is a pure function of that address, so
@@ -2214,23 +2221,29 @@ function solveAgain3(home: ResolvedHome3): Resolved3 {
 /** THE READER of a pivot's lazy value (see the block above). `undefined`: the pivot holds no such value. */
 function lazyValue3<T>(cell: Lazy3<T> | undefined): T | undefined {
   if (!cell) return undefined;
-  if (cell.v !== null) return cell.v;
-  if (computesHere3(cell)) return computeHere3(cell);
+  const inHand = lazyHeld3(cell);
+  if (inHand !== undefined) return inHand;
   const home = lazyHome3.get(cell);
+  if (computesHere3(cell)) {
+    const v = computeHere3(cell);
+    if (engineJournal3 && home) engineJournal3.late.push({ cell, figure: home.c, key: home.key, name: home.name });
+    return v;
+  }
   if (!home) throw new Error('a lazy value of a resolved figure that is in no memo of this heap: put the figure there first (keepResolved3)');
   const followed = lazyValues3.get(home.c)?.get(`${home.key}|${home.name}`) as T | undefined;
-  if (followed !== undefined) return (cell.v = followed);
+  if (followed !== undefined) return holdLazy3(cell, followed);
   lazyStats3.solvedAgain++;
   const v = lazyValue3(solveAgain3(home).pivot?.[home.name] as Lazy3<T> | undefined);
   if (v === undefined) throw new Error(`the figure solved again holds no ${home.name}: resolve3 is not the pure function this memo assumes`);
   keepLazyValue3(home.c, home.key, home.name, v);
-  return (cell.v = v);
+  return holdLazy3(cell, v);
 }
 /** The value of a cell if it is in hand (computed, or followed its figure), without computing it: `null` if not. */
 export function peekLazy3(resolved: Resolved3, name: LazyName3): unknown {
   const cell = resolved.pivot?.[name] as Lazy3<unknown> | undefined;
   if (!cell) return null;
-  if (cell.v !== null) return cell.v;
+  const inHand = lazyHeld3(cell);
+  if (inHand !== undefined) return inHand;
   const home = lazyHome3.get(cell);
   return (home && lazyValues3.get(home.c)?.get(`${home.key}|${home.name}`)) ?? null;
 }
@@ -2245,14 +2258,107 @@ export const placementFreedom3 = (resolved: Resolved3): PlacementFreedom3 | unde
  * that a value asked for later is found or solved (`lazyValue3`). The caller has written the construction's pin
  * origins (`scalarPinOrigin3`) first: they are part of its content.
  */
-export function keepResolved3(figure: Construction3, home: Omit<ResolvedHome3, 'c'>, out: Resolved3): void {
+export function keepResolved3(figure: Construction3, key: string, home: Omit<ResolvedHome3, 'c'>, out: Resolved3): void {
   const c = figureContent3.of(figure);
   homeLazies3(out, { ...home, c });
   const own = ownResolves3(figure);
-  if (!own.has(home.key)) keepResolve3(own, home.key, out);
   let shared = sharedResolves3.get(c);
   if (!shared) sharedResolves3.set(c, (shared = new Map()));
-  if (!shared.has(home.key)) keepResolve3(shared, home.key, out);
+  for (const memo of [own, shared]) {
+    if (memo.has(key)) continue;
+    memo.set(key, out);
+    if (memo.size > RESOLVE_MEMO_PER_FIGURE) adoptedOver3.add(memo);
+  }
+}
+/**
+ * #2890 (ADR-3D-492) — AN ADOPTED ANSWER OUTLIVES ITS JOB'S REPLAY. The memo holds {@link RESOLVE_MEMO_PER_FIGURE}
+ * answers a construction, the oldest dropped. A job's answers arrive when the solving heap has FINISHED, so this heap's
+ * tier would end where that one's ended, while the action this heap then runs starts where that one started: the first
+ * answer it asks for is the first that was dropped (a 200-seed search writes 409). So an arriving answer is not
+ * dropped on arrival. The surplus goes when the next journal arrives, by which time the action has run; a caller that
+ * knows it has run may say so sooner.
+ */
+const adoptedOver3 = new Set<Map<string, Resolved3>>();
+export function releaseAdopted3(): void {
+  for (const memo of adoptedOver3) while (memo.size > RESOLVE_MEMO_PER_FIGURE) memo.delete(memo.keys().next().value as string);
+  adoptedOver3.clear();
+}
+
+/**
+ * #2890 ([ADR-3D-492](../../docs/06b-decisions-3d.md#adr-3d-492) part 2) — THE ENGINE'S HALF OF A JOB'S JOURNAL: every
+ * answer written into a content-keyed memo of this file while a recording is on, in the order written. `figure` is the
+ * construction object that was asked; its content names the entry in any heap. Plain data (`store/journal3.ts` adds
+ * the store's half and the pin origins, and is the one caller).
+ */
+export interface EngineJournal3 {
+  /** an answer of `resolve3`: the memo key it is held under, and the home of the solve it came from */
+  resolves: { figure: Construction3; key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3 }[];
+  /** a seed's verdict (`seedVerdict3`) */
+  verdicts: { figure: Construction3; key: string; out: boolean }[];
+  /** a ring-reach value (`ringReachValue3`) */
+  reaches: { figure: Construction3; seed: number; out: number | null }[];
+  /** a lazy value in hand, addressed like its figure: of a figure in this journal, or of one an earlier journal carried (it follows) */
+  lazies: { figure: Construction3; key: string; name: LazyName3; value: unknown }[];
+}
+let engineJournal3: (Omit<EngineJournal3, 'lazies'> & { late: { cell: Lazy3<unknown>; figure: Construction3; key: string; name: LazyName3 }[] }) | null = null;
+function journalResolve3(figure: Construction3, key: string, home: ResolvedHome3, out: Resolved3): void {
+  // a construction that is not settled (a probe with a temporary pin) has no content: its answers serve no other heap
+  if (!pinsSettled3(figure)) return;
+  engineJournal3!.resolves.push({ figure, key, home: { key: home.key, seed: home.seed, opts: home.opts, parts: home.parts }, out });
+}
+/** Start, or stop, recording what this file's memos are given. One recording at a time. */
+export function recordEngineJournal3(on: boolean): void {
+  if (on && engineJournal3) throw new Error('a journal is already being recorded');
+  engineJournal3 = on ? { resolves: [], verdicts: [], reaches: [], late: [] } : null;
+}
+/** What was written since the last take (the recording goes on). */
+export function takeEngineJournal3(): EngineJournal3 {
+  if (!engineJournal3) throw new Error('no journal is being recorded');
+  const { resolves, verdicts, reaches, late } = engineJournal3;
+  engineJournal3 = { resolves: [], verdicts: [], reaches: [], late: [] };
+  // A figure's cell holds no value, so every value in hand crosses here, addressed like its figure: those of the
+  // figures in this take, and those computed since on a figure an earlier take carried. Each once.
+  const sent = new Set<Lazy3<unknown>>();
+  const lazies: EngineJournal3['lazies'] = [];
+  const send = (cell: Lazy3<unknown>, figure: Construction3, key: string, name: LazyName3): void => {
+    const value = lazyHeld3(cell);
+    if (value === undefined || sent.has(cell)) return;
+    sent.add(cell);
+    lazies.push({ figure, key, name, value });
+  };
+  for (const r of resolves) for (const name of LAZY_NAMES3) if (r.out.pivot?.[name]) send(r.out.pivot[name] as Lazy3<unknown>, r.figure, r.home.key, name);
+  for (const l of late) send(l.cell, l.figure, l.key, l.name);
+  return { resolves, verdicts, reaches, lazies };
+}
+/** Take a journal's entries into this heap's memos, under the same content keys. The pin origins are written first (the caller's). */
+export function adoptEngineJournal3(j: EngineJournal3): void {
+  releaseAdopted3();
+  for (const l of j.lazies) keepLazyValue3(l.figure, l.key, l.name, l.value);
+  for (const r of j.resolves) keepResolved3(r.figure, r.key, r.home, r.out);
+  for (const v of j.verdicts) {
+    const of = figureContent3.of(v.figure);
+    let per = seedVerdicts3.get(of);
+    if (!per) seedVerdicts3.set(of, (per = new Map()));
+    if (per.has(v.key)) continue;
+    per.set(v.key, v.out);
+    if (per.size > SEED_VERDICTS_PER_FIGURE) per.delete(per.keys().next().value as string);
+  }
+  for (const r of j.reaches) {
+    const of = figureContent3.of(r.figure);
+    let per = ringReachMemo3.get(of);
+    if (!per) ringReachMemo3.set(of, (per = new Map()));
+    if (!per.has(r.seed)) per.set(r.seed, r.out);
+  }
+}
+/** A construction's pin origins, aligned with `c.scalarPins`: what must cross BESIDE it, for they are part of its content. */
+export type PinOrigins3 = ({ claim?: Claim3; fact?: number } | null)[];
+export const pinOrigins3 = (c: Construction3): PinOrigins3 => c.scalarPins.map((pin) => scalarPinOrigin3.get(pin) ?? null);
+/** Write a crossed construction's pin origins back onto its pin objects, BEFORE anything asks for its content. */
+export function writePinOrigins3(c: Construction3, origins: PinOrigins3): void {
+  c.scalarPins.forEach((pin, i) => {
+    const o = origins[i];
+    if (o) scalarPinOrigin3.set(pin, o);
+  });
 }
 
 /**
@@ -2286,6 +2392,7 @@ function seedVerdict3(c: Construction3, key: string, judge: () => boolean): bool
   const out = judge();
   per.set(key, out);
   if (per.size > SEED_VERDICTS_PER_FIGURE) per.delete(per.keys().next().value as string);
+  if (engineJournal3) engineJournal3.verdicts.push({ figure: of, key, out });
   return out;
 }
 
@@ -2301,6 +2408,7 @@ export function clearEngineCaches3(): void {
   seedVerdictStats3.asked = seedVerdictStats3.hits = 0;
   lazyValues3 = new WeakMap();
   lazyStats3.solvedAgain = 0;
+  adoptedOver3.clear();
   identityMemo.clear();
   rootsMemo.clear();
 }
@@ -2334,11 +2442,13 @@ export function resolve3(figure: Construction3, seedIn: Seed3, opts: Resolve3Opt
    * normalisation leaves alone is served the SAME object both ways, so no consumer can see two figures (#863).
    */
   const solvedKey = `${base}|raw`;
-  let solved = own.get(solvedKey) ?? sharedResolve3(own, c, solvedKey);
+  // #2890: the figure's home is its SOLVE's: the drawn frame is that solution turned, and shares its lazy cells
+  const home = (): ResolvedHome3 => ({ c, key: solvedKey, seed, opts, parts: false });
+  let solved = own.get(solvedKey) ?? sharedResolve3(figure, own, c, solvedKey, home);
   if (solved) resolveStats3.hits++;
-  else solved = rememberResolve3(own, c, solvedKey, homeLazies3(resolveHeld3(c, seed, opts), { c, key: solvedKey, seed, opts, parts: false }));
+  else solved = rememberResolve3(figure, own, c, solvedKey, home, resolveHeld3(c, seed, opts));
   if (opts.solvedFrame) return solved;
-  return own.get(base) ?? sharedResolve3(own, c, base) ?? rememberResolve3(own, c, base, drawnFrame3(c, solved));
+  return own.get(base) ?? sharedResolve3(figure, own, c, base, home) ?? rememberResolve3(figure, own, c, base, home, drawnFrame3(c, solved));
 }
 
 /**
@@ -2351,11 +2461,12 @@ function resolveParts3(figure: Construction3, c: Construction3, parts: readonly 
   const base = `parts:${at.join(',')}` + (opts.placementImage ? '|img' : '');
   const own = ownResolves3(figure);
   const solvedKey = `${base}|raw`;
-  let solved = own.get(solvedKey) ?? sharedResolve3(own, c, solvedKey);
+  const home = (): ResolvedHome3 => ({ c, key: solvedKey, seed, opts, parts: true });
+  let solved = own.get(solvedKey) ?? sharedResolve3(figure, own, c, solvedKey, home);
   if (solved) resolveStats3.hits++;
-  else solved = rememberResolve3(own, c, solvedKey, homeLazies3(solveParts3(c, parts, seed, opts), { c, key: solvedKey, seed, opts, parts: true }));
+  else solved = rememberResolve3(figure, own, c, solvedKey, home, solveParts3(c, parts, seed, opts));
   if (opts.solvedFrame) return solved;
-  return own.get(base) ?? sharedResolve3(own, c, base) ?? rememberResolve3(own, c, base, drawnFrame3(c, solved));
+  return own.get(base) ?? sharedResolve3(figure, own, c, base, home) ?? rememberResolve3(figure, own, c, base, home, drawnFrame3(c, solved));
 }
 
 /** {@link resolveParts3}'s solve: each part in the solved frame (its own resolve is memoised on the part), joined. */
@@ -3384,7 +3495,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           solvePivot(c, ECat, dims0, seed, undefined, members, undefined, linesAt, { x: xAt, mirror: mirrorAt, freedom: 'measure' })[0]
             ?.placementFreedom?.() ?? NO_PLACEMENT_FREEDOM3,
       );
-      const measured = (): PlacementFreedom3 => placementFreedom.v ?? computeHere3(placementFreedom);
+      const measured = (): PlacementFreedom3 => lazyHeld3(placementFreedom) ?? computeHere3(placementFreedom);
       pivot = { ...pivot, placementFreedom };
       // #2378 (ADR-3D-379) — THE DRAWING TURNS. The operator's 2026-10-23 ruling (#2378, card d04 A): "Each
       // press turns the cube about AB to a new angle. The first drawing may no longer sit square on the floor."
@@ -3435,7 +3546,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           } else if (warm.x) {
             xAt = [...warm.x];
             mirrorAt = warm.mirror ?? false;
-            placementFreedom.v = null;
+            forgetLazy3(placementFreedom);
             pivot = {
               ...pivot!, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen, placementFreedom,
               ...(pivotBefore.symRoots ? { symRoots: pivotBefore.symRoots } : {}),
@@ -3478,7 +3589,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           turnWalked = true;
           xAt = [...warm.x];
           mirrorAt = warm.mirror ?? false;
-          placementFreedom.v = null;
+          forgetLazy3(placementFreedom);
           pivot = {
             ...pivot!, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen, placementFreedom,
             ...(pivotBefore.symRoots ? { symRoots: pivotBefore.symRoots } : {}),
@@ -5509,17 +5620,4 @@ function firstSatisfyingSeedOf3(c: Construction3, from: number, budget: number):
  * #2890 (ADR-3D-492) — A RESOLVED FIGURE HOLDS NOTHING `structuredClone` REFUSES. A function (or a symbol) added to
  * `Resolved3`, at any depth, makes this line fail `tsc`: a figure that cannot cross cannot be handed to the page.
  */
-type Uncloneable3<T> = T extends (...args: never[]) => unknown
-  ? T
-  : T extends symbol
-    ? T
-    : T extends ReadonlyMap<infer K, infer V>
-      ? Uncloneable3<K> | Uncloneable3<V>
-      : T extends ReadonlySet<infer V>
-        ? Uncloneable3<V>
-        : T extends readonly (infer V)[]
-          ? Uncloneable3<V>
-          : T extends object
-            ? { [K in keyof T]-?: Uncloneable3<T[K]> }[keyof T]
-            : never;
 export const RESOLVED_CROSSES3: [Uncloneable3<Resolved3>] extends [never] ? true : never = true;

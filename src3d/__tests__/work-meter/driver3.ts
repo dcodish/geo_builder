@@ -15,7 +15,7 @@
  * home camera. 3-D has no worker and no work after the paint: every unit is page work before the paint, and the
  * meter says so rather than this file.
  */
-import { useGeo3, clearSolveCaches3, derive3, deriveStats3, type Fact3 } from '../../store/store3';
+import { useGeo3, clearSolveCaches3, derive3, deriveStats3, type Derived3, type Fact3 } from '../../store/store3';
 import { decideDeterministic3 } from '../../app/decideDeterministic3';
 import { deserializeFigure3 } from '../../store/figureFile3';
 import { auditLoad3 } from '../../store/loadAudit3';
@@ -47,6 +47,26 @@ export interface ActionRecord3 extends Outcome3 {
 type Seed = ReturnType<typeof useGeo3.getState>['seed'];
 const now = (): number => performance.now();
 
+
+/**
+ * #2890 (ADR-3D-492) — THE RENDER HAS TWO PARTS: the FIGURE (the derive, the DOF line, the chips, the scene) and the
+ * VALUES (the open data panel). A job hands them over one after the other, so a walk on two heaps has to say where
+ * the first ends: `beforeValues` is called at that point, and with `values` off the render stops short of the
+ * values (a heap that has not been handed them yet); {@link renderValues3} then reads them alone. A walk on one heap
+ * touches neither.
+ *
+ * The scene is read BEFORE the values, where the App reads it after (the panel is computed in App3's body, the scene in
+ * its child). The scene's one solver reach is the crossing dots' other configurations, and those cost no unit in either
+ * order (measured over every fixture and the slow corpus: the claims' samples have solved them), so no count depends on
+ * it; but the dots belong to the FIGURE's hand-over, and a heap that is handed the figure alone must find them in it.
+ */
+export const stages3: { beforeValues: (() => void) | null; values: boolean } = { beforeValues: null, values: true };
+
+/** The values a render reads: what the open data panel shows. */
+function readValues3(d: Derived3, seed: Seed): void {
+  dataView(d.construction, seed);
+}
+
 /** The App's render-side derivations for the store's current `(facts, seed)`. Returns its wall time. */
 export function render3(): number {
   const t = now();
@@ -57,12 +77,23 @@ export function render3(): number {
     planeChipsByFact(facts, (id) => d.status[id] === 'ok', (n) => d.resolved.planes.has(n));
     dihedralChipsByFact(facts, (id) => d.status[id] === 'ok');
     paramChipsByFact(facts, competingArcSymbols(collectWedges(d.construction, d.resolved.positions)));
-    dataView(d.construction, seed);
     buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1, {}, true, () => 'value', []);
+    stages3.beforeValues?.();
+    if (stages3.values) readValues3(d, seed);
   } catch {
     /* a render throw is not a timing concern here */
   }
   return now() - t;
+}
+
+/** The values alone, for the figure on screen: the second part of a render whose first ran with `values` off. */
+export function renderValues3(): void {
+  const { facts, seed } = useGeo3.getState();
+  try {
+    readValues3(derive3(facts, seed), seed);
+  } catch {
+    /* as render3 */
+  }
 }
 
 /** Put a figure in the store without measuring anything. */
@@ -126,6 +157,11 @@ export function removeFirst3(): Required<Outcome3> {
  */
 export function beforeEdit3(facts: Fact3[], seed: Seed): void {
   clearSolveCaches3();
+  showBeforeEdit3(facts, seed);
+}
+
+/** {@link beforeEdit3} after its clear: the rows before the last shown, then all of them in the store, unsolved. */
+export function showBeforeEdit3(facts: Fact3[], seed: Seed): void {
   setFigure3(facts.slice(0, -1), seed);
   render3();
   setFigure3(facts, seed);
