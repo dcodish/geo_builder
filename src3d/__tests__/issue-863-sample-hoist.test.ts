@@ -18,7 +18,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { deserializeFigure3 } from '../store/figureFile3';
-import { derive3 } from '../store/store3';
+import { clearSolveCaches3, derive3 } from '../store/store3';
 import { narrowingStats3 } from '../store/narrowing3';
 import { sampleStats } from '../engine/rng';
 
@@ -45,6 +45,9 @@ describe('#863 — the pivot residual loop samples nothing', () => {
 
   it('the counter counts — a figure with a solid samples its dims at least once', () => {
     const r = load('symbolic-line-equation-863.geo3.json');
+    // #2888 (ADR-3D-491): the test above solved this figure, and a solve is keyed by the construction's content, so
+    // it is asked for cold. The lock is unchanged: a derive that solves samples a solid's dims.
+    clearSolveCaches3();
     sampleStats.solidCalls = 0;
     derive3(r.facts, r.seed);
     expect(sampleStats.solidCalls).toBeGreaterThan(0);

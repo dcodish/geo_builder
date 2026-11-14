@@ -52,12 +52,13 @@ import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Claim3, Construction3, Determination3, Id, LinExpr, Operand3, PointDef, Positions3, Requirement3, SolidKind, SolidObj } from './types';
 import { claimHoldsAt3, claimResidual3, claimSeeds, residualHolds3 } from './claims';
+import { ContentTable } from './content3';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
   lineCrossing3,
   ringSelfCrossing3} from './vec3';
-import { canonicalSeed3, partsOf3, seedNumber3, seedOfPart3, type Part3, type Seed3 } from './components3';
+import { seedKey3, canonicalSeed3, partsOf3, seedNumber3, seedOfPart3, type Part3, type Seed3 } from './components3';
 import { baseRingOf, boundSolidDimCount3, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
@@ -2090,6 +2091,115 @@ export const resolveStats3 = { uncached: 0, hits: 0, images: 0 };
  * This memo replaces the claim verifier's narrower one; do not add another beside it (docs/17 M3).
  */
 const resolveMemo3 = new WeakMap<Construction3, Map<string, Resolved3>>();
+
+/**
+ * #2888 ([ADR-3D-491](../../docs/06b-decisions-3d.md#adr-3d-491); ADR-W-210 invariant 4) — ONE CONSTRUCTION OBJECT PER
+ * CONSTRUCTION CONTENT. The memo above, the pivot's recorded pools, the released constructions and the parts all hung off
+ * the construction OBJECT, and the store's fold builds a new one every time it runs. The construction does not depend on
+ * the configuration, so a figure asked for at another seed, a part no line touched, and a list whose fold leaves the same
+ * figure (a row that stands aside for its twin, a row unticked) were each a new object and were solved again.
+ * `resolve3` now asks this table first: a construction whose content it has seen (`engine/content3.ts`: the same graph,
+ * exactly, with the same pin origins) is solved as the object first seen (its representative), so the solve, the pools,
+ * the released constructions and the parts are found there (`sharedResolves3`, below, holds the answers). `resolve3` is
+ * a pure function of the construction's content, its pin origins and the configuration, and nothing a reader takes from
+ * a `Resolved3` is compared with its own construction's objects, so the answer is the one this object would have
+ * computed.
+ *
+ * ONLY A SETTLED CONSTRUCTION IS SHARED: one whose every scalar pin carries the list position of the row that stated it
+ * (`scalarPinOrigin3.fact`, written by the store's fold when the row has applied). A construction solved while its row
+ * is still applying (a right pyramid's apply asks the verifier about its base), or built outside the fold (a probe
+ * with a temporary pin, an engine test), has pins whose origin is not written yet or never will be. Its content could
+ * still change under it, so it keeps the identity rule and is never a representative.
+ *
+ * Bounded: {@link FIGURE_CONTENT_ENTRIES} constructions, the least recently used dropped first.
+ */
+export const FIGURE_CONTENT_ENTRIES = 64;
+const pinOriginOf3 = (node: object): unknown => {
+  const o = scalarPinOrigin3.get(node as ScalarPin);
+  return o ? [o.fact, o.claim] : undefined;
+};
+const pinsSettled3 = (c: Construction3): boolean => c.scalarPins.every((p) => scalarPinOrigin3.get(p)?.fact !== undefined);
+export const figureContent3 = new ContentTable<Construction3>(FIGURE_CONTENT_ENTRIES, pinOriginOf3, pinsSettled3);
+
+/**
+ * #2888 — THE RESOLVE MEMO HAS TWO TIERS. `resolveMemo3` stays what it was: each construction OBJECT's own answers, so
+ * a figure the session comes back to (an undo, a redo, a derive still in the store's memo) finds what it asked for,
+ * whatever other configurations of that content were solved since. Under it, `sharedResolves3` holds the answers of
+ * the CONTENT, on its representative: an object that has not asked yet takes the answer from there. Both hold at most
+ * {@link RESOLVE_MEMO_PER_FIGURE} configurations, the oldest written dropped first, as the one tier always did.
+ */
+const sharedResolves3 = new WeakMap<Construction3, Map<string, Resolved3>>();
+const keepResolve3 = (memo: Map<string, Resolved3>, key: string, out: Resolved3): void => {
+  memo.set(key, out);
+  if (memo.size > RESOLVE_MEMO_PER_FIGURE) memo.delete(memo.keys().next().value as string);
+};
+/** The object's own answers. */
+function ownResolves3(figure: Construction3): Map<string, Resolved3> {
+  let own = resolveMemo3.get(figure);
+  if (!own) resolveMemo3.set(figure, (own = new Map()));
+  return own;
+}
+/** An answer the content already has, taken into the object's own. */
+function sharedResolve3(own: Map<string, Resolved3>, c: Construction3, key: string): Resolved3 | undefined {
+  const hit = sharedResolves3.get(c)?.get(key);
+  if (hit) keepResolve3(own, key, hit);
+  return hit;
+}
+/** A new answer: the object's own, and the content's. */
+function rememberResolve3(own: Map<string, Resolved3>, c: Construction3, key: string, out: Resolved3): Resolved3 {
+  keepResolve3(own, key, out);
+  let shared = sharedResolves3.get(c);
+  if (!shared) sharedResolves3.set(c, (shared = new Map()));
+  keepResolve3(shared, key, out);
+  return out;
+}
+/**
+ * #2888 (ADR-3D-491) — A SEED'S VERDICT IS KEPT PER CONSTRUCTION CONTENT. The configuration search
+ * ({@link firstSatisfyingSeed3}) asks of each seed "does this drawing meet the requirements, and the preferences?".
+ * Each answer needs the figure resolved at that seed, and it is a pure function of the construction's content, the seed
+ * and the preferences asked. A figure whose givens force a special case is answered "no" at every seed, so the search
+ * walks its whole window, and the next action on the same figure (a press of «הציגו תצורה אחרת» starts one seed on) walked
+ * the same seeds again: the resolve memo holds {@link RESOLVE_MEMO_PER_FIGURE} figures per construction, far fewer than
+ * the window, and a resolved figure is the wrong thing to keep for a yes or a no. So the VERDICT is kept: one boolean
+ * per (representative construction, question, seed, preference set), {@link SEED_VERDICTS_PER_FIGURE} per construction,
+ * the oldest written dropped. It is not a limit on the search and it changes no answer: a seed that was judged is not
+ * judged again.
+ */
+export const SEED_VERDICTS_PER_FIGURE = 1024;
+let seedVerdicts3 = new WeakMap<Construction3, Map<string, boolean>>();
+/** #2888: seed verdicts by count: `asked` every question that reached the memo, `hits` those it answered. */
+export const seedVerdictStats3 = { asked: 0, hits: 0 };
+/** #2888: how many verdicts are kept for this construction's content (the bound's lock reads it). */
+export const seedVerdictCount3 = (c: Construction3): number => seedVerdicts3.get(figureContent3.of(c))?.size ?? 0;
+function seedVerdict3(c: Construction3, key: string, judge: () => boolean): boolean {
+  const of = figureContent3.of(c);
+  let per = seedVerdicts3.get(of);
+  if (!per) seedVerdicts3.set(of, (per = new Map()));
+  seedVerdictStats3.asked++;
+  const hit = per.get(key);
+  if (hit !== undefined) {
+    seedVerdictStats3.hits++;
+    return hit;
+  }
+  const out = judge();
+  per.set(key, out);
+  if (per.size > SEED_VERDICTS_PER_FIGURE) per.delete(per.keys().next().value as string);
+  return out;
+}
+
+/**
+ * #2888 — TEST-ONLY: forget everything the engine keeps by content (`store3.clearSolveCaches3`, the one clear, is the
+ * one caller): which constructions share a content, the seed verdicts, and the parameter's two older memos
+ * (`identityMemo`, `rootsMemo`), whose misses scan and do not solve.
+ */
+export function clearEngineCaches3(): void {
+  figureContent3.clear();
+  figureContent3.stats.shared = figureContent3.stats.fresh = figureContent3.stats.opaque = figureContent3.stats.dropped = 0;
+  seedVerdicts3 = new WeakMap();
+  seedVerdictStats3.asked = seedVerdictStats3.hits = 0;
+  identityMemo.clear();
+  rootsMemo.clear();
+}
 const RESOLVE_MEMO_PER_FIGURE = 64;
 /** #2368 (ADR-3D-375): a plain resolve's pivot pools, in call order — replayed by its read-back image only. */
 const pivotStageMemo3 = new WeakMap<Construction3, Map<string, PivotPool[]>>();
@@ -2102,35 +2212,29 @@ const pivotStageMemo3 = new WeakMap<Construction3, Map<string, PivotPool[]>>();
  * joined, then turned onto the floor once (`drawnFrame3`, read from the first solid, which is in the first part). A figure
  * of one part takes the path below, at its part's seed.
  */
-export function resolve3(c: Construction3, seedIn: Seed3, opts: Resolve3Opts = {}): Resolved3 {
+export function resolve3(figure: Construction3, seedIn: Seed3, opts: Resolve3Opts = {}): Resolved3 {
+  const c = figureContent3.of(figure); // #2888: the construction's content, whichever object carries it
   const parts = partsOf3(c);
-  if (parts.length > 1) return resolveParts3(c, parts, seedIn, opts);
+  if (parts.length > 1) return resolveParts3(figure, c, parts, seedIn, opts);
   const seed = seedOfPart3(seedIn, parts[0].key);
   // #1986 (ADR-3D-418): a coordinate letter whose default draw crosses a declared ring is drawn at a widened reach
   if (opts.paramValue === undefined && c.param) {
     const reached = ringReachValue3(c, seed);
-    if (reached !== null) return resolve3(c, seed, { ...opts, paramValue: reached });
+    if (reached !== null) return resolve3(figure, seed, { ...opts, paramValue: reached });
   }
   const base = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '');
-  let per = resolveMemo3.get(c);
-  if (!per) resolveMemo3.set(c, (per = new Map()));
-  const memo = per;
-  const remember = (key: string, out: Resolved3): Resolved3 => {
-    memo.set(key, out);
-    if (memo.size > RESOLVE_MEMO_PER_FIGURE) memo.delete(memo.keys().next().value as string);
-    return out;
-  };
+  const own = ownResolves3(figure);
   /**
    * #2630 (ADR-3D-400 §3): ONE solve per configuration, in the solved frame — the knowledge gates read it as is, and
    * the drawing is that same solution turned onto the floor (`drawnFrame3`, no second solve). A figure the
    * normalisation leaves alone is served the SAME object both ways, so no consumer can see two figures (#863).
    */
   const solvedKey = `${base}|raw`;
-  let solved = memo.get(solvedKey);
+  let solved = own.get(solvedKey) ?? sharedResolve3(own, c, solvedKey);
   if (solved) resolveStats3.hits++;
-  else solved = remember(solvedKey, resolveHeld3(c, seed, opts));
+  else solved = rememberResolve3(own, c, solvedKey, resolveHeld3(c, seed, opts));
   if (opts.solvedFrame) return solved;
-  return memo.get(base) ?? remember(base, drawnFrame3(c, solved));
+  return own.get(base) ?? sharedResolve3(own, c, base) ?? rememberResolve3(own, c, base, drawnFrame3(c, solved));
 }
 
 /**
@@ -2138,28 +2242,21 @@ export function resolve3(c: Construction3, seedIn: Seed3, opts: Resolve3Opts = {
  * the seeds its parts are at (two spellings of one configuration share an entry); each part's own resolve is memoised on
  * the part. A figure split into parts has no coordinate letter (`wholeFigure3`), so `paramValue` never reaches here.
  */
-function resolveParts3(c: Construction3, parts: readonly Part3[], seed: Seed3, opts: Resolve3Opts): Resolved3 {
+function resolveParts3(figure: Construction3, c: Construction3, parts: readonly Part3[], seed: Seed3, opts: Resolve3Opts): Resolved3 {
   const at = parts.map((p) => seedOfPart3(seed, p.key));
   const base = `parts:${at.join(',')}` + (opts.placementImage ? '|img' : '');
-  let memo = resolveMemo3.get(c);
-  if (!memo) resolveMemo3.set(c, (memo = new Map()));
-  const per = memo;
-  const remember = (key: string, out: Resolved3): Resolved3 => {
-    per.set(key, out);
-    if (per.size > RESOLVE_MEMO_PER_FIGURE) per.delete(per.keys().next().value as string);
-    return out;
-  };
+  const own = ownResolves3(figure);
   const solvedKey = `${base}|raw`;
-  let solved = per.get(solvedKey);
+  let solved = own.get(solvedKey) ?? sharedResolve3(own, c, solvedKey);
   if (solved) resolveStats3.hits++;
   else {
     const partOpts: Resolve3Opts = { ...opts, solvedFrame: true };
     const outs = parts.map((p, i) => resolve3(p.construction, at[i], partOpts));
     const drawnAt = canonicalSeed3(seedNumber3(seed), Object.fromEntries(parts.map((p, i) => [p.key, at[i]])));
-    solved = remember(solvedKey, joinParts3(c, outs, drawnAt));
+    solved = rememberResolve3(own, c, solvedKey, joinParts3(c, outs, drawnAt));
   }
   if (opts.solvedFrame) return solved;
-  return per.get(base) ?? remember(base, drawnFrame3(c, solved));
+  return own.get(base) ?? sharedResolve3(own, c, base) ?? rememberResolve3(own, c, base, drawnFrame3(c, solved));
 }
 
 type Pivot3 = NonNullable<Resolved3['pivot']>;
@@ -5104,6 +5201,11 @@ export function checkInSpan(
 export function meetsRequirements3(c: Construction3, seed: Seed3): boolean {
   const hard = c.requirements.filter((req) => req.kind !== 'quad-general');
   if (hard.length === 0) return true;
+  return seedVerdict3(c, `requirements|${seedKey3(seed)}`, () => requirementsMetAt3(c, seed, hard)); // #2888
+}
+
+/** {@link meetsRequirements3}'s judgement of one seed (the figure resolved there). */
+function requirementsMetAt3(c: Construction3, seed: Seed3, hard: readonly Exclude<Requirement3, { kind: 'quad-general' }>[]): boolean {
   const r = resolve3(c, seed);
   return hard.every((req) => {
     if (req.kind === 'mutual') {
@@ -5225,10 +5327,19 @@ export function meetsShapePreferences3(c: Construction3, seed: Seed3, prefs: rea
   // givens force a crossing still resolves, at the seed it resolved at before.
   const rings = c.solids.length > 0 || c.quadShapes.length > 0 || c.claims.some((k) => k.type === 'polygon-open');
   if (prefs.length === 0 && !rings) return true;
-  const r = resolve3(c, seed);
-  if (solidFaceCollapsed(c, r.positions)) return false;
-  if (declaredRingCrossed3(c, r.positions)) return false;
-  return prefs.every((req) => !preferenceFails3(req, r.positions));
+  const judge = (): boolean => {
+    const r = resolve3(c, seed);
+    if (solidFaceCollapsed(c, r.positions)) return false;
+    if (declaredRingCrossed3(c, r.positions)) return false;
+    return prefs.every((req) => !preferenceFails3(req, r.positions));
+  };
+  // #2888: WHICH preferences were asked is part of the verdict's key: each by its place among the figure's own (the
+  // search asks all of them, then the ones the givens leave possible). A preference that is not the figure's own has
+  // no place, and the seed is judged without the memo.
+  const own = quadPreferences3(c);
+  const places = prefs.map((req) => own.indexOf(req));
+  if (places.includes(-1)) return judge();
+  return seedVerdict3(c, `preferences|${seedKey3(seed)}|${places.join(',')}`, judge);
 }
 
 /**
