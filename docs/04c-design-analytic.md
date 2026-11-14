@@ -1511,8 +1511,9 @@ Only the cost of an ask depends on what is solved.
 **The bound.** `BoundedStore`: `LINE_LISTS_MAX` (64) line lists, least recently used first; a line list asked for more
 than `CONFIGURATIONS_MAX` (96) configurations is folded again. The memos are weak, so a dropped line list's solves go
 with it. `clearAnalyticCaches()` (test-only) empties the store and every `ContentCache`: the work meter's walk calls it
-where a session starts (`newSession`: each sequence, and each load), and a test that measures a cold derivation calls it
-first.
+where a session starts (`newSession`: each sequence, each load, and the session an edit is measured in,
+`beforeLastRowEdit`, which has solved the rows before the edited one and not that row), and a test that measures a cold
+derivation calls it first.
 
 **Adding a memo.** A pure function of a construction is memoised in a `ContentCache`, never a bare `WeakMap`, or it is
 cold on every `derive`. Anything that says how one reader treats a figure (a mode, a "shown" flag) is keyed by the

@@ -1,7 +1,7 @@
 {"_":"THE WORK-METER BASELINE (#2873, ADR-W-210). One line per figure-action, sorted by key: solver work in units, never seconds (total = all of it, page = on the UI thread, prePaint = before the figure can paint). Never edited by hand: `npm run work:record -- <builder>` rewrites it, and docs/08 says when."}
 {"k":"#1647 touch sentence|another#1","total":119,"page":119,"prePaint":119}
 {"k":"#1647 touch sentence|delete","total":9460,"page":9460,"prePaint":9460}
-{"k":"#1647 touch sentence|edit","total":119,"page":119,"prePaint":119}
+{"k":"#1647 touch sentence|edit","total":780488,"page":780488,"prePaint":780488}
 {"k":"#1647 touch sentence|load","total":780488,"page":780488,"prePaint":780488}
 {"k":"#1647 touch sentence|submit#1","total":5274,"page":5274,"prePaint":5274}
 {"k":"#1647 touch sentence|submit#2","total":3201,"page":3201,"prePaint":3201}
@@ -10,7 +10,7 @@
 {"k":"#1647 touch sentence|submit#5","total":780488,"page":780488,"prePaint":780488}
 {"k":"#2737 nine+1 shapes|another#1","total":544,"page":544,"prePaint":544}
 {"k":"#2737 nine+1 shapes|delete","total":190398,"page":190398,"prePaint":190398}
-{"k":"#2737 nine+1 shapes|edit","total":544,"page":544,"prePaint":544}
+{"k":"#2737 nine+1 shapes|edit","total":232882,"page":232882,"prePaint":232882}
 {"k":"#2737 nine+1 shapes|load","total":232882,"page":232882,"prePaint":232882}
 {"k":"#2737 nine+1 shapes|submit#1","total":0,"page":0,"prePaint":0}
 {"k":"#2737 nine+1 shapes|submit#10","total":232882,"page":232882,"prePaint":232882}
