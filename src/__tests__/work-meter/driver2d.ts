@@ -10,7 +10,8 @@
  *             → [the worker's `autoResolve`] → the render of the found view (page)
  *   another = the worker's `resample` → applyView → the render (page)
  *   load    = loadFigureText (refresh + smoke replay page; prefold worker) → the render → the resolve → the load audit
- *   edit    = runEditCommit on the last row, to its own text (page) → the render → the resolve
+ *   edit    = runEditCommit on the last row, to its own text (page) → the render → the resolve. The walk measures it
+ *             through `editLastRow`: a session that has built the rows BEFORE the last one and not that row (#2888)
  *   delete  = removeGroup of the first row (page; the seed resets) → the render → the resolve
  *   detect  = the worker's `detect` — the background sweep that follows every step, from cold caches (its lane is a
  *             second worker instance). Nothing waits for it. It leaves the caches cold, so it is an item's last action.
@@ -84,6 +85,14 @@ export interface Driver2d {
   load(text: string): Promise<ActionRecord>;
   /** Edit the last row to its own text. Null when the figure has no row with text. */
   edit(): Promise<ActionRecord | null>;
+  /**
+   * THE METER'S `edit` (#2888, one definition for all four builders): a student who has built rows 1..n changes the
+   * LAST row. A new session; rows 1..n-1 put on screen unmeasured (the render and the resolve gate, as `show` does);
+   * then all n rows put in the store UNSOLVED; then the edit of the last row to its own text, measured. The rows
+   * before it are solved in the session and the edited row's content is not, so this costs about what typing row n
+   * costs, through the edit path. Null when the last row has no text.
+   */
+  editLastRow(all: Snap): Promise<ActionRecord | null>;
   /** Delete one row (the first by default). Null when the figure has fewer than two rows. */
   remove(key?: string): Promise<ActionRecord | null>;
   /** The background sweep over `facts` (the figure on screen by default). Leaves the caches cold. */
@@ -340,6 +349,17 @@ export function createDriver2d(ops: WorkerOps, opts: { searchBudgetMs?: number }
         }
         sumSlices(rec);
       });
+    },
+
+    async editLastRow(all) {
+      const last = all.facts[all.facts.length - 1];
+      if (!last?.utterance) return null;
+      const key = groupKey(last);
+      this.reset();
+      this.show({ facts: all.facts.filter((f) => groupKey(f) !== key), seed: all.seed });
+      figure = all;
+      setStore(all); // the n rows, in the store and not solved: no render, no resolve, no audit
+      return this.edit();
     },
 
     async remove(key) {

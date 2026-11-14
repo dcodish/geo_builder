@@ -24,7 +24,7 @@ import { evaluate } from './evaluate';
 import { lineOffset, polygonMargin, sideRecordsOf, sideShortfall, type SideRecord } from './requirements';
 import { pointInPolygon, pointOutsidePolygon } from './geometry';
 import { constraintRank } from './dofRank';
-import { chargeHit, computeWithCell, solveBudget, type WorkCell } from './solveBudget';
+import { chargeHit, computeWithCell, registerLedger, solveBudget, type WorkCell } from './solveBudget';
 
 /**
  * An ORDER/REGION constraint ('angle-order' / 'length-order' / 'collinear-order' / 'angle-acuteness')
@@ -1060,6 +1060,7 @@ export function allConstraints(c: Construction): Set<Constraint> {
  * rank costs 2·(movable parameters) `evaluateCore` calls and every consumer asks about the same figure.
  */
 const dofMemo = new WeakMap<Construction, { n: number; cell: WorkCell }>();
+registerLedger((c) => dofMemo.get(c as Construction)?.cell);
 export function freeDofCount(c: Construction): number {
   const hit = dofMemo.get(c);
   if (hit && chargeHit(hit.cell)) return hit.n; // #1605 (ADR-582): the rank's evaluateCore calls are charged on a hit

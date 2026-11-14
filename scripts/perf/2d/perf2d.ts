@@ -90,7 +90,8 @@ type Step =
   | { k: 'submit'; u: string; locale: 'he' | 'en'; before?: Snap; follow?: any[] | null; occ?: number }
   | { k: 'another'; before?: Snap; occ?: number }
   | { k: 'delete'; before?: Snap; key?: string }
-  | { k: 'edit' }
+  | { k: 'edit' } // #2888: the last row edited in a session that built the rows before it and not that row (Driver2d.editLastRow); an item's last step
+  | { k: 'retype' } // unmeasured: the last row re-typed where the old edit was measured, so delete and detect run in the same session as before
   | { k: 'clear' }
   | { k: 'undo' }
   | { k: 'redo' }
@@ -116,7 +117,7 @@ function buildJobs(): Item[] {
     const key = finalKey(s);
     if (finals.has(key)) return [];
     finals.add(key);
-    return [{ k: 'load', before: s }, { k: 'presses', n: 6 }, { k: 'edit' }, { k: 'delete' }, { k: 'detect' }];
+    return [{ k: 'load', before: s }, { k: 'presses', n: 6 }, { k: 'retype' }, { k: 'delete' }, { k: 'detect' }, { k: 'edit' }];
   };
 
   // 0. known issues / PR figure (thread mode) — the slow corpus the work meter records too (#2873)
@@ -124,7 +125,7 @@ function buildJobs(): Item[] {
     id: `issue:${id}`,
     source: 'issue',
     ref,
-    steps: [...us.map((u) => ({ k: 'submit' as const, u, locale: 'he' as const })), { k: 'presses', n: 6 }, { k: 'load' }, { k: 'edit' }, { k: 'delete' }, { k: 'detect' }],
+    steps: [...us.map((u) => ({ k: 'submit' as const, u, locale: 'he' as const })), { k: 'presses', n: 6 }, { k: 'load' }, { k: 'retype' }, { k: 'delete' }, { k: 'detect' }, { k: 'edit' }],
   });
   items.push(...SLOW_CORPUS_2D.map((q) => issue(q.id, q.ref, q.lines)));
 
@@ -150,7 +151,7 @@ function buildJobs(): Item[] {
     const steps: Step[] = groups.map((g) => ({ k: 'submit', u: g.facts[0].utterance ?? '', locale, follow: g.facts.map((f) => f.cmd) }));
     const snap = { facts, seed: file.seed ?? 0 };
     finals.add(finalKey(snap));
-    steps.push({ k: 'load', text }, { k: 'presses', n: 6 }, { k: 'edit' }, { k: 'delete' }, { k: 'detect' });
+    steps.push({ k: 'load', text }, { k: 'presses', n: 6 }, { k: 'retype' }, { k: 'delete' }, { k: 'detect' }, { k: 'edit' });
     items.push({ id: `fixture:${name}`, source: 'fixture', ref: name, steps });
   }
 
@@ -332,6 +333,8 @@ async function runItem(idx: number, item: Item) {
   let pressNo = 0;
   /** The figure the item last built or loaded, before a delete took a row off it: what the background sweep covers. */
   let whole: Snap = driver.figure();
+  /** The figure as loaded: the n rows the `edit` step edits the last of (#2888). */
+  let loadedSnap: Snap | null = null;
   for (let si = 0; si < item.steps.length; si++) {
     const st = item.steps[si];
     const base: any = { item: item.id, source: item.source, si, k: st.k };
@@ -403,15 +406,22 @@ async function runItem(idx: number, item: Item) {
         begin(idx, si, 'load');
         emit({ ...base, nfacts: s.facts.length, trail: trail.slice(-12), ...(await driver.load(text)) });
         whole = driver.figure();
+        loadedSnap = whole;
+        continue;
+      }
+      if (st.k === 'retype') {
+        if (!driver.figure().facts.some((f) => f.utterance)) continue;
+        driver.show(driver.figure());
+        await driver.edit(); // unmeasured (#2888)
+        whole = driver.figure();
         continue;
       }
       if (st.k === 'edit') {
-        if (!driver.figure().facts.some((f) => f.utterance)) continue;
+        const all = loadedSnap ?? whole;
+        if (!all.facts.length) continue;
         begin(idx, si, 'edit');
-        driver.show(driver.figure());
-        const rec = await driver.edit();
+        const rec = await driver.editLastRow(all);
         if (rec) emit({ ...base, trail: trail.slice(-12), ...rec });
-        whole = driver.figure();
         continue;
       }
       if (st.k === 'delete') {
@@ -469,7 +479,7 @@ async function main() {
     for (const [i, sis] of want) {
       const max = Math.max(...sis);
       const it = items[i];
-      const steps = it.steps.map((s, si) => (sis.has(si) || (si < max && !(s as any).before && s.k !== 'load' && s.k !== 'detect' && s.k !== 'edit' && !(s.k === 'delete' && !(s as any).key)) ? s : ({ k: 'skip' } as any)));
+      const steps = it.steps.map((s, si) => (sis.has(si) || (si < max && !(s as any).before && s.k !== 'load' && s.k !== 'detect' && s.k !== 'edit' && s.k !== 'retype' && !(s.k === 'delete' && !(s as any).key)) ? s : ({ k: 'skip' } as any)));
       for (let r = 1; r <= runs; r++) {
         trail = [];
         confirmRun = r;

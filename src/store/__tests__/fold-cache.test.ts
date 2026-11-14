@@ -59,17 +59,13 @@ describe('fold memo — the seed-independent fold is computed once per fact-list
  * #365 (ADR-406) — PREFIX REUSE: appending facts resumes from a cached CLEAN prefix fold instead of
  * re-folding every fact, guarded by the pre-scan signature (the appended facts must change nothing
  * about how the prefix folded). The equivalence discipline: every resumed fold is compared with a COLD
- * fold of the same content (cache evicted via FOLD_CACHE_MAX junk entries) — same statuses, same
- * positions, bit-for-bit.
+ * fold of the same content (the memo cleared) — same statuses, same positions, bit-for-bit.
  */
-import { foldStats as fs2 } from '@/store/geoStore';
+import { clearReplayCaches, foldStats as fs2 } from '@/store/geoStore';
 
-const evictFoldCache = () => {
-  // FOLD_CACHE_MAX = 8, FIFO — eight distinct junk folds push everything else out
-  for (let i = 0; i < 8; i++) {
-    replay([F(`~evict${i}`, { type: 'free-point', id: `Z${i}`, x: i, y: -i, free: true } as AnyCommand)], 0);
-  }
-};
+// #2888 (ADR-827): the memo is least-recently-used with a measured bound, so "cold" is asked for by name
+// (it used to be bought with eight junk folds, which only worked while the bound was 8 and first-in-first-out).
+const evictFoldCache = () => clearReplayCaches();
 const posSig = (r: ReturnType<typeof replay>): string =>
   JSON.stringify([...r.positions.entries()].sort(([a], [b]) => (a < b ? -1 : 1)));
 

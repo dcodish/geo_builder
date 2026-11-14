@@ -32,7 +32,8 @@ import { circlePairVariantCase } from '@/engine/variants';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, statedSizeCircles } from '@/engine';
 import { crossingPastSecond } from '@/engine/extensionSide';
-import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
+import { chargeHit, chargedInOpenEpoch, clockSpent, computeWithCell, flatLedger, inWorkEpoch, ledgerTotal, registerLedger, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
+import { workLane } from '../../shell/workMeter';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
 import { DOUBLE_ROOT_SPLIT } from '@/engine/geometry';
@@ -501,10 +502,84 @@ export function observeReattemptCuts<T>(fn: () => T): { value: T; cutKeys: Set<s
  * was measured at ~75 s on a hard figure (issue #59) and is identical for every seed, every dry-run
  * trial array, and every sweep candidate — this cache is what turns an 80 s-per-candidate seed search
  * into one fold + a ~1 s tail per candidate.
+ *
+ * #2888 ([ADR-827](docs/06-decisions.md#adr-827)): least recently used out, at a measured bound. It held 8 entries,
+ * first in first out, so one «הציגו תצורה אחרת» search's candidates pushed out the fold of the figure on screen and
+ * the next read folded it again, and a load's audit folded again the prefixes its refresh had just folded.
  */
 const foldCache = new Map<string, FoldNode>();
-const FOLD_CACHE_MAX = 8;
+/**
+ * #2888 ([ADR-827](docs/06-decisions.md#adr-827)) — THE BOUNDS OF THIS LAYER'S TWO CONTENT MEMOS, per heap. Measured,
+ * not chosen (the ADR has the tables): the access trace of the 171 fixture walks and of ten long sessions (8–12 typed
+ * lines, «הציגו תצורה אחרת» after every fourth line and at the end, an edit, a delete and its undo) was replayed
+ * through a least-recently-used memo of every size.
+ * - `folds` — the fold memo. The most distinct folds one session asked for is 29, and at 12 entries no walk asks for a
+ *   fold the bound had evicted (at the old 8, first in first out, the fixture walks folded 5.4 M units twice). 64 is
+ *   twice the largest working set; a fold holds about 20–40 KB with what hangs off it.
+ * - `samples` — the sampled-construction table ({@link sampledOnce}). The largest session asks for 790 distinct
+ *   samples between two clears; at 512 that session solves 1.55 M units again, at 1024 none. About 1.6 KB a sample.
+ * Together a long session's memos hold 2.3–4.2 MB (it was 2.1–3.8 MB). `samples: 0` turns the table off; a test may
+ * lower either bound to exercise the eviction. Under a budget the fold memo answers as the old 8 entries did, whatever
+ * `folds` is (see `budgetVisibleFolds`), which needs `folds` ≥ 15 to be exact.
+ */
+export const replayMemoConfig = { folds: 64, samples: 1024 };
 export const foldStats = { computes: 0, resumes: 0 };
+/** The fold memo's entry for `key`, marked as the most recently used. */
+function foldCacheGet(key: string): FoldNode | undefined {
+  const node = foldCache.get(key);
+  if (node !== undefined) {
+    foldCache.delete(key);
+    foldCache.set(key, node);
+  }
+  return node;
+}
+/** Store a fold as the most recently used, evicting the least recently used ones past the bound. */
+function foldCachePut(key: string, node: FoldNode): void {
+  // a fold folded again keeps the lanes that held it: in a browser each heap holds its own copy
+  const before = foldCache.get(key);
+  if (before && before !== node) for (const lane of foldLanes.get(before) ?? []) noteFoldHeld(node, lane);
+  noteFoldHeld(node);
+  foldCache.delete(key);
+  while (foldCache.size >= Math.max(1, replayMemoConfig.folds)) foldCache.delete(foldCache.keys().next().value as string);
+  foldCache.set(key, node);
+}
+/** The lanes (`workLane()`: the page, a worker) that folded or read a fold: the heaps that hold it in a browser. */
+const foldLanes = new WeakMap<FoldNode, Set<string>>();
+function noteFoldHeld(node: FoldNode, lane: string = workLane()): void {
+  const lanes = foldLanes.get(node);
+  if (lanes) lanes.add(lane);
+  else foldLanes.set(node, new Set([lane]));
+}
+/**
+ * #2888 (ADR-827) — WHAT A BUDGET SEES OF THE FOLD MEMO: EXACTLY WHAT IT SAW.
+ *
+ * A work budget ([ADR-558](docs/06-decisions.md#adr-558)) counts a fold it has to compute and charges a held one once
+ * per epoch, so which folds are held decides where a budget cuts. The memo used to hold 8 folds, first in first out.
+ * `budgetVisibleFolds` is that old memo's key list, kept in step with every fold stored, primed or read (a read of a
+ * fold the old memo had dropped is where it would have folded, and stored, it again). Inside a work epoch, and under a
+ * clock that has already run out (the indefinite-shape probe folds with its ladder spent on purpose,
+ * [ADR-757](docs/06-decisions.md#adr-757)), a fold is readable only if it is on that list. So a budgeted computation
+ * folds, charges and cuts exactly as before, whatever the larger memo holds. Everywhere else the larger memo answers.
+ *
+ * Beyond that list the two lanes of one node process do not share: a fold is readable by the lane that folded or read
+ * it ({@link foldLanes}). On the list they share as they always did, which is the known lower bound of the 2-D page
+ * count (ADR-W-210 Am. 1); the larger memo must not add to it. In a browser a heap is one lane, and this rule is idle.
+ */
+const BUDGET_VISIBLE_FOLDS = 8;
+const budgetVisibleFolds: string[] = [];
+/** `primed`: a transplanted fold dropped the oldest entry of a full memo even when its own key was already held. */
+function noteFoldStored(key: string, primed = false): void {
+  const held = budgetVisibleFolds.includes(key);
+  if ((primed || !held) && budgetVisibleFolds.length >= BUDGET_VISIBLE_FOLDS) budgetVisibleFolds.shift();
+  if (!budgetVisibleFolds.includes(key)) budgetVisibleFolds.push(key);
+}
+/** May the code running now read the memo's entry for `key`? Always, unless a budget could tell the difference. */
+function foldVisible(key: string): boolean {
+  if (budgetVisibleFolds.includes(key)) return true; // what the 8-entry memo held, read as it always was
+  if (inWorkEpoch() || clockSpent()) return false; // under a budget, nothing more
+  const node = foldCache.get(key);
+  return node !== undefined && (foldLanes.get(node)?.has(workLane()) ?? false); // and beyond it, each lane its own
+}
 function foldKey(facts: Fact[]): string {
   const groupIdx = new Map<string, number>();
   const parts: string[] = [];
@@ -541,25 +616,105 @@ function translateFold(node: FoldNode, permToOrig: number[]): FoldNode {
  * that content runs at TAIL speed and the tab never pays the cold fold.
  */
 export type { FoldNode };
+/**
+ * #2888 ([ADR-827](docs/06-decisions.md#adr-827)) — THE SAMPLED CONSTRUCTION OF A FOLD IS BUILT ONCE, SO ITS SOLVE IS TOO.
+ *
+ * The fold is keyed by content, but everything a seed adds to it was rebuilt per call: {@link runTail} built a new
+ * sampled construction for every facts ARRAY (a submit's gates each fold their own trial array of one content, and the
+ * commit makes another), and every sample pool built its own `applySeed(c, s)` per job. `evaluate` is memoized by the
+ * identity of the construction it is given, so each rebuilt object was solved again: at a seed other than 0 one typed
+ * line solved the same sampled figure once per array (measured: 4 % of that line's work over the fixtures, up to 58 %
+ * on one figure), and a pool re-solved the samples an earlier pool of the same figure had solved.
+ *
+ * This table keeps the sampled object, keyed by the construction it was sampled FROM (a fold's own, which lives in the
+ * content-keyed fold memo, or a sampled one of this table) and by a slot: the tail's seed, a pool job's seed, the
+ * tail's warm start. A second request gets the same object, so `evaluate`, the DOF count and every other memo keyed by
+ * a construction answer from what they hold. Nothing is stored that the pure functions `applySeed`, the reflections
+ * and `warmStartCarriers` would not rebuild identically: the table decides only WHICH object, never what it holds.
+ *
+ * - **Where it lives.** Beside the solver, in whichever heap runs it: the page, the interactive worker and the detect
+ *   worker each have their own. Under node those three are one module instance, so the slot carries the work meter's
+ *   lane: a sample the worker lane solved is never a hit for the page lane, as it is not in a browser.
+ * - **A work budget counts what it counted** ([ADR-558](docs/06-decisions.md#adr-558), ADR-582). `evaluate` charges a
+ *   hit the work it saved, once per work epoch, and a hit of this table is charged what BUILDING the object cost (a
+ *   mirrored seed reads a solve). Two requests inside ONE epoch used to build and solve two objects, and both were
+ *   counted: so inside an epoch that has already charged a solve or the build of the stored object, the table hands
+ *   out a freshly built one ({@link chargedInOpenEpoch}). A hit a work budget cannot afford is built, and cut, as it
+ *   always was. `work.done` is therefore unchanged for every input, cold or warm; only EXECUTED work falls (what the
+ *   work meter counts).
+ * - **Under a clock that has already run out it is not read** (`clockSpent`): a solve there is cut on purpose (the
+ *   indefinite-shape probe, ADR-757), and it must be cut exactly as it was.
+ * - **A cut solve is never kept.** The table holds constructions, not results: `evaluate` refuses to memoize a solve
+ *   a clock or a work budget cut short, as before, and an object whose BUILD a budget cut is not stored.
+ * - **Never inside a fold.** The fold's re-attempt cap counts executed work (ADR-583); nothing in `computeFold` reads
+ *   this table.
+ * - **Bound.** One table per heap, at most {@link replayMemoConfig}`.samples` entries in all, least recently used out.
+ *   The key names its source construction by a number, never by the object, so the table keeps no fold alive: the
+ *   samples of a fold the fold memo has let go are never asked for again, and leave as newer ones arrive.
+ */
+const sampledMemo = new Map<string, Construction>();
+/** A number per source construction, so one bounded table serves every fold (the key never holds the object). */
+let sampledSourceIds = new WeakMap<Construction, number>();
+let nextSampledSource = 1;
+/** What BUILDING a stored object cost: a reflection reads a solve of the construction it mirrors (`applyReflections`). */
+const sampledBuildCells = new WeakMap<Construction, WorkCell>();
+registerLedger((c) => sampledBuildCells.get(c as Construction));
+function sampledOnce(from: Construction, slot: string, build: () => Construction): Construction {
+  // off, or under a clock that has already run out (a solve there is cut, and must be cut as it always was)
+  if (replayMemoConfig.samples <= 0 || clockSpent()) return build();
+  let source = sampledSourceIds.get(from);
+  if (source === undefined) sampledSourceIds.set(from, (source = nextSampledSource++));
+  const key = `${source}:${workLane()}:${slot}`;
+  const hit = sampledMemo.get(key);
+  if (hit) {
+    // This epoch already counted its solve, or its build: a second object, as before. Otherwise the hit is charged
+    // what building it cost, and one a work budget cannot afford is built, and cut, as it always was.
+    if (chargedInOpenEpoch(hit) || !chargeHit(sampledBuildCells.get(hit))) return build();
+    sampledMemo.delete(key);
+    sampledMemo.set(key, hit);
+    return hit;
+  }
+  const aborts0 = solveBudget.aborts;
+  const { value: built, cell } = computeWithCell(build);
+  if (built === from) return built; // nothing to sample (seed 0, a determined figure): the construction itself
+  if (solveBudget.aborts !== aborts0) return built; // a budget cut the solve the build reads: never kept
+  sampledBuildCells.set(built, cell);
+  while (sampledMemo.size >= replayMemoConfig.samples) sampledMemo.delete(sampledMemo.keys().next().value as string);
+  sampledMemo.set(key, built);
+  return built;
+}
+
+/** How many entries each content-keyed memo of this layer holds now (the bound's lock reads it). */
+export function replayMemoSizes(): { folds: number; searchFolds: number; samples: number } {
+  return { folds: foldCache.size, searchFolds: searchFoldCache.size, samples: sampledMemo.size };
+}
 /** Test-only: forget every memoized replay, fold, pool and narrowing note (a COLD measurement on demand). The replay
  *  cache is identity-keyed, so a fresh facts array is already cold there. EVERY content-keyed memo of this layer is
  *  cleared here: the work meter's counts (#2873, ADR-W-210) are reproducible only because nothing survives it. */
 export function clearReplayCaches(): void {
   foldCache.clear();
+  budgetVisibleFolds.length = 0;
   searchFoldCache.clear();
+  sampledMemo.clear();
+  sampledSourceIds = new WeakMap();
   sampleMemo = null;
   clearNarrowingMemo();
 }
 export function getFoldFor(facts: Fact[]): FoldNode | null {
-  const node = foldCache.get(foldKey(resolveBinds(facts))) ?? null;
+  // #2888 (ADR-827): it answers as the 8-entry memo did. Its callers act on the answer under a budget (the
+  // indefinite-shape probe runs with the ladder spent only when this fold is one that probe can resume from), and
+  // a fold handed across the worker boundary is one the worker has just replayed, which is always in that set.
+  const key = foldKey(resolveBinds(facts));
+  const node = (budgetVisibleFolds.includes(key) ? foldCacheGet(key) : undefined) ?? null;
   const cell = node ? cellOf.get(node) : undefined;
   if (node && cell) node.work = ledgerTotal(cell);
   return node;
 }
 export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
   if (fold.work !== undefined) cellOf.set(fold, flatLedger(fold.work)); // #1671: charged like a fold computed here
-  if (foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
-  foldCache.set(foldKey(resolveBinds(facts)), fold);
+  const key = foldKey(resolveBinds(facts));
+  foldCachePut(key, fold);
+  noteFoldStored(key, true);
 }
 
 /**
@@ -707,8 +862,12 @@ function computeReplay(raw: Fact[], seed = 0): Derived {
   // #1697 (ADR-588): a naming by use is a FACT of the line that made it — applied here, to the facts before it
   const facts = resolveBinds(raw);
   const key = foldKey(facts);
-  let fold = foldCache.get(key);
+  let fold = foldVisible(key) ? foldCacheGet(key) : undefined; // #2888 (ADR-827): under a budget, only what it always saw
   if (fold && !chargeHit(cellOf.get(fold))) fold = undefined; // #1605: unaffordable under the budget → recompute
+  if (fold) {
+    noteFoldStored(key); // the 8-entry memo would have folded it here, and held it from here on
+    noteFoldHeld(fold);
+  }
   if (!fold) {
     const abortsBefore = solveBudget.aborts;
     const { value, cell } = computeWithCell(() => computeFold(facts));
@@ -718,8 +877,8 @@ function computeReplay(raw: Fact[], seed = 0): Derived {
     // content — memoizing it would pin the degraded figure for every later, unbudgeted replay.
     if (solveBudget.aborts === abortsBefore) {
       cellOf.set(fold, cell);
-      if (!foldCache.has(key) && foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
-      foldCache.set(key, fold);
+      foldCachePut(key, fold);
+      noteFoldStored(key);
     }
   }
   const out = tailChoice(fold, facts, seed);
@@ -1381,10 +1540,11 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
   // pre-scan signature above says the appended facts change nothing about how the prefix folded. Then
   // the fold starts from the cached construction and pays only the NEW facts. Conservative by design:
   // any doubt (a new symbol, a new explicit equality, a mixed group…) falls back to the full fold.
-  let resumeFrom: { node: FoldNode; count: number } | null = null;
+  let resumeFrom: { node: FoldNode; count: number; key: string } | null = null;
   if (hoistDepth === 0 && foldCache.size) {
     const fullKey = foldKey(facts);
     for (const [k, node] of foldCache) {
+      if (!foldVisible(k)) continue; // #2888 (ADR-827)
       if (!fullKey.startsWith(`${k}\n`)) continue;
       const count = k.split('\n').length;
       if (resumeFrom && count <= resumeFrom.count) continue;
@@ -1392,12 +1552,16 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       if (node.retriedCreating) continue; // #1411: a creating fact landed AFTER later facts — resume would reorder it
       if (node.statusByIndex.some((s) => s !== 'ok' && s !== 'disabled')) continue;
       if (node.prescanSig !== prescanSigFor(count)) continue;
-      resumeFrom = { node, count };
+      resumeFrom = { node, count, key: k };
     }
     // #1605 (ADR-582): resuming IS a memo hit on the prefix node — charged its work, and declined (a full
     // fold instead) when an armed work budget cannot afford it, exactly as a cold fold would have run.
     if (resumeFrom && !chargeHit(cellOf.get(resumeFrom.node))) resumeFrom = null;
-    if (resumeFrom) foldStats.resumes++;
+    if (resumeFrom) {
+      foldStats.resumes++;
+      foldCacheGet(resumeFrom.key); // the prefix a fold resumed from is in use
+      noteFoldHeld(resumeFrom.node);
+    }
     if (resumeFrom?.node.reattemptCut && attemptScope) attemptScope.cut = true; // #1770: the prefix's cut is ours
   }
   // Build the construction by folding the enabled facts. `forced` maps a fact id to a status string that
@@ -2327,12 +2491,16 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   //    and re-shape the figure, coupling the (independent) shape DOF to the side choice. Reflecting them
   //    after leaves the sampled shape intact and only flips the side.
   // mask 0 — every ordinary seed — leaves the construction untouched, so this is free for normal figures.
-  const helpers = new Set(directionHelperFreePoints(cur));
-  const refl = reflectableFreePoints(cur);
-  const fullMask = reflectMaskOf(seed);
-  let preMask = 0, postMask = 0;
-  refl.forEach((id, i) => { if (fullMask & (1 << i)) (helpers.has(id) ? (postMask |= 1 << i) : (preMask |= 1 << i)); });
-  const sampled = applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
+  // #2888 (ADR-827): the sampled construction is a function of the fold's construction and the seed, so it is built
+  // once per fold and seed ({@link sampledOnce}): a second facts array of the same content is solved from the memo.
+  const sampled = sampledOnce(cur, `tail:${seed}`, () => {
+    const helpers = new Set(directionHelperFreePoints(cur));
+    const refl = reflectableFreePoints(cur);
+    const fullMask = reflectMaskOf(seed);
+    let preMask = 0, postMask = 0;
+    refl.forEach((id, i) => { if (fullMask & (1 << i)) (helpers.has(id) ? (postMask |= 1 << i) : (preMask |= 1 << i)); });
+    return applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
+  });
   let figure = sampled;
   let e = evaluate(figure);
   // #359 ([ADR-400](docs/06-decisions.md#adr-400)): per-seed BASIN RETRY. The fold's ladder (recruit /
@@ -2345,7 +2513,9 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   // that evaluates clean never reaches this and previously-green seeds are bit-identical; the sampled
   // non-driven DOFs keep their sampled values, so genuine variety is untouched.
   if (!e.ok) {
-    const warmed = warmStartCarriers(figure, cur);
+    const from = figure;
+    const warmStart = sampledOnce(from, 'warm', () => warmStartCarriers(from, cur) ?? from);
+    const warmed = warmStart === from ? null : warmStart;
     if (warmed) {
       const w = evaluate(warmed);
       if (w.ok) {
@@ -2536,7 +2706,11 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   const flat = e.ok && lastError === null ? degeneratePolygons(figure, e.positions) : [];
   const degeneracies: DegenerateNotice[] = flat.length ? nameDegeneracies(facts, seed, flat) : [];
   const concluded = new Set<string>(facts.filter((_, i) => fold.concludedByIndex?.[i]).map((f) => f.id));
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc, degeneracies, sampledFailure, concluded };
+  // #2888 (ADR-827): a sampled figure's solve is now shared by every replay of its content at this seed, but a
+  // replay's positions map stays ITS OWN, as it was when each replay solved its own object: the sample pools tag a
+  // positions map by identity with a pool's own seed index (`seedOfSample`), and two pools must not share a tag.
+  const positions = !e.ok ? new Map<Id, Vec>() : figure === cur ? e.positions : new Map(e.positions);
+  return { construction: figure, positions, circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc, degeneracies, sampledFailure, concluded };
 }
 
 /** The (a, b, id, circle) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto `circle` at id"). */
@@ -4726,7 +4900,8 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean; atSeed?: num
     ? []
     : constructions.flatMap((c) =>
         Array.from({ length: N }, (_, s) => () => {
-          const r = evaluate(applySeed(c, s));
+          // #2888 (ADR-827): the sample of (c, s) is one object for every pool of this figure, so it is solved once
+          const r = evaluate(sampledOnce(c, `pool:${s}`, () => applySeed(c, s)));
           if (r.ok) {
             raw.push(r.positions);
             circlesOfSample.set(r.positions, r.circles);

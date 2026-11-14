@@ -3,8 +3,18 @@
  *
  * `load` is the cold load of the file. `submit#k` re-types the file's k-th row on the figure of the rows before it (a
  * row the deterministic lane does not read is followed by its saved commands, as the timing harness does). Then, on
- * the loaded figure: one «הציגו תצורה אחרת», an edit of the last row to its own text, the delete of the first row, and
- * the background detection sweep of the loaded figure. Each fixture starts from cold caches, so its counts depend on nothing run before it.
+ * the loaded figure: one «הציגו תצורה אחרת», the delete of the first row, and the background detection sweep of the
+ * loaded figure. Each fixture starts from cold caches, so its counts depend on nothing run before it.
+ *
+ * `edit` IS THE LAST ACTION, AND HAS ONE DEFINITION IN EVERY BUILDER (#2888, ADR-W-210 phase 2): a student who has
+ * built rows 1..n changes the LAST row. The rows before it are solved in the session and the edited row's content is
+ * not (`Driver2d.editLastRow`: a new session, rows 1..n-1 on screen unmeasured, all n rows in the store unsolved, then
+ * the edit of the last row to its own text). Re-typing a row whose content the session has already solved counts
+ * almost nothing once caches are keyed by content, and says nothing of what an edit costs. The n rows are the loaded
+ * figure's, at its saved seed.
+ *
+ * Where the walk measured the old edit (after the press, before the delete) the last row is still re-typed,
+ * UNMEASURED: `delete` and `detect` run in the session that re-type leaves, so they count exactly what they did.
  */
 import { groupKey, type Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
@@ -69,7 +79,8 @@ type Run = (action: string, fn: () => Promise<ActionRecord | null>) => Promise<v
 /** The cold load of a saved figure, and the actions made on the loaded figure. */
 async function onLoaded(driver: Driver2d, text: string, plan: WalkPlan, run: Run): Promise<void> {
   await run('load', () => driver.load(text));
-  const loaded = driver.figure().facts;
+  const whole = driver.figure();
+  const loaded = whole.facts;
   for (let p = 1; p <= plan.presses; p++) {
     let only = false;
     await run(`another#${p}`, async () => {
@@ -79,9 +90,10 @@ async function onLoaded(driver: Driver2d, text: string, plan: WalkPlan, run: Run
     });
     if (only) break;
   }
-  await run('edit', () => driver.edit());
+  await driver.edit(); // unmeasured: the session `delete` and `detect` have always run in (see the header)
   await run('delete', () => driver.remove());
   await run('detect', () => driver.detect(loaded));
+  await run('edit', () => driver.editLastRow(whole));
 }
 
 /**

@@ -1793,6 +1793,57 @@ the shared memo saved and restored; a "not forced" subset settled by its first s
 fold key. The store keeps `narrowed: { list, facts }` beside `determinacy`; App.tsx renders it in the ⓘ strip through
 `app/narrowingText.ts` and the `figure.narrowed.*` keys.
 
+### Compute once: what the replay layer keeps, and what a budget sees ([ADR-827](06-decisions.md#adr-827), #2888)
+
+Phase 2 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) for 2-D. `replay(facts, seed)` is pure, and three memos in
+`replay/core.ts` (two of them new or changed here) decide how often its parts are computed. Each lives in the heap that
+solves: the page, the interactive worker and the detect worker each have their own (`store/geoWork.ts`).
+
+| Memo | Holds | Key | Bound | Since |
+|---|---|---|---|---|
+| the replay memo (`replayCache`) | a `Derived` | the facts ARRAY's identity, then the seed | 512 seeds per array; weak in the array | E1 |
+| the fold memo (`foldCache`) | a `FoldNode` (everything a seed does not change) | the fact list's CONTENT (`foldKey`) | `replayMemoConfig.folds`, least recently used out | [ADR-280](06-decisions.md#adr-280); the bound and the order are ADR-827's |
+| the sampled-construction memo (`sampledOnce`) | the sampled `Construction` of a fold at a seed, of a pool job, and of the tail's warm start | the construction it was sampled FROM + the lane + the slot | `replayMemoConfig.samples` in all, least recently used out | ADR-827 |
+
+- **The fold memo.** Reading an entry marks it used (`foldCacheGet`), and so does resuming from it as a prefix
+  ([ADR-406](06-decisions.md#adr-406)). The old memo held 8 entries, first in first out, so the candidates of one
+  «הציגו תצורה אחרת» search pushed out the figure's own fold, and a load's audit folded again the prefixes its refresh had
+  just folded. The bound is measured over long sessions (the ADR has the table).
+- **The sampled construction.** `runTail` asks `sampledOnce(cur, 'tail:<seed>')` for the construction it evaluates, and a
+  pool job asks `sampledOnce(c, 'pool:<s>')`. A second facts array of the same content (a gate's trial array, the committed
+  array, a worker's clone) gets the SAME object, so `evaluate`, `resolveDriven` and the DOF count answer from their own
+  identity memos. The table stores nothing the pure samplers would not rebuild: it decides which object, never what it
+  holds. A replay still builds its own `Derived`, and a sampled figure's `positions` map is a copy per replay, because the
+  pool tags a positions map by identity with a pool's own seed index (`seedOfSample`).
+- **Each lane its own.** Under node the three heaps are one module instance. A sample the worker lane solved is never a
+  hit for the page lane (`workLane()`, `shell/workMeter.ts`, in the table's key), and beyond the old eight entries a
+  fold is readable only by the lane that folded or read it (`foldLanes`). Inside the old eight the lanes share a fold as
+  they always did, which is the known lower bound of 2-D's page count; the larger memo adds nothing to it.
+- **Under a budget nothing is different.** Two rules keep every budgeted computation exactly what it was:
+  1. *The sampled memo.* `evaluate` charges a hit the work it saved, once per work epoch ([ADR-582](06-decisions.md#adr-582)),
+     and a hit of the table is charged what BUILDING the object cost (a mirrored seed reads a solve; the build has its
+     own ledger cell). Inside an epoch that has already charged a solve or the build of the stored object, `sampledOnce`
+     builds a fresh one (`chargedInOpenEpoch`, `engine/solveBudget.ts`, over every identity memo that registers its
+     ledger), because two requests in one epoch used to be two solves and both were counted. A hit a work budget cannot
+     afford is built, and cut, as before. Under a clock that has run out or has no time left (`clockSpent`, `>=`: a
+     search on a zero budget must not be answered inside the millisecond its deadline was computed in) it always builds
+     a fresh one.
+  2. *The fold memo.* Inside a work epoch and under a clock that has already run out, a fold is readable only if the old
+     8-entry first-in-first-out memo would hold it (`budgetVisibleFolds`, kept in step by `noteFoldStored`); `getFoldFor`
+     answers by that set always, because its callers act on the answer under a budget (`restatesExistingShape`).
+  So for a given state of the other memos `work.done` and every budget's cut point are unchanged; only EXECUTED work
+  falls, which is what the work meter counts. (A ledger still remembers the history it was computed in: the ADR's
+  known limits.) Nothing in `computeFold` reads either memo's new part: the fold's re-attempt cap counts executed work
+  ([ADR-583](06-decisions.md#adr-583)).
+- **A cut solve is never kept.** The sampled memo holds constructions, not results. `evaluate` and the fold memo refuse a
+  result a clock or a work budget cut short, as before, and an object whose BUILD a budget cut is not stored.
+- **What a memo holds is never written into.** A fold's construction is shared by every later fold that resumes from it, so
+  `applyCommand` builds a new object for anything it changes and leaves its input untouched ([ADR-624](06-decisions.md#adr-624);
+  the right-triangle seat on a placed vertex was a second site, fixed here). The fixture net checks it per figure: each
+  prefix is folded, then the whole figure, and no prefix's construction may have changed.
+- **`clearReplayCaches`** (test-only) clears all of it. Each work-meter walk starts from it, so a count depends on
+  nothing run before the figure ([docs/08](08-testing-strategy.md), "The work meter").
+
 ## The knowledge pool
 
 ### The knowledge pool of a DETERMINED figure is its admissible set (#434, [ADR-509](06-decisions.md#adr-509))
