@@ -191,7 +191,9 @@ describe('ringOrderContradiction (#2811) blames the latest line, in all three or
  * answered. The stored seat yields to the statement structurally: the worker answers at the 'current' tier.
  */
 describe('#2813 — a stored reflex seat yields to a later stated angle (the worker path)', () => {
-  type Posted = { done?: { op: string; found?: { facts: { cmd: { type: string; reflex?: number } }[]; seed: number } | null; ok?: true } };
+  // #2890 (ADR-829): the worker speaks the shared protocol (`shell/workerProtocol`): `run` in, `done` with the value out
+  type Found = { facts: { cmd: { type: string; reflex?: number } }[]; seed: number };
+  type Posted = { t: string; value?: 'ok' | Found | null };
   const g = globalThis as unknown as { self?: { postMessage: (m: unknown) => void; onmessage?: (e: { data: unknown }) => void } };
   const posted: Posted[] = [];
   let onmessage: ((e: { data: unknown }) => void) | undefined;
@@ -210,8 +212,10 @@ describe('#2813 — a stored reflex seat yields to a later stated angle (the wor
     {
       const worker = (facts: ReturnType<typeof factsOf>, seed: number) => {
         posted.length = 0;
-        onmessage!({ data: { id: 1, op: 'autoResolve', facts, seed } });
-        return posted[posted.length - 1]!.done!;
+        onmessage!({ data: { t: 'run', id: 1, op: 'autoResolve', args: { facts, seed } } });
+        const answer = posted[posted.length - 1]!;
+        expect(answer.t, 'a synchronous operation is answered inside its own message').toBe('done');
+        return { found: answer.value === 'ok' ? undefined : answer.value };
       };
       // the store as the App leaves it: each commit, then the worker's search applied
       let facts = factsOf(['מרובע ABCD', 'מרובע ABDC']);

@@ -20,7 +20,12 @@
  *   counted until the paint that follows its work, because in a builder that solves inside the React
  *   render the heavy part runs AFTER the store update the job made.
  * - **The basis stamp.** A job records what it was started for (the caller's `basis()`: its facts and
- *   seed). Nothing reads it to drop a result yet; later phases of ADR-W-210 do.
+ *   seed), read WHEN ITS TURN STARTS (#2890, ADR-W-210 Am. 4), after the jobs it waited behind have run: an action
+ *   that waits its turn acts on the figure as it is then, so that is the figure its result may be applied to. A
+ *   stamp read when the job was asked for made every job that waited look stale.
+ * - **Ordering across lanes** (#2890). A lane may be declared BEHIND another: its jobs are still counted and shown
+ *   on their own lane, and each also waits for every job the other lane had been asked for before it. The other
+ *   lane does not wait for them. («הציגו תצורה אחרת» has its own button, and still waits its turn.)
  * - **No paint in a test.** `paint` is injected. Where there is no `requestAnimationFrame` (node, the
  *   suite) the default resolves at once, so a job is one promise and the engine and the stores stay as
  *   synchronous as they were.
@@ -41,14 +46,21 @@ export interface WorkQueueOptions<B> {
   basis?: () => B;
   /** Whether two stamps name the same figure. Default: `Object.is`. */
   sameBasis?: (a: B, b: B) => boolean;
+  /** Lane → the lane its jobs take their turn behind (see the header). A `run` may name its own with `behind`. */
+  behind?: Readonly<Record<string, string>>;
+  /**
+   * Called when a job's turn starts, where its stamp is read; what it returns is called when the job is released,
+   * after its closing paint. For a measure of one student action WHOLE (a page-lane work ceiling).
+   */
+  span?: (job: Job<B>) => (() => void) | void;
 }
 
 /** What a running job knows about itself. */
 export interface Job<B = unknown> {
   readonly lane: string;
-  /** The stamp taken when the job was asked for; `undefined` when the queue has no `basis`. */
+  /** The stamp read when the job's turn started; `undefined` when the queue has no `basis`. */
   readonly basis: B | undefined;
-  /** The figure the job was started for is no longer the current one. Advisory in phase 1: nothing is dropped on it. */
+  /** The figure the job started on is no longer the current one: something else changed it while this job worked. */
   stale(): boolean;
   /**
    * Work this job started and did not await (a post-commit search) belongs to it: the job is not finished,
@@ -67,6 +79,8 @@ export interface RunOptions {
    * counted on its lane and released in a `finally` like any job, with no paint of its own. Default `true`.
    */
   paint?: boolean;
+  /** This job also takes its turn behind the jobs already asked for on that lane. Default: the queue's `behind`. */
+  behind?: string;
 }
 
 export interface WorkQueue<B = unknown> {
@@ -135,23 +149,29 @@ export function createWorkQueue<B = undefined>(options: WorkQueueOptions<B> = {}
   function run<T>(work: (job: Job<B>) => T | Promise<T>, runOptions: RunOptions = {}): Promise<T> {
     const lane = runOptions.lane ?? INTERACTIVE;
     const shown = runOptions.paint !== false;
-    const basis = options.basis?.();
+    const behind = runOptions.behind ?? options.behind?.[lane];
     count(lane, 1);
-    const turn = tails.get(lane) ?? Promise.resolve();
+    const own = tails.get(lane) ?? Promise.resolve();
+    // behind another lane: after every job that lane has been asked for so far (it does not wait for this one)
+    const turn: Promise<unknown> = behind !== undefined && behind !== lane ? Promise.all([own, tails.get(behind) ?? Promise.resolve()]) : own;
     const result = turn.then(async () => {
       const joined: unknown[] = [];
-      const job: Job<B> = {
-        lane,
-        basis,
-        stale: () => (options.basis && basis !== undefined ? !same(basis, options.basis()) : false),
-        join: (more) => {
-          joined.push(more);
-          return more;
-        },
-        paint,
-      };
+      let released: (() => void) | void = undefined;
       try {
         if (shown) await paint();
+        // the stamp is read HERE, when the job's turn has come: the jobs it waited behind have changed the figure
+        const basis = options.basis?.();
+        const job: Job<B> = {
+          lane,
+          basis,
+          stale: () => (options.basis && basis !== undefined ? !same(basis, options.basis()) : false),
+          join: (more) => {
+            joined.push(more);
+            return more;
+          },
+          paint,
+        };
+        released = options.span?.(job);
         running++;
         try {
           const out = await work(job);
@@ -166,6 +186,7 @@ export function createWorkQueue<B = undefined>(options: WorkQueueOptions<B> = {}
       } finally {
         try {
           if (shown) await paint();
+          released?.();
         } finally {
           count(lane, -1);
         }
@@ -208,12 +229,25 @@ export type Queued<S, K extends keyof S> = {
  * the table is derived from the classification and cannot name an action the registry does not. Each
  * entry reads the action from `state()` when the job RUNS, so it acts on the store as it is then.
  */
-export function queuedActions<S, K extends keyof S>(queue: WorkQueue<unknown>, state: () => S, names: readonly K[], options?: RunOptions): Queued<S, K> {
+export function queuedActions<S, K extends keyof S>(queue: WorkQueue<unknown>, state: () => S, names: readonly K[], options?: QueuedOptions): Queued<S, K> {
   const table = {} as Record<K, (...args: unknown[]) => Promise<unknown>>;
   for (const name of names) {
-    table[name] = (...args: unknown[]) => queue.run(() => (state()[name] as (...a: unknown[]) => unknown)(...args), options);
+    table[name] = (...args: unknown[]) =>
+      queue.run((job) => {
+        const runLocal = () => (state()[name] as (...a: unknown[]) => unknown)(...args);
+        return options?.around ? options.around(String(name), args, job, runLocal) : runLocal();
+      }, options);
   }
   return table as unknown as Queued<S, K>;
+}
+
+export interface QueuedOptions extends RunOptions {
+  /**
+   * The builder's wrapper of every routed action (#2890): how the action reaches its solver. `runLocal` runs the
+   * store's own action on this thread; a builder may call it through its worker client's executor, prime first and
+   * then call it, or send the action elsewhere and never call it. With no wrapper an action is `runLocal()`.
+   */
+  around?: (name: string, args: readonly unknown[], job: Job<unknown>, runLocal: () => unknown) => unknown;
 }
 
 /**

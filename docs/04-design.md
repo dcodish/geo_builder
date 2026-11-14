@@ -229,7 +229,8 @@ src/
   replay/      core.ts — the pure replay layer: fold memo + deferral + HOIST + seed/config searches + the
                shared sample core; naming.ts; engine ← replay ← store enforced by test
   store/       geoStore.ts (Zustand + zundo: the fact list as source of truth, rename/swap/merge),
-               figureFile (save/load), loadAudit, geoWork/geoWorker (the Web-Worker seam)
+               figureFile (save/load), loadAudit, geoOps/geoWork/geoWorker (the Web-Worker seam: the
+               operations, the client over shell/workerClient, the entry over shell/workerHost; ADR-829)
   render/      transform + scene (pure figure→primitives) + Figure.tsx (declarative SVG, pan/zoom, hover)
   theorems/    the authored theorem table + coverage disposition map + rank bands + audit harness
   validation/  the differential coordinate oracle (engine-import-free; dev/CI only)
@@ -1797,7 +1798,10 @@ fold key. The store keeps `narrowed: { list, facts }` beside `determinacy`; App.
 
 Phase 2 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) for 2-D. `replay(facts, seed)` is pure, and three memos in
 `replay/core.ts` (two of them new or changed here) decide how often its parts are computed. Each lives in the heap that
-solves: the page, the interactive worker and the detect worker each have their own (`store/geoWork.ts`).
+solves: the page, the interactive worker and the detect worker each have their own (`store/geoWork.ts`). One thing
+crosses back to a worker: after a cancel or a crash the replacement worker is handed the page's fold of the figure on
+screen, its CHECKPOINT (`geoOps.takeCheckpoint`, [ADR-829](06-decisions.md#adr-829); the shared client's `seed`,
+[04w](04w-design-shell.md) § *The worker client*), so the next line resumes from it instead of folding in an empty heap.
 
 | Memo | Holds | Key | Bound | Since |
 |---|---|---|---|---|
@@ -1850,7 +1854,10 @@ solves: the page, the interactive worker and the detect worker each have their o
 - **`clearReplayCaches`** (test-only) clears all of it. Each work-meter walk starts from it, so a count depends on
   nothing run before the figure ([docs/08](08-testing-strategy.md), "The work meter"). It cannot empty the replay memo,
   which is weak in the facts array; so the meter's `detect` action hands its lane a structured clone of the facts, as a
-  browser's detect worker receives them (ADR-827, step 4).
+  browser's detect worker receives them (ADR-827, step 4). Since [ADR-829](06-decisions.md#adr-829) the gate goes
+  further: each worker's operations are a module instance of their own and every message is cloned, so the two rules
+  above (the lane in the sampled table's key, a fold readable by the lane that folded it) are idle there, as they are
+  in a browser. They still hold for every suite that runs the operations in the page's instance.
 
 ## The knowledge pool
 

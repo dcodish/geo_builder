@@ -59,6 +59,9 @@ the יואל גבע 572 booklet, 2020–2025, Q3 of every exam.
   return memoized objects, keyed by their whole input (`value/contentMemo.ts`): never write to one, and a
   new memo is made there, keyed by everything its function reads, so `clearComplexCaches` empties it too
   ([ADR-CX-090](../docs/06d-decisions-complex.md#adr-cx-090)).
+- **The fold stays on the page's thread, under a ceiling of 256 units an action** (`CEILING_CX`, `app/workCx.ts`;
+  [ADR-CX-091](../docs/06d-decisions-complex.md#adr-cx-091)). The work-meter gate fails an action above it. Raising
+  the number, or giving complex a worker, is an ADR with the measurement, never a quiet edit.
 
 The stage order every mechanism inserts into is [`docs/LADDER-CX.md`](../docs/LADDER-CX.md). **Every
 mechanism ADR names its stage and updates that file.**

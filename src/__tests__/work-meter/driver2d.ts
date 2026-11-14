@@ -11,8 +11,17 @@
  *   another = the worker's `resample` → applyView → the render (page)
  *   load    = loadFigureText (refresh + smoke replay page; prefold worker) → the render → the resolve → the load audit
  *   edit    = runEditCommit on the last row, to its own text (page) → the render → the resolve. The walk measures it
- *             through `editLastRow`: a session that has built the rows BEFORE the last one and not that row (#2888)
- *   delete  = removeGroup of the first row (page; the seed resets) → the render → the resolve
+ *             through `editLastRow`: a session that has built the rows BEFORE the last one and not that row (#2888).
+ *             The n rows it puts in the store are a CLONE (#2890): the loaded session's own array still carries its
+ *             replay, keyed by the array's identity, which no clear empties, so the "unsolved" rows were served it.
+ *   delete  = removeGroup of the first row (page; the seed resets) → the render. NO resolve (#2890): the App's delete
+ *             is `act.removeGroup` and nothing else (`App.tsx`; a whole row's deletion is exempt from the search by a
+ *             measured decision, ADR-518). This driver used to run the resolve gate and the worker's search after it,
+ *             which on a figure whose first row is gone runs to its end for nothing: work no student's delete does.
+ *   undo    = the store's undo of that delete (page) → the render. The earlier `(facts, seed)` comes back by
+ *             reference, so the render is served by what the session already holds.
+ *   toggle  = runSetGroupEnabled(the first row, off) (page; the seed resets) → the render → the resolve, as the App's
+ *             tick box runs it (`App.tsx`, `editPipeline.ts`): unlike a delete, a toggle IS followed by the search.
  *   detect  = the worker's `detect` — the background sweep that follows every step, as a browser's detect worker runs
  *             it: over a STRUCTURED CLONE of the facts (what a `postMessage` delivers) and from caches that hold
  *             nothing another lane computed (its lane is a second worker instance). Nothing waits for it. It leaves
@@ -30,13 +39,17 @@
  * runs the searches with no clock (vitest's MODE 'test'). The timing harness passes `geoWorker.ts`'s own bodies with
  * its 12-second budget, so it times what a browser's worker runs.
  *
- * Under node the page and the worker share ONE module instance, so a view the worker has searched is a memo hit
- * when the page renders it. In a browser the worker's caches are its own and only a transplanted fold crosses.
- * The page count measured here is therefore a LOWER bound on a browser's (ADR-W-210 Am. 1).
+ * THE WORKER'S HEAPS (#2890, ADR-829). The gate hands this driver a client whose two lanes are served from their own
+ * module instances, every message cloned (`shell/workerExecutor`'s isolated executor): the page, the interactive
+ * worker and the detect worker are then three heaps, as in a browser, and what the page counts is what a browser's
+ * page computes. Such a client says so with {@link WorkerOps.reset}, and the driver empties those heaps where a
+ * session starts. Handed operations with no `reset` (the timing harness: one module instance, the worker's bodies
+ * under `inWorkerLane`), a view the worker has searched is a memo hit when the page renders it, and the page count
+ * is a LOWER bound on a browser's (ADR-W-210 Am. 1): that is how every count was recorded before #2890.
  */
 import { decidePreParse, decideFromParse } from '@/app/decideDeterministic';
 import { commitVerdict } from '@/app/submitPipeline';
-import { runEditCommit } from '@/app/editPipeline';
+import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
 import {
   useGeoStore,
   replay,
@@ -65,6 +78,12 @@ export interface WorkerOps {
   autoResolve(facts: Fact[], seed: number): Promise<'ok' | { facts: Fact[]; seed: number; fold: FoldNode | null } | null>;
   resample(facts: Fact[], seed: number): Promise<{ facts: Fact[]; seed: number } | null>;
   detect(facts: Fact[]): Promise<unknown>;
+  /**
+   * Present when the lanes are SEPARATE heaps (the gate's isolated client): empty every worker heap (`'all'`: a new
+   * session) or the detect worker's alone (`'detect'`: its sweep starts from nothing another sweep left). Absent when
+   * the operations run in the page's own module instance; the driver then clears the one heap there is.
+   */
+  reset?(which: 'all' | 'detect'): void;
 }
 
 /** One measured action: `*_main` / `*_worker` / `*_bg` wall-time slices in ms, the outcome, and the three counts. */
@@ -100,6 +119,10 @@ export interface Driver2d {
   editLastRow(all: Snap): Promise<ActionRecord | null>;
   /** Delete one row (the first by default). Null when the figure has fewer than two rows. */
   remove(key?: string): Promise<ActionRecord | null>;
+  /** Undo the last store change (the walk: the delete before it). */
+  undo(): Promise<ActionRecord>;
+  /** Turn one row off (the first by default), as its tick box does. Null when the figure has fewer than two rows. */
+  toggle(key?: string): Promise<ActionRecord | null>;
   /** The background sweep over `facts` (the figure on screen by default). Leaves the caches cold. */
   detect(facts?: Fact[]): Promise<ActionRecord>;
   /** What a save of the figure on screen writes. */
@@ -196,6 +219,7 @@ export function createDriver2d(ops: WorkerOps, opts: { searchBudgetMs?: number }
     },
     reset() {
       clearReplayCaches();
+      ops.reset?.('all');
       useGeoStore.setState({ facts: [], seed: 0 });
       useGeoStore.temporal.getState().clear();
       figure = { facts: [], seed: 0 };
@@ -304,6 +328,7 @@ export function createDriver2d(ops: WorkerOps, opts: { searchBudgetMs?: number }
 
     load(text) {
       clearReplayCaches();
+      ops.reset?.('all');
       return metered(async (rec) => {
         let pf = 0;
         const t = now();
@@ -362,8 +387,10 @@ export function createDriver2d(ops: WorkerOps, opts: { searchBudgetMs?: number }
       const key = groupKey(last);
       this.reset();
       this.show({ facts: all.facts.filter((f) => groupKey(f) !== key), seed: all.seed });
-      figure = all;
-      setStore(all); // the n rows, in the store and not solved: no render, no resolve, no audit
+      // a CLONE: the caller's array may carry a replay under its identity (the loaded session's does), which no clear
+      // empties, and rows that are served a replay are not "in the store and not solved" (#2890)
+      figure = structuredClone(all);
+      setStore(figure); // the n rows, in the store and not solved: no render, no resolve, no audit
       return this.edit();
     },
 
@@ -377,7 +404,41 @@ export function createDriver2d(ops: WorkerOps, opts: { searchBudgetMs?: number }
         useGeoStore.getState().removeGroup(key ?? keys[0]);
         rec.remove_main = r1(now() - t);
         adopt();
-        await settle(rec, '');
+        // the render, and nothing after it: the App's delete runs no resolve (see the header)
+        const t2 = now();
+        render(figure);
+        rec.render_main = r1(now() - t2);
+        sumSlices(rec);
+      });
+    },
+
+    undo() {
+      return metered(async (rec) => {
+        setStore(figure);
+        const t = now();
+        useGeoStore.getState().undo();
+        rec.undo_main = r1(now() - t);
+        adopt();
+        rec.nfacts = figure.facts.length;
+        const t2 = now();
+        render(figure);
+        rec.render_main = r1(now() - t2);
+        sumSlices(rec);
+      });
+    },
+
+    async toggle(key) {
+      const keys = [...new Set(figure.facts.map(groupKey))];
+      if (keys.length < 2) return null;
+      return metered(async (rec) => {
+        setStore(figure);
+        rec.nfacts = figure.facts.length;
+        let settling = false;
+        const t = now();
+        runSetGroupEnabled(key ?? keys[0], false, { resolveAfterCommit: () => void (settling = true) });
+        rec.toggle_main = r1(now() - t);
+        adopt();
+        if (settling) await settle(rec, '');
         sumSlices(rec);
       });
     },
@@ -386,7 +447,9 @@ export function createDriver2d(ops: WorkerOps, opts: { searchBudgetMs?: number }
       // the detect lane is its own worker instance: it has folded nothing the page or the interactive worker folded,
       // and it is handed the facts as a worker receives them, a structured clone. The page's own array would be a
       // hit on `replay`'s identity memo, which is not a cache `clearReplayCaches` can empty (see the header).
-      clearReplayCaches();
+      // Where the lanes ARE separate heaps only the detect worker's is emptied; in one heap, the heap.
+      if (ops.reset) ops.reset('detect');
+      else clearReplayCaches();
       const received = structuredClone(facts);
       return metered(async (rec, painted) => {
         painted(); // the figure is on screen; nothing waits for the sweep
