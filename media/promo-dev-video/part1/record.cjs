@@ -1,13 +1,14 @@
 // Records player.html in real time at 1920×1080 and encodes out/part1-look.mp4 (#2887).
 // The recording starts before the page has loaded; the lead-in is trimmed at the moment play() starts.
-const { chromium } = require('playwright');
+// Every browser goes through the repo's harness (CLAUDE.md rule 2, #1955): it stubs /api/parse, so no model call can leave.
+const launchBrowser = async (opts) => (await import(require('url').pathToFileURL(require('path').join(__dirname, '../../../scripts/lib/browser-harness.mjs')).href)).launchBrowser(opts);
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 const OUT = path.join(__dirname, 'out');
 fs.mkdirSync(OUT, { recursive: true });
 (async () => {
-  const b = await chromium.launch();
+  const b = await launchBrowser();
   const ctx = await b.newContext({ viewport: { width: 1920, height: 1080 }, recordVideo: { dir: OUT, size: { width: 1920, height: 1080 } } });
   const t0 = Date.now();
   let startedAt = null;

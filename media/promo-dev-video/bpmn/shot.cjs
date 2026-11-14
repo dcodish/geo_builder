@@ -1,7 +1,8 @@
-const { chromium } = require('playwright');
+// Every browser goes through the repo's harness (CLAUDE.md rule 2, #1955): it stubs /api/parse, so no model call can leave.
+const launchBrowser = async (opts) => (await import(require('url').pathToFileURL(require('path').join(__dirname, '../../../scripts/lib/browser-harness.mjs')).href)).launchBrowser(opts);
 const path = require('path');
 (async () => {
-  const b = await chromium.launch();
+  const b = await launchBrowser();
   const p = await b.newPage({ viewport: { width: 1600, height: 1100 } });
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
