@@ -15,8 +15,17 @@
  *             was shown.
  *
  * There is NO Worker in the analytic tree: every unit is page work, and the meter says so rather than this file.
+ *
+ * WHAT IS ALREADY SOLVED WHEN AN ACTION STARTS (#2888, ADR-AG-476). `derive` keeps solved content by content, and the
+ * store outlives the action, as it does in the page. So an action's count is the work it adds to its SESSION:
+ * {@link newSession} empties the store where a session starts, and `doLoad` is a session of its own (a saved file opened in
+ * a new tab finds nothing solved). Everything else runs on what the session's earlier actions left.
+ *
+ * AN EDIT IS MEASURED IN A SESSION THAT HAS NOT SOLVED THE EDITED ROW ({@link beforeLastRowEdit}; the meter's one
+ * definition of `edit`, the same in every builder). A cache keyed by content cannot forget one row, so re-typing a row to
+ * its own text in the session that built it would count nothing, where a student who changes a row solves the new row.
  */
-import { derive, type Derivation } from '../../engine/derive';
+import { clearAnalyticCaches, derive, type Derivation } from '../../engine/derive';
 import { decideSubmit, decideEditHost, isHeld } from '../../app/submit';
 import { decideRename, decideSwap } from '../../app/rename';
 import { anotherConfiguration } from '../../app/another';
@@ -168,6 +177,36 @@ export function settledState(lines: string[], seed: Seed, hosts: Hosts): State {
   return { lines, seed, hosts, d };
 }
 
+/**
+ * A figure ON SCREEN and settled, unmeasured: the App's render, its passive effects, the pool and the re-render when the
+ * pool completes, exactly as a measured action leaves it (`renderAndAfter`).
+ */
+export function shownState(lines: string[], seed: Seed, hosts: Hosts): State {
+  const d = renderAndAfter(lines, seed, hosts, blank(), () => {});
+  return { lines, seed, hosts, d };
+}
+
+/**
+ * THE SESSION AN EDIT OF THE LAST ROW IS MEASURED IN (#2888; the meter's one definition of `edit`, the same in every
+ * builder): **a student who has built rows 1..n changes the LAST row; the rows before it are solved in the session, the
+ * edited row's content is not.**
+ *
+ * 1. a new session (the store is emptied);
+ * 2. rows 1..n−1 on screen and settled, UNMEASURED, at the session's seed and with the hosts those rows recorded;
+ * 3. all n rows are the session's lines, and nothing of the n-row figure is solved: no derive, no render, no audit.
+ *
+ * The edit is then measured through `doEdit`, re-typing the last row to its own text: about what `submit#n` costs, through
+ * the EDIT path. For a one-row figure the prefix is empty and the edit is cold.
+ */
+export function beforeLastRowEdit(st: Pre): Pre {
+  newSession();
+  const last = st.lines.length - 1;
+  const hosts: Hosts = {};
+  for (const [k, v] of Object.entries(st.hosts)) if (Number(k) < last) hosts[Number(k)] = v;
+  if (last > 0) shownState(st.lines.slice(0, last), st.seed, hosts);
+  return { lines: st.lines, seed: st.seed, hosts: st.hosts };
+}
+
 // ------------------------------------------------------------------ actions
 export type ActionKind = 'submit' | 'another' | 'load' | 'delete' | 'edit' | 'llm-commit';
 export interface Pre {
@@ -221,8 +260,17 @@ function anotherBody(st: State, onPhase: (p: string) => void): { ph: Phases; nex
   return { ph, next: { lines: st.lines, seed: r.seed, hosts: st.hosts, d } };
 }
 
-/** Load (file / share link / restored session): the audit's cold derive at seed 0 (loadSession.ts), then the App's render. */
+/** A student's session starts: nothing is solved yet. The walk and the timing harness call it per sequence. */
+export function newSession(): void {
+  clearAnalyticCaches();
+}
+
+/**
+ * Load (file / share link / restored session): the audit's cold derive at seed 0 (loadSession.ts), then the App's render.
+ * A load is a NEW SESSION — the page was opened on the file — so it starts from an empty store (#2888).
+ */
 function loadBody(lines: string[], seed: Seed, hosts: Hosts, onPhase: (p: string) => void): { ph: Phases; next: State } {
+  newSession();
   const ph = blank();
   onPhase('decide');
   const t = now();
@@ -246,7 +294,7 @@ function deleteBody(st: State, index: number, onPhase: (p: string) => void): { p
   return { ph, next: { lines, seed: st.seed, hosts, d } };
 }
 
-function editBody(st: State, index: number, text: string, onPhase: (p: string) => void): { ph: Phases; next: State | null } {
+function editBody(st: Pre, index: number, text: string, onPhase: (p: string) => void): { ph: Phases; next: State | null } {
   const ph = blank();
   onPhase('decide');
   const t = now();
@@ -289,4 +337,4 @@ export const doSubmit = (st: State, raw: string, onPhase: PhaseCb = quiet) => me
 export const doAnother = (st: State, onPhase: PhaseCb = quiet) => metered(() => anotherBody(st, onPhase));
 export const doLoad = (lines: string[], seed: Seed, hosts: Hosts, onPhase: PhaseCb = quiet) => metered(() => loadBody(lines, seed, hosts, onPhase));
 export const doDelete = (st: State, index: number, onPhase: PhaseCb = quiet) => metered(() => deleteBody(st, index, onPhase));
-export const doEdit = (st: State, index: number, text: string, onPhase: PhaseCb = quiet) => metered(() => editBody(st, index, text, onPhase));
+export const doEdit = (st: Pre, index: number, text: string, onPhase: PhaseCb = quiet) => metered(() => editBody(st, index, text, onPhase));

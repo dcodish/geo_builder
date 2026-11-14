@@ -1480,6 +1480,46 @@ the other root, and a ring is offered only on the piece, its sentence saying «�
 
 ## Evaluate and the configuration pool
 
+### Solved content is keyed by content ([ADR-AG-476](06c-decisions-analytic.md#adr-ag-476), #2888; ADR-W-210 invariant 4)
+
+`derive(lines, at, seedNames, pins)` is a pure function of its four arguments, and it is remembered as one, in two layers.
+
+- **A line list folds once.** `foldLines` (parse, `resolveToolLetters`, `resolveMints`, `nameCanonicalCentres`, `fold`)
+  does not depend on the configuration. Its result is kept in `derive.ts`'s store under
+  `JSON.stringify([lines, seedNames, pins])` (the maps sorted by key), so every configuration of a line list is solved on
+  ONE `Construction` object.
+- **A configuration derives once.** `deriveAt` (the drawable walk, the refusals and their attribution, the stated
+  measures, the drawn configuration) is kept per `configurationKey(at)`: seed, reach, wide and the parts' landings. A
+  re-lettered construction (`followObjects`) is one object per lettering of its line list (`letteredAs`).
+- **What a caller receives is its own.** A fresh `Derivation` object per call whose `construction` is a VIEW of the kept
+  one (`content.ts` `viewOf`: a shallow copy, mapped back by `contentOf`). React's identity checks and the per-derivation
+  memos (`narrowingNotesOf`) behave as before. The lists inside a derivation are shared and frozen.
+
+**The solver memos.** Every memo that was a `WeakMap<Construction, …>` in `evaluate.ts`, `carriers.ts` and
+`components.ts` is a `ContentCache` (the same weak map, read through `contentOf`), so the views of one line list share
+one set of solves for as long as the store holds it. `evaluate`, `drawableAt` and `partsOf` work on the content, so
+nothing a solve keeps (a part's `whole`, the prior figure) is one caller's view; `partsOf` still answers a one-part figure
+with the very object it was given.
+
+**What is not shared.** `poolCache` stays keyed by the view: `deferred` and `pendingShown` are how ONE reader treats a
+figure. And a pool reads what was asked through its own construction (`askedOf`, noted by `drawableAt`), never what the
+shared memo holds. A derivation's views start from what its body asked (`recordAsks`, `adoptAsks`); `distinctConfigSeeds`
+replays its walk's asks on a memo hit, and a filled pool re-notes its seeds while a derivation is being computed. So a
+deferred pool's «בודק…» and the option walk that fills the pool before the paint happen exactly where they did from cold.
+Only the cost of an ask depends on what is solved.
+
+**The bound.** `BoundedStore`: `LINE_LISTS_MAX` (64) line lists, least recently used first; a line list asked for more
+than `CONFIGURATIONS_MAX` (96) configurations is folded again. The memos are weak, so a dropped line list's solves go
+with it. `clearAnalyticCaches()` (test-only) empties the store and every `ContentCache`: the work meter's walk calls it
+where a session starts (`newSession`: each sequence, each load, and the session an edit is measured in,
+`beforeLastRowEdit`, which has solved the rows before the edited one and not that row), and a test that measures a cold
+derivation calls it first.
+
+**Adding a memo.** A pure function of a construction is memoised in a `ContentCache`, never a bare `WeakMap`, or it is
+cold on every `derive`. Anything that says how one reader treats a figure (a mode, a "shown" flag) is keyed by the
+object, like the pool. A memo that outlives an action and is NOT reached through a construction is a `BoundedStore`, so
+the clear function and the bound cover it.
+
 ### Independent parts are evaluated and walked apart ([ADR-AG-425](06c-decisions-analytic.md#adr-ag-425), #2737)
 
 A figure whose statements share no unknown is several independent PARTS. `components.ts` `partsOf` finds them with a
@@ -1764,7 +1804,7 @@ choice seed, root) is the one on the screen (#2633).
 
 #### One configuration pool, completed after the render ([ADR-AG-180](06c-decisions-analytic.md#adr-ag-180), #1473)
 
-Every gate reads **`configurationPool(c)`** — seeds 0..23, one per construction. On the page,
+Every gate reads **`configurationPool(c)`** — seeds 0..23, one per construction object a reader holds (a view; the solves behind it are shared by content, [ADR-AG-476](06c-decisions-analytic.md#adr-ag-476)). On the page,
 `configurationPool(d.construction).defer()` makes an unconfirmed value **pending** (`settled(fn)`, `askSettled`,
 «בודק…»), and `app/poolScheduler.ts` completes the pool one seed per macrotask (never `requestIdleCallback`). The perf
 lock counts `evaluateStats.uncached`; `curveFromEquation` is memoised (`__setConicMemo(false)`).

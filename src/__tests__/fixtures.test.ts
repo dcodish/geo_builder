@@ -115,6 +115,21 @@ describe('figure-file fixtures net', () => {
       const built = rescued?.facts ?? savedFacts;
       const builtSeed = rescued?.seed ?? savedSeed;
 
+      // #2888 (ADR-827, ADR-624's class): the fold memo holds each prefix's construction, by content, for as long as a
+      // session uses it. A step that WRITES INTO the construction it starts from (instead of building a new one)
+      // changes what every later reader of that prefix gets. Each prefix is folded in turn, the whole figure after
+      // them, and no prefix's construction may have changed. Rides this walk: the parser-drift test below folds the
+      // same prefixes, so this adds no solve.
+      it('folding a row writes into no construction an earlier row built (applyCommand is pure)', () => {
+        const shots = stepsOf(built).map((step) => {
+          const prefix = built.slice(0, step.start);
+          return { prefix, was: JSON.stringify(replay(prefix, builtSeed).construction) };
+        });
+        replay(built, builtSeed);
+        for (const { prefix, was } of shots)
+          expect(JSON.stringify(replay(prefix, builtSeed).construction), `the construction of the first ${prefix.length} fact(s) changed once later rows were folded`).toBe(was);
+      });
+
       it('replays green: builds, verified, nothing pending', () => {
         const fig = replay(built, builtSeed);
         expect(fig.lastError).toBeNull();

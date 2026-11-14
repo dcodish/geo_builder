@@ -38,6 +38,7 @@ import { UNBOUNDED, circleDefPoints, type Construction, type Domain, type GeoObj
 import { INDEXED_NAME_RE } from '../../shell/indexedName';
 import { resolveCurve } from './curves';
 import { toolSymbol } from './names';
+import { ContentCache } from './content';
 
 /**
  * The plane's own coordinates. A curve is the zero set of `f(x, y; params)`, so `x` and `y` occur
@@ -399,7 +400,7 @@ export function paramRegister(c: Construction): ParamDecl[] {
  * the construction, which is immutable: the register is read many times per evaluation.
  */
 export type SizeRole = 'linear' | 'even';
-const sizeCache = new WeakMap<Construction, ReadonlyMap<string, SizeRole>>();
+const sizeCache = new ContentCache<ReadonlyMap<string, SizeRole>>();
 
 /** A probe value per symbol for the letters an equation holds besides the one under test. */
 const SIZE_PROBES = [1.7, 2.3, 1.3, 0.7, 2.1, 1.9, 1.1, 2.7, 3.1, 0.9];
@@ -579,7 +580,7 @@ export function sizeContradiction(c: Construction): string | null {
  * solve's starting point: it keeps the window the solve was tuned on (a slope started far out chases a tangent the
  * line's form cannot hold — measured on Q2 ד). Structural, so a constraint kind added later is covered. Memoized.
  */
-const reachedCache = new WeakMap<Construction, { syms: ReadonlySet<string>; ids: ReadonlySet<Id> }>();
+const reachedCache = new ContentCache<{ syms: ReadonlySet<string>; ids: ReadonlySet<Id> }>();
 export function reachedByGivens(c: Construction): { syms: ReadonlySet<string>; ids: ReadonlySet<Id> } {
   const hit = reachedCache.get(c);
   if (hit) return hit;
@@ -657,7 +658,7 @@ export function constraintSymbols(constraints: Construction['constraints']): str
  * alone. Memoized on the construction, which is immutable.
  */
 type AnyConstraint = Construction['constraints'][number];
-const labelCache = new WeakMap<Construction, ReadonlyMap<string, AnyConstraint>>();
+const labelCache = new ContentCache<ReadonlyMap<string, AnyConstraint>>();
 export function labelRows(c: Construction): ReadonlyMap<string, AnyConstraint> {
   const hit = labelCache.get(c);
   if (hit) return hit;

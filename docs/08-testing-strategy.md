@@ -37,7 +37,7 @@ Define how Geo Builder is tested and — critically — **what must pass before 
 | `node scripts/test-tiers.mjs kinds [full\|fast]` | — | instant | The latest run's CPU by kind of test and by tree ([ADR-W-191](06w-decisions-workspace.md#adr-w-191)), from the per-file times every run keeps beside the log |
 | `npm run test:tiers` | — | instant | Which slow files have actually caught something |
 | `npm run test:exams` | the exam corpus: every replayed exam/textbook sequence, all builders (`-- --changed` = only the builders the diff touches) | **~90 s** all four, measured; per builder in [ADR-W-172](06w-decisions-workspace.md#adr-w-172) | A fix round's **per-item** exam check. Not a separate batch gate: every member already runs in `test:full`. Writes `reports/exam-run.json` |
-| `npm run work:check -- <builder>` · `work:record` · `work:report` | one builder's work-meter gate alone · re-record its baseline · the totals | 2-D ~6 min, 3-D ~5 min, analytic ~11 min, complex ~2 s for a whole builder; `--only <fixture>` takes seconds | [The work meter](#the-work-meter-adr-w-210-am-1-2873), below. Every gate already runs in `test:full` |
+| `npm run work:check -- <builder>` · `work:record` · `work:report` | one builder's work-meter gate alone · re-record its baseline · the totals | 2-D ~6 min, 3-D ~5 min, analytic ~8 min, complex ~2 s for a whole builder; `--only <fixture>` takes seconds | [The work meter](#the-work-meter-adr-w-210-am-1-2873), below. Every gate already runs in `test:full` |
 | **`npm run test:docs`** | the `DOCS.json` doc-gate set | **~2 s**, 674 tests | **The gate for a DOC-ONLY change** ([ADR-W-041](06w-decisions-workspace.md#adr-w-041)). Anything touching `.ts`/`.tsx` pays `test:full`. Five product tests read a document at runtime — two BYTE-MATCH one against a code table — and `ci.yml` ignores `docs/`, so `.github/workflows/docs.yml` runs this set on the paths CI declines (#905) |
 
 **The split is measured, never hand-written.** `test:full` records the files exceeding 60 s into `reports/test-tiers.json`; `test:fast` derives its `--exclude` list from it. A newly-slow test joins the slow tier by itself — the drift that quietly undid [ADR-280](06-decisions.md#adr-280)'s 3-min suite over two weeks. The file is rewritten only when *membership* changes, so a routine green run leaves the tree clean. Commit it: the fast tier must mean the same thing on every machine.
@@ -106,19 +106,35 @@ press take 6 s was found by the operator's play.
 
 | | 2-D | 3-D | Analytic | Complex |
 | --- | --- | --- | --- | --- |
-| One unit | one `evaluateCore` call | one residual evaluation of `leastSquares` | one residual evaluation of `solveLM`, `jacobianRank` or `scanRoots` | one exact solve of a fold |
+| One unit | one `evaluateCore` call | one residual evaluation of `leastSquares` | one residual evaluation of `solveLM`, `jacobianRank` or `scanRoots` | one executed line read (`parseLineV2`) or one exact solve of a fold ([ADR-CX-090](06d-decisions-complex.md#adr-cx-090)) |
 | Gate | `src/__tests__/work-meter-gate.test.ts` | `src3d/__tests__/work-meter-gate.test.ts` | `src-analytic/__tests__/work-meter-gate.test.ts` | `src-complex/__tests__/work-meter-gate.test.ts` |
 | Baseline | `src/__tests__/work-meter/baseline.jsonl` | `src3d/__tests__/work-meter/baseline.jsonl` | `src-analytic/__tests__/work-meter/baseline.jsonl` | `src-complex/__tests__/work-meter/baseline.jsonl` |
-| Gate's wall time alone · inside `test:full`, measured 2026-11-13 | 6 min · 11 min | 5 min · 10 min | 11 min · 15 min | under 2 s |
+| Gate's wall time alone (2026-11-13; analytic 2026-11-14) · inside `test:full` (2026-11-14, after phase 2) | 6 min · 12 min | 5 min · 9 min | 8 min · 12 min | under 2 s |
 
 **What a gate does.** It walks **every** fixture of its tree through the student's actions, with the tree's
 action driver (`<tree>/__tests__/work-meter/driver*.ts`, the same code `scripts/perf/` times): re-typing each row
-(`submit#k`), one «הציגו תצורה אחרת» (`another#1`), a cold `load`, an `edit` of the last row to its own text, the
-`delete` of the first row, and in 2-D the background `detect` sweep. Each action gets three counts: `total` (all the
+(`submit#k`), one «הציגו תצורה אחרת» (`another#1`), a cold `load`, the `delete` of the first row, an `edit` of the last
+row, and in 2-D the background `detect` sweep. Each action gets three counts: `total` (all the
 work), `page` (the part on the page's UI thread, as against a worker) and `prePaint` (the part before the figure can
 paint). The baseline holds one line per figure-action, sorted, so two branches that each add a fixture merge as
 insertions. Nothing is sampled or skipped: a gate is one test file, in the slow tier, run by `npm run test:full` and by
 its product's `test:run:<product>` lane.
+
+**A walk is a session** ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 3, #2888). Every builder keeps solved
+content by its content, and the caches outlive the action, so a count is **what the action adds to its session**, and
+the walk states where a session starts. Each builder has ONE test-only function that empties every content-keyed cache
+(2-D `clearReplayCaches`, 3-D `clearSolveCaches3`, analytic `clearAnalyticCaches`, complex `clearComplexCaches`); a
+cache added later joins it, or the gate's determinism lock fails.
+- A fixture's walk starts from emptied caches and stays warm while the rows are typed: `submit#k` runs on the figure
+  of the rows before it, which that session has solved. The press follows in the same session.
+- `load` is cold: a saved file opened in a new session. `delete` runs in the loaded session.
+- `edit` is the walk's last action and has one definition in every builder: **a student who has built rows 1..n
+  changes the last row; the rows before it are solved in the session, the edited row's content is not.** The walk
+  builds that state (emptied caches; rows 1..n−1 shown, unmeasured; all n rows in the store, unsolved) and then
+  measures the edit of the last row to its own text. So an edit costs about what the submit of that row costs,
+  through the edit path. Re-typing a row on a session that has already solved it would count nothing.
+- 2-D's `detect` runs as a browser's detect worker does: on its own copy of the facts, with nothing another lane
+  computed.
 
 **The rule.** An action above its baseline in **any** of the three counts fails, and the message names the
 figure, the action, the numbers and the next step. So does an action with no baseline line, a baseline line the walk

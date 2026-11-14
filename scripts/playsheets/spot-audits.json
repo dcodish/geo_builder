@@ -236,6 +236,35 @@
         "משולש ABC"
       ],
       "lookFor": "RULED 2026-11-13: an action pressed while the tool works waits its turn. Type the line. Press «טען» and choose src/__tests__/fixtures/hexagon-regular-by-angles-2797.geo.json (it loads for about 8 seconds). WHILE it still says «חושב…», press «בטל». The hexagon appears, and then the undo takes it back, so the session ends on the triangle ABC."
+    },
+    {
+      "sheet": "debt-2888",
+      "id": "T12",
+      "kind": "3d:assertion",
+      "queued": "2026-11-14",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCD",
+        "M אמצע BB'"
+      ],
+      "lookFor": "The cube and M on the edge BB′, both rows green."
+    },
+    {
+      "sheet": "debt-2888",
+      "id": "T13",
+      "kind": "3d:assertion",
+      "queued": "2026-11-14",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCD",
+        "∠BAC = 60",
+        "∠BAC = 60"
+      ],
+      "lookFor": "The claim is refused both times: «הטענה לא מתקיימת בציור — בדקו את החישוב»; one row only."
     }
   ],
   "results": [

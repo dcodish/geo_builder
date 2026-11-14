@@ -39,7 +39,7 @@ import { fileURLToPath } from 'node:url';
 import { Session } from 'node:inspector';
 import type { Seed } from '../../../src-analytic/engine/evaluate';
 // The App's work per action is the ONE driver this harness and the work-meter gate share (#2873).
-import { doAnother, doDelete, doEdit, doLoad, doSubmit, settledState, type Hosts, type Phases, type State } from '../../../src-analytic/__tests__/work-meter/driverAnalytic';
+import { beforeLastRowEdit, doAnother, doDelete, doEdit, doLoad, doSubmit, newSession, settledState, type Hosts, type Phases, type State } from '../../../src-analytic/__tests__/work-meter/driverAnalytic';
 import type { WorkCounts } from '../../../shell/workMeter';
 import { SLOW_CORPUS_ANALYTIC } from '../../../src-analytic/__tests__/work-meter/slowCorpusAnalytic';
 
@@ -186,6 +186,8 @@ type PhaseCb = (job: number, step: number, kind: string, p: string) => void;
 function runJob(ji: number, job: Job, emit: Emit, phase: PhaseCb): void {
   let step = 0;
   const base = { job: ji, source: job.source, id: job.id, ...(job.kind === 'prod' ? { iph: job.iph } : {}) };
+  // #2888 (ADR-AG-476): a job is one session — nothing is solved when it starts, and each action runs on what it left.
+  newSession();
   let st = settledState([], 0, {});
   const pre = (s: State): Pre => ({ lines: s.lines, seed: s.seed, hosts: s.hosts });
   const act = (kind: ActionKind, utterance: string | undefined, fn: (cb: (p: string) => void) => { ph: Phases; work: WorkCounts; next: State | null }, extra: { pre?: Pre; index?: number } = {}): State | null => {
@@ -209,10 +211,12 @@ function runJob(ji: number, job: Job, emit: Emit, phase: PhaseCb): void {
     }
     // load the saved file cold (the fixture's own saved seed when it has one, else the configuration on screen)
     act('load', undefined, (cb) => doLoad(st.lines, job.saveSeed ?? st.seed, st.hosts, cb), { pre: { lines: st.lines, seed: job.saveSeed ?? st.seed, hosts: st.hosts } });
-    // edit the last line to its own text (decideEditHost)
-    act('edit', st.lines[st.lines.length - 1], (cb) => doEdit(st, st.lines.length - 1, st.lines[st.lines.length - 1], cb), { index: st.lines.length - 1 });
-    // delete the first fact of a multi-fact figure
+    // delete the first fact of a multi-fact figure (in the loaded session)
     if (st.lines.length > 1) act('delete', st.lines[0], (cb) => doDelete(st, 0, cb));
+    // edit the last line (decideEditHost), in a session that has solved the lines before it and not this one — the meter's
+    // one definition of `edit` (#2888, `beforeLastRowEdit`); last, so the load and the delete mean what they meant
+    const editing = beforeLastRowEdit(st);
+    act('edit', st.lines[st.lines.length - 1], (cb) => doEdit(editing, editing.lines.length - 1, editing.lines[editing.lines.length - 1], cb), { index: st.lines.length - 1 });
     return;
   }
 
@@ -353,10 +357,16 @@ function confirm(): void {
     if (!r) { process.stdout.write(`MISSING ${k}\n`); continue; }
     out[k] = [];
     for (let i = 0; i < reps; i += 1) {
-      const st = settledState(r.pre.lines, r.pre.seed, r.pre.hosts);
+      // #2888 (ADR-AG-476): each repetition is its own session — the settled figure before the action, and nothing else.
+      newSession();
+      // An edit of the last row to its own text is the walk's edit: measured where that row is not solved (#2888).
+      const ownLast = r.kind === 'edit' && (r.index ?? 0) === r.pre.lines.length - 1 && r.pre.lines[r.pre.lines.length - 1] === r.utterance;
+      const editing = ownLast ? beforeLastRowEdit(r.pre) : null;
+      const st = editing ? null : settledState(r.pre.lines, r.pre.seed, r.pre.hosts);
       const cb = () => {};
       // --prof <file>: the LAST repetition of the action (and only the action) is CPU-profiled
       const done = profiled(i === reps - 1 ? arg('--prof') : undefined, () => {
+        if (editing || !st) return doEdit(editing!, r.index ?? 0, r.utterance!, cb);
         if (r.kind === 'submit' || r.kind === 'llm-commit') return doSubmit(st, r.utterance!, cb);
         if (r.kind === 'another') return doAnother(st, cb);
         if (r.kind === 'load') return doLoad(r.pre.lines, r.pre.seed, r.pre.hosts, cb); // pre = the saved state

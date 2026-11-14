@@ -7,16 +7,17 @@
  *   submit  = decideSubmitCx + the render
  *   another = the next seed + the render
  *   load    = hydrateSession (a cold hydrate of the saved file) + the render
- *   edit    = editLine(the last line, its own text): the gateChange path (config tries, and blame on failure) + the render
+ *   edit    = editLine(the last line, its own text): the gateChange path (config tries, and blame on failure) + the render,
+ *             in a session that has solved the lines before it and NOT the edited one (`editLastRowCx` builds that state)
  *   delete  = removeLine(the first line) + the render
  *
  * "The render" is what App.tsx's useMemo chain recomputes after the store changes (letterLines empty: no chip
  * toggled): deriveLines + coincidencesCx + askRowsOf + realParamNotes + buildScene. There is no Worker anywhere in
  * src-complex and no work after the paint: every unit is page work before the paint, and the meter says so rather
- * than this file.
+ * than this file. A unit is one executed line read or one exact solve (#2888, ADR-CX-090).
  */
 import { decideSubmitCx, hydrateSession, editLine } from '../../app/submit';
-import { deriveLines, complexScopeOf } from '../../app/deriveLines';
+import { clearComplexCaches, deriveLines, complexScopeOf } from '../../app/deriveLines';
 import { coincidencesCx } from '../../app/coincidences';
 import { realParamNotes } from '../../app/paramNote';
 import { askRowsOf } from '../../app/askLane';
@@ -56,6 +57,8 @@ const storeState = (): StCx => {
   const g = useComplexStore.getState();
   return { lines: [...g.lines], disabled: [...g.disabled], seed: g.seed, queries: [...g.queries] };
 };
+/** The session the store holds now, as plain data (what {@link editLastRowCx} rebuilds its state from). */
+export const sessionCx = (): StCx => storeState();
 
 /** App.tsx's useMemo chain after a store change. */
 export function renderCx(s: StCx): RenderCx {
@@ -141,6 +144,38 @@ export function editLastCx(): ActionRecordCx | null {
     const r = renderCx(storeState());
     return { ms: e + r.ms, parts: { gate: e }, verdict: ok ? 'ok' : 'refused', nLines: useComplexStore.getState().lines.length };
   });
+}
+
+/**
+ * THE EDIT THE METER RECORDS (#2888, ADR-CX-090; one definition for all four builders): a student who has built rows
+ * 1..n changes the LAST row. The rows before it are solved in the session; the edited row's content is not.
+ *
+ * A memo is keyed by content and cannot forget one row, so the session state is built explicitly, from `session` (the
+ * loaded figure: its n rows, which are muted, its seed and its questions):
+ *   1. a new session — every memo emptied;
+ *   2. rows 1..n-1 in the store and on screen, UNMEASURED: the render solves them, as a session that typed them has;
+ *   3. all n rows in the store, nothing solved (no render, no fold);
+ *   4. the measured action: {@link editLastCx}, the last row edited to its own text.
+ * So the edit costs about what typing the last row costs, through the EDIT path. For a one-row figure the prefix is
+ * empty and the edit is cold. Null on an empty session.
+ */
+export function editLastRowCx(session: StCx): ActionRecordCx | null {
+  const n = session.lines.length;
+  if (n < 1) return null;
+  const put = (rows: number): void =>
+    useComplexStore.setState({
+      lines: session.lines.slice(0, rows),
+      disabled: session.disabled.filter((d) => d < rows),
+      seed: session.seed,
+      queries: [...session.queries],
+      lastError: null,
+      lastNote: null,
+    });
+  clearComplexCaches();
+  put(n - 1);
+  renderCx(storeState());
+  put(n);
+  return editLastCx();
 }
 
 /** Delete the store's first line. Null when it holds fewer than two. */

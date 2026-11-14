@@ -8,7 +8,7 @@ Use them before and after an optimisation, on the same machine.
 
 Every action is measured twice in the same run: its TIME, and its WORK — the work meter's three counts (#2873,
 ADR-W-210): solver work in units, in all / on the page's UI thread / before the figure can paint. One unit is one
-evaluateCore call (2-D), one residual evaluation (3-D, analytic), one exact solve (complex). The actions themselves
+evaluateCore call (2-D), one residual evaluation (3-D, analytic), one line read or one exact solve (complex). The actions themselves
 live in each product's tests — <tree>/__tests__/work-meter/driver*.ts — and are the SAME code the suite's work-meter
 gate runs, so a count read here and a count the gate fails on describe the same action.
 

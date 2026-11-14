@@ -149,6 +149,26 @@ export function chargeHit(cell: WorkCell | undefined): boolean {
   return true;
 }
 
+/**
+ * #2888 ([ADR-827](docs/06-decisions.md#adr-827)) — HAS THE OPEN WORK EPOCH ALREADY CHARGED A SOLVE OF THIS OBJECT?
+ *
+ * Every memo keyed by an object's identity that carries a ledger registers how to find its entry's cell
+ * ({@link registerLedger}: `evaluate`, `resolveDriven`, the DOF count). A cache that hands the SAME object to a second
+ * caller — where each caller used to build its own — asks this first: inside an epoch that has already charged a solve
+ * of that object, a second hand-out would be served free, while two separately built objects were each solved and
+ * counted. So the cache builds a fresh object there, and the epoch counts exactly what it counted before the cache
+ * existed. Outside an epoch nothing is charged and no budget reads the counter, so this is always false.
+ */
+const ledgerLookups: ((key: object) => WorkCell | undefined)[] = [];
+export function registerLedger(lookup: (key: object) => WorkCell | undefined): void {
+  ledgerLookups.push(lookup);
+}
+export function chargedInOpenEpoch(key: object): boolean {
+  if (!epochOpen) return false;
+  for (const lookup of ledgerLookups) if (lookup(key)?.charged === epochId) return true;
+  return false;
+}
+
 /** #1671 (ADR-584): a ledger's total — every `own` in its closure once — the work a transplanted entry
  *  (a fold computed in the geometry worker) is charged on this thread, so a worker-warmed fold costs the
  *  same in a work budget as one this thread computed. */
@@ -180,6 +200,20 @@ export function withWorkEpoch<T>(fn: () => T): T {
   } finally {
     epochOpen = false;
   }
+}
+
+/** #2888 (ADR-827): is a work epoch open — may a work budget be reading the counter now? */
+export function inWorkEpoch(): boolean {
+  return epochOpen;
+}
+/**
+ * #2888 (ADR-827): is a clock budget armed that has NO TIME LEFT (its deadline is now, or past)? It only asks: no abort
+ * is counted. `>=`, not `>`: a search handed a budget of zero computes its deadline as this very millisecond, and its
+ * loop gives up only once the clock has ticked. It always did tick, because each candidate was solved; a memo that
+ * answers in microseconds would let that search examine candidates on a budget it was told it does not have.
+ */
+export function clockSpent(): boolean {
+  return solveBudget.deadlineAt !== null && Date.now() >= solveBudget.deadlineAt;
 }
 
 /** Has the armed WORK budget run out? Never true when unarmed. Counted as a ladder abort, like the clock. */

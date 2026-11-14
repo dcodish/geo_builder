@@ -2,7 +2,7 @@
  * THE ANALYTIC WORK-METER GATE (#2873, [ADR-W-210](../../docs/06w-decisions-workspace.md#adr-w-210) phase 0).
  *
  * Every saved sequence in `fixtures/` (a saved figure, or an entry of a corpus file) is walked through the student's
- * actions — typing each line, «הציגו תצורה אחרת», a cold load, an edit, a delete — and each action's solver work is held
+ * actions — typing each line, «הציגו תצורה אחרת», a cold load, a delete, an edit — and each action's solver work is held
  * against `work-meter/baseline.jsonl`. An action that does MORE work than its baseline fails; the message says which
  * figure, which action, the numbers, and what to do. The rule, the tolerance (zero) and the re-record are
  * `shell/__tests__/work-gate.ts`'s; the actions are `work-meter/driverAnalytic.ts`'s, the same driver the timing
@@ -12,8 +12,13 @@
  * (`scanRoots`). The analytic tree has no worker, so every unit is page work today — the honest starting point of
  * invariant 1; the part after the paint is the pool and the passive effects.
  *
- * test-budget: the gate walks all 208 saved sequences through every student action (1 963 actions): about 11 min alone,
- * 15 min inside the full suite (ADR-W-210 Am. 1). One file, because the baseline is one file.
+ * A sequence is walked as SESSIONS (#2888, ADR-AG-476): solved content is kept by content across actions, so the walk
+ * empties the store where a session starts (the sequence, its load, and its edit) and an action's count is what it adds
+ * to its session. The edit is measured where the rows before it are solved and the edited row is not (the meter's one
+ * definition of `edit`, every builder's). `work-meter/walkAnalytic.ts` says exactly where.
+ *
+ * test-budget: the gate walks all 208 saved sequences through every student action (1 963 actions): about 8 min alone
+ * since #2888 (11 min before it, ADR-W-210 Am. 1). One file, because the baseline is one file.
  *
  * Re-record: `npm run work:record -- analytic` (docs/08, "The work meter").
  */

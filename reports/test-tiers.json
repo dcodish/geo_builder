@@ -6,10 +6,9 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-11-13",
+  "updatedAt": "2026-11-14",
   "slow": [
     "src-analytic/__tests__/geo-input-parity.test.ts",
-    "src-analytic/__tests__/issue-1334-tolerance-artefact.test.ts",
     "src-analytic/__tests__/issue-1353-imperatives-taught-2.test.ts",
     "src-analytic/__tests__/issue-1353-imperatives-taught-3.test.ts",
     "src-analytic/__tests__/issue-1353-imperatives-taught.test.ts",
@@ -22,11 +21,8 @@
     "src-analytic/__tests__/issue-1473-pool-invariant-7.test.ts",
     "src-analytic/__tests__/issue-1473-pool-invariant-8.test.ts",
     "src-analytic/__tests__/issue-1473-pool-invariant.test.ts",
-    "src-analytic/__tests__/issue-1556-freerank-equality-rows.test.ts",
-    "src-analytic/__tests__/issue-1616-rulings-0310.test.ts",
     "src-analytic/__tests__/issue-1618-corpus471-ratchet.test.ts",
     "src-analytic/__tests__/issue-1620-tangents-meet.test.ts",
-    "src-analytic/__tests__/issue-1621-ratios-areas.test.ts",
     "src-analytic/__tests__/issue-1637-g1-knowledge-2.test.ts",
     "src-analytic/__tests__/issue-1637-g1-knowledge-3.test.ts",
     "src-analytic/__tests__/issue-1637-g1-knowledge-4.test.ts",
@@ -36,7 +32,6 @@
     "src-analytic/__tests__/issue-1699-blame-first-unsat.test.ts",
     "src-analytic/__tests__/issue-1888-lost-part.test.ts",
     "src-analytic/__tests__/issue-2233-choice-note-pool.test.ts",
-    "src-analytic/__tests__/issue-2506-loose-limit-collapse.test.ts",
     "src-analytic/__tests__/issue-2691-letter-sweep.test.ts",
     "src-analytic/__tests__/work-meter-gate.test.ts",
     "src/__tests__/determined-prints-1.test.ts",
@@ -72,6 +67,7 @@
     "src/app/__tests__/student-text-leak-lock.test.ts",
     "src/app/__tests__/submitPipeline.test.ts",
     "src/engine/__tests__/adr028-driven.test.ts",
+    "src/engine/__tests__/apply-purity.test.ts",
     "src/engine/__tests__/dof-vacuous.test.ts",
     "src/engine/__tests__/inscribe-joint-solve.test.ts",
     "src/engine/__tests__/membership-conversion.test.ts",
@@ -111,6 +107,7 @@
     "src3d/__tests__/student-text-1455-5.test.ts",
     "src3d/__tests__/student-text-1455.test.ts",
     "src3d/__tests__/symbol-pin-collapse.test.ts",
-    "src3d/__tests__/work-meter-gate.test.ts"
+    "src3d/__tests__/work-meter-gate.test.ts",
+    "src3d/store/__tests__/compute-once-2888.test.ts"
   ]
 }

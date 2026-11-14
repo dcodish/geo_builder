@@ -3,7 +3,7 @@
  *
  * Every builder's innermost solving function calls {@link meterWork} once per unit of its own work. A unit is a
  * count, never a time: 2-D one `evaluateCore`, 3-D one residual evaluation of `leastSquares`, analytic one residual
- * evaluation of `solveLM` (and of the rank and the root scan beside it), complex one `foldConstraints`. A unit's
+ * evaluation of `solveLM` (and of the rank and the root scan beside it), complex one executed line read or one exact solve (ADR-CX-090). A unit's
  * cost differs between builders and between figures, so counts are only ever compared against the same action of
  * the same figure (the committed baselines, `work-meter/baseline.jsonl` in each product's tests).
  *

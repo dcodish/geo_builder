@@ -3,12 +3,26 @@
  * sequence of lines.
  *
  * `submit#k` types the k-th line on the settled figure of the lines before it. Then, on the figure the lines built: one
- * «הציגו תצורה אחרת», the cold load of the saved file (its own seed when it has one), an edit of the last line to its
- * own text, and the delete of the first line. The analytic engine keeps its caches on the construction, and `derive`
- * builds a new one each time, so a sequence's counts depend on nothing run before it.
+ * «הציגו תצורה אחרת», the cold load of the saved file (its own seed when it has one), the delete of the first line, and
+ * an edit of the last line.
+ *
+ * ONE SEQUENCE IS THREE SESSIONS (#2888, ADR-AG-476). `derive` keeps solved content by content and the store outlives the
+ * action, so the walk says where a session starts, and a count is "what this action adds to its session":
+ *  1. THE SESSION THAT TYPES THE LINES. The store is emptied first (`newSession`), and each action runs on what the
+ *     earlier ones solved, as the page does: `submit#k` on the figure of the lines before it, «הציגו תצורה אחרת» on the
+ *     figure the lines built.
+ *  2. THE LOADED SESSION. A load is a session of its own (`doLoad` empties the store: a saved file opened in a new tab),
+ *     and the delete runs in it.
+ *  3. THE EDIT'S SESSION — the meter's one definition of `edit`, the same in every builder: **a student who has built rows
+ *     1..n changes the LAST row; the rows before it are solved in the session, the edited row's content is not.** A cache
+ *     keyed by content cannot forget one row, so the walk builds that state (`beforeLastRowEdit`): a new session, rows
+ *     1..n−1 on screen and settled (unmeasured), then all n rows as the session's lines with nothing of the n-row figure
+ *     solved. The edit re-types the last row to its own text through the edit path, so it costs about what `submit#n`
+ *     costs. It is the walk's LAST action, so the load and the delete mean what they meant.
+ * A sequence's counts depend on nothing run before it.
  */
 import type { Seed } from '../../engine/evaluate';
-import { doAnother, doDelete, doEdit, doLoad, doSubmit, settledState, type Phases, type State } from './driverAnalytic';
+import { beforeLastRowEdit, doAnother, doDelete, doEdit, doLoad, doSubmit, newSession, settledState, type Phases, type State } from './driverAnalytic';
 import type { WorkCounts } from '../../../shell/workMeter';
 
 export interface WalkedActionA {
@@ -36,6 +50,7 @@ export function walkSequence(lines: readonly string[], saveSeed: Seed | undefine
     return r.next;
   };
 
+  newSession();
   let st = settledState([], 0, {});
   if (plan.submits === 'all') {
     lines.forEach((line, k) => {
@@ -57,8 +72,10 @@ export function walkSequence(lines: readonly string[], saveSeed: Seed | undefine
   // the saved file, loaded cold (its own saved seed when it has one, else the configuration on screen)
   const seed = saveSeed ?? st.seed;
   run('load', () => doLoad(st.lines, seed, st.hosts));
-  run('edit', () => doEdit(st, st.lines.length - 1, st.lines[st.lines.length - 1]));
   if (st.lines.length > 1) run('delete', () => doDelete(st, 0));
+  // the last row edited, in a session that has solved the rows before it and not this one (the walk's last action)
+  const editing = beforeLastRowEdit(st);
+  run('edit', () => doEdit(editing, editing.lines.length - 1, editing.lines[editing.lines.length - 1]));
   return out;
 }
 

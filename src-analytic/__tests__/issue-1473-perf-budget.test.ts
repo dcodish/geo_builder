@@ -14,7 +14,7 @@
  * 3. **The conic memo.** It removes most conic fits, and changes no figure (`__setConicMemo(false)`).
  */
 import { describe, expect, it } from 'vitest';
-import { derive } from '../engine/derive';
+import { clearAnalyticCaches, derive } from '../engine/derive';
 import {
   configurationPool,
   distinctConfigSeeds,
@@ -96,10 +96,13 @@ describe('#1473 — the render path spends no evaluation the pool adds (B′)', 
     it(`${name}: every line, deferred render ≤ the pre-#1473 seed consumers`, () => {
       for (let n = 1; n <= lines.length; n += 1) {
         const prefix = lines.slice(0, n);
+        // #2888 (ADR-AG-476): solved content now outlives a derivation, so each side of the comparison says it starts cold.
+        clearAnalyticCaches();
         const d = derive(prefix, 0);
         configurationPool(d.construction).defer();
         const now = spent(() => renderPath(d));
 
+        clearAnalyticCaches();
         const d2 = derive(prefix, 0);
         const prior = spent(() => priorConsumers(d2));
         expect(now, `line ${n} «${prefix[n - 1]}»`).toBeLessThanOrEqual(prior);
@@ -164,6 +167,7 @@ describe('#1473 — the conic memo', () => {
   it('cuts the conic fits of completing the 572 pool by at least 5×', () => {
     const fits = (memo: boolean) => {
       __setConicMemo(memo);
+      clearAnalyticCaches(); // #2888: the fits of a COLD derivation — a remembered one fits nothing either way
       try {
         const before = conicStats.fits;
         const d = derive(PART_B, 0);
@@ -181,6 +185,7 @@ describe('#1473 — the conic memo', () => {
   it('changes no figure: every pool configuration of the heavy figures signs identically with the memo off', () => {
     const sigs = (lines: string[], memo: boolean) => {
       __setConicMemo(memo);
+      clearAnalyticCaches(); // #2888: each side solves for itself — a remembered figure would compare with itself
       try {
         const c = derive(lines, 0).construction;
         return Array.from({ length: POOL_SIZE }, (_, s) => figureSignature(drawableAt(c, s)));

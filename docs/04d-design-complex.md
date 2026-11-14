@@ -350,6 +350,51 @@ never as a contradiction or a refutation.
   a line the fold set aside reaches the strip with its `why` (`refusalWhy` → `InputError` `refused`,
   worded by `app/errorText.ts`), never as the generic «אינו מתיישב עם», which asserts a contradiction.
 
+## Compute once: the line read and its memo ([ADR-CX-090](06d-decisions-complex.md#adr-cx-090), #2888)
+
+Everything on the path from the student's lines to the figure is a pure function of content: no clock, no random
+source, no language. Three of those functions keep their results past the student's action (ADR-W-210 invariant 4,
+"compute once"). Each is a table made by `value/contentMemo.ts`: from a content KEY to a FROZEN value, bounded, the
+least recently used entry out first.
+
+| Memo | Function | The key, which is its whole input | Bound | A full table holds |
+| --- | --- | --- | --- | --- |
+| `readings` | `parseLineV2` (`parser/rules.ts`): one line read | the line as typed, and the declared letter families as a sorted set (`parseKey`) | 1 024 | about 4.2 MB (4 KB a reading, with the atoms it registers) |
+| `figures` | `deriveLines` (`app/deriveLines.ts`): one fold | the line list and the questions in order, the configuration index, the seed, the chip set (`deriveKey`) | 256 | 3.2 MB of the heaviest fixture's figures (12.5 KB each) |
+| `patterns` | `rx` (`parser/lexicon.ts`): one compiled rule pattern | flags and pattern source | 512; the grammar has 44 | compiled expressions |
+
+- **What a reading depends on, exactly.** The text and the declared families, read by membership (`isComplexName`).
+  Nothing else: the readings that depend on ORDER (which of ADR-CX-005's three modes `X^n = …` has, what a
+  selection picks from, a reserved letter) are decided by `lowerLines`, which runs per fold over the memoized
+  readings and is not memoized. So the same line under other declared letters is another entry, and the same line
+  at another place in another figure is the same entry, correctly.
+- **The read's one side effect.** Reading a literal registers its exact pair in the value layer's atom registries
+  (`value/angle.ts`, `value/gaussian.ts`). A memo hit skips the read and so the registration. That is sound because
+  the registries are add-only, keyed by a name derived from the exact value, and never cleared: an entry made by
+  the first read is still there for every later hit, and `clearComplexCaches` leaves them alone.
+- **A stored value is shared and frozen.** A hit returns the same object to every caller. `ParsedLine`'s channels
+  are `readonly` arrays, so a write does not compile, and `deepFreeze` makes one throw at run time. `lowerLines`
+  copies the rows it accumulates and never changes a reading.
+- **A global or sticky pattern is never kept.** It carries `lastIndex` between calls, so sharing one would make a
+  match depend on the match before it. `rx` builds those fresh, as it always did.
+- **What is NOT memoized, on purpose.** The part of a fold that does not depend on the configuration (`lowerLines`
+  and `exactSolve`) is still executed once per distinct fold, and the entailment gate makes two exact solves of
+  content the gate's folds already solved. After the two memos the exact solve is 12.5 % of what is left (measured),
+  under half of it repeats, and sharing it needs a seam into `foldConstraints`. It is left for the meter to rank.
+- **One clear function.** Every memo registers itself, and `clearComplexCaches()` (`app/deriveLines.ts`, test-only)
+  empties them all, so a memo added later cannot be left out. No result depends on it; only the executed work does.
+- **The work meter.** One unit is one EXECUTED line read or one exact solve; a hit is charged nothing. The gate's
+  walk starts each figure from empty memos and stays warm, as one session does, and its load is cold again
+  (`__tests__/work-meter/walkCx.ts`). Its `edit` comes last, in a session of its own: the rows before the last are
+  solved, the edited row is not (`editLastRowCx` in the driver builds that state), so it sizes a real edit. The
+  timing harness does the same per corpus item.
+- **Locks.** `value/__tests__/content-memo-2888.test.ts` (the table: the key, the bound, the freeze, the clear) and
+  `__tests__/compute-once-2888.test.ts`: one read and one fold per content; a line under other declared letters, and
+  a figure asked with another seed, question, chip or line order, is never served the other's result; and over the
+  whole fixture corpus, driven through `submitLine`, `hydrateSession`, `editLine`, `toggleLine` and the store,
+  everything a student can see is identical with empty memos before every step and with memos full of a whole
+  session.
+
 ## Claims — three verdicts, and why the third is not optional
 
 `model/claim.ts` returns **`holds` / `refuted` / `unknown`**, where `unknown` means *not decidable from
