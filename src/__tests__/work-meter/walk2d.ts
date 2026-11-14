@@ -3,7 +3,8 @@
  *
  * `load` is the cold load of the file. `submit#k` re-types the file's k-th row on the figure of the rows before it (a
  * row the deterministic lane does not read is followed by its saved commands, as the timing harness does). Then, on
- * the loaded figure: one «הציגו תצורה אחרת», the delete of the first row, and the background detection sweep of the
+ * the loaded figure: one «הציגו תצורה אחרת», the delete of the first row, the undo of that delete, the first row turned
+ * off (#2890: `undo` and `toggle` are student actions the walk did not drive), and the background detection sweep of the
  * loaded figure. Each fixture starts from cold caches, so its counts depend on nothing run before it.
  *
  * `edit` IS THE LAST ACTION, AND HAS ONE DEFINITION IN EVERY BUILDER (#2888, ADR-W-210 phase 2): a student who has
@@ -21,7 +22,7 @@ import type { AnyCommand } from '@/engine';
 import type { ActionRecord, Driver2d } from './driver2d';
 
 export interface WalkedAction {
-  /** The action's name inside its fixture: `load`, `submit#3`, `another#1`, `edit`, `delete`, `detect`. */
+  /** The action's name inside its fixture: `load`, `submit#3`, `another#1`, `edit`, `delete`, `undo`, `toggle`, `detect`. */
   action: string;
   rec: ActionRecord;
 }
@@ -91,7 +92,15 @@ async function onLoaded(driver: Driver2d, text: string, plan: WalkPlan, run: Run
     if (only) break;
   }
   await driver.edit(); // unmeasured: the session `delete` and `detect` have always run in (see the header)
-  await run('delete', () => driver.remove());
+  let deleted = false;
+  await run('delete', async () => {
+    const rec = await driver.remove();
+    deleted = rec !== null;
+    return rec;
+  });
+  // the undo puts the loaded session's figure back, by reference; the toggle then acts on that figure
+  if (deleted) await run('undo', () => driver.undo());
+  await run('toggle', () => driver.toggle());
   await run('detect', () => driver.detect(loaded));
   await run('edit', () => driver.editLastRow(whole));
 }

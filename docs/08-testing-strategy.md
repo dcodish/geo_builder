@@ -109,12 +109,12 @@ press take 6 s was found by the operator's play.
 | One unit | one `evaluateCore` call | one residual evaluation of `leastSquares` | one residual evaluation of `solveLM`, `jacobianRank` or `scanRoots` | one executed line read (`parseLineV2`) or one exact solve of a fold ([ADR-CX-090](06d-decisions-complex.md#adr-cx-090)) |
 | Gate | `src/__tests__/work-meter-gate.test.ts` | `src3d/__tests__/work-meter-gate.test.ts` | `src-analytic/__tests__/work-meter-gate.test.ts` | `src-complex/__tests__/work-meter-gate.test.ts` |
 | Baseline | `src/__tests__/work-meter/baseline.jsonl` | `src3d/__tests__/work-meter/baseline.jsonl` | `src-analytic/__tests__/work-meter/baseline.jsonl` | `src-complex/__tests__/work-meter/baseline.jsonl` |
-| Gate's wall time alone (2026-11-13; analytic 2026-11-14) · inside `test:full` (2026-11-14, after phase 2) | 6 min · 12 min | 5 min · 9 min | 8 min · 12 min | under 2 s |
+| Gate's wall time alone (2026-11-13; analytic 2026-11-14; 2-D with three heaps 2026-11-14) · inside `test:full` (2026-11-14, after phase 2) | 9.5 min · not yet measured with three heaps (12 min before) | 5 min · 9 min | 8 min · 12 min | under 2 s |
 
 **What a gate does.** It walks **every** fixture of its tree through the student's actions, with the tree's
 action driver (`<tree>/__tests__/work-meter/driver*.ts`, the same code `scripts/perf/` times): re-typing each row
 (`submit#k`), one «הציגו תצורה אחרת» (`another#1`), a cold `load`, the `delete` of the first row, an `edit` of the last
-row, and in 2-D the background `detect` sweep. Each action gets three counts: `total` (all the
+row, and in 2-D the `undo` of that delete, the first row turned off (`toggle`) and the background `detect` sweep. Each action gets three counts: `total` (all the
 work), `page` (the part on the page's UI thread, as against a worker) and `prePaint` (the part before the figure can
 paint). The baseline holds one line per figure-action, sorted, so two branches that each add a fixture merge as
 insertions. Nothing is sampled or skipped: a gate is one test file, in the slow tier, run by `npm run test:full` and by
@@ -135,6 +135,30 @@ cache added later joins it, or the gate's determinism lock fails.
   through the edit path. Re-typing a row on a session that has already solved it would count nothing.
 - 2-D's `detect` runs as a browser's detect worker does: on its own copy of the facts, with nothing another lane
   computed.
+
+**2-D's gate walks three heaps** ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 4,
+[ADR-829](06-decisions.md#adr-829), #2890). A browser runs 2-D in three heaps: the page, the interactive worker and
+the detect worker. Under node they were one module instance sharing every memo, so the page's count was a lower
+bound. The gate now hands 2-D's worker client one **isolated executor** per lane (`shell/workerExecutor`): each
+worker's operations are loaded as a module instance of their own (`shell/__tests__/isolated-ops.ts`,
+`secondInstance`), every argument and result passes through `structuredClone`, and the units a worker's instance
+counts come back in the meter envelope. So:
+- the `page` count is what a browser's page computes, and nothing a worker solved is a memo hit for it;
+- a result that does not clone fails the walk, at the action that produced it;
+- an adoption that misses (phase 3's later steps) shows as page work, which the one-instance gate could not see.
+
+A builder's first worker joins the same way: load its op table with `secondInstance`, hand it to `isolatedExecutor`,
+and inject the executor into its worker client. A driver whose client has separate heaps says so (2-D's
+`WorkerOps.reset`), and empties those heaps where a session starts.
+
+**Three of 2-D's actions were corrected with it** (the measurement, not the code a student runs):
+- `delete` is `removeGroup` and the render, as the App's delete is. It used to be followed by the resolve gate and
+  the worker's search, which the App runs after a toggle or an edit and never after a delete (ADR-518): on a figure
+  whose first row is gone that search ran to its end for nothing.
+- `edit` puts a CLONE of the n rows in the store. The loaded session's own array still carried its replay, keyed by
+  the array's identity, which no clear empties.
+- `undo` (of that delete) and `toggle` (the first row turned off, with the resolve gate the App runs after it) are
+  walked. They were student actions the meter did not see.
 
 **The rule.** An action above its baseline in **any** of the three counts fails, and the message names the
 figure, the action, the numbers and the next step. So does an action with no baseline line, a baseline line the walk
@@ -164,9 +188,10 @@ every builder's totals from the committed baselines. A re-record never writes a 
 - **2-D's gate measures the whole search, not the browser's clipped one.** Under vitest 2-D's clock budgets are off
   (`import.meta.env.MODE === 'test'`: the search budgets in `replay/core.ts`, and since #2873 the two load budgets in
   `store/loadAudit.ts`), which is what makes the counts exact. A browser stops a search after 12 s.
-- **2-D's `page` count is a lower bound.** Under node the page and the worker are one module instance and share one
-  memo, so a view the worker searched is a memo hit when the page draws it; a browser's worker has its own caches.
-  The lane is charged by `src/store/geoWork.ts`'s synchronous fallback, which is the work a browser sends to its worker.
+- **2-D's `page` count is a browser's** since #2890 (above): the gate's workers are their own module instances. In
+  every OTHER suite, and in `scripts/perf/2d`, 2-D's worker operations run in the page's module instance, charged to
+  the worker lane by the client's same-instance executor (`shell/workerExecutor`); a page count read there is still a
+  lower bound, because a view the worker searched is a memo hit when the page draws it.
 - 3-D, analytic and complex have no worker: every unit is page work today.
 - What is not counted is listed, with its measured size, in [ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1.
 
