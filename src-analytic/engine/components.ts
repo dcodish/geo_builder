@@ -25,8 +25,9 @@ import { objectDeps, paramRegister, symbolDeps } from './carriers';
 import { asPair } from './lines';
 import type { Constraint } from './solve';
 import { curveByName, isFree, type Construction, type Id } from './types';
+import { ContentCache, contentOf } from './content';
 
-const partsMemo = new WeakMap<Construction, Construction[]>();
+const partsMemo = new ContentCache<Construction[]>();
 
 /** Union–find over string nodes. */
 class Links {
@@ -88,12 +89,17 @@ function namedNodes(raw: Construction, value: unknown, ids: ReadonlySet<string>,
  * objects themselves), carries the whole as `whole` (the frame its starts are sampled in), and is stable per `raw`, so
  * per-construction memos see one object per part.
  */
-export function partsOf(raw: Construction, readsOf?: (raw: Construction) => ReadonlyMap<Constraint, ReadonlySet<Id>>): Construction[] {
-  const hit = partsMemo.get(raw);
-  if (hit) return hit;
-  const out = computeParts(raw, readsOf);
-  partsMemo.set(raw, out);
-  return out;
+export function partsOf(given: Construction, readsOf?: (raw: Construction) => ReadonlyMap<Constraint, ReadonlySet<Id>>): Construction[] {
+  // #2888 (ADR-AG-476): the parts are of the CONTENT, never of one caller's view of it — a part's `whole`, and the
+  // one-part answer `[raw]`, are shared by every view, so neither may be a view (it would carry that reader's pool).
+  const raw = contentOf(given);
+  let out = partsMemo.get(raw);
+  if (!out) {
+    out = computeParts(raw, readsOf);
+    partsMemo.set(raw, out);
+  }
+  // One part is the construction the caller holds — the very object, as it always was.
+  return given !== raw && out.length === 1 && out[0] === raw ? [given] : out;
 }
 
 function computeParts(raw: Construction, readsOf?: (raw: Construction) => ReadonlyMap<Constraint, ReadonlySet<Id>>): Construction[] {
