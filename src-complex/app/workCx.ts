@@ -15,7 +15,7 @@
  * on a component that reaches a job action through the store instead of through {@link actCx} or
  * {@link jobStoreCx}.
  */
-import { createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
+import { INTERACTIVE, createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
 import { useComplexStore } from '../store/useComplexStore';
 
 type State = ReturnType<typeof useComplexStore.getState>;
@@ -29,10 +29,16 @@ export type BasisCx = Pick<State, (typeof BASIS_FIELDS_CX)[number]>;
 const basisOf = (s: State): BasisCx => ({ lines: s.lines, disabled: s.disabled, seed: s.seed });
 const sameBasis = (a: BasisCx, b: BasisCx) => BASIS_FIELDS_CX.every((k) => a[k] === b[k]);
 
-export const workCx = createWorkQueue<BasisCx>({ basis: () => basisOf(useComplexStore.getState()), sameBasis });
-
 /** The lane of «הציגו תצורה אחרת»: shown on its own button, as 2-D shows it (measured at `main`, 2026-11-13). */
 export const ANOTHER = 'another';
+/**
+ * #2890 ([ADR-W-210](../../docs/06w-decisions-workspace.md#adr-w-210) Am. 4, ruled): «הציגו תצורה אחרת» pressed while
+ * another action runs WAITS ITS TURN and then searches the figure that action left. It is still counted and shown on
+ * its own button, and a line entered while a search runs does not wait for the search.
+ */
+const BEHIND = { [ANOTHER]: INTERACTIVE };
+
+export const workCx = createWorkQueue<BasisCx>({ basis: () => basisOf(useComplexStore.getState()), sameBasis, behind: BEHIND });
 
 /** The store actions that write the figure's basis: each is reached from a component only as a job. */
 export const JOB_ACTIONS_CX = [

@@ -189,7 +189,10 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   2-D also keeps a second, small «חושב…» under the box; it waits for the same 0.3 s and may arrive later on a
   line the page itself computes. While the tool works, Enter is off from the action itself and a typed line
   stays in the box (FR-SU-34), and an action pressed meanwhile runs when the first is done, in the order pressed
-  (operator, 2026-11-13). Not covered yet: an ask and the data panel (#2886). The operator's ruling
+  (operator, 2026-11-13). **«הציגו תצורה אחרת» is no exception** ([ADR-W-210](06w-decisions-workspace.md#adr-w-210)
+  Am. 4): pressed while another action runs it waits its turn and then searches the figure that action left, and
+  its own button reads «חושב…» meanwhile. A line entered while a search runs is still taken at once (in 2-D that
+  search is then superseded, as it was: ADR-812). Not covered yet: an ask and the data panel (#2886). The operator's ruling
   (2026-11-13): «user should know the engine is working and not frozen».
   - Sources: [ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 2, #2874.
 - **FR-SU-20 (Must)** — **Radians are the complex Builder's notation only.** In the 2-D, 3-D and analytic
@@ -357,6 +360,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | --- | --- | --- | --- | --- | --- |
 | A pasted paragraph | one row per sentence | same | same | same | **Same** (ADR-W-125, FR-SU-19) |
 | A line typed while the previous one is processing | Enter off («חושב…»); the line stays in the box | same | same | same | **Same** (ADR-W-198, FR-SU-34) |
+| «הציגו תצורה אחרת» pressed while another action is still running | waits its turn, then searches the figure that action left; its own button reads «חושב…» meanwhile (until #2890 the press was dropped when the action finished) | same (the page used to be frozen, so the press landed after the action) | same | same | **Same** (ADR-W-210 Am. 4, FR-SU-37; ruled 2026-11-13, question 1) |
 | The engine is working on something the student did (submit, show another, load, edit, delete, toggle, rename, swap, undo, redo, clear) | once it has worked 0.3 s: «הוסף» greyed, reads «חושב…», a ring turning; the «הציגו תצורה אחרת» search on its own button; a faster action shows nothing | same | same | same | **Same** (ADR-W-210 Am. 2, FR-SU-37) |
 | A line that refers to a point the figure lacks («M אמצע AB», «AB = 2 AD» on a blank page) | created free; the notice «נוצרה נקודה חדשה X — …» with ✕ removing the line | same; a named line too («הישר k …»), with no notice (ADR-W-163) | same | created silently, no notice | **Gap** — complex #2562 (`later`); ruled 2026-09-27 (#1467, ADR-W-162); one notice, `shell/frame/CreatedNotice.tsx` + suite keys |
 | An AI answer that drops a shape or role word the student typed («שווה צלעת» answered «משולש ABC») | refused, the word named (dropped-given) | same | records today | n/a (no AI fallback) | **Ruled** — 2026-10-08 (#1906, ADR-W-144, FR-SU-21); analytic's half is #1906's third item; one reader, `shell/llm/honestyCore.ts` `propertyWords` |
