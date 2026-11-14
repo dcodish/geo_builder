@@ -294,6 +294,21 @@
         "ABC מקיים תכונה מסתורית"
       ],
       "lookFor": "The second line is not added: «לא הבנתי את הבקשה — נסו לנסח אחרת…» and the line stays in the box; one row."
+    },
+    {
+      "sheet": "feat-2890-analytic",
+      "id": "T7",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-14",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "lines": [
+        "A(1,2)",
+        "B(4,6)",
+        "קטע AB"
+      ],
+      "lookFor": "Three rows, the segment drawn again."
     }
   ],
   "results": [

@@ -347,7 +347,7 @@ export function clearAnalyticCaches(): void {
   clearContentCaches();
 }
 
-const lineListKey = (lines: readonly string[], seedNames: Readonly<Record<string, string>>, pins: Readonly<Record<number, readonly string[]>>): string =>
+export const lineListKey = (lines: readonly string[], seedNames: Readonly<Record<string, string>>, pins: Readonly<Record<number, readonly string[]>>): string =>
   JSON.stringify([
     lines,
     Object.keys(seedNames).sort().map((k) => [k, seedNames[k]]),

@@ -8,6 +8,10 @@ import { devCrashMode } from '../shell/session/crash';
 import { crashSessionAn } from './app/sessionPersistAn';
 import { logCrashAnalytic } from './debug/sessionLogAnalytic';
 import './styles.css';
+import { startAnalyticWork } from './app/workerAn';
+
+// #2890 (ADR-AG-478): the analytic worker starts with the page, so its chunk downloads beside the page's own assets
+startAnalyticWork();
 
 // #1507 (ADR-W-195): an error while drawing costs a notice and «שחזור», never the construction. The
 // boundary sits inside the i18n provider (its notice reads the suite's keys) and around the whole app.

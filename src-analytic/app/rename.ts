@@ -665,7 +665,11 @@ export function dispatchRename(
   actions: RenameActions,
   current?: Derivation,
 ): RenameVerdict {
-  const v = decideRename(from, to, state, current);
+  return applyRenameVerdict(decideRename(from, to, state, current), actions);
+}
+
+/** Apply a rename decided elsewhere (the worker, #2890): ONE commit, or the refusal shown. Returns the verdict. */
+export function applyRenameVerdict(v: RenameVerdict, actions: RenameActions): RenameVerdict {
   if (v.kind === 'refused') actions.setError(v.error);
   else actions.applyRename(commitOf(v));
   return v;
@@ -679,7 +683,11 @@ export function dispatchSwap(
   actions: SwapActions,
   current?: Derivation,
 ): SwapVerdict {
-  const v = decideSwap(a, b, state, current);
+  return applySwapVerdict(decideSwap(a, b, state, current), actions);
+}
+
+/** Apply a swap decided elsewhere (the worker, #2890). */
+export function applySwapVerdict(v: SwapVerdict, actions: SwapActions): SwapVerdict {
   if (v.kind === 'refused') actions.setError(v.error);
   else actions.applySwap(commitOf(v));
   return v;

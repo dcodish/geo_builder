@@ -39,7 +39,7 @@ import { existingNamesAnalytic, faithfulnessAnalytic, restoreStatedSequencesAnal
 import type { InputError } from '../store/useAnalyticStore';
 import { askKeepingNames, type NameRetry } from '../../shell/llm/retryLostNames';
 
-type Judged =
+export type Judged =
   /** The proxy was throttled. The caller says "busy", never "I did not understand". */
   | { kind: 'busy'; why: 'rate-limited' | 'daily-limit' }
   /** No usable answer, or the model judged the request inexpressible. Keep the deterministic refusal. */
@@ -117,14 +117,28 @@ export function fallbackContext(lines: readonly string[]): string {
  * 2026-11-06: *"Or even go back to llm to get the correct one."* A retry that still contradicts it meets the same gate,
  * so it is the `unfaithful` refusal naming the value.
  */
+/**
+ * The two places the fallback SOLVES (#2890, [ADR-AG-478](../../docs/06c-decisions-analytic.md#adr-ag-478)): the names the
+ * figure holds, and the judging of the model's lines through the submit decision. The page passes its worker's
+ * operations; a test, or a caller with no worker, runs them here.
+ */
+export interface FallbackSolver {
+  existing(lines: readonly string[], seed: Seed): Promise<ReadonlySet<string>> | ReadonlySet<string>;
+  judge(utterance: string, lines: readonly string[], seed: Seed, answer: LlmStepsOutcome | null, existing: ReadonlySet<string>): Promise<Judged> | Judged;
+}
+/** The names a figure holds (the fallback's faithfulness gate reads them). */
+export const existingNamesOf = (lines: readonly string[], seed: Seed): Set<string> => new Set(existingNamesAnalytic(derive(lines, seed).construction));
+const HERE: FallbackSolver = { existing: existingNamesOf, judge: (u, l, s, a, e) => judgeAnswer(u, l, s, a, e) };
+
 export async function runFallback(
   utterance: string,
   lines: readonly string[],
   seed: Seed,
   ask: (utterance: string, context: string, keep?: readonly string[], contradicted?: readonly string[]) => Promise<LlmStepsOutcome | null>,
+  solver: FallbackSolver = HERE,
 ): Promise<FallbackOutcome> {
   const context = fallbackContext(lines);
-  const existing = existingNamesAnalytic(derive(lines, seed).construction);
+  const existing = await solver.existing(lines, seed);
   const gate = (a: LlmStepsOutcome) => faithfulnessAnalytic(utterance, restoreStatedSequencesAnalytic(utterance, [...a.steps]).lines, existing);
   const { answer, retry } = await askKeepingNames(
     (keep, contradicted) =>
@@ -133,12 +147,12 @@ export async function runFallback(
     (a) => !a.busy && a.steps.length > 0,
     (a) => gate(a).contradicted,
   );
-  const out = judgeAnswer(utterance, lines, seed, answer, existing);
+  const out = await solver.judge(utterance, lines, seed, answer, existing);
   return retry ? { ...out, retry } : out;
 }
 
 /** The gates, on the one answer that goes on. */
-function judgeAnswer(utterance: string, lines: readonly string[], seed: Seed, answer: LlmStepsOutcome | null, existing: ReadonlySet<string>): Judged {
+export function judgeAnswer(utterance: string, lines: readonly string[], seed: Seed, answer: LlmStepsOutcome | null, existing: ReadonlySet<string>): Judged {
   if (!answer) return { kind: 'none' };
   if (answer.busy) return { kind: 'busy', why: answer.busy };
   if (!answer.steps.length) return { kind: 'none' };
