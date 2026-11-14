@@ -1837,10 +1837,16 @@ solves: the page, the interactive worker and the detect worker each have their o
   ([ADR-583](06-decisions.md#adr-583)).
 - **A cut solve is never kept.** The sampled memo holds constructions, not results. `evaluate` and the fold memo refuse a
   result a clock or a work budget cut short, as before, and an object whose BUILD a budget cut is not stored.
-- **What a memo holds is never written into.** A fold's construction is shared by every later fold that resumes from it, so
-  `applyCommand` builds a new object for anything it changes and leaves its input untouched ([ADR-624](06-decisions.md#adr-624);
-  the right-triangle seat on a placed vertex was a second site, fixed here). The fixture net checks it per figure: each
-  prefix is folded, then the whole figure, and no prefix's construction may have changed.
+- **What a memo holds is never written into: a resumed prefix is never mutated** ([ADR-828](06-decisions.md#adr-828), #2370).
+  A fold's construction is shared by every later fold that resumes from it, so `applyCommand` builds a new object for
+  anything it changes and leaves its input untouched. It copies `prev.objects` as an ARRAY, so an assignment into an
+  object found there is a write into `prev`: [ADR-624](06-decisions.md#adr-624) met the class first, and the
+  right-triangle seat on a placed vertex was a second site (after «משולש ABC» · «המשולש ישר זווית» the held «משולש ABC» had a
+  driven C, and «הציגו תצורה אחרת» could not move the right angle). Three locks: the engine's, which deep-freezes the
+  construction before every step of every fixture and catalog example (`engine/__tests__/apply-purity.test.ts`); the
+  memo's, resumed fold = cold fold at every seat and seed (`replay/__tests__/fold-resume.test.ts`); and the fixture
+  net's per-figure check, where each prefix is folded, then the whole figure, and no prefix's construction may have
+  changed.
 - **`clearReplayCaches`** (test-only) clears all of it. Each work-meter walk starts from it, so a count depends on
   nothing run before the figure ([docs/08](08-testing-strategy.md), "The work meter").
 
