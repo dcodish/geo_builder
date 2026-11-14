@@ -3,7 +3,7 @@
  * ADOPTION, one module at a time.
  *
  * "The other heap" here is this one after `clearSolveCaches3()`: nothing solved, then a CLONE of the journal adopted.
- * (Two real heaps walking every fixture in step is `__tests__/two-heaps-2890.test.ts`.) Each lock names the thing a
+ * (Two real heaps walking every fixture is the work-meter gate, ADR-3D-493.) Each lock names the thing a
  * journal must carry: take it away and the adopting heap solves.
  */
 import { beforeEach, describe, expect, it } from 'vitest';

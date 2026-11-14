@@ -20,7 +20,7 @@
 
 import { appBaseUrl, figureLinkUrl, linkFits } from '../../shell/session/link';
 import { readEnvelope } from '../../shell/save';
-import { loadAnalyticSession } from './loadSession';
+import { loadAnalyticSession, type LoadAuditor } from './loadSession';
 import { ANALYTIC_ENVELOPE, useAnalyticStore } from '../store/useAnalyticStore';
 
 export type ShareLinkResult =
@@ -48,7 +48,7 @@ export function shareLinkForAnalytic(): ShareLinkResult {
  * a future version), `too-large` over the shared statement ceiling (#1379), refused before a line
  * replays. The store is left exactly as it was.
  */
-export function openSharedAnalytic(payload: string): true | 'broken' | 'too-large' {
+export function openSharedAnalytic(payload: string, audit?: LoadAuditor): true | 'broken' | 'too-large' {
   let parsed: unknown;
   try {
     parsed = JSON.parse(payload);
@@ -58,6 +58,6 @@ export function openSharedAnalytic(payload: string): true | 'broken' | 'too-larg
   const env = readEnvelope(parsed, ANALYTIC_ENVELOPE);
   if (!env.ok) return env.reason === 'too-large' ? 'too-large' : 'broken';
   // A link has no filename to name the figure from, so the envelope's own name is all there is.
-  loadAnalyticSession(env.data, '');
+  loadAnalyticSession(env.data, '', audit);
   return true;
 }

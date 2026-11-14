@@ -53,7 +53,7 @@ import { btn, card as themeCard, fs, sectionTitle } from '@/ui/theme';
 // tree's own btn.accent/btn.subtle, which the operator praised); every builder's row consumes it.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { configurationAxes, factsWaitingForLetter, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
-import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
+import { cancelGeoWork, geoJobs, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, figureNameFromFileName, figureStateOf, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import type { FigureLoadOutcome, FigureLoadRefusal } from '@/store/figureLoad';
@@ -84,14 +84,14 @@ import { bidiSegments, isolateLtrRuns, textDir } from '@/i18n/bidi';
 // #745: the rasteriser and the printed width are SHARED (shell/export/svgToPng), so every builder that
 // prints a figure prints it at one width and one ink weight. Two copies could drift; one cannot.
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
-import { auditLoadedFigure, liveAuditFindings } from '@/store/loadAudit';
+import { liveAuditFindings } from '@/store/loadAudit';
 import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit, type CreatedNotice2D } from '@/app/submitPipeline';
 import { runViewResolve } from '@/app/resolveView';
 import { narrowingText } from '@/app/narrowingText';
 import { figureStatus, figureStatusParams } from '@/app/figureStatus';
-import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
+import { editJob, setGroupEnabledJob } from '@/app/workerJobs';
 import { subscribeFigureNotes } from '@/app/figureNotes';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
 import { convergeText } from '../shell/converge';
@@ -349,7 +349,8 @@ export default function App() {
     // #2874: an edit re-solves the figure, so it is a job — the working state is painted first, and the
     // search it launches belongs to the same job.
     return work.run((job) =>
-      runEditCommit(key, editText, { t, setInputNote, resolveAfterCommit: () => void job.join(resolveAfterCommit()), centresShown: () => useGeoStore.getState().showCenters }),
+      // #2890 (ADR-830): the edit seam decides and commits in the geometry worker; the page shows its notes and puts it in
+      editJob(key, editText, { t, setInputNote, resolveAfterCommit: () => void job.join(resolveAfterCommit()), centresShown: () => useGeoStore.getState().showCenters }),
     );
   }
 
@@ -555,7 +556,7 @@ export default function App() {
     // re-drew C-on-A on every load, silently. One undo still restores the pre-load session: the
     // resolve's applyView merges into the load's own history entry (temporal paused there).
     void job.join(resolveAfterCommit());
-    const audit = auditLoadedFigure(loaded.facts);
+    const audit = await geoJobs.audit(loaded.facts); // #2890 (ADR-830): in the geometry worker
     if (audit.findings.length > 0) {
       setFileAudit(audit.findings); // note is DERIVED from these against live facts (issue #24) — self-clears
     } else if (refreshed.length > 0) {
@@ -1721,7 +1722,7 @@ export default function App() {
                   // Routed through `src/app/` (#1133): re-enabling a given ADDS a requirement back, so
                   // it searches for a configuration that honours it exactly as a submit does.
                   // #2874: a toggle re-solves the figure — a job, and the search it launches belongs to it
-                  if (g) void work.run((job) => runSetGroupEnabled(id, !g.facts.every((f) => f.enabled), { resolveAfterCommit: () => void job.join(resolveAfterCommit()) }));
+                  if (g) void work.run((job) => setGroupEnabledJob(id, !g.facts.every((f) => f.enabled), { resolveAfterCommit: () => void job.join(resolveAfterCommit()) }));
                 }}
                 toggleLabel={t('actions.toggle')}
                 editValueOf={(id) => {

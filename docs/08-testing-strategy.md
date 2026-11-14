@@ -156,6 +156,11 @@ counts come back in the meter envelope. So:
 - a result that does not clone fails the walk, at the action that produced it;
 - an adoption that misses (phase 3's later steps) shows as page work, which the one-instance gate could not see.
 
+**3-D's gate walks two heaps** ([ADR-3D-493](06b-decisions-3d.md#adr-3d-493), #2890 round 2): the page (the test file's
+own instance) and 3-D's worker (`app/ops3.ts` loaded with `secondInstance`, served by `isolatedExecutor`). Every action
+and every step the walk takes between actions goes through the App's own job path (`app/offPage3.ts`), so the page's
+count is zero, `total` is the worker's work and `prePaint` is its figure's part. `newSession3` empties both heaps.
+
 A builder's first worker joins the same way: load its op table with `secondInstance`, hand it to `isolatedExecutor`,
 and inject the executor into its worker client. A driver whose client has separate heaps says so (2-D's
 `WorkerOps.reset`), and empties those heaps where a session starts.
@@ -197,6 +202,8 @@ every builder's totals from the committed baselines. A re-record never writes a 
 - **2-D's gate measures the whole search, not the browser's clipped one.** Under vitest 2-D's clock budgets are off
   (`import.meta.env.MODE === 'test'`: the search budgets in `replay/core.ts`, and since #2873 the two load budgets in
   `store/loadAudit.ts`), which is what makes the counts exact. A browser stops a search after 12 s.
+- **2-D's `page` count is 0** since [ADR-830](06-decisions.md#adr-830): every decision runs in the worker and the page
+  adopts the settled figure. A 2-D change that puts solver work back on the page fails the gate on that action.
 - **2-D's `page` count is a browser's** since #2890 (above): the gate's workers are their own module instances. In
   every OTHER suite, and in `scripts/perf/2d`, 2-D's worker operations run in the page's module instance, charged to
   the worker lane by the client's same-instance executor (`shell/workerExecutor`); a page count read there is still a

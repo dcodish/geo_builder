@@ -25,7 +25,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
-import { geoWork, useGeoWorkExecutor } from '@/store/geoWork';
+import { useGeoWorkExecutor } from '@/store/geoWork';
 import { replay as pageReplay } from '@/replay/core';
 import { executorByLane, isolatedExecutor } from '../../shell/workerExecutor';
 import { secondInstance } from '../../shell/__tests__/isolated-ops';
@@ -56,17 +56,13 @@ const workerHeap = () =>
     const { clearReplayCaches, replay } = await import('@/replay/core'); // load-in-body-ok: a worker's heap is a second module instance, loaded from the beforeAll below
     const { readWork } = await import('../../shell/workMeter'); // load-in-body-ok: a worker's heap is a second module instance, loaded from the beforeAll below
     // a worker's table (the found view's fold crosses), under the suite's clock: none
-    return { ops: geoOps({ transplant: true }), clear: clearReplayCaches, units: () => readWork().total, seed: takeCheckpoint, replay };
+    return { ops: geoOps({ crossing: true }), clear: clearReplayCaches, units: () => readWork().total, seed: takeCheckpoint, replay };
   });
 type Heap = Awaited<ReturnType<typeof workerHeap>>;
 let interactive: Heap;
 let detect: Heap;
 
 const driver = createDriver2d({
-  prefold: (facts, seed) => geoWork.prefold(facts, seed),
-  autoResolve: (facts, seed) => geoWork.autoResolve(facts, seed),
-  resample: (facts, seed) => geoWork.resample(facts, seed),
-  detect: (facts) => geoWork.detect(facts),
   reset: (which) => {
     if (which === 'all') interactive.clear();
     detect.clear();

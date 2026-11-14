@@ -28,7 +28,7 @@ import { orderToolActions } from '../shell/frame/toolRow';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import registry from '../products.json';
 import { dataView, mutualRowKey3, panelIsEmpty, pointPlaneRowKey3, radiusRowLabel3 } from './engine/dataView';
-import { answerQuery } from './engine/queries';
+import { answerQuery, type QueryResult } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { defaultPlaneDisplay3 } from './engine/types';
 import { bareNamingSlots } from './engine/notices';
@@ -69,8 +69,9 @@ import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
 import { derive3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
-import { ANOTHER, MODEL, act3, armBasisGuard3, jobStore3, work3 } from './app/work3';
-import { WorkingFace, useWorking, workingDim } from '../shell/frame/WorkingMark';
+import { ANOTHER, MODEL, VALUES, act3, armBasisGuard3, jobStore3, work3 } from './app/work3';
+import { offPage3, offPageAction3, setPanelOpen3, useValues3 } from './app/offPage3';
+import { WorkingFace, useShownWorking, useWorking, workingDim } from '../shell/frame/WorkingMark';
 
 // #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
 // without the work queue shows up the first time anyone presses it.
@@ -105,6 +106,16 @@ function MathRun({ children }: { children: React.ReactNode }) {
       {children}
     </span>
   );
+}
+
+/** #2890 (ADR-3D-493): a question whose answer is still being solved: «= בודק…», after the shell's threshold. */
+function AskPending3({ text }: { text: string }) {
+  const shown = useShownWorking(true);
+  return shown ? (
+    <span className="text-slate-400" data-testid="ask-pending">
+      {' '}= {text}
+    </span>
+  ) : null;
 }
 
 export default function App3() {
@@ -332,13 +343,16 @@ export default function App3() {
     if (!f) return;
     const text = await f.text();
     // #2874: a load re-solves the whole figure — one job, the parse and the load audit included
-    await work3.run(() => {
+    await work3.run(async () => {
+      // #2890 (ADR-3D-493): solved off the page first; the page then reads the same file with the same row ids
+      const h = await offPage3([{ kind: 'open', text }]);
       const r = deserializeFigure3(text);
       if (r.ok) {
         jobStore3().loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode, r.dihedralShown);
         setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
         noteLoadOutcome(r.facts, r.seed);
       } else reportLoadError(r.reason);
+      h.after();
     });
   };
 
@@ -378,8 +392,10 @@ export default function App3() {
 
   // #2874: opening a link is a load — one job
   const openLink3 = (payload: string) =>
-    void work3.run(() => {
+    void work3.run(async () => {
+      const h = await offPage3([{ kind: 'open', text: payload }]); // #2890: solved off the page first
       const r = openShared3(payload);
+      h.after();
       if (r.ok) {
         setFigureName(r.name ?? ''); // a link has no filename to take the name from
         noteLoadOutcome(r.facts, r.seed);
@@ -475,8 +491,10 @@ export default function App3() {
     if (!offer) return;
     const payload = offer.payload;
     // #2874: restoring is loading — one job
-    void work3.run(() => {
+    void work3.run(async () => {
+      const h = await offPage3([{ kind: 'open', text: payload }]); // #2890: solved off the page first
       const r = restoreSession3(payload);
+      h.after();
       setOffer(null);
       if (r.ok) {
         setFigureName(r.name ?? ''); // a restored session has no filename to take its name from
@@ -514,13 +532,44 @@ export default function App3() {
     });
   }, []);
 
-  const dataPanel = useMemo(() => (showData ? dataView(derived.construction, seed) : null), [showData, derived, seed]);
+  /**
+   * #2890 (ADR-3D-493) — THE VALUES FOLLOW THE FIGURE. Operator, 2026-11-14 (#2890): *"Figure first, both tools"*;
+   * *"One «בודק…» line"*; *"Yes, all redraws"*. The panel's rows and the saved questions' answers are solved by the
+   * worker after the figure; until they are in hand for the figure on screen the panel reads ONE grey line «בודק…»
+   * (shown after the shell's threshold), never a number from the previous figure. Where nothing is solved off the page
+   * (no `Worker`) the values are always in hand.
+   */
+  const values = useValues3(facts, seed);
+  useEffect(() => setPanelOpen3(showData), [showData]);
+  const valuesPending = showData && !values.panel;
+  // the shell's threshold: the line is shown only once the values have been awaited for WORKING_SHOWN_AFTER_MS, so values
+  // that follow the figure quickly never blink it (the page's thread is free to count: the solving is in the worker)
+  const showPending = useShownWorking(valuesPending);
+  const dataPanel = useMemo(() => (showData && values.panel ? dataView(derived.construction, seed) : null), [showData, values.panel, derived, seed]);
   // #274 (ADR-3D-057): answer each saved query against the current figure. Coordinate-free honesty gate
   // lives in `answerQuery` — a query it can't answer as knowledge reports WHY, never a sampled number.
+  // #2890: a question whose answer is still being solved reads «בודק…» in place of its answer, as analytic's ask row does.
   const queryResults = useMemo(
-    () => (showData ? queries.map((q) => answerQuery(derived.construction, q, seed)) : []),
-    [showData, queries, derived, seed],
+    () =>
+      showData && values.panel
+        ? queries.map((q): QueryResult & { pending?: true } => (values.answered(q) ? answerQuery(derived.construction, q, seed) : { text: q, answer: null, echo: 'plain', pending: true }))
+        : [],
+    [showData, values, queries, derived, seed],
   );
+  // the panel opened on a figure whose values were not read (it was closed): one job reads them
+  const panelJob = useRef<{ facts: unknown; seed: unknown } | null>(null);
+  useEffect(() => {
+    if (!showData || values.panel || values.pendingFor !== null) return;
+    if (panelJob.current?.facts === facts && panelJob.current.seed === seed) return; // asked for already
+    panelJob.current = { facts, seed };
+    void work3.run(
+      async () => {
+        const h = await offPage3([], { panel: true });
+        h.after();
+      },
+      { lane: VALUES },
+    );
+  }, [showData, values, facts, seed]);
   const [queryText, setQueryText] = useState('');
   const queryRef = useRef<HTMLInputElement | null>(null);
 
@@ -537,9 +586,9 @@ export default function App3() {
    * put the panels back the way they started.
    */
   const clearAll = () =>
-    void work3.run(() => {
+    void work3.run(async () => {
       logDebug3({ kind: 'action', action: 'clear' });
-      jobStore3().clear();
+      await offPageAction3('clear', [], () => jobStore3().clear());
       setText('');
       setGuidanceNote(null);
       setQueryText('');
@@ -575,8 +624,8 @@ export default function App3() {
     setGuidanceNote(null);
     setLoadNote(null);
     const utterance = crossingUtterance3({ ...k, point: { x: 0, y: 0, z: 0 } }, id, i18n.language !== 'en');
-    void work3.run(() => {
-      jobStore3().submit(utterance);
+    void work3.run(async () => {
+      await offPageAction3('submit', [utterance], () => jobStore3().submit(utterance));
       logDebug3({
         kind: 'input',
         utterance,
@@ -607,8 +656,11 @@ export default function App3() {
     // lowercase-label nudge, then the #73 (ADR-3D-040) guidance register, in that order — is ONE pure
     // function, `decideDeterministic3`. This handler only dispatches it, so the log-triage replay, which
     // CALLS the same function, cannot disagree with what a student is shown.
+    // #2890 (ADR-3D-493): the decision is solved off the page first; the page then decides over what was solved
+    const line = await offPage3([{ kind: 'line', raw }]);
     const v = decideDeterministic3(useGeo3.getState(), raw);
     if (v.kind === 'guided') {
+      line.after();
       // A guided line never reaches the model: a non-constructive family can never build, so an LLM call
       // on it is pure cost (the 2-D ADR-289 twin), and a lowercase-label line is taught its spelling.
       logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: 'not-understood', intermediate: true });
@@ -618,6 +670,7 @@ export default function App3() {
       return 'kept';
     }
     jobStore3().dispatchVerdict(v);
+    line.after();
     let err = useGeo3.getState().lastError;
     // #2062 (ADR-3D-480): the exam's membership question points at a panel row — open the panel and highlight it
     if (err?.code === 'answer-in-panel') {
@@ -632,7 +685,7 @@ export default function App3() {
       // which has already painted) and released in the queue's `finally`.
       const { steps, restored, retry } = await work3.run(() => escalate3Flow(useGeo3.getState(), raw, escalate3), { lane: MODEL, paint: false });
       if (retry) logDebug3(nameRetryEvent(retry));
-      if (steps) jobStore3().submitSteps(raw, steps);
+      if (steps) await offPageAction3('submitSteps', [raw, steps], () => jobStore3().submitSteps(raw, steps));
       err = useGeo3.getState().lastError;
       // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
       // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
@@ -1091,7 +1144,7 @@ export default function App3() {
               disabled={facts.length === 0 || resampling}
               onClick={() => {
                 logDebug3({ kind: 'action', action: 'show-another' });
-                void work3.runIfIdle(() => jobStore3().resample(), { lane: ANOTHER });
+                void work3.runIfIdle(() => offPageAction3('resample', [], () => jobStore3().resample()), { lane: ANOTHER });
               }}
             >
               <WorkingFace working={resampling} idle={t('actions.another')} busy={t('input.thinking')} />
@@ -1298,7 +1351,9 @@ export default function App3() {
                         <span>
                           {/* #1543 (ADR-3D-301): the echo is arrowed only when the QUESTION was read as a vector */}
                           {askEchoNode3(r.text, r.echo, new Set(vectorNames3(derived.construction)))}
-                          {r.answer !== null ? (
+                          {r.pending ? (
+                            <AskPending3 text={t('dataPanel.checking')} />
+                          ) : r.answer !== null ? (
                             <span className="font-medium">
                               {/* #823: an answer may have several ROWS — a plane gives its standard and
                                   its parametric form, one per line, never joined by a `|` (operator,
@@ -1325,8 +1380,15 @@ export default function App3() {
                   },
                 ]}
               >
-                {(!dataPanel || panelIsEmpty(dataPanel)) && queryResults.length === 0 && (
-                  <p className="text-slate-400">{t('dataPanel.empty')}</p>
+                {valuesPending ? (
+                  /* #2890 (ruled 2026-11-14): ONE grey line while the values are computed, after the shell's threshold */
+                  showPending && (
+                    <p className="text-slate-400" data-testid="values-pending">
+                      {t('dataPanel.checking')}
+                    </p>
+                  )
+                ) : (
+                  (!dataPanel || panelIsEmpty(dataPanel)) && queryResults.length === 0 && <p className="text-slate-400">{t('dataPanel.empty')}</p>
                 )}
                 {/* #739: the distance-witness display toggle — a checkbox HERE like 2-D's display
                     toggles (#738), not a button on the figure row (reverses the B6 placement). */}
@@ -1349,10 +1411,20 @@ export default function App3() {
                   addLabel={t('query.add')}
                   unreadableHint={t('query.note.notUnderstood')}
                   onSubmit={(text) => {
-                    addQuery(text);
-                    // #2062 (ADR-3D-480): a membership question asked here highlights the row its answer points at
-                    const a = answerQuery(derived.construction, text, seed);
-                    setHighlightRow(a.inPanel ? pointPlaneRowKey3(a.inPanel.point, a.inPanel.plane) : null);
+                    // #2890 (ADR-3D-493): the answer is solved off the page; the row reads «בודק…» until it is in hand
+                    void work3.run(
+                      async () => {
+                        const h = await offPage3([{ kind: 'ask', text }], { panel: true });
+                        addQuery(text);
+                        h.after();
+                        await h.settled;
+                        // #2062 (ADR-3D-480): a membership question asked here highlights the row its answer points at
+                        const s = useGeo3.getState();
+                        const a = answerQuery(derive3(s.facts, s.seed).construction, text, s.seed);
+                        setHighlightRow(a.inPanel ? pointPlaneRowKey3(a.inPanel.point, a.inPanel.plane) : null);
+                      },
+                      { lane: VALUES },
+                    );
                   }}
                   palette={{ symbols: SYMBOL_SPECS_3, startCollapsed: true, compact: true, toggleTitle: t('palette.show') }}
                 />

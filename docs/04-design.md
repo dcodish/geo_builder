@@ -230,7 +230,9 @@ src/
                shared sample core; naming.ts; engine ← replay ← store enforced by test
   store/       geoStore.ts (Zustand + zundo: the fact list as source of truth, rename/swap/merge),
                figureFile (save/load), loadAudit, geoOps/geoWork/geoWorker (the Web-Worker seam: the
-               operations, the client over shell/workerClient, the entry over shell/workerHost; ADR-829)
+               operations, the client over shell/workerClient, the entry over shell/workerHost; ADR-829).
+               Since ADR-830 EVERY decision runs in the worker (geoOps: decide, judge, act, edit, load,
+               audit, settle on a shadow store) and the page adopts the settled figure (app/workerJobs)
   render/      transform + scene (pure figure→primitives) + Figure.tsx (declarative SVG, pan/zoom, hover)
   theorems/    the authored theorem table + coverage disposition map + rank bands + audit harness
   validation/  the differential coordinate oracle (engine-import-free; dev/CI only)
@@ -1798,8 +1800,18 @@ fold key. The store keeps `narrowed: { list, facts }` beside `determinacy`; App.
 
 Phase 2 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) for 2-D. `replay(facts, seed)` is pure, and three memos in
 `replay/core.ts` (two of them new or changed here) decide how often its parts are computed. Each lives in the heap that
-solves: the page, the interactive worker and the detect worker each have their own (`store/geoWork.ts`). One thing
-crosses back to a worker: after a cancel or a crash the replacement worker is handed the page's fold of the figure on
+solves: the page, the interactive worker and the detect worker each have their own (`store/geoWork.ts`).
+
+**Since [ADR-830](06-decisions.md#adr-830) the page solves nothing.** Every decision runs in the interactive worker
+(`geoOps`), which answers the SETTLED VIEW of the figure it ended on (`settleView`: the replay and its work, the fold,
+the evaluation, the baked construction and the DOF count of the drawn construction). The page ADOPTS it
+(`adoptSettled`): the replay under the identity of the facts array it puts in its store, the three engine memos under
+that replay's construction, the fold by content. The render's readers and the resolve gate then hit, measured at 0
+units over the corpus. An adopted entry carries a flat ledger of the work it saved (ADR-584). `hasReplay` and
+`peekReplay` read the memo without solving; `ensureSettled` asks the worker for a figure the page holds no view of
+(an undo past what it adopted).
+
+One thing crosses back to a worker: after a cancel or a crash the replacement worker is handed the page's fold of the figure on
 screen, its CHECKPOINT (`geoOps.takeCheckpoint`, [ADR-829](06-decisions.md#adr-829); the shared client's `seed`,
 [04w](04w-design-shell.md) § *The worker client*), so the next line resumes from it instead of folding in an empty heap.
 

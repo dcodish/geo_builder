@@ -280,6 +280,50 @@
         "קטע AB"
       ],
       "lookFor": "Three rows at the end, the segment AB drawn."
+    },
+    {
+      "sheet": "feat-2890-2d",
+      "id": "T10",
+      "kind": "2d:assertion",
+      "queued": "2026-11-14",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "ABC מקיים תכונה מסתורית"
+      ],
+      "lookFor": "The second line is not added: «לא הבנתי את הבקשה — נסו לנסח אחרת…» and the line stays in the box; one row."
+    },
+    {
+      "sheet": "feat-2890-analytic",
+      "id": "T7",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-14",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "lines": [
+        "A(1,2)",
+        "B(4,6)",
+        "קטע AB"
+      ],
+      "lookFor": "Three rows, the segment drawn again."
+    },
+    {
+      "sheet": "feat-2890-3d",
+      "id": "T8",
+      "kind": "3d:assertion",
+      "queued": "2026-11-14",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ABC",
+        "D על AB",
+        "AD = 3"
+      ],
+      "lookFor": "Three rows at the end, D on AB."
     }
   ],
   "results": [

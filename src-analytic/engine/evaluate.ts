@@ -6295,12 +6295,22 @@ export interface ConfigurationPool {
   /** The page's mode: gates answer PENDING from a partial pool instead of filling it. */
   defer(): void;
   readonly deferred: boolean;
+  /**
+   * FIGURE FIRST (#2890, [ADR-AG-478](../../docs/06c-decisions-analytic.md#adr-ag-478); operator ruling 2026-11-14):
+   * deferred, and the gates evaluate NOTHING for themselves, not even the floor of seeds 0..2 a deferred pool pays, and
+   * no reader fills the pool (`knownValues`' `fillPool` is ignored). A value the seeds already asked do not settle is
+   * pending until the knowledge arrives. What the figure's own derivation asked is still read, so a held page shows
+   * exactly what the heap that solved it showed at the same stage.
+   */
+  hold(): void;
+  readonly held: boolean;
   /** A gate answered pending on this pool — the page owes a re-render when it completes. */
   readonly pendingShown: boolean;
 }
 
 class Pool implements ConfigurationPool {
   deferred = false;
+  held = false;
   pendingShown = false;
   private done = false;
   constructor(private readonly c: Construction) {}
@@ -6340,6 +6350,10 @@ class Pool implements ConfigurationPool {
   }
   defer(): void {
     this.deferred = true;
+  }
+  hold(): void {
+    this.deferred = true;
+    this.held = true;
   }
   notePending(): void {
     this.pendingShown = true;
@@ -6415,8 +6429,16 @@ function poolSeeds(c: Construction): { pool: Pool; seeds: number[] } {
    * seeds at render — the very cost B′ moved off the render path. Three seeds is the floor the render path
    * has always paid; whatever they cannot settle is pending until the idle loop completes the pool.
    */
-  for (let s = 0; s < PENDING_FLOOR; s += 1) drawableAt(c, s);
+  if (!pool.held) for (let s = 0; s < PENDING_FLOOR; s += 1) drawableAt(c, s);
   return { pool, seeds: pool.ready() };
+}
+
+/** A HELD pool (#2890) has not asked for this seed: the reader answers pending instead of solving it. */
+function unaskedWhileHeld(c: Construction, seed: number): boolean {
+  const pool = poolOf(c);
+  if (!pool.held || pool.ready().includes(seed)) return false;
+  pool.notePending();
+  return true;
 }
 
 /** The seeds a deferred pool evaluates synchronously, before the render. */
@@ -6915,7 +6937,7 @@ export function knownValues(
   if (!open && !pending) return { known: true, value };
   if (!open) return { known: false, pending: true };
   const pool = poolOf(c);
-  if (!opts.fillPool && pool.deferred && !pool.complete()) {
+  if ((!opts.fillPool || pool.held) && pool.deferred && !pool.complete()) {
     const seen: number[][] = [];
     for (const f of admittedOf(c, pool.ready())) {
       const v = read(f);
@@ -6978,6 +7000,7 @@ function sameFamily(cur: NumCurve, first: NumCurve): boolean {
 
 export function knownCurveOptions(c: Construction, id: Id): NumCurve[] | null {
   const read = (f: Figure) => f.curves.find((q) => q.id === id)?.curve ?? null;
+  if (unaskedWhileHeld(c, 0)) return null;
   const first = read(drawableAt(c, 0));
   if (!first) return null;
   const fields = coefficientFields(first);
@@ -7033,6 +7056,8 @@ export function knownCurve(
   // configuration at the first seed, never from a raw seed the tool would not show — measured on the
   // 572 figure, the raw seed 0 had not converged and its slope was 5e-5 off the one every drawable
   // configuration agreed on (#1317).
+  // #2890 (ADR-AG-478): a HELD pool evaluates nothing for a gate: seed 0 not yet asked is a curve not yet known.
+  if (!seeds && unaskedWhileHeld(c, 0)) return null;
   const first = read(drawableAt(c, seeds ? seeds[0] : 0));
   if (!first) return null;
   let pending = false;

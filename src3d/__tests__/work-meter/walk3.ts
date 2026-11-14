@@ -10,7 +10,7 @@
  * THE SESSION THE WALK IS (#2888, [ADR-3D-491](../../../docs/06b-decisions-3d.md#adr-3d-491)). Solved content is keyed by
  * content and outlives the action, so a count depends on what the session solved before it, and the walk says what
  * that is:
- *  - a figure's walk STARTS FROM CLEARED CACHES (`clearSolveCaches3()`), so its counts depend on
+ *  - a figure's walk STARTS FROM CLEARED CACHES (`newSession3()`, every heap), so its counts depend on
  *    nothing walked before it, in any order;
  *  - `load` is the COLD load of the file: a student who opens it in a new session;
  *  - the caches are cleared again, and the rows are then typed in ONE session that stays warm, as a student's does:
@@ -39,30 +39,33 @@
  * session's own row ids) is made cold by clearing the solve caches before it. Its delete follows in the loaded session,
  * then its edit and the readers' session, by the same definitions.
  *
- * THE WALK IS A SEQUENCE OF STEPS (#2890, [ADR-3D-492](../../../docs/06b-decisions-3d.md#adr-3d-492)). `stepsOfFixture3`
- * and `stepsOfLines3` yield after every step: each measured action, and each thing the walk does between them (a new
- * session, a figure put in the store and shown, a row committed from its saved commands). `walkFixture3` and
- * `walkLines3` run them to the end and keep the measured ones, as before. The steps exist so that TWO heaps can walk
- * in step (`twoHeaps3.ts`): one runs a step, what it wrote crosses, the other adopts it and runs the same step. A new
- * session is a step of its own for that reason: the second heap must clear BEFORE it adopts the next step's entries.
+ * THE WALK IS A SEQUENCE OF STEPS (#2890, ADR-3D-492). `stepsOfFixture3` and `stepsOfLines3` yield after every step:
+ * each measured action, and each thing the walk does between them (a new session, a figure shown, a row committed from
+ * its saved commands). `walkFixture3` and `walkLines3` run them to the end and keep the measured ones.
+ *
+ * #2890 round 2 ([ADR-3D-493](../../../docs/06b-decisions-3d.md#adr-3d-493)): every step goes through the App's own job
+ * path (`driver3.ts`), so a step the walk takes between two actions is solved where the student's actions are: in the
+ * worker's heap, when the gate hands one. A new session empties every heap (`newSession3`).
  */
-import { useGeo3, clearSolveCaches3, decideCommands3, type Fact3 } from '../../store/store3';
+import { useGeo3, type Fact3 } from '../../store/store3';
 import { deserializeFigure3 } from '../../store/figureFile3';
 import {
   another3,
   ask3,
+  commitSaved3,
   editLast3,
   loadFacts3,
   loadText3,
   metered3,
+  newSession3,
   openPanel3,
   questionsOf3,
   redoStep3,
   removeFirst3,
   renameFirst3,
-  render3,
   setFigure3,
   showBeforeEdit3,
+  showFigure3,
   showPanelClosed3,
   submitLine3,
   swapFirstTwo3,
@@ -95,89 +98,85 @@ export interface WalkPlan3 {
 }
 
 type Seed = ReturnType<typeof useGeo3.getState>['seed'];
-type Steps3 = Generator<WalkStep3, void, void>;
+type Steps3 = AsyncGenerator<WalkStep3, void, void>;
 
 const clean = (fs: Fact3[]): Fact3[] => fs.map((f) => ({ id: f.id, enabled: f.enabled !== false, utterance: f.utterance, cmds: f.cmds }) as Fact3);
 
 /** A measured action, as a step. */
-function measured(action: string, fn: () => Outcome3, onAction?: (action: string) => void, utterance?: string): WalkStep3 & { rec: ActionRecord3 } {
+async function measured(action: string, fn: () => Outcome3 | Promise<Outcome3>, onAction?: (action: string) => void, utterance?: string): Promise<WalkStep3 & { rec: ActionRecord3 }> {
   onAction?.(action);
-  return { action, ...(utterance ? { utterance } : {}), rec: metered3(fn) };
+  return { action, ...(utterance ? { utterance } : {}), rec: await metered3(fn) };
 }
 
-/** A new session: every cache cleared. Its own step (see the header). */
-function* newSession(): Steps3 {
-  clearSolveCaches3();
+/** A new session: every cache cleared, in every heap. Its own step. */
+async function* newSession(): Steps3 {
+  newSession3();
   yield { action: '(new session)' };
 }
 
 /** The edit, in its own session (`beforeEdit3`): the rows before the last shown, then all of them in the store unsolved. */
-function* editSteps(built: { facts: Fact3[]; seed: Seed }, onAction?: (action: string) => void): Steps3 {
+async function* editSteps(built: { facts: Fact3[]; seed: Seed }, onAction?: (action: string) => void): Steps3 {
   onAction?.('edit');
   yield* newSession();
-  showBeforeEdit3(built.facts, built.seed);
+  await showBeforeEdit3(built.facts, built.seed);
   yield { action: '(rows before the edit)' };
-  yield { action: 'edit', rec: metered3(editLast3) };
+  yield { action: 'edit', rec: await metered3(editLast3) };
 }
 
 /** After the delete, in its session: the delete undone and done again, then the first row unticked and ticked again. */
-function* afterDeleteSteps(onAction?: (action: string) => void): Steps3 {
-  yield measured('undo', undoStep3, onAction);
-  yield measured('redo', redoStep3, onAction);
-  undoStep3();
+async function* afterDeleteSteps(onAction?: (action: string) => void): Steps3 {
+  yield await measured('undo', undoStep3, onAction);
+  yield await measured('redo', redoStep3, onAction);
+  await undoStep3();
   yield { action: '(the delete undone again)' };
-  yield measured('untick', toggleFirst3, onAction);
-  yield measured('retick', toggleFirst3, onAction);
+  yield await measured('untick', toggleFirst3, onAction);
+  yield await measured('retick', toggleFirst3, onAction);
 }
 
 /** The readers' session (see the header): the panel opened on a standing figure, a rename, a swap, the asks. */
-function* readerSteps(built: { facts: Fact3[]; seed: Seed }, onAction?: (action: string) => void): Steps3 {
+async function* readerSteps(built: { facts: Fact3[]; seed: Seed }, onAction?: (action: string) => void): Steps3 {
   yield* newSession();
-  setFigure3(built.facts, built.seed);
-  showPanelClosed3();
+  await showPanelClosed3(built.facts, built.seed);
   yield { action: '(figure, panel closed)' };
-  yield measured('panel', openPanel3, onAction);
-  yield measured('rename', renameFirst3, onAction);
-  yield measured('swap', swapFirstTwo3, onAction);
+  yield await measured('panel', openPanel3, onAction);
+  yield await measured('rename', renameFirst3, onAction);
+  yield await measured('swap', swapFirstTwo3, onAction);
   let k = 0;
-  for (const q of questionsOf3()) yield measured(`ask#${++k}`, () => ask3(q), onAction, q);
+  for (const q of questionsOf3()) yield await measured(`ask#${++k}`, () => ask3(q), onAction, q);
 }
 
-export function* stepsOfFixture3(text: string, plan: WalkPlan3, onAction?: (action: string) => void): Steps3 {
+export async function* stepsOfFixture3(text: string, plan: WalkPlan3, onAction?: (action: string) => void): Steps3 {
   const r = deserializeFigure3(text);
   if (!r.ok) return;
   /** A typed row; a row that no longer records is committed from its saved commands, outside the measurement. */
-  function* submit(f: Fact3, k: number): Steps3 {
-    const step = measured(`submit#${k + 1}`, () => submitLine3(f.utterance), onAction, f.utterance);
+  async function* submit(f: Fact3, k: number): Steps3 {
+    const step = await measured(`submit#${k + 1}`, () => submitLine3(f.utterance), onAction, f.utterance);
     const recorded = step.rec.verdict === 'record' || step.rec.verdict === 'retick';
     if (!recorded) step.rec.verdict += '(+saved-cmds)';
     yield step;
     if (recorded) return;
-    const v = decideCommands3(useGeo3.getState(), f.utterance, f.cmds, { twins: false, seedSearch: true });
-    if (v.kind === 'record') useGeo3.getState().dispatchVerdict(v);
+    await commitSaved3(f.utterance, f.cmds);
     yield { action: '(saved commands)' };
   }
 
   yield* newSession();
   setFigure3([], 0);
-  yield measured('load', () => loadText3(text), onAction);
+  yield await measured('load', () => loadText3(text), onAction);
   yield* newSession();
   if (plan.submits === 'all') {
-    setFigure3([], 0);
-    render3();
+    await showFigure3([], 0);
     yield { action: '(empty figure)' };
     for (const [k, f] of r.facts.entries()) yield* submit(f, k);
   } else if (plan.submits === 'last') {
     // the figure of the rows before the last, as the student had it on screen
-    setFigure3(clean(r.facts.slice(0, -1)), 0);
-    render3();
+    await showFigure3(clean(r.facts.slice(0, -1)), 0);
     yield { action: '(rows before the last)' };
     yield* submit(r.facts[r.facts.length - 1], r.facts.length - 1);
   }
-  for (let p = 1; p <= plan.presses; p++) yield measured(`another#${p}`, another3, onAction);
+  for (let p = 1; p <= plan.presses; p++) yield await measured(`another#${p}`, another3, onAction);
   const built = { facts: useGeo3.getState().facts, seed: useGeo3.getState().seed };
   if (built.facts.length > 1) {
-    yield measured('delete', removeFirst3, onAction);
+    yield await measured('delete', removeFirst3, onAction);
     yield* afterDeleteSteps(onAction);
   }
   if (built.facts.length > 0) {
@@ -190,20 +189,19 @@ export function* stepsOfFixture3(text: string, plan: WalkPlan3, onAction?: (acti
  * A sequence of typed lines (the slow corpus): each line submitted on the figure of the lines before it, then
  * «הציגו תצורה אחרת», the cold load of what a save of the figure writes, an edit of the last row and the delete of the first.
  */
-export function* stepsOfLines3(lines: readonly string[], plan: WalkPlan3, onAction?: (action: string) => void): Steps3 {
+export async function* stepsOfLines3(lines: readonly string[], plan: WalkPlan3, onAction?: (action: string) => void): Steps3 {
   yield* newSession();
-  setFigure3([], 0);
-  render3();
+  await showFigure3([], 0);
   yield { action: '(empty figure)' };
-  for (const [k, u] of lines.entries()) yield measured(`submit#${k + 1}`, () => submitLine3(u), onAction, u);
+  for (const [k, u] of lines.entries()) yield await measured(`submit#${k + 1}`, () => submitLine3(u), onAction, u);
   if (useGeo3.getState().facts.length === 0) return;
-  for (let p = 1; p <= plan.presses; p++) yield measured(`another#${p}`, another3, onAction);
+  for (let p = 1; p <= plan.presses; p++) yield await measured(`another#${p}`, another3, onAction);
   const saved = JSON.stringify(useGeo3.getState().facts);
   yield* newSession();
-  yield measured('load', () => loadFacts3(JSON.parse(saved), 0), onAction);
+  yield await measured('load', () => loadFacts3(JSON.parse(saved), 0), onAction);
   const built = { facts: useGeo3.getState().facts, seed: useGeo3.getState().seed };
   if (built.facts.length > 1) {
-    yield measured('delete', removeFirst3, onAction);
+    yield await measured('delete', removeFirst3, onAction);
     yield* afterDeleteSteps(onAction);
   }
   yield* editSteps(built, onAction);
@@ -211,16 +209,16 @@ export function* stepsOfLines3(lines: readonly string[], plan: WalkPlan3, onActi
 }
 
 /** The measured actions of a walk, in order. */
-const measuredOf = (steps: Steps3): WalkedAction3[] => {
+async function measuredOf(steps: Steps3): Promise<WalkedAction3[]> {
   const out: WalkedAction3[] = [];
-  for (const s of steps) if (s.rec) out.push({ action: s.action, ...(s.utterance ? { utterance: s.utterance } : {}), rec: s.rec });
+  for await (const s of steps) if (s.rec) out.push({ action: s.action, ...(s.utterance ? { utterance: s.utterance } : {}), rec: s.rec });
   return out;
-};
+}
 
-export function walkFixture3(text: string, plan: WalkPlan3, onAction?: (action: string) => void): WalkedAction3[] {
+export function walkFixture3(text: string, plan: WalkPlan3, onAction?: (action: string) => void): Promise<WalkedAction3[]> {
   return measuredOf(stepsOfFixture3(text, plan, onAction));
 }
 
-export function walkLines3(lines: readonly string[], plan: WalkPlan3, onAction?: (action: string) => void): WalkedAction3[] {
+export function walkLines3(lines: readonly string[], plan: WalkPlan3, onAction?: (action: string) => void): Promise<WalkedAction3[]> {
   return measuredOf(stepsOfLines3(lines, plan, onAction));
 }

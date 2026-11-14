@@ -1,0 +1,122 @@
+{
+  "name": "feat-2890-analytic",
+  "title": "#2890 round 2 — analytic solves off the page: the page answers while it computes, the figure comes before its values (PR, port 5189)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "title": "The slow rhombus: the figure appears at once, the values follow, and the page answers meanwhile",
+      "lines": ["מעוין BADC", "שכל קודקודיו מונחים על הצירים", "CA=10", "O(0,0)", "מרחק נקודה O מהצלע DA הוא √5", "x_A > 0"],
+      "expectRows": ["מעוין BADC", "CA=10", "O(0,0)"],
+      "expect": ["6 נתונים"],
+      "lookFor": "Type the first four lines. Type the fifth and press Enter: the rhombus is redrawn within a moment, and the values in the panel on the left read «בודק…» for about 4 seconds, then fill in. Meanwhile scroll the page and open «מדריך»: they answer at once. Then type the sixth line: the same, about 6 seconds.",
+      "before": "On prod the page freezes for about 4 s (line 5) and 6 s (line 6): nothing moves, and the figure and the values appear together at the end."
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "title": "An ordinary figure, «בטל» and «בצע שוב»",
+      "lines": ["A(1,2)", "B(4,6)", "קטע AB"],
+      "after": [{ "click": "בטל" }, { "click": "בצע שוב" }],
+      "expectRows": ["A(1,2)", "B(4,6)", "קטע AB"],
+      "expectFigure": ["A", "B"],
+      "lookFor": "Three rows at the end, the segment AB drawn.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "title": "The values arrive: a point's coordinates in the panel",
+      "lines": ["A(1,2)", "B(4,6)"],
+      "expect": ["A = (1, 2)", "B = (4, 6)"],
+      "lookFor": "The panel reads A = (1, 2) and B = (4, 6); no «בודק…» left.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "title": "A question is answered",
+      "lines": ["A(1,2)", "B(4,6)", "קטע AB"],
+      "asks": ["AB"],
+      "expect": ["= 5"],
+      "lookFor": "The ask «AB» answers 5.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T5",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "title": "A contradicted length is still refused",
+      "lines": ["A(1,2)", "B(4,6)", "קטע AB", "AB = 7"],
+      "expectRefusal": "לא נמצאה תצורה שבה מתקיים",
+      "lookFor": "«לא נמצאה תצורה שבה מתקיים: «AB = 7»»; three rows.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T6",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "title": "«הציגו תצורה אחרת» changes the figure",
+      "lines": ["משולש ABC", "A(0,0)", "B(6,0)", "שטח המשולש ABC הוא 12"],
+      "cycles": 1,
+      "expectConfigsDiffer": true,
+      "lookFor": "The press moves C to another place.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T7",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "title": "A row ticked off and on",
+      "lines": ["A(1,2)", "B(4,6)", "קטע AB"],
+      "after": [{ "toggle": 3 }, { "toggle": 3 }],
+      "expectRows": ["A(1,2)", "B(4,6)", "קטע AB"],
+      "expectFigure": ["A", "B"],
+      "lookFor": "Three rows, the segment drawn again.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T8",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "title": "Deleting a row and «בטל»",
+      "lines": ["A(1,2)", "B(4,6)", "קטע AB"],
+      "after": [{ "clickOn": "[data-testid=\"analytic-facts\"] > li:nth-child(3) button:has-text(\"✕\")", "say": "לחצו ✕ בשורה 3" }, { "click": "בטל" }],
+      "expectRows": ["A(1,2)", "B(4,6)", "קטע AB"],
+      "lookFor": "The third row goes and comes back; three rows.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T9",
+      "class": "look",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "title": "A locus question still traces its curve",
+      "lines": ["M(1,2)", "K(1,0)", "נקודה E", "E על הישר x = -1", "דרך E עובר ישר l1 מקביל לציר ה-x", "l2 אנך אמצעי ל-EK", "G נקודת החיתוך של הישר l1 עם הישר l2"],
+      "after": [{ "click": "הצג מקום גאומטרי" }],
+      "lookFor": "The locus chip on G's row is pressed: the parabola G traces is drawn, and the ask row names it.",
+      "before": "unchanged (a regression guard)."
+    }
+  ]
+}

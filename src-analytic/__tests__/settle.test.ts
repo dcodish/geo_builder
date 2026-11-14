@@ -25,7 +25,20 @@ import { pointText } from '../app/pointText';
 import { locusChips, askLocus } from '../app/locusChip';
 import { anotherConfiguration } from '../app/another';
 import { inWorkerLane, readWork } from '../../shell/workMeter';
-import { handOver, heapSequences } from './settle-heaps';
+import { heapSequences } from './heapsAn';
+
+/**
+ * The two LANES of one module instance are two heaps (`derive`'s store is one per lane): run `fn` in the worker's
+ * lane, then hand the page what it settled, through a structured clone. The unit-level form of a worker's hand-over;
+ * the walk and the reading comparison use a second module instance (`heapsAn.ts`).
+ */
+function handOver<T>(fn: () => T): { value: T; loss: string[]; lists: number } {
+  const { value, keys } = inWorkerLane(() => settling(fn));
+  const message = inWorkerLane(() => settledOf(keys));
+  const loss = cloneLoss(message);
+  adoptSettled(structuredClone(message));
+  return { value, loss, lists: message.lists.length };
+}
 
 const fmt = (v: number) => String(Math.round(v * 1e6) / 1e6);
 function units(fn: () => void): number {

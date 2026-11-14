@@ -8,9 +8,12 @@ import { CrashBoundary } from '../shell/frame/CrashBoundary';
 import { devCrashMode } from '../shell/session/crash';
 import { crashSession3 } from './store/sessionPersist3';
 import { logCrash3 } from './debug/sessionLog3';
+import { startWork3 } from './app/offPage3';
 
 document.documentElement.lang = i18n3d.language;
 document.documentElement.dir = i18n3d.dir();
+// #2890 (ADR-3D-493): 3-D's worker starts with the page, so its chunk downloads beside the page's own
+startWork3();
 
 // #1507 (ADR-W-195): an error while drawing costs a notice and «שחזור», never the construction. The
 // boundary sits inside the i18n provider (its notice reads the suite's keys) and around the whole app.

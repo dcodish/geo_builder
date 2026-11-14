@@ -83,7 +83,36 @@ export function analyticsSubmit(event: Record<string, unknown>): Record<string, 
 }
 
 /** Append one event. DEV → full debug log; PROD → lean usage analytics. */
+/**
+ * #2890 ([ADR-830](../../docs/06-decisions.md#adr-830)): code that runs in the geometry WORKER logs into a capture, and
+ * the page sends what it captured. A worker's own module instance has its own session id and its own `session`
+ * marker, so a line it sent itself would read as a second visitor.
+ */
+const captures: Record<string, unknown>[][] = [];
+export function captureLogs<T>(fn: () => T): { value: T; logs: Record<string, unknown>[] } {
+  const logs: Record<string, unknown>[] = [];
+  captures.push(logs);
+  try {
+    return { value: fn(), logs };
+  } finally {
+    captures.splice(captures.lastIndexOf(logs), 1);
+  }
+}
+/** The asynchronous twin: the capture holds until `fn` settles (one job at a time in a worker, so nothing else logs). */
+export async function captureLogsAsync<T>(fn: () => Promise<T>): Promise<{ value: T; logs: Record<string, unknown>[] }> {
+  const logs: Record<string, unknown>[] = [];
+  captures.push(logs);
+  try {
+    return { value: await fn(), logs };
+  } finally {
+    captures.splice(captures.lastIndexOf(logs), 1);
+  }
+}
 export function logDebug(event: Record<string, unknown>): void {
+  if (captures.length) {
+    captures[captures.length - 1].push(event);
+    return;
+  }
   if (import.meta.env.DEV) {
     post({ session: sessionId, seq: seq++, clientTs: new Date().toISOString(), ...event });
     return;

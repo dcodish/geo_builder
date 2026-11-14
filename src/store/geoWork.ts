@@ -17,10 +17,12 @@
  * one that serves each lane from its own module instance, as a browser's two worker heaps are.
  */
 import type { QueryInput, ValuesPanelResult } from '@/engine/valuesPanel';
-import { getFoldFor, type DetectAllResult, type Fact, type FoldNode } from '@/replay/core';
+import { adoptSettled, peekFoldFor, type DetectAllResult, type Fact, type FoldNode, type SettledView } from '@/replay/core';
 import { createWorkerClient } from '../../shell/workerClient';
 import { sameInstanceExecutor, type Executor } from '../../shell/workerExecutor';
 import { geoOps, type GeoCheckpoint, type GeoOps } from './geoOps';
+export type { Acted, StoreData, ViewArg } from './geoOps';
+export { storeData } from './geoOps';
 import { rowNouns } from './rowNouns';
 
 /**
@@ -36,6 +38,15 @@ const LANE_OF: Record<keyof GeoOps, Lane> = {
   resample: 'interactive',
   autoResolve: 'interactive',
   prefold: 'interactive',
+  // #2890 (ADR-830): the whole decision of an action runs where the searches run
+  settle: 'interactive',
+  act: 'interactive',
+  decide: 'interactive',
+  judge: 'interactive',
+  edit: 'interactive',
+  load: 'interactive',
+  audit: 'interactive',
+  dryRun: 'interactive',
   detect: 'detect',
   values: 'detect', // #217: same background lane — rides the same memoized pool
 };
@@ -43,8 +54,11 @@ const LANE_OF: Record<keyof GeoOps, Lane> = {
 const spawn = (): Worker => new Worker(new URL('./geoWorker.ts', import.meta.url), { type: 'module' });
 
 /** The page's own heap serves the operations: the page's default budgets, and no fold to ship to itself. */
-const inProcess: Executor = sameInstanceExecutor(geoOps({ transplant: false }));
-let executor: Executor = inProcess;
+// Built on first use: `geoOps.ts` imports the store, which imports this module, so the table is not there yet while
+// this module is evaluated (an import cycle a bundler and vitest resolve in a different order).
+let inProcess: Executor | null = null;
+const local = (): Executor => (inProcess ??= sameInstanceExecutor(geoOps({ crossing: false })));
+let executor: Executor | null = null;
 
 /**
  * #2757 ([ADR-812](../../docs/06-decisions.md#adr-812)) — the figure on screen as the store last reported it
@@ -55,7 +69,7 @@ let executor: Executor = inProcess;
 let onScreen: Fact[] | null = null;
 function checkpoint(): GeoCheckpoint | null {
   if (!onScreen || onScreen.length === 0) return null;
-  const fold = getFoldFor(onScreen);
+  const fold = peekFoldFor(onScreen); // by content, whatever a budget sees: the page runs no budget
   return fold ? { facts: onScreen, fold } : null;
 }
 
@@ -64,9 +78,17 @@ const client = createWorkerClient<GeoOps>({
     interactive: { spawn, prePaint: true },
     detect: { spawn, prePaint: false },
   },
-  executor: { run: (lane, op, args, hooks) => executor.run(lane, op, args, hooks), seed: (lane, args) => executor.seed?.(lane, args) },
+  executor: { run: (lane, op, args, hooks) => (executor ?? local()).run(lane, op, args, hooks), seed: (lane, args) => (executor ?? local()).seed?.(lane, args) },
   seed: checkpoint,
 });
+
+/**
+ * #2890 (ADR-830): what the ✕ and a superseded search stop are the SEARCHES. The interactive worker also runs the whole
+ * decision of a line, an edit or a delete now, and a line typed while a search runs is posted behind it: stopping the
+ * search must not take that line with it. The worker is restarted only when the request it is running is a search.
+ */
+const SEARCHES: ReadonlySet<string> = new Set(['resample', 'autoResolve', 'prefold']);
+const isSearch = (request: { op: string }): boolean => SEARCHES.has(request.op);
 
 /** Start both workers now (the page's entry calls this), so their chunk downloads beside the page's own assets. */
 export function startGeoWork(): void {
@@ -79,14 +101,14 @@ export function startGeoWork(): void {
  * instance of `geoOps`, with every message cloned.
  */
 export function useGeoWorkExecutor(next: Executor | null): void {
-  executor = next ?? inProcess;
+  executor = next;
 }
 
 /** Kill the in-flight work the STUDENT is waiting on (the ✕ cancel button) — the interactive lane. The
  *  background detection lane is left alone: nothing is waiting on it, and killing it would only throw
  *  away a sweep the next step has to pay for again. */
 export function cancelGeoWork(): void {
-  client.cancel('interactive');
+  client.cancel('interactive', isSearch);
 }
 
 /** True when the error is a deliberate `cancelGeoWork` — callers go quiet, never surface it. */
@@ -144,7 +166,7 @@ export function supersedeStaleSearches(now: { facts: Fact[]; seed: number }): bo
     token.superseded = true;
     any = true;
   }
-  if (any) client.cancel('interactive');
+  if (any) client.cancel('interactive', isSearch);
   return any;
 }
 
@@ -159,7 +181,8 @@ export const geoWork = {
   ): Promise<{ facts: Fact[]; seed: number; basis: ViewBasis } | null> {
     const basis = { facts, seed };
     const found = await searchOn(basis, () => client.run(LANE_OF.resample, 'resample', { facts, seed }, { onProgress }));
-    return found ? { ...found, basis } : null;
+    if (found?.settled) adoptSettled(found.settled); // #2890 (ADR-830): drawn without folding it again
+    return found ? { facts: found.facts, seed: found.seed, basis } : null;
   },
   /** The post-commit config search. `'ok'` = already valid; `null` = nothing found in budget. */
   async autoResolve(
@@ -169,7 +192,8 @@ export const geoWork = {
     const basis = { facts, seed };
     const found = await searchOn(basis, () => client.run(LANE_OF.autoResolve, 'autoResolve', { facts, seed }));
     if (found === 'ok') return 'ok';
-    return found ? { ...found, basis } : null;
+    if (found?.settled) adoptSettled(found.settled); // #2890 (ADR-830)
+    return found ? { facts: found.facts, seed: found.seed, fold: found.fold, basis } : null;
   },
   /** Warm the fold for a fact-list's content off-thread; returns the node for `primeFoldFor`. */
   async prefold(facts: Fact[], seed: number): Promise<FoldNode | null> {
@@ -188,7 +212,8 @@ export const geoWork = {
     if (detectInFlight?.facts === facts) return detectInFlight.promise;
     if (detectInFlight) client.cancel('detect'); // superseded — its figure is no longer on screen
     const promise = client
-      .run(LANE_OF.detect, 'detect', { facts, nouns: rowNouns(facts) })
+      // #2890 (ADR-830): the page's fold of the figure goes with it, so the detect worker does not fold it again
+      .run(LANE_OF.detect, 'detect', { facts, nouns: rowNouns(facts), fold: peekFoldFor(facts) })
       .then((result) => result)
       .finally(() => {
         if (detectInFlight?.promise === promise) detectInFlight = null;
@@ -199,6 +224,23 @@ export const geoWork = {
 };
 
 let detectInFlight: { facts: Fact[]; promise: Promise<DetectAllResult> } | null = null;
+
+/**
+ * #2890 ([ADR-830](../../docs/06-decisions.md#adr-830)) — THE WHOLE DECISION OF AN ACTION, in the worker. Each answers
+ * an `Acted` (`geoOps.ts`): what the worker changed and the settled view of the figure it ended on. The page puts it
+ * in its store at the one sink ({@link applyActed}). In the page's own heap (no `Worker`) the operation acted on the
+ * page's store directly and answers `applied`.
+ */
+export const geoJobs = {
+  settle: (facts: Fact[], seed: number): Promise<SettledView | null> => client.run('interactive', 'settle', { facts, seed }),
+  act: (state: import('./geoOps').StoreData, name: string, args: unknown[]) => client.run('interactive', 'act', { state, name, args }),
+  decide: (args: Parameters<GeoOps['decide']>[0]) => client.run('interactive', 'decide', args),
+  judge: (args: Parameters<GeoOps['judge']>[0]) => client.run('interactive', 'judge', args),
+  edit: (args: Parameters<GeoOps['edit']>[0]) => client.run('interactive', 'edit', args),
+  load: (text: string, prefold: boolean) => client.run('interactive', 'load', { text, prefold }),
+  audit: (facts: Fact[]) => client.run('interactive', 'audit', { facts }),
+  dryRun: (facts: Fact[], seed: number, cmds: import('@/engine').AnyCommand[]) => client.run('interactive', 'dryRun', { facts, seed, cmds }),
+};
 
 /** #217: the values-panel rows, off-thread on user request; shares the detect lane + pool memo.
  *  #477: the student's queries ride the SAME call, so their answers come from the same sample pool as

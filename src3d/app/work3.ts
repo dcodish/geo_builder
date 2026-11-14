@@ -17,6 +17,8 @@
 import { INTERACTIVE, createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
 import { redo3, undo3, useGeo3, type Fact3 } from '../store/store3';
 import type { Seed3 } from '../engine/components3';
+import { historyTarget3, offPageRun3 } from './offPage3';
+import type { StoreAction3 } from './ops3';
 
 /** The store fields `derive3` reads: a change to either re-solves the figure. */
 export const BASIS_FIELDS_3 = ['facts', 'seed'] as const;
@@ -34,7 +36,13 @@ export const ANOTHER = 'another';
  * another action runs WAITS ITS TURN and then searches the figure that action left. It is still counted and shown on
  * its own button, and a line entered while a search runs does not wait for the search.
  */
-const BEHIND = { [ANOTHER]: INTERACTIVE };
+/**
+ * #2890 round 2 (ADR-3D-493): the lane of a job that only READS the figure's values: the data panel opened on a
+ * standing figure, a question asked. It shows nothing on the submit button (the panel says «בודק…»), and it takes its
+ * turn behind the student's actions, so it reads the figure they leave.
+ */
+export const VALUES = 'values';
+const BEHIND = { [ANOTHER]: INTERACTIVE, [VALUES]: INTERACTIVE };
 
 export const work3 = createWorkQueue<Basis3>({
   basis: () => {
@@ -67,10 +75,23 @@ export const FREE_ACTIONS_3: Readonly<Record<string, string>> = {
 /** The history steps, which live beside the store (zundo's temporal) under these names. Both restore an earlier basis. */
 export const HISTORY_ACTIONS_3 = ['undo3', 'redo3'] as const;
 
+/**
+ * #2890 round 2 ([ADR-3D-493](../../docs/06b-decisions-3d.md#adr-3d-493)): every routed action is SOLVED OFF THE PAGE
+ * first (`offPage3.ts`): 3-D's worker runs it and the page's readers, the page adopts what that solved, and then the
+ * store's own action runs here over it. An undo or a redo is run by the worker on the figure it goes back to.
+ */
+const offPage = (name: string, args: readonly unknown[], runLocal: () => unknown): Promise<unknown> => {
+  if (name === 'undo' || name === 'redo') {
+    const state = historyTarget3(name);
+    return offPageRun3([], runLocal, state ? { state } : {});
+  }
+  return offPageRun3([{ kind: 'action', name: name as StoreAction3, args: [...args] }], runLocal);
+};
+
 /** The job actions AS JOBS: what a component calls. Same arguments; the result arrives in a promise. */
 export const act3 = {
-  ...queuedActions(work3, () => useGeo3.getState(), JOB_ACTIONS_3),
-  ...queuedActions(work3, () => ({ undo: undo3, redo: redo3 }), ['undo', 'redo'] as const),
+  ...queuedActions(work3, () => useGeo3.getState(), JOB_ACTIONS_3, { around: (name, args, _job, runLocal) => offPage(name, args, runLocal) }),
+  ...queuedActions(work3, () => ({ undo: undo3, redo: redo3 }), ['undo', 'redo'] as const, { around: (name, args, _job, runLocal) => offPage(name, args, runLocal) }),
 };
 
 /**

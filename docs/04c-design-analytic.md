@@ -1528,6 +1528,32 @@ cold on every `derive`. Anything that says how one reader treats a figure (a mod
 object, like the pool. A memo that outlives an action and is NOT reached through a construction is a `BoundedStore`, so
 the clear function and the bound cover it.
 
+### The page never solves: the analytic worker, and the figure before its values ([ADR-AG-478](06c-decisions-analytic.md#adr-ag-478), #2890; ADR-W-210 phase 3)
+
+Every solve of this builder runs in its worker (`app/analyticWorker.ts`, the shared host `shell/workerHost`), started with
+the page (`main.tsx`). The operations are one table, `app/opsAn.ts`: the decisions (`submit`, `edit`, `toggle`,
+`another`, `letter`, `audit`, `fallbackExisting`, `fallbackJudge`), each the function the page called before, and
+`show`, a figure and its values. Each answers plain data with the content it solved (`engine/settle.ts`), which the
+page's client (`app/workerAn.ts`) adopts before it hands the verdict on.
+
+**Figure first** (operator ruling 2026-11-14). `show` sends the FIGURE as a part: the derivation and what the render's
+readers solve with the configuration pool HELD (`pool.hold()`: every gate pending, no seed evaluated for a gate, no
+reader fills the pool). Then it completes the pool, one configuration per `ctx.tick()`, giving way to a newer request
+(`complete: false`: kept, handed over, asked again while that figure is still shown), runs every reader again with the
+questions asked and the two notes of the paint, and answers the VALUES. The readers are one list,
+`app/figureReaders.ts`, read by the operations and by the work meter's driver; `App.tsx` calls each from its own memos.
+
+**The page renders what it holds** (`app/useShownFigure.ts`): the last store state whose figure is adopted, so rows,
+canvas and panel change together; at stage `figure` the derivation's pool is held and every value is pending, at stage
+`values` the pool is complete. A question is a value: its row is pending until the worker answered it on that figure.
+A pending word «בודק…» is revealed after `WORKING_SHOWN_AFTER_MS` by an opacity animation (`app/PendingText.tsx`).
+Every job ends after the figure of the store's new basis is drawn (`figureOfStore`); the values follow outside it.
+Where no worker serves (node, the suites, an old browser) the figure stage runs in the render's own task
+(`figureNow`) and the values from the same client; the load's audit is the caller's (`loadAnalyticSession(…, AUDIT_LATER)`).
+
+**The meter's walk** runs every operation through an executor (`useDriverExecutor`); the gate hands `shell`'s isolated
+executor over a second module instance (`__tests__/heapsAn.ts`), so its `page` count is a browser page's.
+
 ### A settled result, and its adoption ([ADR-AG-477](06c-decisions-analytic.md#adr-ag-477), #2890; ADR-W-210 phase 3)
 
 The page may not solve (ADR-W-210 invariant 1). The route is "settle, then hand over": the heap that solved hands the

@@ -22,12 +22,16 @@
  *
  * Re-record: `npm run work:record -- analytic` (docs/08, "The work meter").
  */
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sequencesOf, walkSequence, type FixtureSequence, type WalkPlanA } from './work-meter/walkAnalytic';
 import { SLOW_CORPUS_ANALYTIC } from './work-meter/slowCorpusAnalytic';
 import { firstDifference, openWorkGate, walkOrder, type MeasuredAction } from '../../shell/__tests__/work-gate';
+import { isolatedExecutor } from '../../shell/workerExecutor';
+import { secondInstance } from '../../shell/__tests__/isolated-ops';
+import { useDriverExecutor } from './work-meter/driverAnalytic';
+import { derive as pageDerive } from '../engine/derive';
 
 const DIR = join(__dirname, 'fixtures');
 /** `WORK_METER_CORPUS=slow` (`npm run work:check -- analytic --slow`): the open speed issues' sequences instead of the fixtures. */
@@ -53,28 +57,48 @@ const gate = openWorkGate({
 /** Every line typed, one press of «הציגו תצורה אחרת». */
 const PLAN: WalkPlanA = { submits: 'all', presses: 1 };
 
-function walk(figure: string): MeasuredAction[] {
+async function walk(figure: string): Promise<MeasuredAction[]> {
   const s = sequences.get(figure)!;
-  return walkSequence(s.lines, s.seed, PLAN).map((a) => ({ action: a.action, work: a.work, ms: a.ph.total, ...(a.utterance ? { label: a.utterance } : {}) }));
+  return (await walkSequence(s.lines, s.seed, PLAN)).map((a) => ({ action: a.action, work: a.work, ms: a.ph.total, ...(a.utterance ? { label: a.utterance } : {}) }));
 }
 
+/**
+ * #2890 (ADR-AG-478) — THE WORKER'S HEAP: analytic's operations as its worker entry serves them, in a module instance of
+ * their own, every message cloned (`shell`'s isolated executor). The page's part of each action runs in this file's
+ * instance, so its `page` count is what a browser's page does.
+ */
+const workerHeap = () =>
+  secondInstance(async () => {
+    const { opsAn, takeCheckpointAn } = await import('../app/opsAn'); // load-in-body-ok: a worker's heap is a second module instance, loaded from the beforeAll below
+    const { clearAnalyticCaches, derive } = await import('../engine/derive'); // load-in-body-ok: a worker's heap is a second module instance, loaded from the beforeAll below
+    const { readWork } = await import('../../shell/workMeter'); // load-in-body-ok: a worker's heap is a second module instance, loaded from the beforeAll below
+    return { ops: opsAn, clear: clearAnalyticCaches, units: () => readWork().total, seed: takeCheckpointAn, derive };
+  });
+
 describe('work meter — analytic: no recorded student action does more solver work than its baseline', () => {
+  beforeAll(async () => {
+    const worker = await workerHeap();
+    // a lock that compared one heap with itself would pass by checking nothing (docs/17 §9)
+    expect(worker.derive, "the worker's engine is not the page's").not.toBe(pageDerive);
+    useDriverExecutor({ executor: isolatedExecutor(worker.ops, { units: worker.units, seed: worker.seed }), clear: worker.clear });
+  }, 120_000);
+  afterAll(() => useDriverExecutor(null));
   for (const figure of walkOrder(corpus).filter(gate.wants)) {
-    it(figure, () => {
-      gate.check(figure, walk(figure));
+    it(figure, async () => {
+      gate.check(figure, await walk(figure));
     }, SLOW ? 7_200_000 : 900_000);
   }
 
   // The slow corpus is walked once: it is asked for by hand, and its figures are the dearest ones.
   if (!SLOW) {
     // docs/17 §7: a work count's lock runs a figure again, warm and after other figures, and asserts EQUAL WORK.
-    it('the counts are reproducible: a second walk of a figure, after every other figure, counts the same', () => {
+    it('the counts are reproducible: a second walk of a figure, after every other figure, counts the same', async () => {
       const byCost = gate.walkedByCost();
       const again = [...new Set([byCost[Math.floor(byCost.length * 0.1)], byCost[Math.floor(byCost.length * 0.5)]])].filter(Boolean);
       expect(again.length).toBeGreaterThan(0);
       for (const figure of again) {
-        const second = walk(figure);
-        const third = walk(figure);
+        const second = await walk(figure);
+        const third = await walk(figure);
         expect(firstDifference(gate.measured(figure)!, second), `«${figure}», walked again after the whole corpus`).toBeNull();
         expect(firstDifference(second, third), `«${figure}», walked twice in a row`).toBeNull();
       }

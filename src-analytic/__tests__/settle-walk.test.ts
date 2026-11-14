@@ -1,55 +1,78 @@
 /**
- * #2890 ([ADR-AG-477](../../docs/06c-decisions-analytic.md#adr-ag-477); ADR-W-210 invariant 1) — THE TWO-HEAP WALK: with
- * every action solved in a worker's heap and handed over, THE PAGE SOLVES NOTHING.
+ * #2890 ([ADR-AG-478](../../docs/06c-decisions-analytic.md#adr-ag-478); ADR-W-210 invariant 1) — THE TWO-HEAP WALK: with
+ * every solve of every action in the worker's heap and handed over, THE PAGE SOLVES NOTHING.
  *
- * The work meter's own walk of a saved sequence (`work-meter/walkAnalytic.ts`: every line typed, «הציגו תצורה אחרת», a
- * load, a delete, an edit, the questions, a row ticked off and on, undo, redo, a rename), run as phase 3 will run it:
- *   1. each action in the WORKER's lane, on the worker's own store, exactly as the committed driver runs it today;
- *   2. the line lists it touched handed over as a settled result (`engine/settle.ts`): exported, checked for anything a
- *      clone would lose, passed through `structuredClone`, adopted by the page's store;
- *   3. the page's own part (the commit's re-render and everything after it: `shownState` / `shownSession`) in the PAGE's
- *      lane, under the meter.
- * Three assertions per action: the worker did exactly the work the committed baseline records (so this is the same walk,
- * not a cheaper one); the message loses nothing in the clone; the page's lane counted ZERO units.
+ * The work meter's own walk of a saved sequence (`work-meter/walkAnalytic.ts`), with its operations served by `shell`'s
+ * isolated executor over a second module instance of `app/opsAn.ts` (`heapsAn.ts`): every message cloned, the units
+ * returned in the envelope. Per action: the page's lane counts ZERO units, and no message the worker sends would lose
+ * anything in a structured clone (`engine/settle.ts` `cloneLoss`, on every part and every value).
  *
- * It is this tree's own until the shared client lands: `settle-heaps.ts` then gives way to the isolated executor, and the
- * gate itself walks this way. `SETTLE_WALK=all` runs every saved sequence (about ten minutes); the suite runs a sample.
+ * `SETTLE_WALK=all` walks every saved sequence (about ten minutes); the suite walks a sample. The gate itself walks every
+ * sequence the same way and holds its counts against the baseline.
  *
  * test-budget: eleven saved sequences, each walked once through every recorded action.
  */
-import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { walkSequence, type WalkPlanA } from './work-meter/walkAnalytic';
-import { heapSequences, twoHeaps } from './settle-heaps';
+import { useDriverExecutor } from './work-meter/driverAnalytic';
+import { heapSequences, workerHeapAn } from './heapsAn';
+import { isolatedExecutor } from '../../shell/workerExecutor';
+import type { OpContext, OpTable } from '../../shell/workerProtocol';
+import { cloneLoss } from '../engine/settle';
+import { derive as pageDerive } from '../engine/derive';
 
 const PLAN: WalkPlanA = { submits: 'all', presses: 1 };
-const baseline = new Map<string, number>();
-for (const line of readFileSync(join(__dirname, 'work-meter', 'baseline.jsonl'), 'utf8').split('\n')) {
-  if (!line.startsWith('{"k"')) continue;
-  const row = JSON.parse(line) as { k: string; total: number };
-  baseline.set(row.k, row.total);
+const losses: string[] = [];
+let sent = 0;
+/** The worker's table, with every part and every value it sends checked for what a clone would lose. */
+function checked(ops: OpTable): OpTable {
+  const check = (where: string, v: unknown): void => {
+    sent += 1;
+    for (const l of cloneLoss(v)) losses.push(`${where}: ${l}`);
+  };
+  return Object.fromEntries(
+    Object.entries(ops).map(([name, f]) => [
+      name,
+      (args: unknown, ctx: OpContext) => {
+        const out = f(args, {
+          ...ctx,
+          part: (part, value) => {
+            check(`${name}/${part}`, value);
+            ctx.part(part, value);
+          },
+        });
+        if (out && typeof (out as Promise<unknown>).then === 'function') {
+          return (out as Promise<unknown>).then((v) => {
+            check(name, v);
+            return v;
+          });
+        }
+        check(name, out);
+        return out;
+      },
+    ]),
+  );
 }
 
 describe('#2890 — a settled result adopted by the page leaves the page nothing to solve', () => {
   const sequences = heapSequences(process.env.SETTLE_WALK === 'all');
+  beforeAll(async () => {
+    const worker = await workerHeapAn();
+    expect(worker.derive, "the worker's engine is not the page's").not.toBe(pageDerive);
+    useDriverExecutor({ executor: isolatedExecutor(checked(worker.ops), { units: worker.units, seed: worker.seed }), clear: worker.clear });
+  }, 120_000);
+  afterAll(() => useDriverExecutor(null));
   it('the sample is there', () => expect(sequences.length).toBeGreaterThanOrEqual(11));
 
   for (const s of sequences) {
-    it(s.id, () => {
-      const { hooks, handed } = twoHeaps();
-      const walked = walkSequence(s.lines, s.seed, PLAN, undefined, hooks);
-      expect(walked.length).toBe(handed.length);
-      // the worker ran the recorded walk: the same solver work as the committed baseline, action by action
-      expect(
-        walked.filter((a) => baseline.get(`${s.id}|${a.action}`) !== a.work.total).map((a) => `${a.action}: worker ${a.work.total}, baseline ${baseline.get(`${s.id}|${a.action}`)}`),
-        'the worker lane does the work the baseline records',
-      ).toEqual([]);
-      expect(walked.filter((a) => a.work.page !== 0).map((a) => a.action), 'none of the action itself is charged to the page').toEqual([]);
-      // nothing is lost in the clone
-      expect(handed.filter((h) => h.loss.length > 0).map((h) => `${h.action}: ${h.loss.join('; ')}`), 'every message survives its clone whole').toEqual([]);
-      // and the page, rendering from what it adopted, solves nothing
-      expect(handed.filter((h) => h.pageUnits !== 0).map((h) => `${h.action}: ${h.pageUnits} units on the page`), 'the page solves nothing').toEqual([]);
+    it(s.id, async () => {
+      losses.length = 0;
+      sent = 0;
+      const walked = await walkSequence(s.lines, s.seed, PLAN);
+      expect(walked.length).toBeGreaterThan(0);
+      expect(sent, 'the worker answered').toBeGreaterThan(0);
+      expect(losses, 'every message survives its clone whole').toEqual([]);
+      expect(walked.filter((a) => a.work.page !== 0).map((a) => `${a.action}: ${a.work.page} units on the page`), 'the page solves nothing').toEqual([]);
     }, 900_000);
   }
 });

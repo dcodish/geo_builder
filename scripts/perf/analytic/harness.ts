@@ -39,7 +39,7 @@ import { fileURLToPath } from 'node:url';
 import { Session } from 'node:inspector';
 import type { Seed } from '../../../src-analytic/engine/evaluate';
 // The App's work per action is the ONE driver this harness and the work-meter gate share (#2873).
-import { beforeLastRowEdit, doAnother, doDelete, doEdit, doLoad, doSubmit, newSession, settledState, type Hosts, type Phases, type State } from '../../../src-analytic/__tests__/work-meter/driverAnalytic';
+import { beforeLastRowEdit, doAnother, doDelete, doEdit, doLoad, doSubmit, newSession, settledState, stateOf, type Hosts, type Phases, type State } from '../../../src-analytic/__tests__/work-meter/driverAnalytic';
 import type { WorkCounts } from '../../../shell/workMeter';
 import { SLOW_CORPUS_ANALYTIC } from '../../../src-analytic/__tests__/work-meter/slowCorpusAnalytic';
 
@@ -72,7 +72,7 @@ function corpusRows(flag: string, candidates: string[], what: string): Record<st
 }
 
 /** Sample ONLY `fn` into `file` (a V8 .cpuprofile) when a file is given. */
-function profiled<T>(file: string | undefined, fn: () => T): T {
+async function profiled<T>(file: string | undefined, fn: () => Promise<T>): Promise<T> {
   if (!file) return fn();
   const sess = new Session();
   sess.connect();
@@ -80,7 +80,7 @@ function profiled<T>(file: string | undefined, fn: () => T): T {
   sess.post('Profiler.setSamplingInterval', { interval: 500 });
   sess.post('Profiler.start');
   try {
-    return fn();
+    return await fn();
   } finally {
     sess.post('Profiler.stop', (err, res) => {
       if (!err) {
@@ -183,40 +183,40 @@ interface Rec {
 type Emit = (r: Omit<Rec, 'key'>) => void;
 type PhaseCb = (job: number, step: number, kind: string, p: string) => void;
 
-function runJob(ji: number, job: Job, emit: Emit, phase: PhaseCb): void {
+async function runJob(ji: number, job: Job, emit: Emit, phase: PhaseCb): Promise<void> {
   let step = 0;
   const base = { job: ji, source: job.source, id: job.id, ...(job.kind === 'prod' ? { iph: job.iph } : {}) };
   // #2888 (ADR-AG-476): a job is one session — nothing is solved when it starts, and each action runs on what it left.
   newSession();
-  let st = settledState([], 0, {});
-  const pre = (s: State): Pre => ({ lines: s.lines, seed: s.seed, hosts: s.hosts });
-  const act = (kind: ActionKind, utterance: string | undefined, fn: (cb: (p: string) => void) => { ph: Phases; work: WorkCounts; next: State | null }, extra: { pre?: Pre; index?: number } = {}): State | null => {
+  let st = await settledState([], 0, {});
+  const pre = (s: State): Pre => stateOf(s.lines, s.seed, s.hosts);
+  const act = async (kind: ActionKind, utterance: string | undefined, fn: (cb: (p: string) => void) => Promise<{ ph: Phases; work: WorkCounts; next: State | null }>, extra: { pre?: Pre; index?: number } = {}): Promise<State | null> => {
     const s = step++;
     const p = extra.pre ?? pre(st);
-    const r = fn((ph) => phase(ji, s, kind, ph));
+    const r = await fn((ph) => phase(ji, s, kind, ph));
     emit({ ...base, step: s, kind, ...(utterance !== undefined ? { utterance } : {}), ...(extra.index !== undefined ? { index: extra.index } : {}), pre: p, ph: r.ph, work: r.work });
     if (STOP_AFTER !== null && s >= STOP_AFTER) throw new Error('STOP');
     return r.next;
   };
 
   if (job.kind === 'seq') {
-    for (const line of job.lines) st = act('submit', line, (cb) => doSubmit(st, line, cb)) ?? st;
+    for (const line of job.lines) st = await act('submit', line, (cb) => doSubmit(st, line, cb)) ?? st;
     if (!st.lines.length) return;
     // show another ×6
     let s2 = st;
     for (let i = 0; i < 6; i += 1) {
-      const n = act('another', undefined, (cb) => doAnother(s2, cb));
+      const n = await act('another', undefined, (cb) => doAnother(s2, cb));
       if (!n) break;
       s2 = n;
     }
     // load the saved file cold (the fixture's own saved seed when it has one, else the configuration on screen)
-    act('load', undefined, (cb) => doLoad(st.lines, job.saveSeed ?? st.seed, st.hosts, cb), { pre: { lines: st.lines, seed: job.saveSeed ?? st.seed, hosts: st.hosts } });
+    await act('load', undefined, (cb) => doLoad(st.lines, job.saveSeed ?? st.seed, st.hosts, cb), { pre: stateOf(st.lines, job.saveSeed ?? st.seed, st.hosts) });
     // delete the first fact of a multi-fact figure (in the loaded session)
-    if (st.lines.length > 1) act('delete', st.lines[0], (cb) => doDelete(st, 0, cb));
+    if (st.lines.length > 1) await act('delete', st.lines[0], (cb) => doDelete(st, 0, cb));
     // edit the last line (decideEditHost), in a session that has solved the lines before it and not this one — the meter's
     // one definition of `edit` (#2888, `beforeLastRowEdit`); last, so the load and the delete mean what they meant
-    const editing = beforeLastRowEdit(st);
-    act('edit', st.lines[st.lines.length - 1], (cb) => doEdit(editing, editing.lines.length - 1, editing.lines[editing.lines.length - 1], cb), { index: st.lines.length - 1 });
+    const editing = await beforeLastRowEdit(st);
+    await act('edit', st.lines[st.lines.length - 1], (cb) => doEdit(editing, editing.lines.length - 1, editing.lines[editing.lines.length - 1], cb), { index: st.lines.length - 1 });
     return;
   }
 
@@ -227,18 +227,18 @@ function runJob(ji: number, job: Job, emit: Emit, phase: PhaseCb): void {
       if (degraded) break; // the figure is no longer the student's: stop rather than time a different figure
       if (e.ev === 'action') {
         const a = String(e.action ?? '');
-        if (a === 'clear') { history.push(st); st = settledState([], 0, {}); continue; }
+        if (a === 'clear') { history.push(st); st = await settledState([], 0, {}); continue; }
         if (a === 'undo' && history.length) { st = history.pop()!; continue; }
-        if (a === 'show-another') { const n = act('another', undefined, (cb) => doAnother(st, cb)); if (n) { history.push(st); st = n; } continue; }
+        if (a === 'show-another') { const n = await act('another', undefined, (cb) => doAnother(st, cb)); if (n) { history.push(st); st = n; } continue; }
         if (a === 'delete' && typeof e.detail === 'string' && st.lines.includes(e.detail)) {
           const at = st.lines.indexOf(e.detail);
-          const n = act('delete', e.detail, (cb) => doDelete(st, at, cb));
+          const n = await act('delete', e.detail, (cb) => doDelete(st, at, cb));
           history.push(st); st = n!; continue;
         }
         if (a === 'edit' && typeof e.detail === 'string') {
           const m = /^(\d+):([\s\S]*)$/.exec(e.detail);
           if (m && Number(m[1]) < st.lines.length) {
-            const n = act('edit', m[2], (cb) => doEdit(st, Number(m[1]), m[2], cb), { index: Number(m[1]) });
+            const n = await act('edit', m[2], (cb) => doEdit(st, Number(m[1]), m[2], cb), { index: Number(m[1]) });
             if (n) { history.push(st); st = n; }
             continue;
           }
@@ -255,12 +255,12 @@ function runJob(ji: number, job: Job, emit: Emit, phase: PhaseCb): void {
         let ls: string[];
         try { ls = JSON.parse(e.commands); } catch { degraded = true; continue; }
         for (const l of ls) {
-          const n = act('llm-commit', l, (cb) => doSubmit(st, l, cb));
+          const n = await act('llm-commit', l, (cb) => doSubmit(st, l, cb));
           if (n) { history.push(st); st = n; }
         }
         continue;
       }
-      const n = act('submit', u, (cb) => doSubmit(st, u, cb));
+      const n = await act('submit', u, (cb) => doSubmit(st, u, cb));
       if (n) { history.push(st); st = n; }
     }
     return;
@@ -278,15 +278,15 @@ function runJob(ji: number, job: Job, emit: Emit, phase: PhaseCb): void {
       if (pendingAction && pendingAction.kind === 'delete') {
         const pa = pendingAction;
         const at = st.lines.indexOf(pa.detail);
-        if (at >= 0 && JSON.stringify(st.lines.filter((_, i) => i !== at)) === JSON.stringify(act2)) act('delete', pa.detail, (cb) => doDelete(st, at, cb));
+        if (at >= 0 && JSON.stringify(st.lines.filter((_, i) => i !== at)) === JSON.stringify(act2)) await act('delete', pa.detail, (cb) => doDelete(st, at, cb));
       }
       pendingAction = null;
-      if (JSON.stringify(act2) !== JSON.stringify(st.lines) || JSON.stringify(seed) !== JSON.stringify(st.seed)) st = settledState(act2, seed, {});
+      if (JSON.stringify(act2) !== JSON.stringify(st.lines) || JSON.stringify(seed) !== JSON.stringify(st.seed)) st = await settledState(act2, seed, {});
       continue;
     }
     if (e.kind === 'action') {
       const a = String(e.action ?? '');
-      if (a === 'show-another') act('another', undefined, (cb) => doAnother(st, cb));
+      if (a === 'show-another') await act('another', undefined, (cb) => doAnother(st, cb));
       else if (a === 'delete') pendingAction = { kind: 'delete', detail: String(e.detail ?? '') };
       continue;
     }
@@ -294,7 +294,7 @@ function runJob(ji: number, job: Job, emit: Emit, phase: PhaseCb): void {
       if (e.source !== 'parser') continue;
       const u = String(e.utterance ?? '').trim();
       if (!u) continue;
-      act('submit', u, (cb) => doSubmit(st, u, cb));
+      await act('submit', u, (cb) => doSubmit(st, u, cb));
     }
   }
 }
@@ -304,7 +304,7 @@ function runJob(ji: number, job: Job, emit: Emit, phase: PhaseCb): void {
 const STOP_AFTER: number | null = arg('--stop-after-step') !== undefined ? Number(arg('--stop-after-step')) : null;
 const keyOf = (r: Omit<Rec, 'key'>) => `${r.source}|${r.id}|${r.step}`;
 
-function sweep(): void {
+async function sweep(): Promise<void> {
   const from = Number(arg('--from', '0'));
   const to = Number(arg('--to', '1e9'));
   const out = path.resolve(arg('--out') ?? path.join(OUT_DIR, 'results.jsonl'));
@@ -320,7 +320,7 @@ function sweep(): void {
     if (!wanted(job)) continue;
     process.stdout.write(`JOB ${ji} ${job.source} ${job.id}\n`);
     try {
-      runJob(
+      await runJob(
         ji,
         job,
         (r) => fs.appendFileSync(out, JSON.stringify({ ...r, key: keyOf(r) }) + '\n'),
@@ -335,7 +335,7 @@ function sweep(): void {
 }
 
 /** Re-run one recorded action on its own (fresh process state, settled pre-state), `reps` times. */
-function confirm(): void {
+async function confirm(): Promise<void> {
   const spec = arg('--confirm')!;
   // `@file` = one key per line (to-confirm.txt, written by summarize.mjs)
   const keys = spec.startsWith('@') ? fs.readFileSync(spec.slice(1), 'utf8').split('\n').map((s) => s.trim()).filter(Boolean) : spec.split(',');
@@ -361,11 +361,11 @@ function confirm(): void {
       newSession();
       // An edit of the last row to its own text is the walk's edit: measured where that row is not solved (#2888).
       const ownLast = r.kind === 'edit' && (r.index ?? 0) === r.pre.lines.length - 1 && r.pre.lines[r.pre.lines.length - 1] === r.utterance;
-      const editing = ownLast ? beforeLastRowEdit(r.pre) : null;
-      const st = editing ? null : settledState(r.pre.lines, r.pre.seed, r.pre.hosts);
+      const editing = ownLast ? await beforeLastRowEdit(stateOf(r.pre.lines, r.pre.seed, r.pre.hosts)) : null;
+      const st = editing ? null : await settledState(r.pre.lines, r.pre.seed, r.pre.hosts);
       const cb = () => {};
       // --prof <file>: the LAST repetition of the action (and only the action) is CPU-profiled
-      const done = profiled(i === reps - 1 ? arg('--prof') : undefined, () => {
+      const done = await profiled(i === reps - 1 ? arg('--prof') : undefined, () => {
         if (editing || !st) return doEdit(editing!, r.index ?? 0, r.utterance!, cb);
         if (r.kind === 'submit' || r.kind === 'llm-commit') return doSubmit(st, r.utterance!, cb);
         if (r.kind === 'another') return doAnother(st, cb);
@@ -383,7 +383,7 @@ function confirm(): void {
   if (o) fs.writeFileSync(o, JSON.stringify(out));
 }
 
-if (arg('--confirm')) confirm();
+if (arg('--confirm')) void confirm();
 else if (argv.includes('--count')) process.stdout.write(`COUNT ${buildJobs().length}\n`);
 else if (argv.includes('--list')) for (const j of buildJobs()) process.stdout.write(`${j.source}|${j.id}\n`);
-else sweep();
+else void sweep();

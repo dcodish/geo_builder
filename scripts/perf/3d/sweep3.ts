@@ -125,10 +125,10 @@ function fixtureTasks(): Task[] {
         // step through the utterances one submit at a time
         clearSolveCaches3();
         setState({ facts: [], seed: 0 });
-        render();
+        await render();
         for (const f of r.facts) {
-          await emit({ kind: 'submit', prior: priorOf(), utterance: f.utterance, fn: () => {
-            const res = submitLine(f.utterance);
+          await emit({ kind: 'submit', prior: priorOf(), utterance: f.utterance, fn: async () => {
+            const res = await submitLine(f.utterance);
             if (res.verdict !== 'record' && res.verdict !== 'retick') {
               // fixture drift: commit the saved commands untimed so the rest of the file still steps
               const st = useGeo3.getState();
@@ -150,20 +150,19 @@ function fixtureTasks(): Task[] {
           // more (untimed), then the first row unticked and ticked again
           await emit({ kind: 'undo', prior: priorOf(), fn: undoStep3 });
           await emit({ kind: 'redo', prior: priorOf(), fn: redoStep3 });
-          undoStep3();
+          await undoStep3();
           await emit({ kind: 'untick', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: toggleFirst3 });
           await emit({ kind: 'retick', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: toggleFirst3 });
         }
         // the edit of the last fact to its own text, in the session the meter's walk states (beforeEdit3: the rows before
         // it solved, the edited row's content not)
         if (built.facts.length > 0) {
-          beforeEdit3(built.facts, built.seed);
+          await beforeEdit3(built.facts, built.seed);
           await emit({ kind: 'edit', prior: priorOf(), utterance: built.facts[built.facts.length - 1].utterance, fn: editLast3 });
           // the readers' session (walk3.ts): the built figure shown with the data panel closed, then the panel opened,
           // a rename, a swap and the asks
           clearSolveCaches3();
-          setFigure3(built.facts, built.seed);
-          showPanelClosed3();
+          await showPanelClosed3(built.facts, built.seed);
           await emit({ kind: 'panel', prior: priorOf(), fn: openPanel3 });
           await emit({ kind: 'rename', prior: priorOf(), fn: renameFirst3 });
           await emit({ kind: 'swap', prior: priorOf(), fn: swapFirstTwo3 });
@@ -195,7 +194,7 @@ function prodTasks(): Task[] {
     build: async (emit) => {
       clearSolveCaches3(); // a student's session starts with nothing solved, then stays warm
       setState({ facts: [], seed: 0 });
-      render();
+      await render();
       const history: St[] = [];
       let future: St[] = [];
       const cur = (): St => ({ facts: useGeo3.getState().facts, seed: useGeo3.getState().seed });
@@ -215,21 +214,21 @@ function prodTasks(): Task[] {
         const u = (e.utterance ?? '').replace(/\s+/g, ' ').trim();
         if (!u) continue;
         const before = cur();
-        await emit({ kind: 'submit', prior: priorOf(), utterance: u, fn: () => {
-          const res = submitLine(u);
+        await emit({ kind: 'submit', prior: priorOf(), utterance: u, fn: async () => {
+          const res = await submitLine(u);
           const after = cur();
           if (after.facts !== before.facts) { history.push(before); future = []; }
           return res;
         } });
         const lines = llmLines(e);
         if (lines && useGeo3.getState().facts === before.facts)
-          await emit({ kind: 'llm-step', prior: priorOf(), utterance: `${u}  ⟶ [${lines.join(' | ')}]`, fn: () => {
+          await emit({ kind: 'llm-step', prior: priorOf(), utterance: `${u}  ⟶ [${lines.join(' | ')}]`, fn: async () => {
             const t = now();
             const v = decideSteps3(useGeo3.getState(), u, lines);
             useGeo3.getState().dispatchVerdict(v);
             const decideMs = now() - t;
             if (v.kind === 'record') { history.push(before); future = []; }
-            return { verdict: v.kind, decideMs, renderMs: v.kind === 'record' ? render() : 0 };
+            return { verdict: v.kind, decideMs, renderMs: v.kind === 'record' ? await render() : 0 };
           } });
       }
       // the session's final figure: delete-first (load is not replayable from prod: the file is not logged)
@@ -277,7 +276,7 @@ function debugTasks(): Task[] {
         clearSolveCaches3();
         for (const s of steps) {
           setState({ facts: s.prev, seed: s.seed });
-          render(); // the App had already drawn the prior figure
+          await render(); // the App had already drawn the prior figure
           await emit({ kind: 'submit', prior: s.prev.filter((f) => f.enabled).map((f) => f.utterance), utterance: s.fact.utterance, fn: () => submitLine(s.fact.utterance) });
         }
         if (!fig) return;
@@ -304,7 +303,7 @@ function issueTasks(): Task[] {
     build: async (emit) => {
       clearSolveCaches3();
       setState({ facts: [], seed: 0 });
-      render();
+      await render();
       for (const u of lines) await emit({ kind: 'submit', prior: priorOf(), utterance: u, fn: () => submitLine(u) });
       for (let i = 0; i < PRESSES; i++)
         await emit({ kind: 'another', prior: priorOf(), fn: another3 });
@@ -352,7 +351,7 @@ async function main() {
         await sess.post('Profiler.setSamplingInterval', { interval: 200 });
         await sess.post('Profiler.start');
       }
-      const r = metered3(a.fn);
+      const r = await metered3(a.fn);
       const ms = r.ms;
       if (profiling) {
         const { profile } = await sess.post('Profiler.stop');

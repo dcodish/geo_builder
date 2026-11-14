@@ -15077,6 +15077,8 @@ const REGION_TAIL = new RegExp(
  * present, no command carries a region, and a head label went unreferenced — rescue via
  * {@link regionSideFallback}, never commit the subject-less half-parse.
  */
+/** The item the honesty battery names when {@link droppedRegionSubject} fires: the region words the line stated. */
+export const REGION_SUBJECT_ITEM = 'בתוך/מחוץ';
 export function droppedRegionSubject(utterance: string, commands: AnyCommand[]): boolean {
   // Normalizes internally (idempotent) so the App's LLM commit path (#266/ADR-387 — the second
   // attempt must hold the same line, the ADR-240 discipline) can pass the raw utterance.
@@ -15164,6 +15166,8 @@ const POLY_NOUN =
  * `shape-variant`, or a midpoint-pinning `set-equal` (the ADR-411 determined lowering). Fires the
  * same escalate-never-commit route as its siblings, on the grammar AND the LLM commit paths.
  */
+/** The item the honesty battery names when {@link droppedMidsegment} fires. */
+export const MIDSEGMENT_ITEM = 'קטע אמצעים';
 export function droppedMidsegment(utterance: string, commands: AnyCommand[]): boolean {
   if (!/midsegment|mid-?segment|midline|קטע\s+ה?אמצעים/i.test(utterance)) return false;
   return !commands.some(
@@ -16251,6 +16255,8 @@ export const VERB_TANGENT = 'משיק/tangent';
 export const VERB_PARALLEL = 'מקביל/parallel';
 export const VERB_PERPENDICULAR = 'מאונך/perpendicular';
 
+/** The bisection gate's verb: the item the battery names, and what `droppedGivenVerbs` reports. */
+export const BISECT_VERB = 'חוצה/bisect';
 export const VERB_GATES: VerbGate[] = [
   // "tan- : a REFERENCE to a drawn tangent line ("המשיק חותך…" → line:"tan-A"); tanaux-/tanmid- : the
   // Thales AUX-CIRCLE construction of an external tangent (tangentFromExternal / tangentsFromExternal,
@@ -16259,7 +16265,7 @@ export const VERB_GATES: VerbGate[] = [
   // `present.source` for a substring, which is the same substring-stands-for-identity defect this
   // issue closes — and would have broken silently the moment the source was recomposed.
   gate({ verb: VERB_TANGENT, he: ['משיק'], en: [['tangent']], satisfied: family('tangent', 'circles-tangent', 'set-perpendicular', '"tan-', 'tanaux-', 'tanmid-'), tangency: true }),
-  gate({ verb: 'חוצה/bisect', he: ['חוצ'], en: [['bisect', 's|ed|ing|ors|or|ion']], satisfied: family('bisector', 'midpoint', 'set-angle-ratio', 'set-equal', 'arc-midpoint', 'set-line') }),
+  gate({ verb: BISECT_VERB, he: ['חוצ'], en: [['bisect', 's|ed|ing|ors|or|ion']], satisfied: family('bisector', 'midpoint', 'set-angle-ratio', 'set-equal', 'arc-midpoint', 'set-line') }),
   // `parallelogram` is listed EXPLICITLY: the macro does encode the parallel pairs, so it is genuine
   // evidence — it simply has to be evidence by intent rather than by substring coincidence (#771).
   gate({ verb: VERB_PARALLEL, he: ['מקביל'], en: [['parallel']], satisfied: family('parallel', 'parallelogram') }),

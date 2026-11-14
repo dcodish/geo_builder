@@ -7965,3 +7965,48 @@ What the last four rows say about the round's biggest risk, a verdict cut by a c
 **What the student will see.**
 - [ruled] «הציגו תצורה אחרת» pressed while another action runs waits its turn and then searches the figure that action left, in every tool. ADR-W-210 Am. 2, question 1 (operator, 2026-11-13: *"i go with your recommendations"*, on "an action pressed while the tool is working waits its turn"); the plan on #2890 records it. Until now 2-D dropped the press when the action finished, and in the other three the page was frozen for the whole action.
 - [asked] 2-D's first line of a session no longer waits for the worker to download (about 0.4 s on the live site, Am. 2; 133 ms → 67 ms on the dev servers). *"Speed is very important."* (operator, 2026-11-12)
+
+### ADR-W-210 Amendment 5 (2026-11-14) — phase 3, part 2 as built: the page never solves in 2-D, 3-D and analytic, and the values follow the figure (#2890)
+
+**Status:** built · 2026-11-14 · feature (workspace: 2-D, 3-D, analytic) · branch `feat/2890-part2`, three builder branches merged into it · on the operator's word (*"go ahead with next phases"*) and his three rulings of 2026-11-14 on #2890
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-33 (the values follow the figure, Must); [02c](02c-requirements-analytic.md) R16 (two promises: the figure before its values, the page answers while it computes) · **Design:** [04](04-design.md), [04b](04b-design-3d.md) "The page does not solve", [04c](04c-design-analytic.md); [docs/08](08-testing-strategy.md) (each gate walks separate heaps through the product's own client)
+
+**The three ADRs.** [ADR-830](06-decisions.md#adr-830) (2-D), [ADR-3D-493](06b-decisions-3d.md#adr-3d-493), [ADR-AG-478](06c-decisions-analytic.md#adr-ag-478). Each builder's whole decision runs in its worker on the shared client of Amendment 4; the page adopts the settled result into its phase 2 memos and solves nothing. How each hands over is the builder's own: 2-D applies a settled view (replay, fold, the drawn construction's evaluation and DOF count) through one store sink, `geoStore.adopt(slice, basis)`; analytic adopts the line-list store's entries and renders the last state whose figure it holds; 3-D adopts the worker's journal and runs its own unchanged action over it.
+
+**Invariant 1 reached.** Every gate walks the page and the worker as separate module instances (`isolatedExecutor` over `secondInstance`), every message cloned.
+
+| Builder | Page work, part 1 → part 2 | Total | Before the paint |
+|---|---|---|---|
+| 2-D | 58 260 341 → **0** | 170 346 395 → 140 769 144 (−17.4 %: what a browser solved twice, on the page and in the worker) | 128 011 916 → 109 258 693 |
+| 3-D | 138 045 517 → **0** | 138.05 M → 138.03 M (two panel lines fell) | 138.05 M → 118.86 M |
+| Analytic | 165 433 537 → **0** | unchanged in every action | 112 407 658 → 15 289 737 |
+| Complex | 1 205, on the page by design, under its ceiling (Amendment 4) | unchanged | unchanged |
+
+Slow corpora: page 0 in all three (2-D 37.7 M → 0, 3-D 71.7 M → 0, analytic → 0). No line's total rose in any builder.
+
+**Measured in a browser** (dev servers through the harness, `main` @ `f594c42d` against each branch; the longest stretch with no animation frame on the page's thread is the "frozen" measure of Amendment 2):
+
+| Builder, action | Frozen, `main` → branch | Figure on screen | Values complete |
+|---|---|---|---|
+| 2-D «ריבוע חוסם את מעגל O» | 4.0 s → 17 ms; a click answered after 3.1 s → 35 ms | unchanged | unchanged |
+| analytic rhombus line 5 | 4 124 ms → 30 ms | 4 147 ms → 199 ms | 4 147 ms → 4 372 ms |
+| analytic rhombus line 6 | 5 776 ms → 29 ms | 5 797 ms → 174 ms | 5 797 ms → 5 887 ms |
+| 3-D «\|SA\| = 5» | 2.2–2.4 s → 17 ms; a drag turns the figure while «חושב…» shows | 2 254 → 2 260 ms | with the figure (under 0.3 s, so no «בודק…») |
+
+**The cold-restart risk of the design pass, measured.** 2-D's page gates run under wall clocks that decide verdicts; they now run in a worker that the search's ✕ terminates. The respawned worker is seeded with the page's fold of the figure on screen. Over 52 browser sessions (the hexagon fixture with and without a ✕ before the next line, and the five dearest slow-corpus lines with and without a ✕ before them, two passes), every verdict and refusal text equals `main`'s. Not covered: on three of those five lines the search ended before the ✕ appeared, so only the kite line and the hexagon ran after a restart. Phase 4 (work limits) removes the clocks.
+
+**What the operator ruled for this part** (#2890, 2026-11-14, each with its options and a recommendation): figure first in analytic and 3-D, «בודק…» for a value not there after 0.3 s; in 3-D one grey «בודק…» line in the data panel; after every redraw. And, playing analytic's T1 with the question put beside it: a click while a figure's values are still computing is taken at once and the old figure's values are dropped (*"T1 works great"*).
+
+**Found and fixed on the way.** 3-D's narrowing memo was keyed by the fact array, so the worker's cloned arrays recomputed it; it is keyed by content now. 2-D's ✕ stops only the searches, not a line typed during one (as on `main`). 3-D's App rendered to a string had no server snapshot for its values store.
+
+**Left on the page, and not walked by the meters.** 2-D: the model path's context building before a call, when a line names by use or the answer has several lines (`boundView`, `lostNewLabels`, `laneContext`). Analytic: the gate walks the driver's copy of the readers, not `App.tsx`, and no development guard reports a unit charged to the page lane; `shell/workMeter.ts` needs that listener. 3-D: a basis that changes a third time during one job falls back to the page solving (correct, slower). The asks, rename, swap, merge, the cycle chips and a clicked crossing are still outside 2-D's walk. Safari and Firefox were not probed. The worker chunks grew: 2-D 368 KB → 839 KB (271 KB gzip), and analytic and 3-D now ship one each.
+
+**Sibling audit.** The three iterative builders change together; complex stays on the page under its ceiling by design (invariant 1's stated exception). `shell/` is unchanged in this part.
+
+**What the student will see.**
+- [asked] While 2-D, 3-D or analytic computes, the page is not frozen: it scrolls, answers clicks, and in 3-D the figure can be turned. *"user should know the engine is working and not frozen"* (operator, 2026-11-13)
+- [ruled] In analytic and 3-D, when a line is accepted the figure is drawn at once and the values follow; a value not there after 0.3 s shows «בודק…». Operator, 2026-11-14, #2890 question 1: *"Figure first, both tools (Recommended)"*.
+- [ruled] In 3-D, while the values are being computed the data panel shows one grey line «בודק…», and the rows appear together; never a number from the previous figure. #2890 question 2: *"One «בודק…» line (Recommended)"*. After every redraw and when the panel is opened: question 3, *"Yes, all redraws (Recommended)"*. And *"3d can behave like analytics"* (2026-11-13).
+- [ruled] Once a figure is on screen, the next action does not wait for that figure's values; the old figure's values are dropped. Operator, 2026-11-14, after playing analytic's T1 with that question beside it: *"T1 works great"*.
+- [ruled] An action pressed while the tool works on a figure waits its turn (Am. 2, question 1).
+- [2-D] Save, share, the exports, the language and the guide stay usable while a job runs and act on the figure on screen: measured in 2-D on `main` during its worker search (save 43 ms, language 47 ms, guide 53 ms) and in 3-D on the branch (save 36 ms).

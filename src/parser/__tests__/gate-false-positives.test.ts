@@ -82,14 +82,15 @@ const show = (v: unknown[] | boolean): string => (typeof v === 'boolean' ? Strin
 
 describe('#140 — the gate list is DERIVED from the submit path, never enumerated here', () => {
   it('every gate the pipeline calls is exercised by this file (ADR-W-006)', () => {
-    const src = readFileSync(path.resolve(__dirname, '../../app/submitPipeline.ts'), 'utf8');
+    // #2890 (ADR-830): the model's answer is judged in `llmJudge.ts` (moved out of the pipeline to run in the worker)
+    const src = ['../../app/submitPipeline.ts', '../../app/llmJudge.ts'].map((f) => readFileSync(path.resolve(__dirname, f), 'utf8')).join(String.fromCharCode(10));
     // BOTH halves of the battery's naming convention — `droppedX` (what the lowering LOST) and
     // `introducedX` (#255: what it ADDED). Extracting only the first would have silently missed the
     // mirror gate the day it landed, which is the exact failure ADR-W-006 exists to prevent.
     const called = [...new Set([...src.matchAll(/\b((?:dropped|introduced)[A-Z]\w*)\s*\(/g)].map((m) => m[1]))];
     // The extraction must find something: an anchor/naming change that silently yields an empty list
     // would leave this test passing forever while proving nothing (the shrinking-expectation trap).
-    expect(called.length, 'no gates extracted from submitPipeline.ts — the naming convention changed').toBeGreaterThanOrEqual(8);
+    expect(called.length, 'no gates extracted from submitPipeline.ts + llmJudge.ts — the naming convention changed').toBeGreaterThanOrEqual(8);
     for (const g of called) {
       expect(Object.keys(GATES), `submitPipeline.ts calls ${g}() — add it to GATES in this file (#140)`).toContain(g);
     }

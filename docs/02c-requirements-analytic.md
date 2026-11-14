@@ -916,7 +916,9 @@ a sentence the tool parsed.
 **R15 — The tool never has to work out that an ambiguity is harmless.** No special case for "this one happens not to matter".
 
 **R16 — `isKnowledge` must vary the DISCRETE choices too, not only the continuous parameters.** Judged over **one configuration pool** of 24 drawable configurations; an unconfirmed value shows «בודק…», never a provisional number (operator ruling B′).
-- Sources: ADR-AG-180, #1473.
+- **The figure first, its values after** (#2890, operator ruling 2026-11-14: *"Figure first, both tools (Recommended)"*): when a line is accepted, or the figure is redrawn by any action, the figure is drawn as soon as it is solved, and every value of the data panel, every answer of the ask lane, a curve's centre label and conic marks follow when the configuration pool is complete. A value that has not arrived 0.3 s after the figure shows «בודק…» until it does; one that arrives sooner shows no «בודק…» at all. Never a provisional number, and never a value of the previous figure.
+- **The page answers while the tool computes** (#2890, *"user should know the engine is working and not frozen"*): the solving runs off the page's thread, so the page scrolls, pans and answers clicks; an action pressed meanwhile waits its turn (ADR-W-210 Am. 2).
+- Sources: ADR-AG-180, #1473; ADR-AG-478, #2890.
 
 **R17 — A stated shape noun may narrow a parameter's domain.** **OPEN:** intended, or should a stated kind never constrain? (beside ADR-AG-005 D7's three domains)
 - «נתונה אליפסה שמשוואתה x²+a·y²=1»

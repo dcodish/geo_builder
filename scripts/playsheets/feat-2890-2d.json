@@ -1,0 +1,229 @@
+{
+  "name": "feat-2890-2d",
+  "title": "#2890 round 2 — 2-D decides in its worker: the page answers while it computes (PR, port 5180)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: while a slow line computes, the page still scrolls and answers clicks",
+      "lines": [
+        "מעגל O",
+        "ריבוע ABCD חסום במעגל O",
+        "ריבוע חוסם את מעגל O"
+      ],
+      "expectRows": [
+        "מעגל O",
+        "ריבוע ABCD חסום במעגל O",
+        "ריבוע חוסם את מעגל O"
+      ],
+      "lookFor": "Type the first two lines. Type the third and press Enter. While «הוסף» reads «חושב…» (about 5 seconds): scroll the page, and tick «הציגו מידות» off and on — each answers at once and the ring keeps turning. Then the third row lands, with the same note under the box as on prod.",
+      "before": "On prod the page is frozen for about 4 seconds of that line: a scroll or a click waits until it is over."
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: the defining interaction builds exactly as before",
+      "lines": [
+        "ריבוע ABCD",
+        "נקודה G על AD",
+        "זווית GBA = 37"
+      ],
+      "expectRows": [
+        "ריבוע ABCD",
+        "נקודה G על AD",
+        "∠GBA = 37"
+      ],
+      "expectFigure": [
+        "G"
+      ],
+      "lookFor": "The square, G on AD, the 37° angle at B; three green rows.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: «הציגו תצורה אחרת» moves the right angle",
+      "lines": [
+        "משולש ABC",
+        "המשולש ישר זווית"
+      ],
+      "cycles": 2,
+      "expectConfigsDiffer": true,
+      "lookFor": "Each press moves the right angle to another vertex.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: a contradicting length is still refused",
+      "lines": [
+        "משולש ABC",
+        "AB = 5",
+        "AB = 7"
+      ],
+      "expectRefusal": "סותר את",
+      "lookFor": "The third line is refused: «… סותר את «AB = 5» …»; two rows.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T5",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: deleting a row and «בטל»",
+      "lines": [
+        "משולש ABC",
+        "נקודה D על BC",
+        "AD = 4"
+      ],
+      "after": [
+        {
+          "clickOn": "ul li:nth-child(3) button:has-text(\"✕\")",
+          "say": "לחצו ✕ בשורה 3"
+        },
+        {
+          "click": "בטל"
+        }
+      ],
+      "expectRows": [
+        "משולש ABC",
+        "נקודה D על BC",
+        "AD = 4"
+      ],
+      "lookFor": "The third row goes and comes back; three rows.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T6",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: a row turned off and on again",
+      "lines": [
+        "משולש ABC",
+        "נקודה D על BC",
+        "AD = 4"
+      ],
+      "after": [
+        {
+          "toggle": 3
+        },
+        {
+          "toggle": 3
+        }
+      ],
+      "expectRows": [
+        "משולש ABC",
+        "נקודה D על BC",
+        "AD = 4"
+      ],
+      "expectFigure": [
+        "D"
+      ],
+      "lookFor": "Three rows at the end, D on BC with AD = 4.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T7",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: editing a row in place",
+      "lines": [
+        "משולש ABC",
+        "נקודה D על BC",
+        "AD = 4"
+      ],
+      "after": [
+        {
+          "clickOn": "ul li:nth-child(3) button[aria-label=\"עריכה במקום\"]",
+          "say": "לחצו ✎ בשורה 3"
+        },
+        {
+          "typeInto": "ul li:nth-child(3) div > input",
+          "text": "AD = 5"
+        }
+      ],
+      "expectRows": [
+        "משולש ABC",
+        "נקודה D על BC",
+        "AD = 5"
+      ],
+      "lookFor": "The third row now reads AD = 5 and the figure follows; three rows.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T8",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: a figure comes back after a reload (a load)",
+      "lines": [
+        "משולש ABC",
+        "נקודה D על BC",
+        "AD = 4"
+      ],
+      "after": [
+        {
+          "reload": true
+        }
+      ],
+      "expectRows": [
+        "משולש ABC",
+        "נקודה D על BC",
+        "AD = 4"
+      ],
+      "expectFigure": [
+        "D"
+      ],
+      "lookFor": "After the reload and «המשך», the same three rows and figure.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T9",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: swapping two letters, typed as a line",
+      "lines": [
+        "משולש ABC",
+        "AB = 5",
+        "החלף בין A ל-B"
+      ],
+      "lookFor": "The rows now read with A and B exchanged (AB = 5 stays AB = 5 read the other way), the figure relabelled, no refusal.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T10",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: a line the grammar does not read, answered by the model's stand-in, is still refused",
+      "lines": [
+        "משולש ABC",
+        "ABC מקיים תכונה מסתורית"
+      ],
+      "lookFor": "The second line is not added: «לא הבנתי את הבקשה — נסו לנסח אחרת…» and the line stays in the box; one row.",
+      "before": "unchanged (a regression guard).",
+      "expectRefusal": "לא הבנתי את הבקשה"
+    }
+  ]
+}

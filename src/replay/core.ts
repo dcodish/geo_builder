@@ -27,7 +27,8 @@ import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { pinnedLowering, statedOnCommonTangents } from './statedOnCommonTangents';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities, isShapeCarrier } from '@/engine';
-import { carrierParams, setCarrierVals, CIRCLES_TOUCH_REL } from '@/engine/evaluate';
+import { carrierParams, setCarrierVals, CIRCLES_TOUCH_REL, adoptEvaluate, adoptResolved, evaluate as evaluateMemo, resolveDrivenMemo } from '@/engine/evaluate';
+import { adoptDofCount, freeDofCount as freeDofCountMemo } from '@/engine/sample';
 import { circlePairVariantCase } from '@/engine/variants';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, statedSizeCircles } from '@/engine';
@@ -699,6 +700,84 @@ export function clearReplayCaches(): void {
   sampledSourceIds = new WeakMap();
   sampleMemo = null;
   clearNarrowingMemo();
+}
+/**
+ * #2890 ([ADR-830](docs/06-decisions.md#adr-830), ADR-W-210 phase 3) — THE SETTLED VIEW of a figure: everything the
+ * page's readers ask of `(facts, seed)`, computed in the heap that solves (a worker), with every lazily solved value
+ * forced, as plain data that survives `structuredClone`:
+ *   - the replay (`Derived`) and the work it cost (its ledger's total, for the adopted entry's flat ledger);
+ *   - the fold, for the page to keep (a restarted worker is handed it back, the detect worker is handed it);
+ *   - the evaluation and the baked construction of the drawn construction (`configurationAxes` → `branchCount` →
+ *     `evaluate`), and its DOF count (`freeDofCount`): the three identity-keyed engine memos the render reads.
+ * Measured in the design pass on #2890: adopting all of it, the page's render readers and its resolve gate count 0
+ * units on 1 156 of 1 156 handed-over actions; without the DOF count they do not.
+ */
+export interface SettledView {
+  facts: Fact[];
+  seed: number;
+  derived: Derived;
+  work: number;
+  fold: FoldNode | null;
+  ev: ReturnType<typeof evaluateMemo> | null;
+  resolved: Construction | null;
+  dof: number | null;
+}
+export function settleView(facts: Fact[], seed: number): SettledView {
+  const derived = replay(facts, seed);
+  const cell = cellOf.get(derived);
+  const usable = viewUsable(derived);
+  return {
+    facts,
+    seed,
+    derived,
+    work: cell ? ledgerTotal(cell) : 0,
+    fold: getFoldFor(facts),
+    // the render reads these only of a drawable view (`viewUsable`), so only those are forced
+    ev: usable ? evaluateMemo(derived.construction) : null,
+    resolved: usable ? resolveDrivenMemo(derived.construction) : null,
+    dof: usable ? freeDofCountMemo(derived.construction) : null,
+  };
+}
+/**
+ * Adopt a settled view received from another heap, under the identity of ITS facts array: the array the page then
+ * puts in its store. Every reader of the page that asks of that `(facts, seed)` (the render, the resolve gate) is then
+ * a memo hit. An adopted entry carries a flat ledger of the work it saved, as a transplanted fold does (ADR-584), so a
+ * budget that meets one charges it. Nothing an entry the page already holds is overwritten.
+ */
+export function adoptSettled(v: SettledView): void {
+  if (v.fold) primeFoldFor(v.facts, v.fold);
+  let entry = replayCache.get(v.facts);
+  const fresh = entry && entry.snapshot.length === v.facts.length && entry.snapshot.every((f, i) => f === v.facts[i]);
+  if (!entry || !fresh) {
+    entry = { snapshot: v.facts.slice(), bySeed: new Map() };
+    replayCache.set(v.facts, entry);
+  }
+  const key = `${v.seed}`;
+  if (!entry.bySeed.has(key)) {
+    cellOf.set(v.derived, flatLedger(v.work));
+    entry.bySeed.set(key, v.derived);
+  }
+  const c = entry.bySeed.get(key)!.construction;
+  if (c === v.derived.construction) {
+    if (v.ev) adoptEvaluate(c, v.ev);
+    if (v.resolved) adoptResolved(c, v.resolved);
+    if (v.dof !== null) adoptDofCount(c, v.dof);
+  }
+}
+/** The fold this heap holds for the CONTENT of `facts`, read without solving and without touching the memo's order or
+ *  what a budget sees (#2890: the page hands it to the detect worker). */
+export function peekFoldFor(facts: Fact[]): FoldNode | null {
+  return foldCache.get(foldKey(resolveBinds(facts))) ?? null;
+}
+/** Whether this heap already holds the replay of `(facts, seed)`: a read of the memo that never solves. */
+export function hasReplay(facts: Fact[], seed: number): boolean {
+  const entry = replayCache.get(facts);
+  if (!entry || entry.snapshot.length !== facts.length || !entry.snapshot.every((f, i) => f === facts[i])) return false;
+  return entry.bySeed.has(`${seed}`);
+}
+/** The replay of `(facts, seed)` this heap holds, or undefined: never solves. */
+export function peekReplay(facts: Fact[], seed: number): Derived | undefined {
+  return hasReplay(facts, seed) ? replayCache.get(facts)!.bySeed.get(`${seed}`) : undefined;
 }
 export function getFoldFor(facts: Fact[]): FoldNode | null {
   // #2888 (ADR-827): it answers as the 8-entry memo did. Its callers act on the answer under a budget (the
