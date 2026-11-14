@@ -69,6 +69,30 @@ export function inWorkerLane<T>(fn: () => T): T {
   }
 }
 
+/**
+ * The same, for work that is NOT one synchronous call: an operation that yields and resumes (#2890). The lane is the
+ * worker's from this call until the returned function is called. Whatever else runs on this thread in between is
+ * charged to the worker too, so a caller holds it only across awaits that let nothing else in.
+ */
+export function holdWorkerLane(): () => void {
+  const was = onPage;
+  onPage = false;
+  return () => {
+    onPage = was;
+  };
+}
+
+/**
+ * Work counted in ANOTHER heap, joined to this one's counts (#2890, ADR-W-210 Am. 4): the units a worker reports with
+ * each message (`shell/workerProtocol`, the meter envelope). They are never page work. `prePaint` is the LANE's phase,
+ * declared once by the builder (the student waits for this lane's work, or does not), not the moment a message
+ * happens to arrive.
+ */
+export function meterRemote(units: number, prePaint: boolean): void {
+  counts.total += units;
+  if (prePaint) counts.prePaint += units;
+}
+
 export interface MeteredAction {
   /** The action's figure is on screen: work from here on is no longer pre-paint. */
   painted(): void;

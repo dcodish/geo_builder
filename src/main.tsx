@@ -7,6 +7,11 @@ import { CrashBoundary } from '../shell/frame/CrashBoundary';
 import { devCrashMode } from '../shell/session/crash';
 import { geoCrashSession } from './store/sessionPersist';
 import { logCrash } from './debug/sessionLog';
+import { startGeoWork } from './store/geoWork';
+
+// #2890 (ADR-829): the geometry workers start WITH the page, so their chunk downloads beside the page's own assets
+// and the first line of a session does not wait for it (measured on the live site: about 0.4 s, ADR-W-210 Am. 2).
+startGeoWork();
 
 // #910 (ADR-581): the dev step-through panel. `import.meta.env.DEV` is a build-time constant — `false` in a
 // production build, so this branch and its lazy import are dropped and the panel is never bundled. In dev

@@ -485,13 +485,16 @@ The model is never called. **The meta-lock** runs the same checks against an ora
 
 **One job per student action; the working state is counted, never set.** `shell/work.ts` is pure (no React, no builder, no string):
 
-- `createWorkQueue({ paint?, basis?, sameBasis? })` → `run(work, { lane?, paint? })`, `runIfIdle(…)`, `working(lane?)`, `inJob()`, `subscribe`, `idle()`.
+- `createWorkQueue({ paint?, basis?, sameBasis?, behind?, span? })` → `run(work, { lane?, paint?, behind? })`, `runIfIdle(…)`, `working(lane?)`, `inJob()`, `subscribe`, `idle()`.
 - **A job's life:** counted the moment it is asked for → waits for a paint (the indicator is on screen) → runs after every earlier job of its lane → its joined work settles → waits for the paint that shows what it produced → released, in a `finally`. In a builder that solves inside the React render, the heavy part runs after the store update the job made, which is why the closing paint is part of the job.
 - **`working(lane)` is the lane's count.** Nothing sets or clears it, so no exit can leave a tool working and none can forget to say so.
 - **Lanes** are named serial queues. `interactive` (the default) is the student's actions; a builder names others for work shown elsewhere (`another`: «הציגו תצורה אחרת», on its own button) or nested in a job that has already painted (`model`: the model call inside a submit, `paint: false`).
-- **The job handle:** `basis` and `stale()` (the stamp of the facts and seed the action was started for; carried, read by nothing in phase 1), `join(promise)` (work started and not awaited belongs to the job), `paint()` (a long job shows progress).
+- **The job handle:** `basis` and `stale()` (the stamp of the facts and seed the job STARTED on), `join(promise)` (work started and not awaited belongs to the job), `paint()` (a long job shows progress).
+- **The stamp is read when the job's turn starts**, after its opening paint and after every job it waited behind ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 4, #2890). Phase 1 read it when the job was asked for, so an action that waited its turn behind another looked stale by construction, though it acts on the figure as it then is (`useLatest`, below). `stale()` now means one thing: something else changed the figure while THIS job worked, so its result is for a figure no longer on screen.
+- **Ordering across lanes** (Am. 4). `behind` maps a lane to the lane its jobs take their turn behind (`run` may name one for a single job). Such a job is still counted and shown on its OWN lane, and it also waits for every job the other lane had been asked for before it; the other lane does not wait for it. Every builder declares `{ another: interactive }`: «הציגו תצורה אחרת» pressed while another action runs waits its turn and then searches the figure that action left (ruled), and a line entered while a search runs is still taken at once.
+- **A span of one job** (Am. 4). `span(job)` is called when a job's turn starts, where the stamp is read; what it returns is called when the job is released, after its closing paint. It measures one student action WHOLE, the render it causes included: the page-lane work ceiling of a builder that stays on the page's thread is one (`pageLaneCeiling`, below).
 - **`paint` is injected.** In a browser it is two animation frames, and resolves at once in a hidden tab. With no `requestAnimationFrame` (node, the suite) it resolves at once: a job is one promise, and tests that call an engine or a store directly are untouched.
-- `queuedActions(queue, state, names)` turns the listed store actions into jobs (same arguments, the result in a promise), reading the action from the store when the job runs. `watchBasis(queue, onChange, onFault)` is the basis guard: a figure whose basis changes with no job running is a fault.
+- `queuedActions(queue, state, names, { around? })` turns the listed store actions into jobs (same arguments, the result in a promise), reading the action from the store when the job runs. `around(name, args, job, runLocal)` is the builder's wrapper of every routed action, the place an action is sent to its solver (Am. 4): run it through the worker client's executor, prime and then `runLocal()`, or send it elsewhere and never call it. `watchBasis(queue, onChange, onFault)` is the basis guard: a figure whose basis changes with no job running is a fault.
 
 **The indicator** is `shell/frame/WorkingMark.tsx`. `InputArea`'s `busy` turns the submit button off, shows `busyLabel` and mounts `WorkingMark`: a ring turned by a CSS animation of `transform` alone, on its own layer (`will-change`), which the browser's compositor keeps running while the page's thread is busy (under «reduce motion», a fade of `opacity`). Its keyframes go into the document head, never into the button, where a `<style>` element would become part of the button's text. `useWorking(queue, lane)` reads the derived state (`useSyncExternalStore`). `useLatest(value)` keeps a component's job bodies as the latest render defines them: a job runs after the paint and after earlier jobs, so a body that closed over the render it was clicked in would act on a figure an earlier job has changed.
 
@@ -518,6 +521,44 @@ The model is never called. **The meta-lock** runs the same checks against an ora
 A submit asks with `runIfIdle`: while the lane works it is not taken, and the line stays in the box (ADR-W-198).
 
 **The cross-product lock** is `shell/__tests__/fixtures/work-routing-rows.ts` ("How a cross-product wiring guard is written", above), and it guards the class, not a list of today's actions. A store's functions are read at run time, so a new action with no class fails; each free action's `set(…)` calls are read from the store's source, so one that writes a basis field fails; every source of the tree outside `store/` and `app/` is scanned for the hook spellings a component uses (a selector, `getState()`, a destructured hook) naming a job action; and the product's real table is driven under the basis guard. The meta-lock is `work-routing-meta-2874.test.ts`. What the scan cannot see (a store handle passed around under another name) the basis guard reports at run time: each page arms it in development.
+
+### The worker client ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 4, #2890)
+
+**One protocol between a builder's page and its worker, and the same operations where there is no worker.** Lifted out of 2-D's `geoWork` / `geoWorker` (ADR-290), which was the only one; analytic and 3-D get their first worker through it, and complex uses its page-lane half. Four modules, none of which knows a builder, an operation's name, a field of a result or what a checkpoint holds:
+
+| Module | Runs on | Holds |
+| --- | --- | --- |
+| `shell/workerProtocol.ts` | both | the messages, `OpContext`, `Op` / `OpTable`, `cancelled()` / `isCancelled()` |
+| `shell/workerHost.ts` | the worker | `serveWorker(ops, { seed? })`: a builder's worker entry is this one call |
+| `shell/workerClient.ts` | the page | `createWorkerClient({ lanes, executor, seed? })` → `start()`, `run(lane, op, args, { onProgress?, onPart? })`, `cancel(lane, which?)`, `isCancelled`, `remote(lane)` |
+| `shell/workerExecutor.ts` | the page, node | `sameInstanceExecutor`, `pageLaneExecutor`, `isolatedExecutor`, `executorByLane`, `pageLaneCeiling` |
+
+- **The protocol.** Page → worker: `run { id, op, args }`, `seed { args }`, `drop { id }`. Worker → page: `ready`, `progress { id, k, n }`, `part { id, name, value, units }`, `done { id, value, units }`, `error { id, message, units }`. `args` and `value` are the builder's and must survive `structuredClone`. Every `run` carries all its job needs: no message refers to an earlier one, so a worker can be replaced between any two jobs (measured in 2-D: starting every action from a fresh clone of the figure changes 7 of 1 327 recorded actions, Am. 4).
+- **An operation** is `(args, ctx) => value`. `ctx.part(name, value)` sends an intermediate result (a figure before the knowledge that follows it); `ctx.progress(k, n)`; `ctx.tick()` yields to the worker's message loop and resolves `true` when a newer request waits, which is the one way a worker hears anything while it works. An operation that never awaits a tick runs to its end and can only be stopped by terminating its worker.
+- **The host** serves one request at a time in the order received, and answers a SYNCHRONOUS operation inside its own message, as a worker that called its solver directly always did. A value that does not clone is the request's error, by name.
+- **A lane is one worker**, declared by the builder with its `spawn` (the literal `new Worker(new URL('./x.ts', import.meta.url), { type: 'module' })`, which a bundler must see where the file is named: the worker ENTRY stays in the product tree) and its phase (`prePaint`: the student waits for this lane's work, or it is background). A queue lane is what the student sees working; a client lane is a heap. The builder maps one onto the other.
+- **`start()` spawns every lane's worker with the page**, so the chunk downloads beside the page's own assets. 2-D's first line of a session used to wait about 0.4 s for it on the live site (Am. 2).
+- **Cancel is termination** (ADR-W-210). `cancel(lane, which)` rejects the selected requests with `{ cancelled }`. If the one the worker is RUNNING is among them: terminate, spawn, hand the new worker the builder's checkpoint (`seed`), and post again, in order, every request that was not cancelled. A request that was only waiting is dropped by message and the worker keeps its caches. A restart restores exactly two things: the waiting requests (the client's) and the checkpoint (the builder's: content the page holds that saves the worker solving it again; in 2-D the fold of the figure on screen).
+- **A crash** of a worker that was serving rejects the request it was running and restarts the same way. One that crashes before it was ever ready (a blocked or missing chunk) has run nothing, so every request is kept; after three such spawns in a row the lane stops spawning and its requests go to the executor.
+- **The executor is injected**, because the builders differ in what must happen where there is no `Worker`:
+
+  | Executor | The op table lives in | Units charged to | Arguments and values | Used by |
+  | --- | --- | --- | --- | --- |
+  | `sameInstanceExecutor(ops)` | this module instance | the worker lane | by reference | every suite; a browser with no `Worker` |
+  | `pageLaneExecutor(ops)` | this module instance | the page lane | by reference | a builder that stays on the page's thread (complex) |
+  | `isolatedExecutor(ops, { units, seed? })` | a SECOND module instance | that instance's own meter, returned in the envelope | `structuredClone`, both ways | the work-meter gates: a browser's separate heaps |
+
+  `executorByLane({ … })` gives each lane its own. The second instance is loaded by the test (`shell/__tests__/isolated-ops.ts`: `secondInstance(load)` forgets the module registry and runs `load`, whose dynamic imports build a fresh instance with its own caches and its own `shell/workMeter`).
+- **The meter envelope.** `part`, `done` and `error` carry the units the worker's own `shell/workMeter` counted since the job's previous message. The client joins them to the page's meter with `meterRemote(units, lane.prePaint)`: never page work, and before the paint when the lane is one the student waits for (the lane's phase, declared once, not the moment a message arrives). In the same instance the units are charged directly, in the worker lane.
+- **`pageLaneCeiling({ ceiling, onOver })`** is a queue `span`: it reads the page lane at a job's turn and at its release and reports an action over the ceiling. It cuts nothing: the work is done by then, and stopping a solve honestly needs phase 4's "not decided" outcome.
+
+| Builder | Op table | Worker entry | Lanes | Checkpoint | Without a `Worker` |
+| --- | --- | --- | --- | --- | --- |
+| 2-D | `src/store/geoOps.ts` (resample, autoResolve, prefold, detect, values) | `src/store/geoWorker.ts` | `interactive` (waited for), `detect` (background) | the fold of the figure on screen | `sameInstanceExecutor`; the gate injects two isolated ones (`useGeoWorkExecutor`) |
+| Complex | its store's job actions | none | none | none | `pageLaneExecutor`, with `pageLaneCeiling` on its queue |
+| Analytic, 3-D | theirs, in their own phase 3 steps | new | at least one | theirs | theirs |
+
+Locks: `shell/__tests__/worker-client.test.ts` (the host; the client against a fake `Worker` that clones every message and answers later; the three executors; the ceiling) and `shell/__tests__/work-queue-2874.test.ts` (the stamp, `behind`, `span`, `around`).
 
 ### The created-points notice ([ADR-W-162](06w-decisions-workspace.md#adr-w-162), #1467)
 
@@ -898,7 +939,10 @@ It holds no product knowledge: the caller decides what one unit is (the table is
 - **The lane.** In a real Worker the global scope says so (`globalThis instanceof WorkerGlobalScope`) and no
   unit is page work. Everywhere else the lane is `page`, unless the work runs inside `inWorkerLane(fn)`:
   a worker client's synchronous fallback does that, so under node the work a browser sends to its worker
-  is charged to the worker. `inWorkerLane` is synchronous and restores the lane when `fn` returns or throws.
+  is charged to the worker. `inWorkerLane` is synchronous and restores the lane when `fn` returns or throws;
+  `holdWorkerLane()` is the same for an operation that yields and resumes (Am. 4).
+- **Work counted in another heap** (Am. 4) joins these counts through `meterRemote(units, prePaint)`: the
+  units a worker reports with each message (the worker client's envelope, above). They are never page work.
 - **The phase.** `meterAction()` begins one student action and returns `painted()`, `unpainted()` and
   `end()`. The action's driver calls `painted()` where the App's figure is on screen; `end()` returns the
   three counts of the action. No builder marks its paints at run time: the phase is the driver's statement.
