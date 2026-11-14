@@ -850,9 +850,20 @@ construction objects (its values are keyed by id; its lazy pivot readers return 
 computed. A representative must never be altered after it is taken, the rule the per-object memos already rested on;
 `ContentTable.changed()` reports a breach and the work-meter gate asserts it stays empty over every fixture's session.
 
+**A seed's verdict is kept too.** The configuration search (`firstSatisfyingSeed3`) asks of each seed whether its
+drawing meets the requirements and the preferences. A figure whose givens force a special case is answered "no" at
+every seed, so the search walks its whole window of 200, and the next action on that figure walks almost the same
+seeds. The resolve memo holds 64 entries per construction, and a resolved figure is the wrong thing to keep for a yes
+or a no. So `meetsRequirements3` and `meetsShapePreferences3` keep their VERDICT (`seedVerdict3`): one boolean per
+representative construction, question, seed (`seedKey3`) and set of preferences asked (each by its place among the
+figure's own), at most `SEED_VERDICTS_PER_FIGURE` (1,024) per construction, the oldest written dropped. It is not a
+limit on the search and changes no answer.
+
 Dropping an entry loses nothing but the sharing, and nothing invalidates: a content key cannot go stale.
-`clearSolveCaches3()` (test-only) forgets both; the work meter's walk calls it where a session starts
-([docs/08](08-testing-strategy.md), "The work meter"; `src3d/__tests__/work-meter/walk3.ts`).
+`clearSolveCaches3()` (test-only) is THE ONE CLEAR: the derive memo, the segment-equation readings, the construction
+table, the seed verdicts and the parameter's two older memos. A cache added later is cleared there, so a session the
+work meter starts is cold in every cache ([docs/08](08-testing-strategy.md), "The work meter";
+`src3d/__tests__/work-meter/walk3.ts`).
 
 What is NOT shared, measured in ADR-3D-491: the figure a new row makes is a new content and is solved from its start,
 at the drawn seed and the claim seeds. Starting those solves from the figure already drawn would change which solution

@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { useGeo3, derive3, deriveStats3, deriveMemoStats3, deriveMemoSize3, clearSolveCaches3, DERIVE_MEMO_ENTRIES, type Fact3 } from '../store3';
-import { figureContent3, resolve3, resolveStats3, FIGURE_CONTENT_ENTRIES } from '../../engine/evaluate';
+import { figureContent3, meetsShapePreferences3, resolve3, resolveStats3, seedVerdictCount3, seedVerdictStats3, FIGURE_CONTENT_ENTRIES, SEED_VERDICTS_PER_FIGURE } from '../../engine/evaluate';
 import { leastSquaresStats } from '../../engine/solve3';
 import { scalarPinOrigin3 } from '../../engine/types';
 import { dataView } from '../../engine/dataView';
@@ -241,6 +241,89 @@ describe('#2888 — a construction is solved once per content', () => {
       expect(figureContent3.size).toBeLessThanOrEqual(FIGURE_CONTENT_ENTRIES);
     }
     expect(figureContent3.stats.dropped).toBeGreaterThanOrEqual(20);
+  });
+});
+
+/**
+ * THE SEED WALK. «AB = 5 · BC = 3 · AC = 7.9999» is a triangle the givens force flat to a hair, so the configuration
+ * search (`firstSatisfyingSeed3`) finds no seed it prefers and walks its whole window of 200. A press then walks the
+ * window again from one seed on: 199 seeds of the same construction content the submit had just judged.
+ */
+describe('#2888 — a seed is judged once per construction content', () => {
+  const FLAT = (JSON.parse(readFileSync(join(DIR, 'stated-length-7-9999-2361.geo3.json'), 'utf8')) as { facts: { utterance: string }[] }).facts.map((f) => f.utterance);
+
+  it('a press after the submit re-judges one seed, not the window, and lands where a cold press lands', () => {
+    submit(...FLAT);
+    const typed = { facts: state().facts, seed: state().seed };
+    expect(Object.values(derive3(typed.facts, typed.seed).status).every((st) => st === 'ok')).toBe(true);
+    const submitAsked = seedVerdictStats3.asked;
+    expect(submitAsked, 'the submit must have walked the window, or this lock checks nothing').toBeGreaterThanOrEqual(200);
+    // warm: the session that typed the figure presses
+    const [h0, e0] = [seedVerdictStats3.hits, leastSquaresStats.evals];
+    state().resample();
+    const warm = { seed: state().seed, hits: seedVerdictStats3.hits - h0, work: leastSquaresStats.evals - e0 };
+    const warmFigure = JSON.stringify([...derive3(state().facts, state().seed).positions]);
+    expect(warm.hits).toBeGreaterThanOrEqual(199);
+    // cold: the same figure and seed in a new session
+    clearSolveCaches3();
+    useGeo3.setState({ facts: typed.facts, seed: typed.seed, lastError: null, lastNotice: null });
+    const e1 = leastSquaresStats.evals;
+    state().resample();
+    const cold = { seed: state().seed, hits: seedVerdictStats3.hits, work: leastSquaresStats.evals - e1 };
+    expect(cold.hits).toBe(0);
+    expect(warm.seed).toEqual(cold.seed);
+    expect(warmFigure).toBe(JSON.stringify([...derive3(state().facts, state().seed).positions]));
+    expect(warm.work).toBeLessThan(cold.work / 10);
+  });
+
+  it('never a stale verdict: another figure, another seed and another set of preferences are each their own question', () => {
+    submit(...FLAT);
+    const { facts, seed } = state();
+    const c = derive3(facts, seed).construction;
+    expect(seedVerdictCount3(c)).toBeGreaterThanOrEqual(200);
+    // another figure (one row fewer): nothing kept for it by this walk beyond what its own submit asked
+    const shorter = derive3(facts.slice(0, 3), seed).construction;
+    expect(figureContent3.of(shorter)).not.toBe(figureContent3.of(c));
+    const kept = seedVerdictCount3(shorter);
+    const [a0, h0] = [seedVerdictStats3.asked, seedVerdictStats3.hits];
+    meetsShapePreferences3(shorter, 100_000);
+    expect(seedVerdictStats3.hits - h0).toBe(0);
+    expect(seedVerdictCount3(shorter)).toBe(kept + 1);
+    // the same figure at a seed nobody asked: judged
+    meetsShapePreferences3(c, 100_000);
+    expect(seedVerdictStats3.hits - h0).toBe(0);
+    // asked again: answered
+    meetsShapePreferences3(c, 100_000);
+    expect(seedVerdictStats3.hits - h0).toBe(1);
+    expect(seedVerdictStats3.asked - a0).toBe(3);
+  });
+
+  it('which preferences were asked is part of the question: the same seed with none of them is judged on its own', () => {
+    submit('מלבן ABCD');
+    const { facts, seed } = state();
+    const c = derive3(facts, seed).construction;
+    expect(c.requirements.some((r) => r.kind === 'quad-general'), 'a rectangle carries a drawing preference, or this lock checks nothing').toBe(true);
+    const h0 = seedVerdictStats3.hits;
+    meetsShapePreferences3(c, 100_000);
+    meetsShapePreferences3(c, 100_000, []);
+    expect(seedVerdictStats3.hits - h0).toBe(0);
+    meetsShapePreferences3(c, 100_000, []);
+    meetsShapePreferences3(c, 100_000);
+    expect(seedVerdictStats3.hits - h0).toBe(2);
+  });
+
+  it(`the bound holds (${SEED_VERDICTS_PER_FIGURE} verdicts per construction), and the one clear forgets them`, () => {
+    submit('משולש ABC');
+    const { facts, seed } = state();
+    const c = derive3(facts, seed).construction;
+    for (let s = 0; s < SEED_VERDICTS_PER_FIGURE + 40; s++) {
+      meetsShapePreferences3(c, 1000 + s);
+      expect(seedVerdictCount3(c)).toBeLessThanOrEqual(SEED_VERDICTS_PER_FIGURE);
+    }
+    expect(seedVerdictCount3(c)).toBe(SEED_VERDICTS_PER_FIGURE);
+    clearSolveCaches3();
+    expect(seedVerdictCount3(c)).toBe(0);
+    expect(seedVerdictStats3.asked).toBe(0);
   });
 });
 

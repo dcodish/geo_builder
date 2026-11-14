@@ -9,7 +9,7 @@
  * THE SESSION THE WALK IS (#2888, [ADR-3D-491](../../../docs/06b-decisions-3d.md#adr-3d-491)). Solved content is keyed by
  * content and outlives the action, so a count depends on what the session solved before it, and the walk says what
  * that is:
- *  - a figure's walk STARTS FROM CLEARED CACHES (`clearSolveCaches3({ readings: true })`), so its counts depend on
+ *  - a figure's walk STARTS FROM CLEARED CACHES (`clearSolveCaches3()`), so its counts depend on
  *    nothing walked before it, in any order;
  *  - `load` is the COLD load of the file: a student who opens it in a new session;
  *  - the caches are cleared again, and the rows are then typed in ONE session that stays warm, as a student's does:
@@ -21,10 +21,10 @@
  *    not. The edit rewrites the row to its own text, so its count is what the last row costs through the EDIT path.
  *    Rewriting a row the session had already solved counted almost nothing once the keys were content, and sized no
  *    edit;
- *  - one thing is carried from the load into the typed session, as it was when the baseline was first recorded: the
- *    READING of a two-reading segment equation (`readingMemo3`). Clearing it there would make three recorded submits
- *    pay the reading's trial folds (ADR-3D-491 has the numbers), which is a change in what those lines mean and is
- *    not made here.
+ *  - "cleared" is every cache, by the one clear function (`clearSolveCaches3`): a session starts cold in all of them.
+ *    The phase 0 walk carried one memo from its load into the typed session (the reading of a two-reading segment
+ *    equation), so three recorded submits did not pay the reading's trial folds; they do now (ADR-3D-491 has the
+ *    before and after).
  * The slow corpus's walk types first: it starts from cleared caches, and its `load` (the saved figure, with the
  * session's own row ids) is made cold by clearing the solve caches before it. Its delete follows in the loaded session
  * and its edit is last, by the same definition.
@@ -75,7 +75,7 @@ export function walkFixture3(text: string, plan: WalkPlan3, onAction?: (action: 
     }
   };
 
-  clearSolveCaches3({ readings: true });
+  clearSolveCaches3();
   setFigure3([], 0);
   run('load', () => loadText3(text));
   clearSolveCaches3();
@@ -106,7 +106,7 @@ export function walkLines3(lines: readonly string[], plan: WalkPlan3, onAction?:
     onAction?.(action);
     out.push({ action, ...(utterance ? { utterance } : {}), rec: metered3(fn) });
   };
-  clearSolveCaches3({ readings: true });
+  clearSolveCaches3();
   setFigure3([], 0);
   render3();
   lines.forEach((u, k) => run(`submit#${k + 1}`, () => submitLine3(u), u));

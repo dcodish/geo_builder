@@ -264,7 +264,7 @@
 {"k":"edge-point-lengths-only-1680.geo3.json|load","total":98079,"page":98079,"prePaint":98079}
 {"k":"edge-point-lengths-only-1680.geo3.json|submit#1","total":0,"page":0,"prePaint":0}
 {"k":"edge-point-lengths-only-1680.geo3.json|submit#2","total":0,"page":0,"prePaint":0}
-{"k":"edge-point-lengths-only-1680.geo3.json|submit#3","total":70936,"page":70936,"prePaint":70936}
+{"k":"edge-point-lengths-only-1680.geo3.json|submit#3","total":98079,"page":98079,"prePaint":98079}
 {"k":"face-diagonals-blank-2610.geo3.json|another#1","total":0,"page":0,"prePaint":0}
 {"k":"face-diagonals-blank-2610.geo3.json|edit","total":0,"page":0,"prePaint":0}
 {"k":"face-diagonals-blank-2610.geo3.json|load","total":0,"page":0,"prePaint":0}
@@ -633,7 +633,7 @@
 {"k":"new-point-equal-lengths-2804.geo3.json|load","total":121869,"page":121869,"prePaint":121869}
 {"k":"new-point-equal-lengths-2804.geo3.json|submit#1","total":0,"page":0,"prePaint":0}
 {"k":"new-point-equal-lengths-2804.geo3.json|submit#2","total":64483,"page":64483,"prePaint":64483}
-{"k":"new-point-equal-lengths-2804.geo3.json|submit#3","total":84586,"page":84586,"prePaint":84586}
+{"k":"new-point-equal-lengths-2804.geo3.json|submit#3","total":121869,"page":121869,"prePaint":121869}
 {"k":"new-point-plain-1680.geo3.json|another#1","total":0,"page":0,"prePaint":0}
 {"k":"new-point-plain-1680.geo3.json|delete","total":38096,"page":38096,"prePaint":38096}
 {"k":"new-point-plain-1680.geo3.json|edit","total":0,"page":0,"prePaint":0}
@@ -1075,7 +1075,7 @@
 {"k":"rider-lengths-only-1680.geo3.json|load","total":5819,"page":5819,"prePaint":5819}
 {"k":"rider-lengths-only-1680.geo3.json|submit#1","total":0,"page":0,"prePaint":0}
 {"k":"rider-lengths-only-1680.geo3.json|submit#2","total":0,"page":0,"prePaint":0}
-{"k":"rider-lengths-only-1680.geo3.json|submit#3","total":0,"page":0,"prePaint":0}
+{"k":"rider-lengths-only-1680.geo3.json|submit#3","total":5819,"page":5819,"prePaint":5819}
 {"k":"right-pyramid-existing-quad-2490.geo3.json|another#1","total":90173,"page":90173,"prePaint":90173}
 {"k":"right-pyramid-existing-quad-2490.geo3.json|delete","total":0,"page":0,"prePaint":0}
 {"k":"right-pyramid-existing-quad-2490.geo3.json|edit","total":90173,"page":90173,"prePaint":90173}
@@ -1122,7 +1122,7 @@
 {"k":"ssa-two-triangles-2714.geo3.json|submit#2","total":1407,"page":1407,"prePaint":1407}
 {"k":"ssa-two-triangles-2714.geo3.json|submit#3","total":10257,"page":10257,"prePaint":10257}
 {"k":"ssa-two-triangles-2714.geo3.json|submit#4","total":6292,"page":6292,"prePaint":6292}
-{"k":"stated-length-7-9999-2361.geo3.json|another#1","total":500439,"page":500439,"prePaint":500439}
+{"k":"stated-length-7-9999-2361.geo3.json|another#1","total":12813,"page":12813,"prePaint":12813}
 {"k":"stated-length-7-9999-2361.geo3.json|delete","total":723017,"page":723017,"prePaint":723017}
 {"k":"stated-length-7-9999-2361.geo3.json|edit","total":500439,"page":500439,"prePaint":500439}
 {"k":"stated-length-7-9999-2361.geo3.json|load","total":12283,"page":12283,"prePaint":12283}

@@ -99,7 +99,7 @@ function fixtureTasks(): Task[] {
         // LOAD first, cold. Solved content is keyed by content and outlives the action (#2888, ADR-3D-491), so the
         // session is stated exactly as the work meter's walk states it (src3d/__tests__/work-meter/walk3.ts): cleared
         // caches, the load, cleared solve caches, then the rows typed in one session that stays warm.
-        clearSolveCaches3({ readings: true });
+        clearSolveCaches3();
         setState({ facts: [], seed: 0 });
         await emit({ kind: 'load', prior: r.facts.filter((f) => f.enabled).map((f) => f.utterance), fn: () => loadText3(text) });
         // step through the utterances one submit at a time
@@ -156,7 +156,7 @@ function prodTasks(): Task[] {
     corpus: 'prod' as const,
     user: evs[0]?.iph,
     build: async (emit) => {
-      clearSolveCaches3({ readings: true }); // a student's session starts with nothing solved, then stays warm
+      clearSolveCaches3(); // a student's session starts with nothing solved, then stays warm
       setState({ facts: [], seed: 0 });
       render();
       const history: St[] = [];
@@ -237,7 +237,7 @@ function debugTasks(): Task[] {
       id: `dbg:${ses}`,
       corpus: 'debug',
       build: async (emit) => {
-        clearSolveCaches3({ readings: true });
+        clearSolveCaches3();
         for (const s of steps) {
           setState({ facts: s.prev, seed: s.seed });
           render(); // the App had already drawn the prior figure
@@ -265,7 +265,7 @@ function issueTasks(): Task[] {
     id: `issue:${name}`,
     corpus: 'issue' as const,
     build: async (emit) => {
-      clearSolveCaches3({ readings: true });
+      clearSolveCaches3();
       setState({ facts: [], seed: 0 });
       render();
       for (const u of lines) await emit({ kind: 'submit', prior: priorOf(), utterance: u, fn: () => submitLine(u) });

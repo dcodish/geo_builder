@@ -125,7 +125,7 @@ export function removeFirst3(): Required<Outcome3> {
  * edit is cold.
  */
 export function beforeEdit3(facts: Fact3[], seed: Seed): void {
-  clearSolveCaches3({ readings: true });
+  clearSolveCaches3();
   setFigure3(facts.slice(0, -1), seed);
   render3();
   setFigure3(facts, seed);

@@ -58,7 +58,7 @@ import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, r
   bisectorDir3,
   lineCrossing3,
   ringSelfCrossing3} from './vec3';
-import { canonicalSeed3, partsOf3, seedNumber3, seedOfPart3, type Part3, type Seed3 } from './components3';
+import { seedKey3, canonicalSeed3, partsOf3, seedNumber3, seedOfPart3, type Part3, type Seed3 } from './components3';
 import { baseRingOf, boundSolidDimCount3, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
@@ -2153,10 +2153,52 @@ function rememberResolve3(own: Map<string, Resolved3>, c: Construction3, key: st
   keepResolve3(shared, key, out);
   return out;
 }
-/** #2888 — TEST-ONLY: forget which constructions share a content (`store3.clearSolveCaches3` is the one caller). */
-export function clearFigureContent3(): void {
+/**
+ * #2888 (ADR-3D-491) — A SEED'S VERDICT IS KEPT PER CONSTRUCTION CONTENT. The configuration search
+ * ({@link firstSatisfyingSeed3}) asks of each seed "does this drawing meet the requirements, and the preferences?".
+ * Each answer needs the figure resolved at that seed, and it is a pure function of the construction's content, the seed
+ * and the preferences asked. A figure whose givens force a special case is answered "no" at every seed, so the search
+ * walks its whole window, and the next action on the same figure (a press of «הציגו תצורה אחרת» starts one seed on) walked
+ * the same seeds again: the resolve memo holds {@link RESOLVE_MEMO_PER_FIGURE} figures per construction, far fewer than
+ * the window, and a resolved figure is the wrong thing to keep for a yes or a no. So the VERDICT is kept: one boolean
+ * per (representative construction, question, seed, preference set), {@link SEED_VERDICTS_PER_FIGURE} per construction,
+ * the oldest written dropped. It is not a limit on the search and it changes no answer: a seed that was judged is not
+ * judged again.
+ */
+export const SEED_VERDICTS_PER_FIGURE = 1024;
+let seedVerdicts3 = new WeakMap<Construction3, Map<string, boolean>>();
+/** #2888: seed verdicts by count: `asked` every question that reached the memo, `hits` those it answered. */
+export const seedVerdictStats3 = { asked: 0, hits: 0 };
+/** #2888: how many verdicts are kept for this construction's content (the bound's lock reads it). */
+export const seedVerdictCount3 = (c: Construction3): number => seedVerdicts3.get(figureContent3.of(c))?.size ?? 0;
+function seedVerdict3(c: Construction3, key: string, judge: () => boolean): boolean {
+  const of = figureContent3.of(c);
+  let per = seedVerdicts3.get(of);
+  if (!per) seedVerdicts3.set(of, (per = new Map()));
+  seedVerdictStats3.asked++;
+  const hit = per.get(key);
+  if (hit !== undefined) {
+    seedVerdictStats3.hits++;
+    return hit;
+  }
+  const out = judge();
+  per.set(key, out);
+  if (per.size > SEED_VERDICTS_PER_FIGURE) per.delete(per.keys().next().value as string);
+  return out;
+}
+
+/**
+ * #2888 — TEST-ONLY: forget everything the engine keeps by content (`store3.clearSolveCaches3`, the one clear, is the
+ * one caller): which constructions share a content, the seed verdicts, and the parameter's two older memos
+ * (`identityMemo`, `rootsMemo`), whose misses scan and do not solve.
+ */
+export function clearEngineCaches3(): void {
   figureContent3.clear();
   figureContent3.stats.shared = figureContent3.stats.fresh = figureContent3.stats.opaque = figureContent3.stats.dropped = 0;
+  seedVerdicts3 = new WeakMap();
+  seedVerdictStats3.asked = seedVerdictStats3.hits = 0;
+  identityMemo.clear();
+  rootsMemo.clear();
 }
 const RESOLVE_MEMO_PER_FIGURE = 64;
 /** #2368 (ADR-3D-375): a plain resolve's pivot pools, in call order — replayed by its read-back image only. */
@@ -5159,6 +5201,11 @@ export function checkInSpan(
 export function meetsRequirements3(c: Construction3, seed: Seed3): boolean {
   const hard = c.requirements.filter((req) => req.kind !== 'quad-general');
   if (hard.length === 0) return true;
+  return seedVerdict3(c, `requirements|${seedKey3(seed)}`, () => requirementsMetAt3(c, seed, hard)); // #2888
+}
+
+/** {@link meetsRequirements3}'s judgement of one seed (the figure resolved there). */
+function requirementsMetAt3(c: Construction3, seed: Seed3, hard: readonly Exclude<Requirement3, { kind: 'quad-general' }>[]): boolean {
   const r = resolve3(c, seed);
   return hard.every((req) => {
     if (req.kind === 'mutual') {
@@ -5280,10 +5327,19 @@ export function meetsShapePreferences3(c: Construction3, seed: Seed3, prefs: rea
   // givens force a crossing still resolves, at the seed it resolved at before.
   const rings = c.solids.length > 0 || c.quadShapes.length > 0 || c.claims.some((k) => k.type === 'polygon-open');
   if (prefs.length === 0 && !rings) return true;
-  const r = resolve3(c, seed);
-  if (solidFaceCollapsed(c, r.positions)) return false;
-  if (declaredRingCrossed3(c, r.positions)) return false;
-  return prefs.every((req) => !preferenceFails3(req, r.positions));
+  const judge = (): boolean => {
+    const r = resolve3(c, seed);
+    if (solidFaceCollapsed(c, r.positions)) return false;
+    if (declaredRingCrossed3(c, r.positions)) return false;
+    return prefs.every((req) => !preferenceFails3(req, r.positions));
+  };
+  // #2888: WHICH preferences were asked is part of the verdict's key: each by its place among the figure's own (the
+  // search asks all of them, then the ones the givens leave possible). A preference that is not the figure's own has
+  // no place, and the seed is judged without the memo.
+  const own = quadPreferences3(c);
+  const places = prefs.map((req) => own.indexOf(req));
+  if (places.includes(-1)) return judge();
+  return seedVerdict3(c, `preferences|${seedKey3(seed)}|${places.join(',')}`, judge);
 }
 
 /**

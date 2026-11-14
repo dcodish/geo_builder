@@ -48,7 +48,7 @@ import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engi
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../lexicon/marks3';
-import { checkInSpan, clearFigureContent3, componentValue, crossingOnInk3, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, clearEngineCaches3, componentValue, crossingOnInk3, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
@@ -582,23 +582,21 @@ let deriveTick3 = 0;
 export const deriveMemoStats3 = { hits: 0, dropped: 0 };
 
 /**
- * #2888 (ADR-3D-491) — TEST-ONLY: forget every solved result that is keyed by content (the derive memo here and the
- * construction table of `resolve3`), so the next derive of any list and the next solve of any construction are cold.
+ * #2888 (ADR-3D-491) — TEST-ONLY: THE ONE CLEAR. Forget everything this tree keeps by content, so that what follows
+ * starts as a new session does, cold in every cache: the derive memo and its fact lists here, the segment-equation
+ * readings (`readingMemo3`, ADR-3D-391 Am. 1), and the engine's (`clearEngineCaches3`: the construction table, the seed
+ * verdicts, the parameter's identity and root memos). A cache added later is cleared HERE, so no walk can forget it.
  * The work meter's walk calls it where a student's session starts (`__tests__/work-meter/walk3.ts`); the product never
  * does (a content key cannot go stale, so nothing invalidates).
- *
- * `readings` also forgets the segment-equation readings (`readingMemo3`, ADR-3D-391 Am. 1), the one older content-keyed
- * memo whose misses solve. It is its own switch because the meter's recorded counts were taken with it warm from the
- * walk's load (see the walk's header).
  */
-export function clearSolveCaches3(opts: { readings?: boolean } = {}): void {
+export function clearSolveCaches3(): void {
   factLists3.clear();
   factListIds3 = new WeakMap();
   deriveMemo3.clear();
   deriveMemoStats3.hits = 0;
   deriveMemoStats3.dropped = 0;
-  if (opts.readings) readingMemo3.clear();
-  clearFigureContent3();
+  readingMemo3.clear();
+  clearEngineCaches3();
 }
 
 /** #2888: how many derives the memo holds now (the bound's lock reads it). */
