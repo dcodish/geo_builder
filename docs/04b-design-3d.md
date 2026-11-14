@@ -814,9 +814,49 @@ per resolve and threaded into the residual (`sampledSolidDims`). `rng.ts` export
 The free-line / free-plane resolvers still sample inside the residual.
 
 **One solve per configuration (#863, [ADR-3D-304](06b-decisions-3d.md#adr-3d-304)).** `resolve3` is a pure
-function of `(construction, seed, paramValue)`, memoized at that chokepoint (a WeakMap on the construction's
-identity — `apply` clones, never mutates). Every consumer shares it through `knowledgeSamples3`;
-`resolveStats3` counts resolves and hits.
+function of `(construction, seed, paramValue)`, memoized at that chokepoint (a WeakMap on the construction
+object that stands for its content, next paragraph — `apply` clones, never mutates). Every consumer shares it through
+`knowledgeSamples3`; `resolveStats3` counts resolves and hits.
+
+**Solved content is keyed by content (#2888, [ADR-3D-491](06b-decisions-3d.md#adr-3d-491); [ADR-W-210](06w-decisions-workspace.md#adr-w-210) invariant 4).**
+Every memo of this tree hangs off an object: the derive off the fact array, the solve and everything beside it (the
+pivot's recorded pools, the released constructions, the parts, the ring reach) off the `Construction3`. Each store
+action brings a new array and each fold builds a new construction, so an object is not the figure. `engine/content3.ts`
+gives each CONTENT one object, at the two chokepoints:
+- **`derive3` (the store).** The key is the fact list's content and the configuration: every row's id, text, commands,
+  `enabled` and `held`. A list the session has derived is answered from the memo whichever array carries it: a row edited
+  to what it said, the last row deleted, a row unticked and ticked again. At most `DERIVE_MEMO_ENTRIES` (64) derives are
+  held, the least recently used dropped; nothing else holds a `Derived3`, so the session's undo history no longer keeps
+  every past figure's derives alive.
+- **`resolve3` (the engine).** Its first line asks `figureContent3` for the construction's representative: the first
+  construction object seen with this content. All the per-construction memos are found on it. The construction does not
+  depend on the configuration, so this is what one figure's configurations share: a search that found seed 3 and the
+  redraw at seed 3 are one solve, although the redraw folded the list again. It is also what a list shares with another
+  list that folds to the same figure (a row that stands aside for its twin, a row unticked), and what the unchanged parts
+  of a split figure share from one line to the next. At most `FIGURE_CONTENT_ENTRIES` (64) representatives, least
+  recently used dropped. The resolve memo itself has two tiers: each construction object keeps its OWN answers, as it
+  always did (so an undo, or a derive the store still holds, finds its figure whatever was solved since), over the
+  answers its content shares on the representative (`sharedResolves3`). Each tier holds at most 64 entries per object.
+
+"The same content" is exact, never a digest: a hash picks the candidates and `sameContent3` compares the two graphs node
+by node. Order is content (array items, map and set entries, object keys); primitives are compared as `Object.is` does;
+a key holding `undefined` is not a missing key; SHARING is content (a claim listed in `claims` and in `scaleGivens` is
+one object in both graphs or two in both, so `list.includes(x)` answers alike); and a side table read with the graph's
+objects is content (the pin-origin table `scalarPinOrigin3`, which `resolveHeld3` reads). A graph holding anything else
+(a function, a class instance) has no content and keeps the identity rule. `resolve3` is a pure function of exactly
+that content and the configuration, and nothing a reader takes from a `Resolved3` is compared with the reader's own
+construction objects (its values are keyed by id; its lazy pivot readers return numbers, and the one that returns pins,
+`heldPins`, is read inside `resolve3`), so the representative's answer is the one any object of that content would have
+computed. A representative must never be altered after it is taken, the rule the per-object memos already rested on;
+`ContentTable.changed()` reports a breach and the work-meter gate asserts it stays empty over every fixture's session.
+
+Dropping an entry loses nothing but the sharing, and nothing invalidates: a content key cannot go stale.
+`clearSolveCaches3()` (test-only) forgets both; the work meter's walk calls it where a session starts
+([docs/08](08-testing-strategy.md), "The work meter"; `src3d/__tests__/work-meter/walk3.ts`).
+
+What is NOT shared, measured in ADR-3D-491: the figure a new row makes is a new content and is solved from its start,
+at the drawn seed and the claim seeds. Starting those solves from the figure already drawn would change which solution
+a solve can reach, so it belongs to the solver, never to a key.
 
 **A pin symbol's admissible roots are one set (#1769, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395)).** One
 root predicate decides whether a candidate joins the pool: `collect` admits it only when it is exact on the primary

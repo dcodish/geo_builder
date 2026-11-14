@@ -10,6 +10,10 @@
  * One unit is one residual evaluation of `leastSquares`. 3-D has no worker, so every unit is page work today — the
  * honest starting point of invariant 1.
  *
+ * #2888 (ADR-3D-491): solved content outlives the action, so each figure's walk starts from cleared caches and then
+ * stays warm, as one student session does (`work-meter/walk3.ts` says exactly where). That is what keeps a count
+ * independent of the figures walked before it, which the reproducibility lock below still asserts.
+ *
  * test-budget: the gate walks all 176 fixtures through every student action (1 266 actions): about 5 min alone, 10 min
  * inside the full suite (ADR-W-210 Am. 1). One file, because the baseline is one file.
  *
@@ -20,6 +24,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { walkFixture3, walkLines3, type WalkPlan3 } from './work-meter/walk3';
 import { SLOW_CORPUS_3D } from './work-meter/slowCorpus3';
+import { figureContent3 } from '../engine/evaluate';
 import { firstDifference, openWorkGate, walkOrder, type MeasuredAction } from '../../shell/__tests__/work-gate';
 
 const DIR = join(__dirname, '..', '..', 'fixtures3');
@@ -47,7 +52,10 @@ function walk(figure: string): MeasuredAction[] {
 describe('work meter — 3-D: no recorded student action does more solver work than its baseline', () => {
   for (const figure of walkOrder(corpus).filter(gate.wants)) {
     it(figure, () => {
-      gate.check(figure, walk(figure));
+      const walked = walk(figure);
+      // #2888: a construction that stands for its content was never altered after it was solved (every figure's session)
+      expect(figureContent3.changed().length, 'a construction was altered after it was taken as its content').toBe(0);
+      gate.check(figure, walked);
     }, SLOW ? 7_200_000 : 900_000);
   }
 

@@ -9,7 +9,8 @@
 //
 // WHAT IT MEASURES — all on the MAIN THREAD (3-D has no worker):
 //   submit  = decideDeterministic3 (App3.submitSentence3) + dispatchVerdict + the App's render-side derivations
-//   another = store.resample() + render;  load = store.loadFigure + auditLoad3 + render (cold fact-array identity)
+//   another = store.resample() + render;  load = store.loadFigure + auditLoad3 + render (cold: the content-keyed caches
+//     are cleared before it; every task starts from cleared caches and then stays warm, as one session does, #2888)
 //   edit    = store.replaceFact(last fact, its own text) + render;  delete = store.remove(first fact) + render
 //   llm-step = decideSteps3 + dispatch + render (prod LLM-committed lines)
 // The actions are src3d/__tests__/work-meter/driver3.ts — the one driver this harness and the work-meter gate share.
@@ -31,10 +32,10 @@
 import { readFileSync, readdirSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { useGeo3, decideSteps3, decideCommands3, type Fact3 } from '../../../src3d/store/store3';
+import { useGeo3, clearSolveCaches3, decideSteps3, decideCommands3, type Fact3 } from '../../../src3d/store/store3';
 import { deserializeFigure3 } from '../../../src3d/store/figureFile3';
 // The actions themselves are the ONE driver this harness and the work-meter gate share (#2873).
-import { another3, editLast3, loadFacts3, loadText3, metered3, removeFirst3, render3 as render, submitLine3 as submitLine } from '../../../src3d/__tests__/work-meter/driver3';
+import { another3, beforeEdit3, editLast3, loadFacts3, loadText3, metered3, removeFirst3, render3 as render, submitLine3 as submitLine } from '../../../src3d/__tests__/work-meter/driver3';
 import { SLOW_CORPUS_3D } from '../../../src3d/__tests__/work-meter/slowCorpus3';
 
 (globalThis as any).fetch = async () => {
@@ -95,10 +96,14 @@ function fixtureTasks(): Task[] {
         const text = readFileSync(join(dir, name), 'utf8');
         const r = deserializeFigure3(text);
         if (!r.ok) return;
-        // LOAD first (cold: fresh identities, nothing of this figure derived yet)
+        // LOAD first, cold. Solved content is keyed by content and outlives the action (#2888, ADR-3D-491), so the
+        // session is stated exactly as the work meter's walk states it (src3d/__tests__/work-meter/walk3.ts): cleared
+        // caches, the load, cleared solve caches, then the rows typed in one session that stays warm.
+        clearSolveCaches3({ readings: true });
         setState({ facts: [], seed: 0 });
         await emit({ kind: 'load', prior: r.facts.filter((f) => f.enabled).map((f) => f.utterance), fn: () => loadText3(text) });
         // step through the utterances one submit at a time
+        clearSolveCaches3();
         setState({ facts: [], seed: 0 });
         render();
         for (const f of r.facts) {
@@ -117,12 +122,16 @@ function fixtureTasks(): Task[] {
         // show another, PRESSES times on the stepped figure
         for (let i = 0; i < PRESSES; i++)
           await emit({ kind: 'another', prior: priorOf(), fn: another3 });
-        // edit the last fact to its own text
-        if (useGeo3.getState().facts.length > 0)
-          await emit({ kind: 'edit', prior: priorOf(), utterance: useGeo3.getState().facts[useGeo3.getState().facts.length - 1].utterance, fn: editLast3 });
+        const built = { facts: useGeo3.getState().facts, seed: useGeo3.getState().seed };
         // delete the first fact
-        if (useGeo3.getState().facts.length > 1)
-          await emit({ kind: 'delete', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: removeFirst3 });
+        if (built.facts.length > 1)
+          await emit({ kind: 'delete', prior: priorOf(), utterance: built.facts[0].utterance, fn: removeFirst3 });
+        // LAST: edit the last fact to its own text, in the session the meter's walk states (beforeEdit3: the rows before
+        // it solved, the edited row's content not)
+        if (built.facts.length > 0) {
+          beforeEdit3(built.facts, built.seed);
+          await emit({ kind: 'edit', prior: priorOf(), utterance: built.facts[built.facts.length - 1].utterance, fn: editLast3 });
+        }
       },
     }));
 }
@@ -147,6 +156,7 @@ function prodTasks(): Task[] {
     corpus: 'prod' as const,
     user: evs[0]?.iph,
     build: async (emit) => {
+      clearSolveCaches3({ readings: true }); // a student's session starts with nothing solved, then stays warm
       setState({ facts: [], seed: 0 });
       render();
       const history: St[] = [];
@@ -227,6 +237,7 @@ function debugTasks(): Task[] {
       id: `dbg:${ses}`,
       corpus: 'debug',
       build: async (emit) => {
+        clearSolveCaches3({ readings: true });
         for (const s of steps) {
           setState({ facts: s.prev, seed: s.seed });
           render(); // the App had already drawn the prior figure
@@ -234,6 +245,7 @@ function debugTasks(): Task[] {
         }
         if (!fig) return;
         const f0 = fig;
+        clearSolveCaches3(); // a cold load
         setState({ facts: [], seed: 0 });
         await emit({ kind: 'load', prior: f0.facts.filter((f) => f.enabled).map((f) => f.utterance), fn: () => loadFacts3(JSON.parse(JSON.stringify(f0.facts)), f0.seed) });
         for (let i = 0; i < PRESSES; i++)
@@ -253,12 +265,14 @@ function issueTasks(): Task[] {
     id: `issue:${name}`,
     corpus: 'issue' as const,
     build: async (emit) => {
+      clearSolveCaches3({ readings: true });
       setState({ facts: [], seed: 0 });
       render();
       for (const u of lines) await emit({ kind: 'submit', prior: priorOf(), utterance: u, fn: () => submitLine(u) });
       for (let i = 0; i < PRESSES; i++)
         await emit({ kind: 'another', prior: priorOf(), fn: another3 });
       const saved = JSON.stringify(useGeo3.getState().facts);
+      clearSolveCaches3(); // a cold load
       await emit({ kind: 'load', prior: priorOf(), fn: () => loadFacts3(JSON.parse(saved), 0) });
     },
   }));

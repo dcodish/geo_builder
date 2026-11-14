@@ -15949,3 +15949,125 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 **Locks.** `src3d/__tests__/letter-coords-new-point-2563.test.ts`; fixture `fixtures3/letter-coords-new-point-2563.geo3.json`. Rewritten, citing this issue: `book-coordinate-givens.test.ts` (blank «B(2t,t,k)» builds) and `partial-point-axis.test.ts` (blank «N(k,p,3)» builds).
 
 **Behaviour change for a student:** «N(k,p,3)» after «B(2t, t, k)» builds N at height 3 with k shared and p a new free letter; a blank «N(k,p,3)», a blank «B(2t, t, k)» and «N(k,2,3)» after «B(2t,t,k)» build too; «הציגו תצורה אחרת» moves the open letters.
+
+## ADR-3D-491 — Compute once: a derive is keyed by the fact list's content and a solve by the construction's content (#2888)
+
+**Status:** built · 2026-11-14 · debt (`P2`) · phase 2 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (invariant 4, "compute once"), 3-D's part · **Issue:** [#2888](https://github.com/dcodish/geo_builder/issues/2888), parent program [#2867](https://github.com/dcodish/geo_builder/issues/2867) · branch `debt/2888-compute-once-3d` off `main` @ `9cd61315`
+**Requirements:** none (internal: no line is accepted, refused, drawn or worded differently) · **Design:** [04b](04b-design-3d.md) — "The solver", *Solved content is keyed by content* · **LADDER stage:** none (memo keys at the derive and the resolve chokepoints; no stage moves)
+**Amends** [ADR-3D-275](#adr-3d-275) (#1422: the derive memo's key was the fact array's identity; its bound was 32 per array) and [ADR-3D-304](#adr-3d-304) (#863: the resolve memo's key was the construction object's identity). These are "the identity-keyed memo locks in 3-D" that ADR-W-210 names.
+
+**Root cause.** Every memo of this tree hung off an OBJECT that is rebuilt: the derive off the fact array, which every store action replaces, and the solve (with the pivot's recorded pools, the released constructions and the parts) off the `Construction3`, which the fold builds anew every time it runs. So a figure the session had already solved was solved again whenever it came back in another object. Class: *a memo keyed by the identity of an object that is rebuilt per action forgets its content at every rebuild.*
+
+**Measured before building** (`main` @ `9cd61315`; the work meter's own walk with a probe at `derive3`'s and `resolve3`'s misses; a repeat is a miss whose content the same session had already solved; the totals equal the phase 0 baseline to the unit).
+
+| Fixtures: action | Actions | Units | Repeats a fact list the session derived | Repeats a construction the session solved | Upper bound (a solve returning the same figure for the same count, whatever the key) |
+|---|---|---|---|---|---|
+| load | 176 | 12,375,388 | 0 | 0 | 0.1 % |
+| submit | 577 | 22,558,879 | 0 | 575,823 (2.6 %) | 3.3 % |
+| «הציגו תצורה אחרת» | 176 | 13,332,266 | 0 | 686,777 (5.2 %) | 5.2 % |
+| edit | 176 | 17,056,927 | 10,365,663 (60.8 %) | 12,496,232 (73.3 %) | 73.4 % |
+| delete | 161 | 28,060,796 | 0 | 0 | 2.4 % |
+| **all** | 1,266 | 93,384,256 | 11.1 % | 14.7 % | 15.7 % |
+
+Slow corpus (14 sequences, 94 actions, 39,522,268 units): edit 93.3 % repeats; submit 0.1 %; press, load and delete 0.
+
+So in 3-D most of an action is solved for the first time. What repeats:
+1. **A fact list that comes back in a new array.** The meter's edit (a row rewritten to what it said) re-derives the standing figure. The same holds for the last row deleted and a row unticked and ticked again (not walked by the meter, locked by the unit test).
+2. **A construction that comes back in a new object.** The fold does not depend on the configuration, yet `derive3(facts, seed′)` folds again and the new object starts every memo cold: the configuration search resolves seeds on one object and the redraw at the seed it found folds another (`stated-length-7-9999-2361`, `trapezoid-reseat-1918`). A row that stands aside for its twin folds to the figure before it (`held-row-2790`, submit#3: 44,567 of 78,956 units). A split figure builds new part objects for every part on every line (`nine-separate-shapes-2764`: 25–64 % of each submit from the fourth shape on).
+
+**What the map's 3-D hypotheses measured as** (#2867; each was a hypothesis, docs/17 §9):
+- *"Every action folds from an empty construction, so rows 1..k−1 are solved again for rows 1..k."* The fold itself does not solve (one apply asks the verifier: a right pyramid's base). What is solved is the figure of rows 1..k, at the drawn seed and the claim seeds, and it is a different content from the figure of rows 1..k−1: 0 of the 22.6 M submit units repeat a derive. Starting that solve from the figure already drawn is a warm start: it changes which solution a solve can reach, so it is the solver's (phase 5), not a key.
+- *C4, "`dataView` and `configurations3` miss the `solvedFrame` memo".* Not at this commit: the panel's seeds are three of the verifier's four, and both read `resolve3`'s one solved-frame entry (ADR-3D-400 §3). The panel is 18.9 % of a submit and 17.3 % of a press on the fixtures (45–58 % on the slow corpus), and it is first-time work: the read-back images (ADR-3D-375) and, where no claim was verified, two more seeds. Phase 3 (values pending after the figure, ruled 2026-11-13) and phase 5.
+- *C1, the verifier's four claim seeds.* Already one resolve set with the panel, the ask lane and the crossings (ADR-3D-304). Each is a cold multi-start, solved once per figure. Phase 5.
+- *C3, deleting the defining solid.* 0 repeats in 161 deletes (28.1 M units, 30 % of the corpus): the list without its first row is a new figure, and its cost is inside the solve. Phase 5.
+- *The pivot's three lazy readers.* Each is computed once per `Resolved3`, which is now once per content. Forcing them is phase 3.
+
+**Decision.** One mechanism, `src3d/engine/content3.ts`, at the two chokepoints.
+
+- **`ContentTable`** gives each content ONE object: the first object seen with a content is its representative, and every later object with that content is answered with it. "The same content" is exact, never a digest: a 32-bit hash picks candidates and `sameContent3` compares the two graphs node by node. Order is content (array items, map and set entries, object keys). Primitives are compared as `Object.is` does (NaN is NaN, −0 is not 0). A key holding `undefined` is not a missing key. SHARING is content: a claim listed in `claims` and in `scaleGivens` is one object in both graphs or two in both, so code that asks `list.includes(x)` answers alike. A side table read with the graph's objects is content. A graph holding anything else (a function, a class instance, a cycle) has no content and keeps the identity rule.
+- **`derive3`** (`store/store3.ts`): the key is the fact list's content (every row's id, text, commands, `enabled`, `held`: the whole `Fact3`, so a field added later joins the key by itself) and the configuration (`seedKey3`). At most **64** derives are held (`DERIVE_MEMO_ENTRIES`), the least recently used dropped. Nothing else holds a `Derived3`.
+- **`resolve3`** (`engine/evaluate.ts`): its first line asks `figureContent3` for the construction's representative, and the figure is solved as that object, so the pivot's recorded pools, the released constructions, the parts and the ring reach are found on it. The side table is `scalarPinOrigin3`, which `resolveHeld3` reads. At most **64** representatives (`FIGURE_CONTENT_ENTRIES`), least recently used dropped.
+- **The resolve memo has two tiers.** Each construction object keeps its OWN answers, exactly as ADR-3D-304 built it (64 entries per object, oldest written dropped). Under it the representative holds the answers its content shares (`sharedResolves3`, 64 entries): an object that has not asked yet takes the answer from there. The own tier is what keeps a figure the session comes back to (an undo, a redo, a derive the store still holds) from being solved again after many other configurations of the same content went through the shared tier. Without it one shared memo of 64 would have been filled by the session's later presses, and coming back to an earlier one would have cost a solve that it did not cost before.
+- **Only a settled construction is shared:** one whose every scalar pin carries the list position of the row that stated it (written by the store's fold after the row applied). A construction solved while its row is still applying, or built outside the fold (a probe with a temporary pin), has an origin that is not written yet or never will be, so its content could change after it was taken. It keeps the identity rule.
+- **`clearSolveCaches3()`** (`store/store3.ts`, test-only) forgets both. The product never calls it: a content key cannot go stale, so nothing invalidates.
+
+**Why a hit is the answer the object would have computed.**
+- `derive3` is a pure function of the fact list and the configuration, and the whole of every `Fact3` is in the key.
+- `resolve3` is a pure function of the construction's graph, its pin origins and the configuration. The graph comparison covers everything a reader of the graph can see, identity between its own objects included.
+- Nothing a reader takes from a `Resolved3` is compared with the reader's own construction objects: its values are keyed by id, its lazy pivot readers return numbers, and the one that returns pins (`heldPins`) is read inside `resolve3`.
+- A representative must never be altered after it is taken. That is the rule the per-object memos already rested on (ADR-3D-304: "`apply` clones a construction, never mutates it"). `ContentTable.changed()` reports a breach, and the work-meter gate now asserts it stays empty over every fixture's session.
+- Locked at the student's entry point (docs/17 §9): `store/__tests__/compute-once-2888.test.ts` runs the meter's session (a load, every row typed, a press, an edit, a delete) with every cache cleared before each action and again warm, on six figures of the classes above, and asserts the same verdicts, statuses, resolved figure, notices and data panel after every action, and that no warm action works more than its cold twin. Run once over the whole fixture corpus before the commit (176 figures, 1,266 actions): every session the same cold and warm, no warm action above its cold twin, no construction altered. That run used the phase 0 walk's edit: the warm sessions total 79,566,274 units (the middle column of the table below, to the unit); the same sessions with every cache cleared before each action total 107,920,954.
+
+**The two identity locks, and why their purpose holds.**
+- [ADR-3D-275](#adr-3d-275)'s lock, `issue-1422-derive-memo.test.ts`, passes unchanged: one press costs one uncached derive, a repeated derive is the same object, a new fact derives fresh, another seed is another derive. Its purpose (a press pays one solve, and never a stale figure) is kept by the content key: a list with any row changed is another content. What changed is the bound: 32 derives per array became 64 in all.
+- [ADR-3D-304](#adr-3d-304)'s lock, `issue-863-resolve-memo.test.ts`: three tests pass unchanged or with their setup stated (a `{ ...construction }` copy was the test's way to ask for "a fresh key"; it now clears the caches first, and the expectations are the same). **One expectation changed:** "a shallow copy is a new key, so it re-solves" (1 uncached resolve) is now "a copy is the same figure, answered with the first object's resolution" (0). The purpose of that line was that a DERIVED construction, one with something substituted, is never served the original's resolution. That holds, and the test now asserts it directly: a construction that differs in anything at all (one more angle mark) re-solves.
+- `issue-863-sample-hoist.test.ts`, "the counter counts": the test before it solves the same figure, so it clears the caches first. Expectation unchanged.
+
+**The work meter's walk** (`src3d/__tests__/work-meter/walk3.ts`; the timing harness `scripts/perf/3d/sweep3.ts` states the same session). Solved content now outlives the action, so a count depends on what the session solved before it, and the walk says what that is:
+- a figure's walk starts from cleared caches, so its counts depend on nothing walked before it, in any order (checked again: the recorded walk, `--order reverse` and `--order shuffle:11` give the same count for all 1,266 actions);
+- `load` is the cold load of the file;
+- the solve caches are cleared again and the rows are typed in ONE session that stays warm, as a student's does; the press and the delete follow in it;
+- the slow corpus's walk types first, and its `load` is made cold by clearing the solve caches before it; its delete follows in the loaded session;
+- **`edit` is the walk's last action and has one definition in all four builders** (the orchestrator's, 2026-11-14): *a student who has built rows 1..n changes the LAST row; the rows before it are solved in the session, the edited row's content is not.* A key cannot forget one row, so the session is built explicitly and unmeasured (`beforeEdit3`): cleared caches, rows 1..n−1 in the store and rendered at the configuration the figure stood at before the delete, then all n rows in the store with nothing solved. The edit rewrites the last row to its own text, so its count is what that row costs through the EDIT path. The phase 0 walk's edit rewrote a row of a figure the session had just solved: with content keys that counted almost nothing (next table, middle column) and sized no edit, and it would have read as "nothing on the page" where a real edit solves the new row there.
+
+One older content-keyed memo also saves solver work: the reading of a two-reading segment equation (`readingMemo3`, ADR-3D-391 Am. 1, 500 entries). The phase 0 baseline was recorded with it warm from the walk's load, so three recorded submits do not pay the reading's trial folds. Clearing it after the load would raise exactly those three (`edge-point-lengths-only-1680` submit#3 70,936 → 98,079; `new-point-equal-lengths-2804` submit#3 84,586 → 121,869; `rider-lengths-only-1680` submit#3 0 → 5,819). That is a change in what those three lines mean, not in what the code does, and it is not made here: the walk clears that memo where a figure's walk starts and where the edit's session starts, and leaves it across the load, exactly as the baseline had it. Clearing it at the start also closes a latent hole in the gate's reproducibility lock: a second walk of one of those three figures would have found the memo warm.
+
+**Before → after** (one unit is one residual evaluation of `leastSquares`; every unit is on the page and before the paint, so the three counts are equal). Two re-records were taken. The middle column keeps the phase 0 walk's edit and shows what the content keys remove. The right column is the committed baseline, with the edit redefined; between the two, no action but `edit` moved.
+
+| Fixtures: action | Actions | Phase 0 | Content keys, the phase 0 edit | Content keys, the edit redefined (committed) | Phase 0 → committed |
+|---|---|---|---|---|---|
+| load | 176 | 12,375,388 | 12,375,388 | 12,375,388 | 0 |
+| submit | 577 | 22,558,879 | 21,720,626 | 21,720,626 | −3.7 % |
+| «הציגו תצורה אחרת» | 176 | 13,332,266 | 13,135,979 | 13,135,979 | −1.5 % |
+| edit | 176 | 17,056,927 | 4,273,485 | 12,910,563 | −24.3 % |
+| delete | 161 | 28,060,796 | 28,060,796 | 28,060,796 | 0 |
+| **all** | 1,266 | 93,384,256 | 79,566,274 (−14.8 %) | 88,203,352 | **−5.5 %** |
+
+| Slow corpus: action | Actions | Phase 0 | Content keys, the phase 0 edit | Content keys, the edit redefined (committed) | Phase 0 → committed |
+|---|---|---|---|---|---|
+| submit | 38 | 10,155,046 | 10,145,585 | 10,145,585 | −0.1 % |
+| «הציגו תצורה אחרת» | 14 | 10,139,223 | 10,135,862 | 10,135,862 | −0.0 % |
+| load | 14 | 8,386,154 | 8,386,154 | 8,386,154 | 0 |
+| edit | 14 | 8,997,246 | 604,570 | 8,391,740 | −6.7 % |
+| delete | 14 | 1,844,599 | 1,844,599 | 1,844,599 | 0 |
+| **all** | 94 | 39,522,268 | 31,116,770 (−21.3 %) | 38,903,940 | **−1.6 %** |
+
+Against phase 0 the committed fixture baseline has 75 actions lower, 1,187 equal and 4 higher; the slow corpus 17 lower, 77 equal, none higher. Of the 1,187 equal, 682 did no solver work in phase 0 either.
+
+**The four edits above their phase 0 count, and why** (accepted with `--accept-rise`, for `edit` lines only; each is the new definition, not more work in the code):
+- `edge-point-lengths-only-1680` 70,531 → 97,674 and `rider-lengths-only-1680` 0 → 5,819: the edited row is a two-reading segment equation, and in the edit's own session its reading is not solved, so the edit pays the reading's trial folds (27,143 and 5,819 units, the same numbers as the submits above).
+- `definite-triangle-one-2235` 0 → 3,850 and `indefinite-triangle-new-2235` 0 → 12,390: these edits read the STANDING figure (an unnamed shape noun is resolved against it). In phase 0 that figure had just been rendered. In the edit's session rows 1..n are in the store with nothing solved, so the read is the first solve of the figure. This is the one place the definition overstates a real edit, whose standing figure is on the screen: rewriting a row to its own text cannot keep the old row solved and the new one unsolved, because they are one content.
+
+**The edit against the figure's other actions** (the sanity check the definition asks for). On the fixtures the edit's count equals the PRESS's count exactly in 166 of 176 figures (in 86 of them the last submit's too): the edit runs at the configuration the press left, and solves the figure once there. So where edit and last submit differ, it is the configuration. The ten largest differences from the last submit: `symbolic-line-equation-863` +434,110 (2,038,083 against 1,603,973: seed 1 against seed 0, the press's own count); `new-point-equal-lengths-2804` +46,110 and `edge-point-lengths-only-1680` +26,738 (the reading's trial folds, above); `blank-line-parallel-plane-2609` −27,552, `prism-two-symbol-component-509` −26,294, `letter-coords-new-point-2563` −20,885, `prism-eq-first-815` and `prism-sym-line-801` −14,175 each, `right-pyramid-existing-quad-2490` +15,165 (each equal to its press: the other configuration); `nine-separate-shapes-2764` −15,886 (77,368: the eight shapes before the last are solved, and the edit solves the last part and joins them). Nine edits equal neither: the three reading figures, the nine shapes, `trapezoid-reseat-1918` and four small ones, 104,037 units apart in all. On the slow corpus the edit runs in the loaded session at the typing seed and equals the last submit in 13 of 14 sequences (`#2806 rhombus` 11,962 against 6,047).
+
+**What the content keys remove, by action** (middle column). The ten largest falls are all edits of the phase 0 kind: `rider-length-1735` 2,227,292 → 0; `symbolic-line-equation-863` 2,160,484 → 122,401; `vector-creates-head-sym-1613` 801,224 → 0; `blank-area-triangle-2609` 718,293 → 0; `rectangle-then-square-2749` 635,034 → 1,707; `free-vector-length-1311` and `…-oneline-1311` 590,280 → 0 each; `letter-coords-new-point-2563` 1,101,192 → 550,359; `shared-letter-coords-2785` 1,052,594 → 550,359; `nine-separate-shapes-2764` 464,262 → 0. That is the measure of a row rewritten to what it said, and of every return to a figure the session has (the last row deleted, a row unticked and ticked again). Outside the edits, 26 actions fell by 1,034,540 units in all, and they are in the committed baseline unchanged: `nine-separate-shapes-2764`'s eight later submits (submit#8 215,878 → 15,298; submit#9 309,132 → 93,254) and its press (506,463 → 318,605); `held-row-2790` submit#3 (78,956 → 34,389); `right-pyramid-rhombus-2490` submit#2 (47,065 → 6,061); `trapezoid-reseat-1918`'s press (127,032 → 118,624); and fifteen smaller ones.
+
+With the edit redefined, the largest falls against phase 0 are `prism-eq-first-815` edit 1,054,750 → 221,647, `letter-coords-new-point-2563` edit 1,101,192 → 550,833, `shared-letter-coords-2785` edit 1,052,594 → 502,235, `pyramid-param-pair-vector-2077` edit 504,683 → 2,948, `coord-symbol-value-902` edit 460,606 → 3,531 and `nine-separate-shapes-2764` edit 464,262 → 77,368: the phase 0 edit solved the figure without its last row at a configuration the session had not solved, and then the whole figure; the edit now finds the rows before it solved.
+
+Of the ten dearest actions in phase 0, the two edits moved (`rider-length-1735` 2,227,292, unchanged under the new definition: it is the figure solved once at the pressed seed; `symbolic-line-equation-863` 2,160,484 → 2,038,083). The other eight are first-time solves and are unchanged: `rider-length-1735` load, submit#3 and press (2.23 M each), `symbolic-line-equation-863` press (2,038,083), load and submit#3 (1,603,973 each), `prism-eq-first-815` submit#3 (1,603,973), `length-letter-2092` delete (1,297,243).
+
+**A long session** (typed figure, 120 presses of «הציגו תצורה אחרת», an edit every 10, an undo and a redo every 20; heap after a forced collection; `main` against this branch, the same machine):
+
+| Figure | Work before → after | Memory the session holds, before → after |
+|---|---|---|
+| `nine-separate-shapes-2764` | 69,047,666 → 38,289,868 (−44.5 %) | 149.6 MB → 30.9 MB |
+| `prism-eq-first-815` | 39,801,226 → 37,103,986 (−6.8 %) | 56.9 MB → 38.0 MB |
+
+Before, every past fact array in the undo history kept its own derives alive, so memory grew with the session. Now it is bounded: 64 derives, each holding its construction's own answers (at most 64 entries), and 64 representatives, each holding its content's shared answers (at most 64 entries).
+
+**What the bound costs.** An undo that goes back past the 64 most recently used derives finds its figure dropped and derives it again, as a load does. Before, it found it, at the price of the memory above.
+
+**Wall time** (`scripts/perf/3d/drive3.mjs`, two alternating runs each on a machine that was running other suites, so ±10 %): the three dearest actions do the same work and take the same time (`rider-length-1735` load 4.5–4.6 s → 4.4–4.8 s; submit#3 4.4–4.5 s → 4.4–4.7 s; press 4.4–5.1 s → 4.4–4.7 s). A row rewritten to what it said in a session that has the figure (the phase 0 walk's edit, timed before the edit was redefined): `rider-length-1735` 4.4–5.1 s → 2 ms; `symbolic-line-equation-863` 6.2–6.3 s → 0.24 s. The comparison itself is not solver work, so the meter does not see it: measured on every fixture, hashing a construction takes 5.7 µs (median; 45 µs the largest) and comparing two takes 7.4 µs; a fact list 1.5 µs and 1.1 µs. Six timed actions with no solver work took 38 ms in all before and 39 ms after.
+
+**Found, not built (each belongs to a later phase).**
+- **The configuration search re-solves its window on every action.** A figure whose givens force a special case walks all 200 seeds of `firstSatisfyingSeed3` on every submit, press and edit, and the per-figure resolve memo holds 64 configurations, so the next action's search finds almost none of the last one's (`stated-length-7-9999-2361`: 504,137 / 500,439 / 500,506 units for submit#4, the press and the edit; the probe above counted 490,490 of the press as repeats under an unbounded key). Keeping 400 resolved figures per construction is the wrong cure; remembering each seed's verdict is small, and it belongs with the search's limit (phase 4).
+- **Warm-starting the claim samples and the next line's solve** from the drawn figure (C1, and the submit's 96 % that is first-time work): solver-internal, phase 5.
+- **The data panel's read-back images** (18.9 % of a submit, up to 58 % of a slow press): after the paint, phase 3.
+- **Delete of the defining solid** (C3): phase 5.
+
+**Sibling audit.** 2-D, analytic and complex land their own parts of this phase under their own ADRs; `server/` has no solver. Inside 3-D the other per-object memos (`partsOf3`, the dims sampler, the free-vector system, the figure lanes) are reached through the representative where `resolve3` calls them. A reader that calls one of them on its own construction object recomputes per object, as before; none of them appeared in the measurement.
+
+**Files.** `src3d/engine/content3.ts` (new) · `src3d/engine/evaluate.ts` (`figureContent3`, `resolve3`'s first line) · `src3d/store/store3.ts` (`derive3`'s memo, `clearSolveCaches3`) · `src3d/__tests__/work-meter/walk3.ts`, `driver3.ts`, `work-meter-gate.test.ts`, the two baselines · `scripts/perf/3d/sweep3.ts` · locks: `src3d/engine/__tests__/content3.test.ts`, `src3d/store/__tests__/compute-once-2888.test.ts`; amended: `issue-863-resolve-memo.test.ts`, `issue-863-sample-hoist.test.ts`.
+
+**What the student will see.**
+- [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)

@@ -48,7 +48,7 @@ import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engi
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../lexicon/marks3';
-import { checkInSpan, componentValue, crossingOnInk3, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, clearFigureContent3, componentValue, crossingOnInk3, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
@@ -56,6 +56,7 @@ import { coincidences3, namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, scalarPinOrigin3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3, type SolidCommand } from '../engine/types';
 import { partsOf3, sameSeed3, seedKey3, seedNumber3, type Seed3 } from '../engine/components3';
+import { ContentTable } from '../engine/content3';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
@@ -554,17 +555,54 @@ const paramPinKey = (c: Construction3): string =>
   [pinningGivens(c), c.paramGivens.length, c.param !== undefined ? symbolValueOf(c, c.param) ?? '' : ''].join('|');
 
 /**
- * #1422 — THE FOLD-MEMO RULE ARRIVES IN 3-D. This store's header records why derive3 was never
- * cached: V0 figures were cheap. ADR-3D-260 (#1311) made every derive SOLVE the free-point rider
- * lane, and one «הציגו תצורה אחרת» press then paid it at least twice (`seedForRequirements`
- * derives the candidate, the view derives it again) — measured ~500 ms per press on
- * «וקטור AB · אורך AB = 5». The memo is keyed on the facts ARRAY IDENTITY (every store action
- * builds a new array — the same property the 2-D `lastViewDelta` self-invalidation states) and the
- * seed; a WeakMap, so a session's figures are dropped with them. Callers treat `Derived3` as
- * read-only already (it is shared across the render tree within one commit). Bounded per figure:
- * a seed sweep touches many seeds, and 32 entries cover the ADR-3D-053 search window.
+ * #1422 (ADR-3D-275) — THE DERIVE MEMO: one press, one solve. ADR-3D-260 (#1311) made every derive SOLVE the free-point
+ * rider lane, and one «הציגו תצורה אחרת» press then paid it at least twice (`seedForRequirements` derives the candidate,
+ * the view derives it again). Callers treat `Derived3` as read-only (it is shared across the render tree).
+ *
+ * #2888 ([ADR-3D-491](../../docs/06b-decisions-3d.md#adr-3d-491); ADR-W-210 invariant 4) — KEYED BY CONTENT. The memo was
+ * keyed on the fact ARRAY's identity, and every store action builds a new array, so a list the session had already
+ * derived was derived again whenever it came back as another array: a row edited to what it said, the last row deleted,
+ * a row unticked and ticked again. Now the key is the list's CONTENT (`factLists3`: each row's id, text,
+ * commands, enabled and held marks, compared exactly, `engine/content3.ts`) and the configuration. `derive3` is a pure
+ * function of those two, so a hit is the derive it would have computed.
+ *
+ * Bounded: at most {@link DERIVE_MEMO_ENTRIES} derives, the least recently used dropped first. Nothing else holds a
+ * `Derived3` (the array → content step holds no figure), so a long session's memory no longer grows with its undo
+ * history, as it did when each past array kept its own derives.
  */
-const deriveMemo3 = new WeakMap<readonly Fact3[], Map<string, Derived3>>();
+export const DERIVE_MEMO_ENTRIES = 64;
+/** The fact lists the session has derived, one representative per content. */
+const factLists3 = new ContentTable<readonly Fact3[]>(DERIVE_MEMO_ENTRIES);
+/** A representative list's number in the memo's keys (never reused, so a dropped list's entries are only unreachable). */
+let factListIds3 = new WeakMap<readonly Fact3[], number>();
+let nextFactListId3 = 0;
+const deriveMemo3 = new Map<string, { out: Derived3; used: number }>();
+let deriveTick3 = 0;
+/** #2888: memo answers by count: `hits` every derive answered from the memo, `dropped` those dropped for the bound. */
+export const deriveMemoStats3 = { hits: 0, dropped: 0 };
+
+/**
+ * #2888 (ADR-3D-491) — TEST-ONLY: forget every solved result that is keyed by content (the derive memo here and the
+ * construction table of `resolve3`), so the next derive of any list and the next solve of any construction are cold.
+ * The work meter's walk calls it where a student's session starts (`__tests__/work-meter/walk3.ts`); the product never
+ * does (a content key cannot go stale, so nothing invalidates).
+ *
+ * `readings` also forgets the segment-equation readings (`readingMemo3`, ADR-3D-391 Am. 1), the one older content-keyed
+ * memo whose misses solve. It is its own switch because the meter's recorded counts were taken with it warm from the
+ * walk's load (see the walk's header).
+ */
+export function clearSolveCaches3(opts: { readings?: boolean } = {}): void {
+  factLists3.clear();
+  factListIds3 = new WeakMap();
+  deriveMemo3.clear();
+  deriveMemoStats3.hits = 0;
+  deriveMemoStats3.dropped = 0;
+  if (opts.readings) readingMemo3.clear();
+  clearFigureContent3();
+}
+
+/** #2888: how many derives the memo holds now (the bound's lock reads it). */
+export const deriveMemoSize3 = (): number => deriveMemo3.size;
 
 /**
  * The 0-DOF DERIVED point kinds (#769, ADR-3D-183) — a point placed by a closed form from other objects. A free
@@ -848,15 +886,31 @@ function touchesDefault3(facts: readonly Fact3[], cmds: readonly Command3[]): bo
 }
 
 export function derive3(facts: Fact3[], seed: Seed3): Derived3 {
-  const per = deriveMemo3.get(facts);
-  const key = seedKey3(seed); // #2764 (ADR-3D-454): a configuration of several parts is keyed by its canonical spelling
-  const hit = per?.get(key);
-  if (hit) return hit;
+  const list = factLists3.of(facts); // #2888: the list's content, whichever array carries it
+  let id = factListIds3.get(list);
+  if (id === undefined) factListIds3.set(list, (id = ++nextFactListId3));
+  // #2764 (ADR-3D-454): a configuration of several parts is keyed by its canonical spelling
+  const key = `${id}|${seedKey3(seed)}`;
+  const hit = deriveMemo3.get(key);
+  if (hit) {
+    hit.used = ++deriveTick3;
+    deriveMemoStats3.hits++;
+    return hit.out;
+  }
   const out = derive3Uncached(facts, seed);
-  const m = per ?? new Map<string, Derived3>();
-  if (!per) deriveMemo3.set(facts, m);
-  m.set(key, out);
-  if (m.size > 32) m.delete(m.keys().next().value as string);
+  deriveMemo3.set(key, { out, used: ++deriveTick3 });
+  if (deriveMemo3.size > DERIVE_MEMO_ENTRIES) {
+    let oldest = key;
+    let at = Infinity;
+    for (const [k, e] of deriveMemo3) {
+      if (e.used < at) {
+        at = e.used;
+        oldest = k;
+      }
+    }
+    deriveMemo3.delete(oldest);
+    deriveMemoStats3.dropped++;
+  }
   return out;
 }
 

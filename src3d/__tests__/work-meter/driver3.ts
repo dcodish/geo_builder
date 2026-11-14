@@ -6,8 +6,8 @@
  *
  *   submit  = decideDeterministic3 (App3.submitSentence3) + dispatchVerdict + the render
  *   another = store.resample() + the render
- *   load    = store.loadFigure + auditLoad3 + the render (fresh fact identities: nothing of the figure derived yet)
- *   edit    = store.replaceFact(the last row, its own text) + the render
+ *   load    = store.loadFigure + auditLoad3 + the render (cold: the walk clears the content-keyed caches before it)
+ *   edit    = store.replaceFact(the last row, its own text) + the render, in the session `beforeEdit3` builds
  *   delete  = store.remove(the first row) + the render
  *
  * "The render" is what App3 recomputes on a new `(facts, seed)`: derive3 (memo), freeDofCount3, the plane / dihedral /
@@ -15,7 +15,7 @@
  * home camera. 3-D has no worker and no work after the paint: every unit is page work before the paint, and the
  * meter says so rather than this file.
  */
-import { useGeo3, derive3, deriveStats3, type Fact3 } from '../../store/store3';
+import { useGeo3, clearSolveCaches3, derive3, deriveStats3, type Fact3 } from '../../store/store3';
 import { decideDeterministic3 } from '../../app/decideDeterministic3';
 import { deserializeFigure3 } from '../../store/figureFile3';
 import { auditLoad3 } from '../../store/loadAudit3';
@@ -101,7 +101,7 @@ export function loadFacts3(facts: Fact3[], seed: Seed, ...rest: unknown[]): Requ
   return { verdict: a.failed.length ? `load-failed:${a.failed.length}/${a.total}` : 'ok', decideMs, renderMs: render3() };
 }
 
-/** Load a saved file's text (fresh identities: a cold load). */
+/** Load a saved file's text (the rows get new ids; the load is cold when the caller cleared the caches, as the walk does). */
 export function loadText3(text: string): Required<Outcome3> {
   const r = deserializeFigure3(text);
   if (!r.ok) return { verdict: `load-refused:${r.reason}`, decideMs: 0, renderMs: 0 };
@@ -114,6 +114,21 @@ export function removeFirst3(): Required<Outcome3> {
   useGeo3.getState().remove(useGeo3.getState().facts[0].id);
   const decideMs = now() - t;
   return { verdict: `err:${(useGeo3.getState().lastError as { code?: string } | null)?.code ?? 'none'}`, decideMs, renderMs: render3() };
+}
+
+/**
+ * THE SESSION AN EDIT IS MEASURED IN (#2888, ADR-3D-491; one definition for all four builders): a student who has built
+ * rows 1..n changes the LAST row. The rows before it are solved in the session; the edited row's content is not.
+ * Solved content is keyed by content, and a key cannot forget one row, so the session is built explicitly, unmeasured:
+ * a new session (cleared caches), rows 1..n−1 in the store and rendered at the figure's configuration, then all n rows
+ * in the store with nothing solved. `editLast3` is measured after it. A one-row figure has no rows before it, so its
+ * edit is cold.
+ */
+export function beforeEdit3(facts: Fact3[], seed: Seed): void {
+  clearSolveCaches3({ readings: true });
+  setFigure3(facts.slice(0, -1), seed);
+  render3();
+  setFigure3(facts, seed);
 }
 
 /** Edit the last row to its own text (App3's onEditCommit → replaceFact). */
