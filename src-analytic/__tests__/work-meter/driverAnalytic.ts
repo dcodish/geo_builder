@@ -40,6 +40,7 @@ import { readAfterPaint, readFigure } from '../../app/figureReaders';
 import { opsAn, type BasisAn, type Decided, type OpsAn, type Shown } from '../../app/opsAn';
 import type { AskedQuestion } from '../../store/useAnalyticStore';
 import { sameInstanceExecutor, type Executor } from '../../../shell/workerExecutor';
+import { isNotDecided, type NotDecided } from '../../../shell/notDecided';
 import { meterAction, meterRemote, type MeteredAction, type WorkCounts } from '../../../shell/workMeter';
 
 export type Hosts = Record<number, readonly string[]>;
@@ -67,9 +68,17 @@ let painted = false;
 async function op<K extends keyof OpsAn>(name: K, args: Parameters<OpsAn[K]>[0]): Promise<unknown> {
   return heap.executor.run('solve', name, args, { onUnits: (units) => meterRemote(units, !painted) });
 }
-/** A decision: its verdict, after the page adopted what it solved. */
-async function decide<K extends Exclude<keyof OpsAn, 'show' | 'figure'>>(name: K, args: Parameters<OpsAn[K]>[0]): Promise<ReturnType<OpsAn[K]> extends Decided<infer V> ? V : never> {
+/**
+ * A decision: its verdict, after the page adopted what it solved. #2893 (ADR-AG-479): no recorded action reaches the
+ * work limit (`SEARCH_LIMIT_AN` is calibrated above the corpus's dearest decision), so a "not decided" here is a
+ * regression the walk names rather than records.
+ */
+async function decide<K extends Exclude<keyof OpsAn, 'show' | 'figure'>>(
+  name: K,
+  args: Parameters<OpsAn[K]>[0],
+): Promise<ReturnType<OpsAn[K]> extends Decided<infer V> ? Exclude<V, NotDecided> : never> {
   const out = (await op(name, args)) as Decided<unknown>;
+  if (isNotDecided(out.value)) throw new Error(name + ': not decided (the work limit was reached on a recorded action)');
   adoptSettled(out.settled);
   return out.value as never;
 }

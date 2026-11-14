@@ -22,7 +22,7 @@
  * show the least-bad one: `solve` reports that it did not converge, and the caller says so. A drawn
  * figure that violates its own givens is the defect this whole product is built to avoid.
  */
-import { meterWork } from '../../shell/workMeter';
+import { solverUnit } from './workLimitAn';
 import { evalExpr, exprText, symbolsOf, type Env } from './expr';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import { CIRCLE_CONIC_WORDS } from '../parser/circleConicWords';
@@ -1641,7 +1641,7 @@ export function solveLM(
   // #2873 (ADR-W-210): one residual evaluation is analytic's unit of work. The rank and the finishing solve below are
   // handed the bare function, because each meters its own evaluations.
   const residuals = (v: number[]): number[] => {
-    meterWork();
+    solverUnit();
     return residuals0(v);
   };
   const n = x0.length;
@@ -1939,7 +1939,7 @@ function gaussian(A: number[][], n: number): number[] | null {
 export function freeRank(x: number[], equalities: (v: number[]) => number[]): number {
   const n = x.length;
   if (n === 0) return n;
-  meterWork(); // #2873: the one evaluation made here; `jacobianRank` meters its own
+  solverUnit(); // #2873: the one evaluation made here; `jacobianRank` meters its own
   if (equalities(x).length === 0) return n;
   return Math.max(0, n - jacobianRank(x, equalities).rank);
 }
@@ -1972,7 +1972,7 @@ export const RANK_REL_TOL = 10 * SOLVE_TOL;
 export function jacobianRank(x: number[], residuals0: (v: number[]) => number[]): { rank: number; nullBasis: number[][]; sigma: number[] } {
   // #2873 (ADR-W-210): a rank's residual evaluations are solver work in the same unit as `solveLM`'s.
   const residuals = (v: number[]): number[] => {
-    meterWork();
+    solverUnit();
     return residuals0(v);
   };
   const n = x.length;
