@@ -1,6 +1,7 @@
 // Captures the real GitHub pages Part 1 shows (#2887). The repo is public; nothing here is private.
 // Run: node capture.cjs   → assets/*.png
-const { chromium } = require('playwright');
+// Every browser goes through the repo's harness (CLAUDE.md rule 2, #1955): it stubs /api/parse, so no model call can leave.
+const launchBrowser = async (opts) => (await import(require('url').pathToFileURL(require('path').join(__dirname, '../../../scripts/lib/browser-harness.mjs')).href)).launchBrowser(opts);
 const path = require('path');
 const fs = require('fs');
 const OUT = path.join(__dirname, 'assets');
@@ -13,7 +14,7 @@ const SHOTS = [
   { name: 'round-2855', url: `${R}/issues/2855`, clip: { x: 0, y: 0, width: 1280, height: 820 } },
 ];
 (async () => {
-  const b = await chromium.launch();
+  const b = await launchBrowser();
   const ctx = await b.newContext({ viewport: { width: 1280, height: 820 }, deviceScaleFactor: 1.5, colorScheme: 'light', locale: 'en-US' });
   const p = await ctx.newPage();
   for (const s of SHOTS) {
