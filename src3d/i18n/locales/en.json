@@ -229,6 +229,7 @@
     "hide": "Hide",
     "hint": "derived vector, coordinate and magnitude presentations — laid out the way you would on paper",
     "empty": "nothing stable to show yet",
+    "checking": "checking…",
     "openParam": "free parameter — pinned once more data arrives",
     "secPoints": "Points",
     "secMeasures": "Measures",

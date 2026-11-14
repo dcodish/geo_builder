@@ -2154,6 +2154,7 @@ function sharedResolve3(figure: Construction3, own: Map<string, Resolved3>, c: C
 function rememberResolve3(figure: Construction3, own: Map<string, Resolved3>, c: Construction3, key: string, home: () => ResolvedHome3, out: Resolved3): Resolved3 {
   const at = home();
   homeLazies3(out, at);
+  if (!resolveHomes3.has(out)) resolveHomes3.set(out, at);
   keepResolve3(own, key, out);
   let shared = sharedResolves3.get(c);
   if (!shared) sharedResolves3.set(c, (shared = new Map()));
@@ -2188,6 +2189,21 @@ export interface ResolvedHome3 {
   parts: boolean;
 }
 const lazyHome3 = new WeakMap<Lazy3<unknown>, ResolvedHome3 & { name: LazyName3 }>();
+/** #2890 round 2: the home of every answer this heap holds (solved here or taken in), for the page's checkpoint. */
+const resolveHomes3 = new WeakMap<Resolved3, ResolvedHome3>();
+/**
+ * #2890 round 2 (ADR-3D-493) — WHAT THIS HEAP HOLDS FOR A CONSTRUCTION OBJECT: its own answers, each with the memo
+ * key it is held under and the home of the solve it came from. Reads only: nothing is solved. The page hands these
+ * to a fresh worker (the checkpoint), so the worker does not solve again the figure the student is looking at.
+ */
+export function heldResolves3(figure: Construction3): { key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3 }[] {
+  const out: { key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3 }[] = [];
+  for (const [key, r] of resolveMemo3.get(figure) ?? []) {
+    const home = resolveHomes3.get(r);
+    if (home) out.push({ key, home: { key: home.key, seed: home.seed, opts: home.opts, parts: home.parts }, out: r });
+  }
+  return out;
+}
 /** The values that followed their figure, per construction content: `<resolve key>|<name>` → value. */
 let lazyValues3 = new WeakMap<Construction3, Map<string, unknown>>();
 const LAZY_VALUES_PER_FIGURE = 512;
@@ -2261,6 +2277,7 @@ export const placementFreedom3 = (resolved: Resolved3): PlacementFreedom3 | unde
 export function keepResolved3(figure: Construction3, key: string, home: Omit<ResolvedHome3, 'c'>, out: Resolved3): void {
   const c = figureContent3.of(figure);
   homeLazies3(out, { ...home, c });
+  if (!resolveHomes3.has(out)) resolveHomes3.set(out, { ...home, c });
   const own = ownResolves3(figure);
   let shared = sharedResolves3.get(c);
   if (!shared) sharedResolves3.set(c, (shared = new Map()));

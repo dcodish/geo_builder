@@ -16205,3 +16205,59 @@ Slow corpus (14 sequences):
 
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)
+
+## ADR-3D-493 — 3-D's page does not solve: every action is solved by a worker, the page adopts its journal and runs its own action, and the data panel's values follow the figure (#2890)
+
+**Status:** built · 2026-11-14 · feature (`P2`) · phase 3 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (invariant 1, "the page never solves"; plan steps 4 and 7 for 3-D) · **Issue:** [#2890](https://github.com/dcodish/geo_builder/issues/2890) · branch `feat/2890-3d-worker` off `main` @ `f594c42d`, a feature PR the operator plays
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-33 (new: the page is never frozen, and the values follow the figure) · **Design:** [04b](04b-design-3d.md) — "The solver", *The page does not solve*; [docs/08](08-testing-strategy.md) "The work meter" (3-D's gate walks two heaps) · **LADDER stage:** none (no stage moves; the solve is untouched)
+**Builds on** [ADR-3D-492](#adr-3d-492) (the lazy cells, the journal and its adoption, the walk's actions) and the shared worker client (ADR-W-210 Am. 4, `shell/worker*.ts`).
+
+**Root cause.** Every action of 3-D solved on the page's own thread: the store action in the click's handler and the readers in the React render after it (87.8 M units of the recorded fixture walk, 138.0 M with the walk's ten later actions, 100 % on the page). While it solved, the page did not paint, scroll, answer a click or turn the figure (measured below: 3.0–3.2 s with no animation frame on «|SA| = 5»). Class: *solving on the thread that draws.*
+
+**Decision.**
+- **One worker, one operation** (`app/worker3.ts` on the shared host; `app/ops3.ts`). `act` sets the worker's store to the page's data, runs the action's steps (a typed line; a store action by name; a file, link or session read; a question), reads the FIGURE (`app/readers3.ts`: the derive, the DOF line, the crossing dots), sends that journal as the part `figure`, reads the VALUES (the open panel's `dataView`, every saved question) and answers with their journal (`store/journal3.ts`, ADR-3D-492). The worker starts with the page (`startWork3`).
+- **The page adopts and runs its own action** (`app/offPage3.ts`). `offPage3(steps)` posts the job with the page's data and the new rows' ids, adopts the figure's journal, and returns; the caller runs its unchanged action, in which every solve is a memo hit, and calls `after()`. Every route that changes or reads the figure goes through it: `act3` (the queue's `around`; undo and redo run the worker on the figure zundo goes back to) and App3's job bodies (a typed sentence and the model's lines, a named crossing, a load, a link, a restored session, «הציגו תצורה אחרת», clear). Nothing is applied as a result, so a step the worker gets wrong costs the page a solve, never a wrong figure.
+- **The new row's id is drawn on the page** (`store/rowIds3.ts`): every id a store action or a load draws comes from the ids the job was handed, in order. Outside a job nothing is installed and an id is fresh, as before.
+- **The basis.** A job is posted for the store as it is; if the store changed before the page could run its action (another lane committed), it is posted again (at most twice). A journal for a figure the student has left is adopted (keyed by content: useless, never wrong) and never marked ready for the figure on screen.
+- **The values follow the figure** (the rulings below). The page waits for the values while the student would not see a wait: up to the shell's threshold (`WORKING_SHOWN_AFTER_MS`, 0.3 s) from the job's start, so a fast action is drawn whole. Past it the figure is drawn, and App3 reads the panel's rows, the saved questions' answers and the canvas coordinate labels only once their journal is in (`useValues3`); until then the panel shows one grey «בודק…» line, after the threshold again (`useShownWorking`), so values that follow the figure quickly never blink it. A question asked reads «<השאלה> = בודק…» until its answer is in. The panel opened on a figure whose values were not read (it was closed) and a question asked are jobs on the `values` lane (behind the student's actions; the submit button does not say «חושב…»).
+- **The meter.** The units the worker reports with the figure's part are before the paint, those with the values after it.
+- **A crashed or replaced worker** is handed the figure on screen (`heldJournal3`: the page's derive, its construction's answers and their lazy values, read without solving).
+- **Where there is no `Worker`** (node, the suites, an old browser) nothing is posted and the values are always ready: the page's own action solves, exactly as before. Every existing test drives that path unchanged.
+- **Found while building, fixed at its cause: the narrowing notes were keyed by the fact ARRAY** (`store/narrowing3.ts`'s memo, which ADR-3D-491 did not reach). A worker is handed every list as a clone, so it computed the notes again for a list it had noted: `held-row-2790`'s press cost 41 439 units in the worker against 33 314 on the page. `derive3` now hands the fold the list's REPRESENTATIVE (`factLists3`), so every memo below it that is keyed by the array is keyed by content. No recorded count rises; on the page alone nothing changes.
+
+**The gate walks two heaps** (`__tests__/work-meter-gate.test.ts`). The worker is `app/ops3.ts` loaded as a second module instance (`shell/__tests__/isolated-ops.ts`), served by the shell's `isolatedExecutor`, every message cloned. The driver (`work-meter/driver3.ts`) goes through the App's own job path for every action and for every step the walk takes between actions; `newSession3` empties both heaps. `twoHeaps3.ts` and `two-heaps-2890.test.ts` (ADR-3D-492's local two-heap lock) are removed: the gate now does what they did, through the product's own client.
+
+**Measured (the work meter, re-recorded; `baseline.jsonl` 2 914 lines over 176 fixtures, `baseline-slow.jsonl` 234 over the slow corpus).** Units, before → after; `page` and `prePaint` are what the student waits on.
+
+| kind (fixtures) | total | page | prePaint |
+| --- | --- | --- | --- |
+| submit | 21.79 M → 21.79 M | 21.79 M → 0 | 21.79 M → 17.80 M |
+| delete | 28.06 M → 28.06 M | 28.06 M → 0 | 28.06 M → 26.37 M |
+| untick | 19.60 M → 19.60 M | 19.60 M → 0 | 19.60 M → 17.95 M |
+| edit | 12.91 M → 12.91 M | 12.91 M → 0 | 12.91 M → 10.73 M |
+| another | 12.65 M → 12.65 M | 12.65 M → 0 | 12.65 M → 10.35 M |
+| load | 12.38 M → 12.38 M | 12.38 M → 0 | 12.38 M → 10.71 M |
+| rename | 12.21 M → 12.21 M | 12.21 M → 0 | 12.21 M → 10.42 M |
+| swap | 11.99 M → 11.99 M | 11.99 M → 0 | 11.99 M → 10.35 M |
+| ask | 4.16 M → 4.16 M | 4.16 M → 0 | 4.16 M → 4.16 M |
+| panel | 2.29 M → 2.28 M | 2.29 M → 0 | 2.29 M → 0 |
+| undo, redo, retick | 0 | 0 | 0 |
+| **all** | **138.05 M → 138.03 M** | **138.05 M → 0** | **138.05 M → 118.86 M** |
+| slow corpus, all | 71.70 M → 71.70 M | 71.70 M → 0 | 71.70 M → 41.57 M |
+
+No line's `total` or `prePaint` rises. Two lines' `total` falls (`diagonal-after-solid-978|panel` 4 368 → 2 634, `perp-knee-at-foot-1946|panel` 34 174 → 21 134: the worker read part of that panel with the job before it). An ask's answer is the value the student waits for, so it stays before the paint.
+
+**Measured in a browser** (`scripts/lib/browser-harness.mjs`; «ריבוע ABCD» · «קטע AS», then «|SA| = 5» and «הציגו תצורה אחרת»; this branch's dev server against `main`'s): the line: figure at 2 260 ms (main 2 254), its last panel row 5 ms later, the longest stretch with no animation frame 17 ms (main 2 200–2 383 ms); «הציגו תצורה אחרת»: figure at 2 388 ms (main 2 256), longest stretch 17 ms (main 2 200–2 467 ms). A drag 0.55 s into the line turns the figure while the job runs (main: the drag waits for the freeze to end). In this figure the values follow within the threshold, so «בודק…» is not shown; on the 863 prism (`AC על הישר …` with a parameter) it is.
+
+**Tests.** `app/__tests__/off-page-2890.test.ts` (new): a load and a typed line solve nothing on the page; a new row takes the page's id in both heaps; past the threshold the figure is in hand and the values pending, then ready together; a fast job is never pending; values for a figure the student left are never marked ready; a job whose figure changed under it is posted again; a fresh worker handed the page's figure does not solve it again; with no worker nothing is posted. Changed: `store/__tests__/compute-once-2888.test.ts` awaits the walk (the walk is async; no expectation changed). Removed: `__tests__/two-heaps-2890.test.ts`, `__tests__/work-meter/twoHeaps3.ts` (replaced by the gate).
+
+**Files.** `src3d/app/offPage3.ts`, `ops3.ts`, `worker3.ts`, `readers3.ts`, `store/rowIds3.ts` (new) · `src3d/app/work3.ts` (`act3`'s `around`, the `values` lane) · `src3d/App3.tsx` (the job bodies, the pending panel) · `src3d/main.tsx` (`startWork3`) · `src3d/store/store3.ts` (`rowId3`, `heldDerive3`, the representative to the fold) · `src3d/store/figureFile3.ts` (`rowId3`) · `src3d/store/journal3.ts` (`heldJournal3`) · `src3d/engine/evaluate.ts` (`heldResolves3`) · `src3d/i18n/locales/{he,en}.json` (`dataPanel.checking`) · `src3d/__tests__/work-meter/{driver3,walk3}.ts`, `work-meter-gate.test.ts`, `baseline.jsonl`, `baseline-slow.jsonl` · `scripts/perf/3d/sweep3.ts` (the async driver).
+
+## What the student will see
+- [asked] While 3-D computes, the page is not frozen: it scrolls, answers clicks and the figure can be turned. *"user should know the engine is working and not frozen"* (operator, 2026-11-13)
+- [ruled] After an accepted line or edit too, the figure is drawn as soon as it is solved and the data panel's values follow. Operator, 2026-11-14 (#2890), question 1: *"Figure first, both tools (Recommended)"*
+- [ruled] While the values are still being computed, the data panel shows ONE grey line «בודק…» where its empty-state line sits, and the rows appear together when ready; never a number from the previous figure. Question 2: *"One «בודק…» line (Recommended)"*
+- [ruled] That holds after every action that redraws the figure («הציגו תצורה אחרת», load, delete, a row ticked or unticked, undo, redo, rename, swap) and when the panel is opened. Question 3: *"Yes, all redraws (Recommended)"*
+- [asked] As analytic's values do: a question asked reads «<השאלה> = בודק…» until its answer is in. *"3d can behave like analytics"* (operator, 2026-11-13)
+- [ruled] An action pressed while the tool works waits its turn. ADR-W-210 Am. 2, question 1 (*"i go with your recommendations"*, 2026-11-13)
+- [2-D] Save, share, the exports, the language and the guide stay usable while a job runs and act on the figure on screen. Measured in 2-D at `main` @ `f594c42d` during its worker search (a 2-D worker search: save 43 ms, the language 47 ms, the guide 53 ms; the save holds the figure on screen. 3-D on this branch: save 36 ms during a job).

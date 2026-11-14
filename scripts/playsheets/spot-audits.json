@@ -280,6 +280,21 @@
         "קטע AB"
       ],
       "lookFor": "Three rows at the end, the segment AB drawn."
+    },
+    {
+      "sheet": "feat-2890-3d",
+      "id": "T8",
+      "kind": "3d:assertion",
+      "queued": "2026-11-14",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ABC",
+        "D על AB",
+        "AD = 3"
+      ],
+      "lookFor": "Three rows at the end, D on AB."
     }
   ],
   "results": [

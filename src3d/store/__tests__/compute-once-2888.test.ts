@@ -374,10 +374,10 @@ function seen(): string {
   return out;
 }
 
-function session(text: string, cold: boolean): { actions: WalkedAction3[]; views: string[] } {
+async function session(text: string, cold: boolean): Promise<{ actions: WalkedAction3[]; views: string[] }> {
   const views: string[] = [];
   let started = false;
-  const actions = walkFixture3(text, PLAN, () => {
+  const actions = await walkFixture3(text, PLAN, () => {
     if (started) views.push(seen()); // the figure the action before this one left
     started = true;
     if (cold) clearSolveCaches3();
@@ -389,11 +389,11 @@ function session(text: string, cold: boolean): { actions: WalkedAction3[]; views
 describe('#2888 — a result does not depend on what was solved before', () => {
   const totals = { cold: 0, warm: 0 };
   for (const file of SESSIONS) {
-    it(`${file}: the session cold before every action and the session warm are the same session`, () => {
+    it(`${file}: the session cold before every action and the session warm are the same session`, async () => {
       const text = readFileSync(join(DIR, file), 'utf8');
-      const cold = session(text, true);
+      const cold = await session(text, true);
       expect(figureContent3.changed(), 'a construction was changed after it was solved').toEqual([]);
-      const warm = session(text, false);
+      const warm = await session(text, false);
       expect(figureContent3.changed(), 'a construction was changed after it was solved').toEqual([]);
       expect(warm.actions.map((a) => `${a.action}:${a.rec.verdict}`)).toEqual(cold.actions.map((a) => `${a.action}:${a.rec.verdict}`));
       expect(warm.views.length).toBe(cold.views.length);
