@@ -50,6 +50,7 @@ this tool *supplies* the one the exam withholds.
 | `engine/evaluate.ts` | Construction + seed → figure; `sampleParam`, and `isKnowledge` — the honesty gate |
 | `engine/derive.ts` | `parse → fold → evaluate`, written once so app and tests take the same route |
 | `engine/content.ts` | Solver memos keyed by content (ADR-AG-476) |
+| `engine/settle.ts` | A finished action as plain data and its adoption into another heap; `cloneLoss`, the lock on what crosses (ADR-AG-477). The line-list store is one per work-meter lane |
 | `engine/solve.ts` | Constraints (refs + residual + name) and the joint solve |
 | `engine/shapes.ts` | Shape registry: a noun is a table row of existing constraints |
 | `engine/statedMeasures.ts` | What the student stated, for the canvas |

@@ -111,7 +111,7 @@ export function locusChips(d: Derivation): LocusChip[] {
 export const LOCUS_CHIPS_KEPT = CONFIGURATIONS_MAX;
 
 /** Per construction and configuration drawn: the chips, and the two figures they were read from. */
-const chipsMemo = new ContentCache<Map<string, { shown: Figure; at: Figure; chips: LocusChip[] }>>();
+const chipsMemo = new ContentCache<Map<string, { shown: Figure; at: Figure; chips: LocusChip[] }>>('chipsMemo');
 
 function chipsOf(d: Derivation, f: Figure): LocusChip[] {
   const start = new Map<Id, { x: number; y: number }>();

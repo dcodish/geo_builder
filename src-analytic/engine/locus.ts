@@ -710,7 +710,7 @@ export function locusOf(
  * one does. Shared by every caller, so frozen.
  */
 export const LOCI_KEPT = 64;
-const locusMemo = new ContentCache<Map<string, { result: LocusResult | null; asked: string[] }>>();
+const locusMemo = new ContentCache<Map<string, { result: LocusResult | null; asked: string[] }>>('locusMemo');
 
 function tracedLocusOf(c: Construction, id: Id, seeds: readonly [Seed, number], bounds: TraceOptions['bounds'] | undefined): LocusResult | null {
   const walked = walkedLocusOf(c, id, seeds, bounds);

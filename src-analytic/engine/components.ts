@@ -27,7 +27,7 @@ import type { Constraint } from './solve';
 import { curveByName, isFree, type Construction, type Id } from './types';
 import { ContentCache, contentOf } from './content';
 
-const partsMemo = new ContentCache<Construction[]>();
+const partsMemo = new ContentCache<Construction[]>('partsMemo');
 
 /** Union–find over string nodes. */
 class Links {
