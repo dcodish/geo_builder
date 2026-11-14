@@ -22,7 +22,7 @@
 // escalated — and `globalThis.fetch` is stubbed to throw right below the imports as a second lock.
 //
 // COMPARABILITY: every `ms` is a wall-clock timing — comparable only on a quiet machine. `work` is CLOCK-FREE and
-// comparable anywhere: the work meter's three counts (#2873, ADR-W-210) — exact solves in all, on the page's UI
+// comparable anywhere: the work meter's three counts (#2873, ADR-W-210; #2888, ADR-CX-090) — executed line reads and exact solves in all, on the page's UI
 // thread, and before the figure can paint — the same numbers the suite's gate holds a fixture to. `verdict` and
 // `nLines` are deterministic too.
 import * as fs from 'node:fs';

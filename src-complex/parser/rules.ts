@@ -126,6 +126,7 @@ import type { ReservedConstant } from '../model/naming';
 import { normalize } from './normalize';
 import { RADIAN, angleDegrees, isRadianText } from './angleText';
 import { type Claim, type Unaccounted, claimAll, unaccountedSpans } from './span';
+import { meterWork } from '../../shell/workMeter';
 
 /**
  * #1894 (ADR-CX-061) — is this (canonical) name a REAL-PARAMETER letter in this figure? A letter outside
@@ -1457,8 +1458,13 @@ export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = 
  * `scope` (#1405) is the letter families the figure declared complex. Only the layer that sees every
  * line can know it (`lowerLines`); a caller reading one line on its own passes nothing and gets the
  * ADR-CX-004 convention.
+ *
+ * ONE LINE READ IS ONE UNIT OF WORK (#2888, [ADR-CX-090](../../docs/06d-decisions-complex.md#adr-cx-090)): the work meter
+ * counts every EXECUTED read here, beside the fold's exact solves, because reading the lines is where this builder's
+ * time goes (80 % of an action, measured) and a count that could not see it guarded nothing.
  */
 export function parseLineV2(raw: string, scope: ComplexScope = NO_SCOPE): ParseOutcome {
+  meterWork();
   const normalized = normalize(raw);
   if (!normalized) return { ok: false, reason: 'not-handled', normalized };
   // #2247 (ADR-CX-081) — «2 1/2» / «2 3» is refused before any rule reads it, so every rule gets the one sentence

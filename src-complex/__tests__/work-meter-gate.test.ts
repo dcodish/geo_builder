@@ -7,9 +7,10 @@
  * do. The rule, the tolerance (zero) and the re-record are `shell/__tests__/work-gate.ts`'s; the actions are
  * `work-meter/driverCx.ts`'s, the same driver the timing harness runs.
  *
- * One unit is one exact solve: every `foldConstraints` makes one, and the entailment gate two. The complex tree has
- * no worker and is the ADR's stated exception — its fold stays on the page under a work ceiling — so every unit is
- * page work, and this baseline is that ceiling.
+ * One unit is one executed line read (`parseLineV2`) or one exact solve (every `foldConstraints` makes one, and the
+ * entailment gate two): [ADR-CX-090](../../docs/06d-decisions-complex.md#adr-cx-090) made the read a unit, because that is
+ * where this builder's time goes. The complex tree has no worker and is the ADR's stated exception — its fold stays on
+ * the page under a work ceiling — so every unit is page work, and this baseline is that ceiling.
  *
  * Re-record: `npm run work:record -- complex` (docs/08, "The work meter").
  */
@@ -27,7 +28,7 @@ const corpus = readdirSync(DIR)
 const gate = openWorkGate({
   product: 'complex',
   title: 'complex numbers',
-  unit: 'one exact solve of a fold (src-complex/replay/derive2.ts)',
+  unit: 'one executed line read (src-complex/parser/rules.ts parseLineV2) or one exact solve of a fold (src-complex/replay/derive2.ts)',
   dir: join(__dirname, 'work-meter'),
   perfCommand: (figure) => `node scripts/perf/complex/sweep.mjs --only "fixture:${figure.replace('.complex.json', '')}"`,
 });

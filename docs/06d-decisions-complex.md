@@ -4529,3 +4529,63 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Locks.** `src-complex/__tests__/already-drawn-1990.test.ts` drives the shared table (`HELD_CASES_COMPLEX`) through the real `submitLine`: one row, the note, no point moving at 4 seeds, and, with the earlier row muted and then deleted, the row carrying the relation alone; controls. Re-based on ADR-W-200's authority: `entailed-noop-2268`, `triage-replay-cx-2241`, `sibling-phrasings`, `app/__tests__/acceptance-gate`.
 
 **Behaviour change for a student:** in complex, «|z1| = 5» after «z1 = 3+4i» (and every exact restatement) is listed as its own row, and the tool says «זה כבר קיים באיור — נוסף כנתון נפרד.» instead of adding nothing.
+
+## ADR-CX-090 — A line read is a counted unit of work, and a line is read once per content: complex's part of "compute once" (#2888)
+
+**Status:** accepted · 2026-11-14 · debt (P2, complex) · branch `debt/2888-compute-once-complex` · phase 2 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (invariant 4), and the decision its Amendment 1 left to this phase · **LADDER stage:** none is added or moved; the memo sits in front of stage 0b (`parse()`), [LADDER-CX](LADDER-CX.md)
+**Operator:** 2026-11-13, in chat: *"I dont want local optimization - i want overall optimization so we dont end up fixing one issue just to discover later we have an issue somewhere else."* · 2026-11-14, in chat: *"go ahead with next phases"*
+
+**Requirements:** none (internal): no line, verdict, drawing or message changes · **Design:** [docs/08](08-testing-strategy.md) "The work meter" (the complex unit)
+
+**Measured before anything was built** (`main` @ `9cd61315`, the dev PC, node 24).
+
+Where the time goes: a CPU profile of `2b-capstone` walked 200 times (500 µs sampling, 14.5 s sampled), the share of sampled time under each function:
+
+| Function | Inclusive share |
+|---|---|
+| `parseLineV2` (`parser/rules.ts`), the read of one line | **81.5 %** |
+| of which `rx` (`parser/lexicon.ts`), a `new RegExp` on every call | 43.0 % (self time) |
+| of which `normalize` | 15.3 % |
+| `foldConstraints` (`replay/derive2.ts`), the whole fold | 12.9 % |
+| of which `exactSolve`, the unit the meter counted | 3.3 % |
+
+The read is reached through `complexScopeOf` (50.2 % of the time: it reads every line to find the declared letters, and the fold, the gate, the ask routing and the render each call it), `lowerLines` (35.1 %), `parseInFigure` (7.8 %) and `parseAsk` (4.0 %). The 112-line synthetic figure of the #2867 map (the probe `scale:rchain-48+refuse`: 112 accepted lines, then «|z1| = -5», refused as impossible after the gate's differential blame) spends 72.0 % of its 2.8 s in the read and 24.7 % in its 234 folds.
+
+How often a line is read: every read, every fold and every `new RegExp` counted over the gate's walk of the 45 fixtures (305 recorded actions), with the content each call was made for.
+
+| Over the 45 fixtures | Executed | Distinct content inside its action | Distinct content inside its session (one fixture's walk) |
+|---|---|---|---|
+| line reads (`parseLineV2`, by text and declared letters) | 8 076 | 1 042 | 177 |
+| `complexScopeOf` calls (by line list) | 2 141 | 578 | 213 |
+| `lowerLines` calls (by line list and declared letters) | 1 297 | 578 | 213 |
+| folds (`deriveLines`, by line list, configuration, seed, questions and chips) | 1 069 | 719 | 322 |
+| `new RegExp` in `rx` | 252 738 (31 per read) | — | — |
+
+So 87 % of the reads repeat a read already made inside the same action, and 98 % one made in the same session. The dearest recorded action, `2b-capstone|load`, reads its 13 lines 427 times and folds 23 times, 13 of them distinct. On the synthetic 113-line session one line is read 1 669 times, and the session makes 93 000 reads of 115 distinct lines and 3.1 million regular expressions.
+
+**Root cause.** `parseLineV2(raw, scope)` is a pure function of the line's text and of the letter families the figure declares complex, and nothing kept its result: every fold, every scope scan and every gate probe read every line again, and each read rebuilt each rule's regular expression from its source text. The cost of an action therefore grows with the square of the number of lines. **Class:** a pure function of content recomputed per call, in the one builder that had no cache at all.
+
+**Decision 1 — a line read is a counted unit.** ADR-W-210 Amendment 1 found that the complex meter counted 3 % of the builder's time (one exact solve per fold) and left open whether line lowering should be counted too. It is, from this change: `parseLineV2` charges one unit per EXECUTED read, beside the unit `exactSolve` already charges. A count of an action is now its executed line reads plus its exact solves.
+- *Why the read, and why at `parseLineV2`.* The amendment proposed one unit per `lowerLines` call. The measurement above says `lowerLines` is under half of the reads: `complexScopeOf`, the gate's own probes, the ask reader and the parameter note read lines without lowering them. `parseLineV2` is the one function every read goes through, so the count sees a read wherever it is made, and a change that makes each fold read its lines twice now fails the gate, as a change that doubles the folds always did.
+- *Why not a unit per fold or per lowering.* A fold's cost is its reads plus its solve; counting reads and solves separately is what lets the count show a memo's effect, and it keeps the entailment gate (two solves, no fold) in the count.
+- *Two kinds of work in one count.* A read and an exact solve cost about the same order (a read about 0.09 ms before this change, a whole fold about 0.1 ms on the fixtures), and a count is only ever compared with the same action of the same figure, so the sum is meaningful where it is used. Analytic's count mixes residual evaluations of three routines in the same way.
+- *A memo hit is not charged.* The meter counts executed work, as 2-D's does (ADR-W-210 Amendment 1). Complex has no work budget and no code reads the count to decide anything, so docs/17 §7's fifth rule (a budget charges a hit the work it saved) has nothing to apply to here.
+
+The unit changed, so the baseline was re-recorded once with `--accept-rise`, in its own commit, before any memo existed. Every one of the 305 recorded actions rose, by exactly its line reads; no exact-solve count moved.
+
+| Recorded actions (45 fixtures) | Phase 0 unit: exact solves | New unit: line reads + exact solves, no memo |
+|---|---|---|
+| total = page = before the paint | 1 231 | 9 307 |
+| submit (134) | 584 | 4 196 |
+| load (45) | 321 | 2 437 |
+| edit (45) | 185 | 1 521 |
+| another (45) | 95 | 824 |
+| delete (36) | 46 | 329 |
+| the dearest, `2b-capstone` load | 23 | 450 |
+| `2b-capstone` submit#13 «המרובע Oz2z3z4» | 3 | 146 |
+| `symbolic-cartesian-forced-1365` load | 19 | 161 |
+
+The gate's determinism held under the new unit before the memo: the record, a check, `--order reverse` and `--order shuffle:7` gave the same 305 counts.
+
+**What the student will see.**
+- [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)
