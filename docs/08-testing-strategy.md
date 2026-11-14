@@ -114,7 +114,9 @@ press take 6 s was found by the operator's play.
 **What a gate does.** It walks **every** fixture of its tree through the student's actions, with the tree's
 action driver (`<tree>/__tests__/work-meter/driver*.ts`, the same code `scripts/perf/` times): re-typing each row
 (`submit#k`), one «הציגו תצורה אחרת» (`another#1`), a cold `load`, the `delete` of the first row, an `edit` of the last
-row, and in 2-D the background `detect` sweep. Each action gets three counts: `total` (all the
+row, and in 2-D the background `detect` sweep. Analytic's walk goes on in the edit's session with what it left out until
+#2890 ([ADR-AG-477](06c-decisions-analytic.md#adr-ag-477)): `ask` (the questions the figure's menus offer), `toggle#1` and
+`toggle#2` (the first row ticked off and on), `undo`, `redo` and `rename`. Each action gets three counts: `total` (all the
 work), `page` (the part on the page's UI thread, as against a worker) and `prePaint` (the part before the figure can
 paint). The baseline holds one line per figure-action, sorted, so two branches that each add a fixture merge as
 insertions. Nothing is sampled or skipped: a gate is one test file, in the slow tier, run by `npm run test:full` and by

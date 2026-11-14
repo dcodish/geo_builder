@@ -16703,5 +16703,43 @@ The two "re-typed" rows are what the walk's `edit` was when these times were tak
 
 **Tests.** `src-analytic/__tests__/locus-memo.test.ts` (17): the same figure is answered once, whichever derivation asked; another configuration, other lines, another point and another frame are each asked again; a hand-built derivation is not answered by a kept one; a caller's copy is its own; a remembered answer leaves the pool as a computed one does; the two bounds; the clear.
 
+### Part 3 — the work meter's walk gains the actions it left out
+
+**Root cause.** The gate proves "the page never solves" only for what its walk drives, and the walk drove five actions. A row ticked off or on, undo, redo, a letter renamed and the whole ask lane ran on the page and were counted nowhere, so a page step measured at zero would not have been zero for a student who asked a question.
+
+**Decision.** The walk (`work-meter/walkAnalytic.ts`) continues the edit's session with six more actions, after the edit, so that no earlier action finds anything it did not find before. They run on a `Session` (`driverAnalytic.ts`): the store's whole basis, with the muted rows, the seed names and the questions asked.
+- `ask`: the questions the figure's own menus offer, pressed one after another through the page's own helpers (`pressChip` for a locus chip, the measure menu's `toggleDrawn` for the questions of each point, curve and segment, in figure order), up to the lane's limit of eight. After each press the page answers EVERY stored question again (`askSettled` over the list, as `App.tsx`'s `answers` memo does). The questions stay asked for the rest of the session, so every later render answers them too, as the page does.
+- `toggle#1`, `toggle#2`: the first row ticked off (`decideToggle`, then the render of the figure without it), and on again (the trial, then the render).
+- `undo`, `redo`: the store restores a basis and the page renders it (back to the row ticked off, and forward again).
+- `rename`: the figure's first lettered point takes the first capital no line uses (`decideRename` over the whole session, then the render of the rewritten lines with the seed names the change left). A figure with no lettered point or no free capital renames nothing.
+A swap is not walked: it is the same decision module and the same full re-solve as a rename, and would add about a fifth to the walk's time. The model's lines are not walked: the walk makes no model call.
+
+**The walk can be run across two heaps** (`WalkHooks`): `setup` wraps what the walk prepares unmeasured, `each` wraps an action and is handed what the page renders after it. The gate uses neither; `settle-walk.test.ts` does (part 2), and the shared client's isolated executor will.
+
+**Recorded** (`npm run work:record -- analytic`; 208 sequences, 3 205 actions where there were 1 963). **No existing line moved**: all 1 963 lines of the five old actions are identical in `total`, `page` and `prePaint` to `main`'s baseline. The 1 242 new lines, as `main`'s readers count them ("before": the same walk on `main`'s `locusChip.ts` and `locus.ts`) and as recorded with part 1:
+
+| Action | Lines | Total before | Total recorded | Change | Before the paint, before | recorded |
+|---|---|---|---|---|---|---|
+| ask | 207 | 25 223 282 | 3 403 045 | −86.5 % | 25 223 282 | 3 403 045 |
+| toggle | 414 | 21 938 121 | 13 418 427 | −38.8 % | 15 511 072 | 12 096 639 |
+| undo | 207 | 4 099 918 | 0 | −100.0 % | 2 172 335 | 0 |
+| redo | 207 | 6 592 111 | 0 | −100.0 % | 3 414 433 | 0 |
+| rename | 207 | 25 489 238 | 22 337 806 | −12.4 % | 13 134 639 | 13 134 639 |
+| the six new actions | 1 242 | 83 342 670 | 39 159 278 | −53.0 % | 59 455 761 | 28 634 323 |
+| submit | 1 139 | 76 473 359 | 76 473 359 | 0.0 % | 54 180 266 | 54 180 266 |
+| load | 207 | 19 141 232 | 19 141 232 | 0.0 % | 9 430 811 | 9 430 811 |
+| edit | 207 | 18 635 882 | 18 635 882 | 0.0 % | 9 488 812 | 9 488 812 |
+| delete | 203 | 11 254 609 | 11 254 609 | 0.0 % | 9 932 821 | 9 932 821 |
+| another | 207 | 769 177 | 769 177 | 0.0 % | 740 625 | 740 625 |
+| all | 3 205 | 209 616 929 | 165 433 537 | −21.1 % | 143 229 096 | 112 407 658 |
+
+Of the new lines 623 are lower with part 1 than on `main`'s readers, 619 are equal and none is higher. 25 of the 207 `ask` lines do solver work. The largest falls: `corpus471.json#11/5` · ask 6 132 840 → 766 584; `exam-2024w-locus-param-1138` · ask 5 637 264 → 798 815; `exam-2024w-locus-1138` · ask 3 489 204 → 495 313; `exam-2024w-locus-param-1138` · undo 2 272 722 → 0; `corpus471.json#20/4` · ask 2 105 652 → 263 175; `exam-2024w-locus-param-1138` · redo 1 597 666 → 0.
+
+What the table says: on `main` a session with questions asked paid for every traced locus again on each press and each render; with part 1 a locus is traced once per figure, and what is left in `ask`, `toggle` and `rename` is first-time work (the first trace of each locus; the figure without its first row; the whole renamed figure, which is a line list the session has never seen). That first-time work is all on the page today, and it is what the page step moves.
+
+**The slow corpus** (`npm run work:record -- analytic --slow`): its 37 existing lines are identical; 18 new lines were added (4 618 435 → 5 598 781 units with them).
+
+**The gate's own cost.** One walk of the corpus takes 681 s here (one run, other suites running beside it), where it took about 500 s with five actions (ADR-AG-476); the slow corpus 16 s. Most of the added time is the rename (22.3 M units: a whole figure solved from nothing, once in the decision and its pool after it) and the first row ticked off (a figure the session has not seen, as the delete is). It is still one file, the longest of the suite; splitting it in two by fixture is as open as it was (ADR-W-210 Am. 1). `scripts/perf/analytic/harness.ts` times the five old actions and does not yet walk the six new ones: a failing new line's `scripts/perf` command times the figure, not that action.
+
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)
