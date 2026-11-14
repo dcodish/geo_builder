@@ -18,7 +18,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearReplayCaches, foldStats, getFoldFor, replay, replayMemoConfig, replayMemoSizes, sharedSamples, type Derived, type Fact } from '@/replay/core';
-import { solveBudget, withSolveBudget, withWorkBudget, withWorkEpoch, work } from '@/engine/solveBudget';
+import { computeWithCell, countWork, servingRepeats, solveBudget, withSolveBudget, withWorkBudget, withWorkEpoch, work } from '@/engine/solveBudget';
+import { nelderMead } from '@/engine/evaluate';
 import { applyCommand, emptyConstruction, reflectableFreePoints, withReflectMask, type AnyCommand, type Command } from '@/engine';
 import { inWorkerLane } from '../../../shell/workMeter';
 
@@ -431,5 +432,56 @@ describe('the fold memo is least-recently-used, with a bound (ADR-827)', () => {
 
   it('the bounds in force are the measured ones (ADR-827)', () => {
     expect(saved).toEqual({ folds: 64, samples: 1024 });
+  });
+});
+
+/**
+ * #2894 ([ADR-832](../../../docs/06-decisions.md#adr-832), ADR-W-210 phase 5) — AN EXACT REPEAT IS SERVED, AND CHARGED AS
+ * IF IT WERE COMPUTED. Inside one `nelderMead` call a point already evaluated is not evaluated again; every counter a
+ * budget, a cap or a ledger reads still advances by what the evaluation advanced it. The meter's executed calls fall.
+ */
+describe('#2894 — an exact repeat is served and charged as computed', () => {
+  it('a served repeat advances work.done, work.executed and the open ledger frame exactly as the first evaluation did', () => {
+    let calls = 0;
+    const f = servingRepeats((x: number[]) => {
+      calls++;
+      countWork();
+      countWork();
+      return x[0] * 2;
+    });
+    const d0 = work.done;
+    const e0 = work.executed;
+    const { value, cell } = computeWithCell(() => [f([1, -0]), f([1, -0]), f([1, 0]), f([1, -0])]);
+    expect(value).toEqual([2, 2, 2, 2]);
+    expect(calls, 'the point [1, -0] is evaluated once; [1, 0] is another point').toBe(2);
+    expect(work.done - d0, 'charged as if all four were computed').toBe(8);
+    expect(work.executed - e0).toBe(8);
+    expect(cell.own).toBe(8);
+  });
+
+  it('a point with a NaN coordinate is never served', () => {
+    let calls = 0;
+    const f = servingRepeats(() => ++calls);
+    f([NaN]);
+    f([NaN]);
+    expect(calls).toBe(2);
+  });
+
+  it('nelderMead never evaluates one point twice in a call, and the descent is the one a recount reproduces', () => {
+    const seen = new Set<string>();
+    let repeats = 0;
+    let calls = 0;
+    const cost = (x: number[]): number => {
+      calls++;
+      const k = x.map((v) => (Object.is(v, -0) ? '-0' : String(v))).join(',');
+      if (seen.has(k)) repeats++;
+      seen.add(k);
+      return (x[0] - 1) ** 2 + 10 * (x[1] + 2) ** 2 + 1e-3;
+    };
+    const a = nelderMead(cost, [0, 0], 400, 0.5);
+    expect(repeats, 'a contracted simplex re-reads its own points; they are served').toBe(0);
+    expect(calls).toBeGreaterThan(0);
+    // the same descent again, from scratch: the same point to the last bit (the memo is the call's own)
+    expect(nelderMead(cost, [0, 0], 400, 0.5)).toEqual(a);
   });
 });

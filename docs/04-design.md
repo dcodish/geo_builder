@@ -1873,6 +1873,15 @@ screen, its CHECKPOINT (`geoOps.takeCheckpoint`, [ADR-829](06-decisions.md#adr-8
 
 ## The knowledge pool
 
+
+**An exact repeat inside one Nelder–Mead call is served ([ADR-832](06-decisions.md#adr-832), #2894).** `nelderMead`
+(`engine/evaluate.ts`) wraps its cost in `servingRepeats` (`engine/solveBudget.ts`): a point the same call has already
+evaluated, bit for bit, is answered from the call's own table instead of being evaluated again (a simplex that has
+contracted onto one point keeps reflecting and shrinking onto it; measured, 44–47 % of every evaluation). The cost is a
+pure function of the point for the life of the call, so the descent is unchanged. A served repeat advances
+`work.done`, `work.executed` and the open ledger frame's `own` by exactly what the first evaluation advanced them, so
+every work budget, the re-attempt cap and every memo entry's ledger read what they read before; only the work meter's
+executed count falls. Nothing is kept between calls.
 ### The knowledge pool of a DETERMINED figure is its admissible set (#434, [ADR-509](06-decisions.md#adr-509))
 
 The relations layer's definite values, the values panel and the forced crossing dots read one shared pool
