@@ -38,6 +38,9 @@
 // an action marked `clipped`: this harness runs the browser's clock budgets (--mode production), and where a 12 s
 // search is cut depends on the machine. The suite's gate runs the same driver with NO clock, so its counts are the
 // whole search's and are exact; the two are different measurements of one action. `outcome` is deterministic too.
+import { useGeoWorkExecutor } from '../../../src/store/geoWork';
+import { geoOps } from '../../../src/store/geoOps';
+import { sameInstanceExecutor } from '../../../shell/workerExecutor';
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -272,24 +275,10 @@ function buildJobs(): Item[] {
 // share. This file gives it the worker's operations as a browser runs them and keeps the session bookkeeping.
 
 /** geoWorker.ts's own bodies, with its 12 s budget, charged to the worker lane: what a browser's worker runs. */
-const workerOps: WorkerOps = {
-  prefold: async (facts, seed) =>
-    inWorkerLane(() => {
-      replay(facts, seed);
-      return getFoldFor(facts);
-    }),
-  autoResolve: async (facts, seed) =>
-    inWorkerLane(() => {
-      if (meetsRequirements(facts, seed)) return 'ok' as const;
-      const found = findValidConfig(facts, seed, WORKER_SEARCH_BUDGET_MS);
-      if (!found) return null;
-      replay(found.facts, found.seed);
-      return { ...found, fold: getFoldFor(found.facts) };
-    }),
-  resample: async (facts, seed) => inWorkerLane(() => searchAnotherView(facts, seed, undefined, WORKER_SEARCH_BUDGET_MS)),
-  detect: async (facts) => inWorkerLane(() => detectAll(facts, rowNouns(facts))),
-};
-const driver = createDriver2d(workerOps, { searchBudgetMs: WORKER_SEARCH_BUDGET_MS });
+// #2890 (ADR-830): every decision goes through the App's client; here it is served by the worker's own table, with its
+// 12 s budget, in this instance, charged to the worker lane (shell/workerExecutor's same-instance executor).
+useGeoWorkExecutor(sameInstanceExecutor(geoOps({ searchBudgetMs: WORKER_SEARCH_BUDGET_MS, crossing: false })));
+const driver = createDriver2d({}, { searchBudgetMs: WORKER_SEARCH_BUDGET_MS });
 let history: Snap[] = [];
 let future: Snap[] = [];
 const loadedFinals = new Set<string>();
@@ -345,27 +334,27 @@ async function runItem(idx: number, item: Item) {
       if (st.k === 'clear') {
         history.push(driver.figure());
         future = [];
-        driver.show({ facts: [], seed: 0 });
+        await driver.show({ facts: [], seed: 0 });
         continue;
       }
       if (st.k === 'undo') {
         if (history.length) {
           future.push(driver.figure());
-          driver.show(history.pop()!);
+          await driver.show(history.pop()!);
         }
         continue;
       }
       if (st.k === 'redo') {
         if (future.length) {
           history.push(driver.figure());
-          driver.show(future.pop()!);
+          await driver.show(future.pop()!);
         }
         continue;
       }
       if (st.k === 'submit') {
         const prev = driver.figure();
         begin(idx, si, 'submit');
-        driver.show(st.before ?? prev);
+        await driver.show(st.before ?? prev);
         const rec: any = { ...base, k: 'submit', trail: trail.slice(-12), ...(await driver.submit(st.u, st.locale, st.follow)) };
         emit(rec);
         trail.push(st.u);
@@ -380,7 +369,7 @@ async function runItem(idx: number, item: Item) {
         if (st.before) driver.show(st.before);
         if (!driver.figure().facts.length) continue;
         begin(idx, si, 'another');
-        driver.show(driver.figure());
+        await driver.show(driver.figure());
         emit({ ...base, press: ++pressNo, trail: trail.slice(-12), ...(await driver.another()) });
         whole = driver.figure();
         continue;
@@ -389,7 +378,7 @@ async function runItem(idx: number, item: Item) {
         if (!driver.figure().facts.length) continue;
         for (let p = 1; p <= st.n; p++) {
           begin(idx, si, 'another#' + p);
-          driver.show(driver.figure());
+          await driver.show(driver.figure());
           const rec: any = { ...base, k: 'another', press: p, trail: trail.slice(-12), ...(await driver.another()) };
           emit(rec);
           if (rec.outcome === 'only-config') break;
@@ -412,7 +401,7 @@ async function runItem(idx: number, item: Item) {
       }
       if (st.k === 'retype') {
         if (!driver.figure().facts.some((f) => f.utterance)) continue;
-        driver.show(driver.figure());
+        await driver.show(driver.figure());
         await driver.edit(); // unmeasured (#2888)
         whole = driver.figure();
         continue;
@@ -429,7 +418,7 @@ async function runItem(idx: number, item: Item) {
         const s = st.before ?? driver.figure();
         if (new Set(s.facts.map(groupKey)).size < 2) continue;
         begin(idx, si, 'delete');
-        driver.show(s);
+        await driver.show(s);
         const rec = await driver.remove(st.key);
         if (rec) emit({ ...base, trail: trail.slice(-12), ...rec });
         if (st.key) driver.show(s); // anchored: the log re-anchors anyway

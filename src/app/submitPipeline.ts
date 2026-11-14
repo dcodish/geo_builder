@@ -16,46 +16,22 @@
  *  - the store is RE-READ after every await that can yield to user actions (the stale-commit race);
  *  - the honesty gates run on BOTH commit paths — a partial parse is never committed.
  */
-import {
-  buildParseCtx,
-  classifyOutOfScope,
-  droppedComparison,
-  droppedCompoundRelation,
-  droppedConstructNoun,
-  droppedGivenNumbers,
-  droppedGivenRelations,
-  droppedGivenVerbs,
-  droppedMidsegment,
-  droppedNewLabels,
-  introducedNewLabels,
-  droppedRadiusSymbol,
-  droppedRegionSubject,
-  droppedWordRelations,
-  looksCompound,
-  lowercaseLabelFold,
-  inscribedCircles,
-} from '@/parser';
+import { buildParseCtx, droppedNewLabels } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { laneContext } from './laneContext';
-import { droppedPropertyWords } from '@/parser/propertyWords';
-import { mergeWordItems } from '../../shell/llm/honestyCore';
 import { askKeepingNames, nameRetryEvent } from '../../shell/llm/retryLostNames';
 import { figureContext } from '@/parser/llmShared';
-import { circleMembers, circleRefs, isGeoPoint } from '@/engine';
+import { circleRefs, isGeoPoint } from '@/engine';
 import type { AnyCommand, Construction, Id, Vec } from '@/engine';
-import { createdByReference } from './createdPoints';
-import { extensionSideVerdict } from './extensionSide';
-import { dryRunOutcome, groupKey, nameByUseCommands, primeFoldFor, replay, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
-import { geoWork, isCancelled } from '@/store/geoWork';
-import { unaccountedSpans } from '@/parser/spanAccounting';
-import { type DecideLog, type DecideNote, type Verdict2D, decideFromParse, decidePreParse } from './decideDeterministic';
-import { unreadItems } from './honestyGates';
+import { nameByUseCommands, replay, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
+import { geoJobs, storeData } from '@/store/geoWork';
+import { actInWorker, applyActed, basisNow, viewArg } from './workerJobs';
+import { type DecideLog, type DecideNote, decidePreParse } from './decideDeterministic';
 import { logDebug } from '@/debug/sessionLog';
 import { otherUtteranceForError } from './errorSubject';
 import { renderNote } from './renderNote';
 import { studentVocabulary } from './studentVocabulary';
 import { boxAfterSubmit, splitSentences, submitSentences, type BoxUpdate, type SentenceOutcome } from '../../shell/sentences';
-import type { CevianHost } from '../../shell/cevianHost';
 import type { Job, WorkQueue } from '../../shell/work';
 
 export interface SubmitUi {
@@ -84,11 +60,10 @@ export interface SubmitUi {
   setCreatedNotice?(notice: CreatedNotice2D | null): void;
 }
 
-/** #1467 — what the created-points notice holds in 2-D: the labels, and the row the ✕ removes. */
-export interface CreatedNotice2D {
-  names: Id[];
-  groupKey: string;
-}
+/** #1467 — what the created-points notice holds in 2-D: the labels, and the row the ✕ removes (in `commitLine.ts` since #2890). */
+export type { CreatedNotice2D } from './commitLine';
+export { commitVerdict } from './commitLine';
+import { type CreatedNotice2D } from './commitLine';
 
 export interface SubmitDeps {
   t: (key: string, opts?: Record<string, unknown>) => string;
@@ -120,39 +95,6 @@ export interface SubmitDeps {
    *  own sentence, which becomes the refusal's SUBJECT where the engine fragment cannot identify the
    *  rejected statement (#943, ADR-487). */
   explainError(raw: string | null | undefined, said?: string, other?: string): string;
-}
-
-/**
- * #1697 ([ADR-588](../../docs/06-decisions.md#adr-588)) — THE ONE PLACE a deterministic verdict reaches the store.
- *
- * A `commit` is the line's naming by use (`name-by-use` facts) followed by its statements, ONE batch — one group,
- * one row, one undo entry. A `noop` whose naming changed the figure («D ו-F על מעגל O1» when D, F already ride
- * it) is a row that owns that naming; a step-aside alone is invisible and commits nothing. A refusal or an
- * escalation commits nothing here, naming included. The pipeline calls this, and so do the locks that replay a
- * sequence through `decideDeterministic2D` — four of them used to re-apply the binds by hand.
- */
-export function commitVerdict(verdict: Verdict2D, utterance: string): CreatedNotice2D | null {
-  const st = useGeoStore.getState();
-  // #1973 (ADR-797): the shape the line's cevian was resolved in rides on its facts, stamped at accept time
-  if (verdict.kind === 'commit') return commitLine([...nameByUseCommands(verdict.binds), ...verdict.commands], verdict.commands, utterance, verdict.host, verdict.restates === true);
-  if (verdict.kind === 'noop' && verdict.binds.some((b) => b.op !== 'step-aside')) st.executeMany(nameByUseCommands(verdict.binds), utterance);
-  return null;
-}
-
-/**
- * #1467 (ADR-769) — commit one line's batch and say which points it created by reference. Both commit paths (the
- * deterministic verdict above and the LLM's decomposition) come through here, so the notice cannot be wired to one.
- * `statements` is the line's own commands, without its naming by use.
- */
-function commitLine(batch: AnyCommand[], statements: readonly AnyCommand[], utterance: string, host?: CevianHost, ownRow = false): CreatedNotice2D | null {
-  const st = useGeoStore.getState();
-  const before = replay(st.facts, st.seed).construction;
-  st.executeMany(batch, utterance, host, ownRow ? { ownRow } : undefined);
-  const now = useGeoStore.getState();
-  const last = now.facts[now.facts.length - 1];
-  if (!last || now.facts.length === st.facts.length) return null;
-  const names = createdByReference(before, replay(now.facts, now.seed).construction, statements, utterance);
-  return names.length ? { names, groupKey: groupKey(last) } : null;
 }
 
 /**
@@ -314,14 +256,11 @@ async function runSentence(utterance: string, deps: BoxDeps, job: Job, pre: Stor
     // A store operation is not geometry: it runs here, before the parser, and never enters the figure. It re-solves
     // the figure all the same, so it runs inside the job like any other line (#2874).
     const { op, from, to } = pre;
-    const res =
-      op === 'swap' ? store().swap(from, to)
-      : op === 'name-centre' ? store().nameCentre(from, to)
-      : op === 'rename' ? store().rename(from, to)
-      : store().merge(from, to);
+    // #2890 (ADR-830): the reducer runs in the worker, on its copy of the store; the page puts the result in
+    const res = (await actInWorker(op === 'swap' ? 'swap' : op === 'name-centre' ? 'nameCentre' : op === 'rename' ? 'rename' : 'merge', [from, to])) as { ok: boolean; reason?: string };
     // A size-qualified naming («מרכז המעגל הקטן הוא O1», #178) also LOCKS which circle is the small/big
     // one (the #102 ruling: a qualifier both refers and asserts), so sampling can never swap the name.
-    if (op === 'name-centre' && res.ok && pre.assert) store().execute({ type: 'set-radius-order', outer: pre.assert.outer, inner: pre.assert.inner }, utterance);
+    if (op === 'name-centre' && res.ok && pre.assert) await actInWorker('execute', [{ type: 'set-radius-order', outer: pre.assert.outer, inner: pre.assert.inner }, utterance]);
     log({
       source: op,
       rename: op === 'name-centre' ? { from, to, ...(pre.assert ? { assert: pre.assert } : {}) } : { from, to },
@@ -336,19 +275,14 @@ async function runSentence(utterance: string, deps: BoxDeps, job: Job, pre: Stor
   // "AD>BC"), freezing the UI. The job's queue painted the working state FIRST (the operator: visible
   // from the moment Submit is pressed until the answer), and it clears it on every exit below, a throw
   // included; the commit paths join `resolveAfterCommit` to the job, so it stays through any auto-resolve.
-  const st0 = store();
-  const verdict = await decideFromParse({ facts: st0.facts, seed: st0.seed, view: deps.view(), centresShown: deps.centresShown?.() }, utterance, locale, {
-    // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
-    // the commit, and every later replay of this content then run at TAIL speed on the main thread.
-    prefold: async (trial, seed) => {
-      try {
-        const fold = await geoWork.prefold(trial, seed);
-        if (fold) primeFoldFor(trial, fold);
-      } catch (err) {
-        if (!isCancelled(err)) throw err; // cancelled prefold: fall through — the sync path still works
-      }
-    },
-  });
+  // #2890 (ADR-830): THE WHOLE DECISION runs in the geometry worker: the parse (it solves), every gate, the dry run
+  // and, when the line commits, the commit itself (ADR-588: `commitVerdict`, the one place a verdict reaches the store),
+  // on the worker's copy of the store. The page puts the result in at its one sink, checked against the figure the
+  // line was typed on, and adopts the settled view, so its render and the resolve gate below solve nothing.
+  const basis = basisNow();
+  const decided = await geoJobs.decide({ state: storeData(), utterance, locale, centresShown: deps.centresShown?.(), view: viewArg(deps.view()) });
+  applyActed(decided, basis);
+  const verdict = decided.value.verdict;
   // #1697 (ADR-588): the #186 / #539 auto-binds (and the #1673 step-aside) the decision simulated are the LINE'S
   // OWN facts — `name-by-use` commands committed in the line's group, ahead of its statements, and applied by
   // `replay`. They used to be store renames applied here whatever the verdict, so the name belonged to no line:
@@ -368,18 +302,14 @@ async function runSentence(utterance: string, deps: BoxDeps, job: Job, pre: Stor
       return; // keep the text so the student can edit it
     case 'commit':
       // One utterance → one BATCH commit (one group id, one set, ONE undo entry — E4/STO-4).
-      {
-        // evaluated FIRST: an optional call (`ui.setCreatedNotice?.(…)`) skips its arguments when the UI has no notice
-        const created = commitVerdict(verdict, utterance);
-        ui.setCreatedNotice?.(created);
-      }
+      ui.setCreatedNotice?.(decided.value.created); // committed in the worker, with the decision (#2890)
       for (const e of verdict.logs) log(e);
       if (verdict.note) ui.setInputNote(noteText(verdict.note));
       ui.clearText();
       job.join(deps.resolveAfterCommit());
       return;
     case 'noop':
-      commitVerdict(verdict, utterance); // #1697: a naming that changed the figure is a row that owns it
+      // #1697: a naming that changed the figure is a row that owns it (committed in the worker with the decision, #2890)
       for (const e of verdict.logs) log(e);
       if (verdict.note) ui.setInputNote(noteText(verdict.note));
       ui.clearText();
@@ -453,194 +383,22 @@ async function runSentence(utterance: string, deps: BoxDeps, job: Job, pre: Stor
     ui.setInputNote(t('input.serviceBusy'));
     return;
   }
-  // RE-READ the store after the await (E3/STO-3): the dry-run below must run against the CURRENT
-  // facts — an undo/canvas action during the network call would otherwise be validated against the
-  // pre-await snapshot while `executeMany` commits onto the live list (a stale-commit race).
-  const cur = store();
-  const curFacts = withBinds(cur.facts); // #1697: the line's naming, applied to the figure the decomposition is judged on
-  // The LLM only counts if its decomposition actually BUILDS something — else it's another silent
-  // fail. Dry-run the combined commands; if neither grammar nor LLM built anything, say so plainly.
-  const llmCmds = out ? out.built.flatMap((g) => g.commands) : [];
-  // #41 (ADR-290): same worker prefold for the LLM decomposition's content before ITS dry-run.
-  if (out !== null && out.built.length > 0) {
-    try {
-      const trial = trialFacts(curFacts, llmCmds);
-      const fold = await geoWork.prefold(trial, cur.seed);
-      if (fold) primeFoldFor(trial, fold);
-    } catch (err) {
-      if (!isCancelled(err)) throw err;
-    }
+  // #2890 (ADR-830): the answer is judged and committed in the worker (`llmJudge.ts`: the dry run, ADR-240's battery,
+  // the commit), against the store as it is NOW (E3/STO-3: an undo during the network call is not committed onto).
+  const judgedOn = basisNow();
+  const judged = await geoJobs.judge({
+    state: storeData(),
+    input: { utterance, locale, out: out ? { built: out.built, dropped: out.dropped, ...(out.restored ? { restored: out.restored } : {}) } : null, bindCmds, weak: Boolean(weak) },
+    view: viewArg(deps.view()),
+  });
+  applyActed(judged, judgedOn);
+  const outcome = judged.value;
+  if (outcome.kind === 'refuse') {
+    ui.setInputNote(t(outcome.note.key, outcome.note.params));
+    return; // keep the text so the student can edit it
   }
-  const llmBuilds =
-    out !== null && out.built.length > 0 && dryRunOutcome(curFacts, llmCmds, cur.seed).produced;
-  if (!llmBuilds) {
-    // Both the grammar AND the LLM failed to BUILD anything. Distinguish a deliberately OUT-OF-SCOPE
-    // concept — a named angle/theorem relationship, a proof or compute request, or pure free text —
-    // from a GENUINE construction gap we should still implement. The out-of-scope cases get a tailored,
-    // pedagogical message (what to do instead) and a `scope:<category>` analytics tag, so the admin
-    // dashboard separates "no need to implement" from "real gap to build" (operator request). A real
-    // gap keeps the plain "couldn't read that" message and the `not-understood` tag.
-    const scope = classifyOutOfScope(utterance);
-    if (scope) {
-      logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${scope.category}` });
-      ui.setInputNote(t(scope.messageKey));
-      return;
-    }
-    // A genuine gap — but if the input packed several statements into one line (a shape AND a point AND an
-    // angle…), the most actionable advice is to break it into smaller steps: each piece parses far more
-    // reliably alone, and the student can see which one is the problem. Tagged distinctly so the operator
-    // can measure how often it fires; still a real `not-understood` gap for the dashboard count.
-    if (looksCompound(utterance)) {
-      logDebug({ kind: 'input', utterance, locale, source: 'llm', result: 'not-understood-compound' });
-      ui.setInputNote(t('input.tooManyParts'));
-      return;
-    }
-    logDebug({ kind: 'input', utterance, locale, source: 'llm', result: out && out.built.length ? 'built-nothing' : 'not-understood' });
-    // "produced nothing even after a retry" gets the explicit problem message; pure out-of-grammar
-    // (the grammar never matched) keeps the gentler "couldn't read that — try an example".
-    ui.setInputNote(t(weak ? 'input.producedNothing' : 'suite.refusal.notUnderstood'));
-    return;
-  }
-  // #779 — the convention nudge holds on the LLM path too (the ADR-240 pattern: the second attempt
-  // never commits what the first refused). Without it, a lowercase-label utterance the grammar
-  // declined would launder its rewrite through the LLM: the model emits uppercase canonical lines,
-  // the case-blind gates see every label accounted, and the commit stores labels the student never
-  // typed in that case — the silent rewrite again, one seam over.
-  {
-    const fold = lowercaseLabelFold(utterance, llmCmds, parseCtxNow().points ?? []); // #2195: the teaching criterion, on this lane too
-    if (fold) {
-      logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:lowercase-labels', commands: llmCmds });
-      ui.setInputNote(t('input.scope.lowercase-labels', { corrected: fold.corrected }));
-      return;
-    }
-  }
-  // HONESTY GATE on the LLM path (ADR-240): the grammar path refuses to commit a parse that leaves a
-  // NEW input label unused (droppedNewLabels, ADR-089) — the second attempt must hold the same line.
-  // Without it, a decomposition that loses a stated point commits a silently-partial figure: the LLM's
-  // canonical line is re-parsed by the SAME grammar that just dropped the label, so the round-trip can
-  // return the identical partial lowering ("A ו C נמצאות על המעגל" committed as A alone — the
-  // operator's saved-figure C floating off its circle). Name the lost label and keep the text to edit.
-  const llmFig = replay(curFacts).construction;
-  // #1898 (ADR-627): the gates OVERLAP by design and the accountant reports one span per OCCURRENCE, so
-  // the concatenation named a lost label once per gate and once per occurrence («D, D»). The list is
-  // assembled through the battery's one merge (`unreadItems`) — the same merge `honestyGateReport.items`
-  // uses, so a gate added to either seam is de-duplicated the day it is written. The superset of gates
-  // and the order of distinct items are unchanged; only repeats go.
-  const lostVerbs = droppedGivenVerbs(utterance, llmCmds);
-  // #1906 (ADR-722 / ADR-W-144): every shape and role word the student typed must survive into the answer — per
-  // occurrence, a misspelt word included («שווה צלעת» answered «משולש ABC»). The bisect verb gate names its own
-  // statement in its own words, so the member does not repeat it.
-  const lostWords = droppedPropertyWords(
-    utterance,
-    llmCmds,
-    {
-      points: llmFig.objects.filter(isGeoPoint).map((o) => o.id),
-      polygons: llmFig.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])),
-      circles: llmFig.objects.flatMap((o) => (o.kind === 'circle' ? [o.id] : [])),
-      // #2545 (ADR-768): which circle a relation word («המעגל החוסם») describes — the answer must bind that one
-      circleMembers: circleMembers(llmFig),
-      inscribedCircles: inscribedCircles(llmFig),
-    },
-    { skip: lostVerbs.includes('חוצה/bisect') ? ['angle-bisector', 'bisect'] : [] },
-  );
-  const stillDropped: string[] = mergeWordItems(unreadItems(
-    lostNewLabels(llmCmds),
-    // the numeric honesty gate holds on the second attempt too (ADR-250): a decomposition that loses a
-    // stated magnitude must name it, never commit the partial figure
-    droppedGivenNumbers(utterance, llmCmds),
-    // and the RELATION gate (ADR-264): a decomposition that loses a stated `AB=CD`/`⊥`/`∥` between
-    // existing points must name it — its labels all appear on the shape, so the older gates never fire
-    droppedGivenRelations(utterance, llmCmds),
-    // and the VERB gate (ADR-292, the #82 P1): a decomposition that loses a stated tangency/
-    // bisection/… verb must name it — never a silent drop on the second attempt either
-    lostVerbs,
-    // and the WORD gate (ADR-360, #210): a decomposition that loses a word-stated circle relation
-    // (זרים/מוכל) must name it — the exact prod class where two unrelated circles committed green
-    droppedWordRelations(utterance, llmCmds),
-    // and the STRUCTURAL gate (#153/#145): the LLM must not re-introduce a truncated lowering of a
-    // compound measure relation — the whole term list lands in one structured constraint, or refuse
-    droppedCompoundRelation(utterance, llmCmds),
-    // and the COMPARISON gate (ADR-390, #277): a decomposition that turns a stated bound into the
-    // equality at the bound must refuse — the same silent misparse, arriving by the LLM seam
-    droppedComparison(utterance, llmCmds) ? ['<>'] : [],
-    // and the MEASURE-SYMBOL gate (issue #53): a decomposition that loses a stated radius symbol
-    // ("שרדיוסו r") must name it — a lowercase measure letter trips none of the older gates
-    droppedRadiusSymbol(utterance, llmCmds),
-    // and the REGION-SUBJECT gate (ADR-303; wired here by #266/ADR-387): a decomposition of a
-    // region-clause utterance («M בתוך המשולש ABC») that references the subject label nowhere
-    // dropped the student's statement about it — the grammar path already held this line
-    droppedRegionSubject(utterance, llmCmds) ? ['בתוך/מחוץ'] : [],
-    // and the MIDSEGMENT gate (#405/ADR-411): a decomposition of a midsegment-flavoured utterance
-    // that carries no midpoint semantics dropped the given — the grammar chokepoint holds this line,
-    // so the LLM seam must too (the ADR-240 pattern: the second attempt never commits the same drop)
-    droppedMidsegment(utterance, llmCmds) ? ['קטע אמצעים'] : [],
-    // and the OBJECT gate (ADR-430, #456): a decomposition that states a shape and a construct on it but
-    // emits only the bare shape must name what it lost. Bound to the commit EVENT on both paths, not to a
-    // code path — the reported 3-D twins were GRAMMAR drops, where the LLM-seam gates never run at all.
-    droppedConstructNoun(utterance, llmCmds),
-    // and SPAN ACCOUNTING (ADR-453): the enforcing verdict the grammar path takes must hold on the
-    // second attempt too — the two seams ask the identical question, or the LLM path becomes the
-    // weaker one by drift (the ADR-240 pattern this whole battery exists to keep).
-    // #1795 (ADR-597): an existing label is context only when the decomposition refers to it — the figure's
-    // circles and polygons say what a reference reaches, exactly as on the grammar seam.
-    unaccountedSpans(utterance, llmCmds, {
-      existingPoints: llmFig.objects.filter(isGeoPoint).map((o) => o.id),
-      radiusSymbols: llmFig.objects.flatMap((o) => (o.kind === 'circle' && o.radiusSymbol ? [o.radiusSymbol] : [])),
-      circleMembers: circleMembers(llmFig),
-      polygons: llmFig.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])),
-    }).map((x) => x.text),
-  ), lostWords); // #1906: the word items first; an ADR-430 «מעגל» inside «מעגל חסומ» is named once, as the phrase
-  if (stillDropped.length > 0) {
-    logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });
-    ui.setInputNote(t('input.labelsDropped', { labels: stillDropped.join(', ') }));
-    return;
-  }
-  // The MIRROR gate (#255): every gate above asks what the decomposition LOST. None asked what it
-  // ADDED, so an LLM that invents a label — «AB חותך את CD» normalised to «M חיתוך AB ו-CD», session
-  // i1mt2us8 — put a node into the student's namespace with `dropped: []` and a green row. Read off the
-  // LLM's own canonical lines, so a label the GRAMMAR mints while lowering them (a foot, a midpoint,
-  // the ADR-263/270 auto-label family) is never mistaken for an invention. Refuse and keep the text:
-  // naming a point is the student's, and a silent commit is the one outcome that cannot be undone by
-  // reading the figure.
-  // #2228 (ADR-695): an EXISTING point the sentence never refers to is an invention too — the decomposition
-  // attached a relation to it («… דרך P») that the student never stated. The figure's polygons and circles say
-  // which existing points a noun in the sentence reaches («המשולש», «הצלע», «המעגל», «הקטע»).
-  const invented = introducedNewLabels(
-    utterance,
-    out!.built.map((g) => g.step),
-    llmFig.objects.filter(isGeoPoint).map((o) => o.id),
-    {
-      polygons: llmFig.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])),
-      circleMembers: circleMembers(llmFig),
-      segments: llmFig.objects.flatMap((o) => (o.kind === 'segment' ? [[o.a, o.b]] : [])),
-    },
-  );
-  if (invented.length > 0) {
-    logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `invented-labels:${invented.join(',')}`, commands: llmCmds });
-    ui.setInputNote(t('input.labelsInvented', { labels: invented.join(', ') }));
-    return;
-  }
-  // #2518 (ADR-784): the impossible-side refusal holds on this lane too (the ADR-240 pattern); the offer is built from
-  // the model's canonical line, the sentence the grammar read, and quotes what the student typed.
-  const wrongSide = extensionSideVerdict(utterance, out!.built.map((g) => g.step).join(' '), llmCmds, parseCtxNow(), curFacts, cur.seed);
-  if (wrongSide) {
-    logDebug({ kind: 'input', utterance, locale, source: 'llm', result: wrongSide.result, commands: llmCmds });
-    ui.setInputNote(t(wrongSide.messageKey, wrongSide.params));
-    return;
-  }
-  // The LLM understood the (often Hebrew) input and decomposed it into canonical steps; show it as
-  // ONE step row labelled by the STUDENT'S ORIGINAL utterance — not the LLM's English canonical lines
-  // (a Hebrew input must never surface as an English row). All built commands share one group, exactly
-  // like a deterministic multi-command parse, so editing the row re-runs the original wording. The
-  // canonical decomposition + any unbuildable steps stay in the debug log / `dropped` report.
-  const created = commitLine([...bindCmds, ...llmCmds], llmCmds, utterance); // one batch → one step row AND one undo entry (E4)
-  ui.setCreatedNotice?.(created);
-  // `commands` carries the LLM's committed canonical commands into the PROD analytics event too (issue
-  // #84) — a `source:llm, result:ok` submit is otherwise opaque and a reported session can't reconstruct.
-  // `restored` (#536): stated point-runs whose LLM respelling the sequence gate corrected («ABD→ADB») —
-  // logged so a `source:llm` submit stays reconstructable, corrections included.
-  logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out!.built.map((g) => g.step), dropped: out!.dropped, commands: llmCmds, ...(out!.restored ? { restored: out!.restored } : {}) });
-  ui.setLlmDropped(out!.dropped);
+  ui.setCreatedNotice?.(outcome.created);
+  ui.setLlmDropped(outcome.dropped);
   ui.clearText();
   job.join(deps.resolveAfterCommit());
 }

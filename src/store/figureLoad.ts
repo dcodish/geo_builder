@@ -29,11 +29,9 @@
  */
 
 import type { FigureFile, FigureLoadFailure } from './figureFile';
-import { deserializeFigure } from './figureFile';
 import type { Fact } from './geoStore';
-import { primeFoldFor, replay, useGeoStore } from './geoStore';
-import { isCancelled } from './geoWork';
-import { refreshLoadedFigure } from './loadAudit';
+import { adoptSettled, useGeoStore } from './geoStore';
+import { geoJobs, isCancelled } from './geoWork';
 
 /** Why a load refused. `replay-failed` covers both the worker and the main-thread derivation. */
 export type FigureLoadRefusal = FigureLoadFailure | 'replay-failed';
@@ -69,28 +67,19 @@ export interface FigureLoadOpts {
  * refusal — a refused load leaves the current session untouched.
  */
 export async function loadFigureText(text: string, opts: FigureLoadOpts = {}): Promise<FigureLoadOutcome> {
-  const r = deserializeFigure(text);
-  if (!r.ok) return { ok: false, reason: r.reason };
-
-  const { facts: refreshedFacts, refreshed } = refreshLoadedFigure(r.file.facts);
-  const file: FigureFile = { ...r.file, facts: refreshedFacts };
-
-  if (opts.prefold) {
-    try {
-      const fold = await opts.prefold(file.facts, file.seed);
-      // `primeFoldFor` transplants the worker's fold so the smoke replay and the first render both
-      // run at tail speed. A cancelled call (a newer load superseded this one) is not a failure.
-      if (fold) primeFoldFor(file.facts, fold as Parameters<typeof primeFoldFor>[1]);
-    } catch (err) {
-      if (!isCancelled(err)) return { ok: false, reason: 'replay-failed' };
-    }
-  }
-
+  // #2890 (ADR-830): steps 1–4 run as ONE operation in the geometry worker (`geoOps.load`): the read, the refresh (it
+  // parses and replays every prefix), the fold and the smoke replay. The figure comes back settled and is adopted, so
+  // the commit below and the first render solve nothing. `opts.prefold` keeps its meaning: fold first, then replay.
+  let read: Awaited<ReturnType<typeof geoJobs.load>>;
   try {
-    replay(file.facts, file.seed);
-  } catch {
-    return { ok: false, reason: 'replay-failed' };
+    read = await geoJobs.load(text, opts.prefold !== undefined);
+  } catch (err) {
+    if (isCancelled(err)) return { ok: false, reason: 'replay-failed' };
+    throw err;
   }
+  if (!read.ok) return { ok: false, reason: read.reason };
+  const { file, refreshed } = read;
+  if (read.settled) adoptSettled(read.settled);
 
   useGeoStore.getState().loadFigure(file);
   if (opts.resetHistory) useGeoStore.temporal.getState().clear();

@@ -280,6 +280,20 @@
         "קטע AB"
       ],
       "lookFor": "Three rows at the end, the segment AB drawn."
+    },
+    {
+      "sheet": "feat-2890-2d",
+      "id": "T10",
+      "kind": "2d:assertion",
+      "queued": "2026-11-14",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "ABC מקיים תכונה מסתורית"
+      ],
+      "lookFor": "The second line is not added: «לא הבנתי את הבקשה — נסו לנסח אחרת…» and the line stays in the box; one row."
     }
   ],
   "results": [

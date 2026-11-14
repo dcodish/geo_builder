@@ -265,6 +265,13 @@ export interface GeoState {
    *  view applies only while the store still holds the `basis` it was searched on; a result that
    *  arrives after an undo, redo, clear, edit or new line is dropped. Returns whether it applied. */
   applyView: (patch: { facts?: Fact[]; seed: number; basis: ViewBasis }) => boolean;
+  /**
+   * #2890 ([ADR-830](docs/06-decisions.md#adr-830)) — THE ONE SINK of an action decided in the geometry worker: the
+   * store fields the worker changed, put in as ONE transition (one undo entry), only while the store still holds the
+   * figure the job started on (`basis`). Returns whether it applied. A stale result is dropped whole (ADR-812's rule
+   * for a search, for every action).
+   */
+  adopt: (slice: Partial<GeoState>, basis: ViewBasis) => boolean;
   /** Show/hide measure labels on the figure (ADR-031). */
   setShowMeasures: (show: boolean) => void;
   /** Show/hide every circle's centre + label (ADR-059). */
@@ -686,6 +693,12 @@ export const useGeoStore = create<GeoState>()(
           ...(found.facts !== was ? { facts: found.facts } : {}),
           seed: found.seed,
         });
+        return true;
+      },
+
+      adopt: (slice, basis) => {
+        if (isStaleBasis(basis, get())) return false;
+        set(slice);
         return true;
       },
 

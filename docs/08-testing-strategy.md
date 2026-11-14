@@ -197,6 +197,8 @@ every builder's totals from the committed baselines. A re-record never writes a 
 - **2-D's gate measures the whole search, not the browser's clipped one.** Under vitest 2-D's clock budgets are off
   (`import.meta.env.MODE === 'test'`: the search budgets in `replay/core.ts`, and since #2873 the two load budgets in
   `store/loadAudit.ts`), which is what makes the counts exact. A browser stops a search after 12 s.
+- **2-D's `page` count is 0** since [ADR-830](06-decisions.md#adr-830): every decision runs in the worker and the page
+  adopts the settled figure. A 2-D change that puts solver work back on the page fails the gate on that action.
 - **2-D's `page` count is a browser's** since #2890 (above): the gate's workers are their own module instances. In
   every OTHER suite, and in `scripts/perf/2d`, 2-D's worker operations run in the page's module instance, charged to
   the worker lane by the client's same-instance executor (`shell/workerExecutor`); a page count read there is still a

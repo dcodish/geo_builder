@@ -15,6 +15,7 @@
  */
 import { INTERACTIVE, createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
 import { useGeoStore, type Fact } from '@/store/geoStore';
+import { actInWorker, ensureSettled } from './workerJobs';
 
 /** The store fields the fold reads: a change to either re-solves the figure. */
 export const BASIS_FIELDS = ['facts', 'seed'] as const;
@@ -72,6 +73,7 @@ export const JOB_ACTIONS = [
   'merge',
   'clear',
   'loadFigure',
+  'adopt',
 ] as const;
 
 const PANEL = 'a panel or ask lane: it reads the figure, never writes its basis, and shows its own pending state';
@@ -100,8 +102,23 @@ export const FREE_ACTIONS: Readonly<Record<string, string>> = {
   toggleDisplayMode: DISPLAY,
 };
 
+/**
+ * #2890 ([ADR-830](../../docs/06-decisions.md#adr-830)): the actions the page makes ITSELF. They solve nothing: undo and
+ * redo bring back a figure the store already held, a clear empties it, and a view or a load arrives decided. After
+ * them the page only makes sure it holds the figure settled. Every other routed action is a reducer, and runs in the
+ * geometry worker on its copy of the store.
+ */
+const ON_THE_PAGE: ReadonlySet<string> = new Set(['undo', 'redo', 'clear', 'applyView', 'adopt', 'loadFigure']);
+
 /** The job actions AS JOBS: what a component calls. Same arguments; the result arrives in a promise. */
-export const act = queuedActions(work, () => useGeoStore.getState(), JOB_ACTIONS);
+export const act = queuedActions(work, () => useGeoStore.getState(), JOB_ACTIONS, {
+  around: async (name, args, _job, runLocal) => {
+    if (!ON_THE_PAGE.has(name)) return actInWorker(name, [...args]);
+    const out = runLocal();
+    await ensureSettled();
+    return out;
+  },
+});
 
 /**
  * The store, for code that is ALREADY inside a job (a pipeline's closure, the post-commit search's
