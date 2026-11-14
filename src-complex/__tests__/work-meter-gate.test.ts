@@ -2,7 +2,7 @@
  * THE COMPLEX-NUMBERS WORK-METER GATE (#2873, [ADR-W-210](../../docs/06w-decisions-workspace.md#adr-w-210) phase 0).
  *
  * Every saved session in `fixtures/` is walked through the student's actions — typing each line, «הציגו תצורה אחרת», a
- * cold load, an edit, a delete — and each action's solver work is held against `work-meter/baseline.jsonl`. An action
+ * cold load, a delete, an edit — and each action's solver work is held against `work-meter/baseline.jsonl`. An action
  * that does MORE work than its baseline fails; the message says which figure, which action, the numbers, and what to
  * do. The rule, the tolerance (zero) and the re-record are `shell/__tests__/work-gate.ts`'s; the actions are
  * `work-meter/driverCx.ts`'s, the same driver the timing harness runs.
@@ -14,7 +14,8 @@
  *
  * A reading and a folded figure are kept by content and outlive the action, so a count depends on what the session
  * already computed. The walk states that: each figure starts from EMPTY memos and stays warm, as one session does,
- * and its load is cold again (`work-meter/walkCx.ts`). The lock at the end is what proves the counts depend on
+ * and its load is cold again (`work-meter/walkCx.ts`). The edit is the walk's last action, in a session that has
+ * solved the rows before the last and not the edited one. The lock at the end is what proves the counts depend on
  * nothing run before the figure.
  *
  * Re-record: `npm run work:record -- complex` (docs/08, "The work meter").

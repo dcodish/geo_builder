@@ -4602,9 +4602,9 @@ The gate's determinism held under the new unit before the memo: the record, a ch
 - **A global or sticky pattern is never kept.** It carries `lastIndex` between calls. `rx` builds those fresh, as before (five call sites, all on a rule's matched path).
 - **Nothing is keyed by a clock, and there is no budget to charge.** A memo returns what the function would compute and nothing else decides a verdict.
 
-**What a walk now does differently.** The gate's walk (`__tests__/work-meter/walkCx.ts`) starts each figure from empty memos and then stays warm, as one student session does, and it empties them again before the `load`, which stays a cold load. The edit and the delete follow the load in that second session. The timing harness (`scripts/perf/complex/harness.ts`) does the same per corpus item. So a recorded count now means: the work this action executes in a session that has done the figure's earlier actions and nothing else. Nothing else about the walk changed, and the gate's determinism lock is untouched.
+**What a walk now does differently.** The gate's walk (`__tests__/work-meter/walkCx.ts`) starts each figure from empty memos and then stays warm, as one student session does, and it empties them again before the `load`, which stays a cold load. The delete follows the load in that second session. So a recorded count now means: the work this action executes in a session that has done the figure's earlier actions and nothing else. **The `edit` is the walk's last action and has a session of its own** (one definition for all four builders, #2888): a student who has built rows 1..n changes the LAST row; the rows before it are solved in the session, the edited row's content is not. A memo is keyed by content and cannot forget one row, so the driver builds that state (`editLastRowCx`): the memos emptied, rows 1..n-1 put in the store and rendered unmeasured, then all n rows put in the store with nothing solved, then the measured edit of the last row to its own text through `editLine`, as before. The rows are the loaded session's, taken before the delete changes it; a one-row figure has an empty prefix and a cold edit. The timing harness (`scripts/perf/complex/harness.ts`) runs the same order and the same edit per corpus item. The gate's determinism lock is untouched.
 
-**Measured after** (the same 305 recorded actions; record, then a check in the recorded order, `--order reverse`, `--order shuffle:7` and `--order shuffle:11`, each a fresh process, all identical).
+**Measured after, with the first walk** (commit `d0651b30`: the `edit` still re-typed the last row in the session that had just solved it, so it reads 0; the final `edit` and totals are in the next section. The same 305 recorded actions; record, then a check in the recorded order, `--order reverse`, `--order shuffle:7` and `--order shuffle:11`, each a fresh process, all identical).
 
 | Recorded actions (45 fixtures) | New unit, no memo | With the memos | Fall |
 |---|---|---|---|
@@ -4632,6 +4632,26 @@ All 305 actions fell; none rose and none stayed. The 354 reads are the 177 disti
 | `2b-capstone` submit#9 | 105 | 3 |
 | `param-modulus-1366` edit | 99 | 0 |
 
+**The `edit`, redefined, and the final baseline.** Re-typing the last row in the session that had just solved it executed nothing, so the first walk's `edit` sized no edit, and its count would have read as "nothing on the page" where a student who changes a row's text makes the page solve the whole new row. The definition above was recorded with `--accept-rise`, for the `edit` lines only: 44 of the 45 rose, and no `submit`, `another`, `load` or `delete` line moved.
+
+| `edit` (45 fixtures) | Count |
+|---|---|
+| phase 0 unit (exact solves) | 185 |
+| new unit, no memo (with no memo the session's state changes nothing, so this is the new definition's count too) | 1 521 |
+| memos, the first walk | 0 |
+| memos, the edit in its own session | **162** (−89.3 % against no memo) |
+
+| Recorded actions (45 fixtures), final | New unit, no memo | Final | Fall |
+|---|---|---|---|
+| total = page = before the paint | 9 307 | **1 205** | −87.1 % |
+| submit (134) | 4 196 | 566 | −86.5 % |
+| load (45) | 2 437 | 383 | −84.3 % |
+| edit (45) | 1 521 | 162 | −89.3 % |
+| another (45) | 824 | 54 | −93.4 % |
+| delete (36) | 329 | 40 | −87.8 % |
+
+Record, a check, `--order reverse`, `--order shuffle:7` and `--order shuffle:11` give the same 305 counts. The edit against the submit of the same row, per fixture (162 against 210 in all): equal in 16, lower in 26 (by 2 in 17, by 3 in 4, by 1 in 5) and higher by 1 in 3. Three things make the difference, alone or together. A typed line pays the entailment gate's two exact solves and an edit does not (`editLine` never asks whether the line was already held). The first line of a figure also folds the empty figure before it, which the edit's set-up has already made (one-row figures). And where a question was typed after the row, the edit's render folds the figure once more with the question, which the submit's session did not have yet (the three that are higher). One edit reads 0 and so does its submit, `declare-complex-after-1405` «u מספר מרוכב»: the teaching note on «u^5 = 32» had already run the gate on exactly that declaration, so the session has solved it before the student types it.
+
 Wall time, the dev PC with the other builders' suites running on it (two alternating rounds of before and after, minutes apart), before = this branch's first commit (the unit change, no memo), best of the runs shown:
 
 | Workload | Before | After |
@@ -4652,7 +4672,7 @@ Each memo was also switched off alone, in the same minutes. Without the fold mem
 **Not built, with the measurement.** The part of a fold that does not depend on the configuration, `lowerLines` and `exactSolve`, is executed once per distinct fold. Of the 689 exact solves left, 310 (45 %) solve a line list the session already solved: another seed or configuration of it, the same figure with the questions, or the entailment gate's two solves of the lists the gate's own folds just solved. Sharing them needs the lowering kept by content and a seam into `foldConstraints`. After the two memos `exactSolve` is 12.5 % of the walk's time and `lowerLines` 5.7 %, so the repeat is about 8 % of what is left, some 0.05 ms an action. It is left for the meter to rank, with phase 5.
 
 **Known limits.**
-- **The walk's `edit` now counts 0.** It re-types the last line's own text, which the session has already folded. The count still fails if an edit starts executing work, but it no longer sizes an edit that changes the text. Changing what the walk's edit types changes what the recorded numbers mean in every builder, so it is reported and not done here.
+- **The walk's `edit` edits the row to its own text.** It sizes an edit of the last row whose content the session has not solved; it does not walk an edit that is refused, or one of an earlier row.
 - **The synthetic refusal is still 0.82 s.** Its 234 folds are 234 different line lists (the gate's differential blame, one earlier line removed at a time), so nothing is solved twice; what is left is the fold. That is ADR-W-210's third cause (a line that cannot hold costs more than one that can) and belongs to phase 5.
 - **A cold load recompiles the patterns** in the walk, because the one clear function empties that table too. A real session pays it once per page.
 - **The timings were taken while other suites used the machine.** The counts are exact; the times are the best of several runs and are comparable with each other only.

@@ -11,7 +11,8 @@
 // {"ev":"m"} after) so sweep.mjs can kill a hang; it writes no file except a --prof profile.
 //
 // THE CACHES (#2888, ADR-CX-090): each corpus item is one student session — it starts from empty memos
-// (clearComplexCaches) and stays warm; its load is cold again, as the work-meter gate's walk does it.
+// (clearComplexCaches) and stays warm; its load is cold again, as the work-meter gate's walk does it. The edit is
+// measured last, in a session that has solved the lines before the edited one and not that one (editLastRowCx).
 //
 // WHAT IT MEASURES — all on the MAIN THREAD (there is no Worker anywhere in src-complex): submit / show-another /
 // load / edit / delete. "render" = what App.tsx's useMemo chain recomputes after the store changes
@@ -36,7 +37,7 @@ import { Session } from 'node:inspector';
 import { hydrateSession } from '../../../src-complex/app/submit';
 import { clearComplexCaches } from '../../../src-complex/app/deriveLines';
 // The actions themselves are the ONE driver this harness and the work-meter gate share (#2873).
-import { anotherCx, applyLineCx, blankCx, editLastCx, loadCx, removeFirstCx, savedFileCx, submitCx, type ActionRecordCx } from '../../../src-complex/__tests__/work-meter/driverCx';
+import { anotherCx, applyLineCx, blankCx, editLastRowCx, loadCx, removeFirstCx, savedFileCx, sessionCx, submitCx, type ActionRecordCx } from '../../../src-complex/__tests__/work-meter/driverCx';
 
 (globalThis as any).fetch = async () => {
   throw new Error('perf harness: network disabled (no LLM)');
@@ -203,22 +204,24 @@ function runItem(it: Item, opts: { only?: string }) {
   s.seed = seed0;
   // load: a cold hydrate of the saved file (the fixture itself, or the final state as a save would write it)
   const file = it.file ?? savedFileCx(s);
-  // the load is COLD: a saved file opened in a new session (the edit and the delete after it are that session's)
+  // the load is COLD: a saved file opened in a new session (the delete after it is that session's)
   clearComplexCaches();
   if (want('load')) {
     out({ ev: 'begin', item: it.id, kind: 'load', step: 0 });
     out({ ev: 'm', ...tag, kind: 'load', step: 0, seq: [...prefix], ...shown(loadCx(file)), thread: 'main' });
   } else hydrateSession(file);
-  if (want('edit')) {
-    // edit the LAST line in place to its own text: editLine's gateChange path (config tries + blame on failure)
-    out({ ev: 'begin', item: it.id, kind: 'edit', step: s.lines.length - 1 });
-    const r = editLastCx();
-    if (r) out({ ev: 'm', ...tag, kind: 'edit', step: r.nLines - 1, seq: [...prefix], ...shown(r), thread: 'main' });
-  }
+  const loaded = sessionCx();
   if (want('delete')) {
     out({ ev: 'begin', item: it.id, kind: 'delete', step: 0 });
     const r = removeFirstCx();
     if (r) out({ ev: 'm', ...tag, kind: 'delete', step: 0, seq: [...prefix], ...shown(r), thread: 'main' });
+  }
+  if (want('edit')) {
+    // LAST, in a session of its own (the work meter's definition, #2888): the lines before the last are solved, the
+    // edited one is not. editLine's gateChange path (config tries + blame on failure) on the last line's own text.
+    out({ ev: 'begin', item: it.id, kind: 'edit', step: loaded.lines.length - 1 });
+    const r = editLastRowCx(loaded);
+    if (r) out({ ev: 'm', ...tag, kind: 'edit', step: r.nLines - 1, seq: [...prefix], ...shown(r), thread: 'main' });
   }
 }
 
