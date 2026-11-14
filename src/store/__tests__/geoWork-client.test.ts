@@ -13,6 +13,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { FromWorker, ToWorker } from '../../../shell/workerProtocol';
+import type { Fact } from '@/replay/core';
 
 class FakeWorker {
   static made: FakeWorker[] = [];
@@ -41,7 +42,7 @@ describe('2-D’s worker client where a Worker exists', () => {
   let W: typeof import('../geoWork');
   let core: typeof import('@/replay/core');
   let meter: typeof import('../../../shell/workMeter');
-  let facts: import('@/replay/core').Fact[];
+  let facts: Fact[];
 
   beforeAll(async () => {
     vi.stubGlobal('Worker', FakeWorker);
