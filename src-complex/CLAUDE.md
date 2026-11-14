@@ -55,6 +55,10 @@ the יואל גבע 572 booklet, 2020–2025, Q3 of every exam.
 - **Nothing stated is ever silently dropped.** Span accounting is the only mechanism — every non-filler
   token span is claimed or the parse refuses. **No `dropped*` gate is ever added**
   ([ADR-CX-009](../docs/06d-decisions-complex.md#adr-cx-009) §2).
+- **A reading and a folded figure are computed once, frozen and shared.** `parseLineV2` and `deriveLines`
+  return memoized objects, keyed by their whole input (`value/contentMemo.ts`): never write to one, and a
+  new memo is made there, keyed by everything its function reads, so `clearComplexCaches` empties it too
+  ([ADR-CX-090](../docs/06d-decisions-complex.md#adr-cx-090)).
 
 The stage order every mechanism inserts into is [`docs/LADDER-CX.md`](../docs/LADDER-CX.md). **Every
 mechanism ADR names its stage and updates that file.**

@@ -13,7 +13,7 @@
  * "The render" is what App.tsx's useMemo chain recomputes after the store changes (letterLines empty: no chip
  * toggled): deriveLines + coincidencesCx + askRowsOf + realParamNotes + buildScene. There is no Worker anywhere in
  * src-complex and no work after the paint: every unit is page work before the paint, and the meter says so rather
- * than this file.
+ * than this file. A unit is one executed line read or one exact solve (#2888, ADR-CX-090).
  */
 import { decideSubmitCx, hydrateSession, editLine } from '../../app/submit';
 import { deriveLines, complexScopeOf } from '../../app/deriveLines';

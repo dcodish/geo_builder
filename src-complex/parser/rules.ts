@@ -126,6 +126,8 @@ import type { ReservedConstant } from '../model/naming';
 import { normalize } from './normalize';
 import { RADIAN, angleDegrees, isRadianText } from './angleText';
 import { type Claim, type Unaccounted, claimAll, unaccountedSpans } from './span';
+import { meterWork } from '../../shell/workMeter';
+import { contentMemo } from '../value/contentMemo';
 
 /**
  * #1894 (ADR-CX-061) — is this (canonical) name a REAL-PARAMETER letter in this figure? A letter outside
@@ -250,16 +252,16 @@ const negationAmong = (normalized: string, unread: readonly Unaccounted[]): stri
 };
 
 export interface ParsedLine {
-  readonly constraints: Constraint[];
-  readonly filters: BranchFilter[];
+  readonly constraints: readonly Constraint[];
+  readonly filters: readonly BranchFilter[];
   /**
    * The student's ANSWERS — verified, never allowed to move the figure. Named `assertions` and not
    * `claims` because `claims` on this interface already means the SPAN ranges the rule consumed, and
    * two different `claims` on one object is how a reader ends up checking the wrong one.
    */
-  readonly assertions: Assertion[];
+  readonly assertions: readonly Assertion[];
   /** the things to DRAW that are not numbers — segments, polygons, circles (F6) */
-  readonly objects: FigureObject[];
+  readonly objects: readonly FigureObject[];
   /**
    * Stated MEASURES — length, perimeter, area (F7).
    *
@@ -267,17 +269,17 @@ export interface ParsedLine {
    * from `assertions` because, unlike a claim, a measure MAY drive when the figure has a free degree
    * of freedom for it to consume. One form, and the engine decides (docs/27 §10 P1).
    */
-  readonly measures: MeasureRelation[];
+  readonly measures: readonly MeasureRelation[];
   /** «שטח OZ₁Z₂Z₃» — a request to DISPLAY a measure, answered only when the value is knowledge */
-  readonly queries: MeasureQuery[];
+  readonly queries: readonly MeasureQuery[];
   /** «היחס בין … ל…» — a ratio of two measures, knowable where neither half is (G8) */
-  readonly ratios: RatioQuery[];
+  readonly ratios: readonly RatioQuery[];
   /** a bare expression: «what is this value?» — answered only when it is knowledge */
-  readonly exprQueries: ExprQuery[];
+  readonly exprQueries: readonly ExprQuery[];
   /** «arg w» — the argument question (#1437), answered from the exact argument carrier */
-  readonly argQueries: ArgQuery[];
+  readonly argQueries: readonly ArgQuery[];
   /** stated sequences as STATEMENTS — what the series pictures are drawn from (F9) */
-  readonly sequences: SequenceStatement[];
+  readonly sequences: readonly SequenceStatement[];
   /**
    * `X^n = …` seen as a SHAPE, not yet as a constraint (#680).
    *
@@ -286,15 +288,15 @@ export interface ParsedLine {
    * entry deliberately produces NO constraint for it: emitting the narrow reading as a default is how
    * the enumeration went missing on this path in the first place.
    */
-  readonly roots: RootsEquation[];
+  readonly roots: readonly RootsEquation[];
   /**
    * #694 — «z₀ הוא הפתרון ברביע הרביעי»: bind a NEW name to the member of an enumerated solution
    * set that satisfies a filter. Reported as a shape; the fold resolves it, because WHICH member
    * satisfies the filter is only knowable once the directions are solved.
    */
-  readonly selections: Selection[];
+  readonly selections: readonly Selection[];
   /** names the line brings into existence, whether or not a constraint mentions them */
-  readonly declares: string[];
+  readonly declares: readonly string[];
   /**
    * #1405 (ADR-CX-047) — names the line TYPES as complex: «u מספר מרוכב» / «u is a complex number».
    *
@@ -303,16 +305,16 @@ export interface ParsedLine {
    * existing number, so `u^5 = 32` still reads as the exam's «פתרו את המשוואה» in either order. The
    * fold draws a typed name as a free number only when nothing else in the figure claims the letter.
    */
-  readonly typed: string[];
+  readonly typed: readonly string[];
   /**
    * #1894 (ADR-CX-061) — real-parameter letters the line TYPES as real: «a ממשי» / «a מספר ממשי».
    * Not an existence and not a point: the fold lists the letter under parameters, and its claim row
    * is checked against the type.
    */
-  readonly realTyped: string[];
-  readonly claims: Claim[];
+  readonly realTyped: readonly string[];
+  readonly claims: readonly Claim[];
   /** angle atoms a cartesian literal introduced, with the degrees they stand for */
-  readonly atoms: Map<string, number>;
+  readonly atoms: ReadonlyMap<string, number>;
 }
 
 export type ParseOutcome =
@@ -324,7 +326,7 @@ export type ParseOutcome =
       readonly ok: false;
       readonly reason: 'unaccounted';
       readonly normalized: string;
-      readonly items: string[];
+      readonly items: readonly string[];
       /** #1890 (W20) — the unread word is a NEGATION: the refusal says so, in 2-D's sentence */
       readonly negation?: string;
     }
@@ -1457,8 +1459,45 @@ export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = 
  * `scope` (#1405) is the letter families the figure declared complex. Only the layer that sees every
  * line can know it (`lowerLines`); a caller reading one line on its own passes nothing and gets the
  * ADR-CX-004 convention.
+ *
+ * A LINE IS READ ONCE PER CONTENT (#2888, [ADR-CX-090](../../docs/06d-decisions-complex.md#adr-cx-090)). The reading
+ * is a pure function of exactly two things, the line's text and the declared families, and both are the memo's key
+ * ({@link parseKey}). Every fold, every scope scan and every gate probe used to read every line again; now each
+ * asks here and the read runs once. The returned outcome is FROZEN and shared: a caller reads it, never changes it.
  */
 export function parseLineV2(raw: string, scope: ComplexScope = NO_SCOPE): ParseOutcome {
+  const key = parseKey(raw, scope);
+  return readings.get(key) ?? readings.set(key, readLine(raw, scope));
+}
+
+/**
+ * How many readings are kept, least recently used out first. One action on a figure of n lines asks for about
+ * n readings per set of declared letters it reads the figure under: none (the scope scan), the figure's own (the
+ * lowering), and one more per solved parameter whose declaration the teaching note tries. The loader's ceiling is
+ * 64 lines (`shell/save`), so the bound holds an action's readings several times over and the session's earlier
+ * figures besides. Measured: a reading holds about 4 KB with the atoms it registers, so a full table is about
+ * 4.2 MB (ADR-CX-090).
+ */
+export const PARSE_MEMO_MAX = 1024;
+const readings = contentMemo<ParseOutcome>('readings', PARSE_MEMO_MAX);
+
+/**
+ * The memo key of one read: EVERYTHING {@link readLine} reads. The text is taken as typed, before any
+ * normalization, so two spellings are never one entry. The scope is read by membership alone (`isComplexName`), so
+ * its key is its members, sorted: the same letters declared in another order are one reading, and a different set
+ * is never served it. The scope part is JSON, which cannot hold a raw NUL, so the first NUL of a key always
+ * separates the two parts and no text can imitate a scope.
+ */
+export const parseKey = (raw: string, scope: ComplexScope = NO_SCOPE): string =>
+  `${scope.size === 0 ? '' : JSON.stringify([...scope].sort())}\u0000${raw}`;
+
+/**
+ * The read itself, EXECUTED. One call is one unit of work: the work meter counts it here, beside the fold's exact
+ * solves, because reading the lines is where this builder's time went (81.5 % of an action, measured) and a count
+ * that could not see it guarded nothing. A memo hit runs nothing and is charged nothing.
+ */
+function readLine(raw: string, scope: ComplexScope): ParseOutcome {
+  meterWork();
   const normalized = normalize(raw);
   if (!normalized) return { ok: false, reason: 'not-handled', normalized };
   // #2247 (ADR-CX-081) — «2 1/2» / «2 3» is refused before any rule reads it, so every rule gets the one sentence

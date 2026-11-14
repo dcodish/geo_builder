@@ -106,7 +106,7 @@ press take 6 s was found by the operator's play.
 
 | | 2-D | 3-D | Analytic | Complex |
 | --- | --- | --- | --- | --- |
-| One unit | one `evaluateCore` call | one residual evaluation of `leastSquares` | one residual evaluation of `solveLM`, `jacobianRank` or `scanRoots` | one exact solve of a fold |
+| One unit | one `evaluateCore` call | one residual evaluation of `leastSquares` | one residual evaluation of `solveLM`, `jacobianRank` or `scanRoots` | one executed line read (`parseLineV2`) or one exact solve of a fold ([ADR-CX-090](06d-decisions-complex.md#adr-cx-090)) |
 | Gate | `src/__tests__/work-meter-gate.test.ts` | `src3d/__tests__/work-meter-gate.test.ts` | `src-analytic/__tests__/work-meter-gate.test.ts` | `src-complex/__tests__/work-meter-gate.test.ts` |
 | Baseline | `src/__tests__/work-meter/baseline.jsonl` | `src3d/__tests__/work-meter/baseline.jsonl` | `src-analytic/__tests__/work-meter/baseline.jsonl` | `src-complex/__tests__/work-meter/baseline.jsonl` |
 | Gate's wall time alone · inside `test:full`, measured 2026-11-13 | 6 min · 11 min | 5 min · 10 min | 11 min · 15 min | under 2 s |

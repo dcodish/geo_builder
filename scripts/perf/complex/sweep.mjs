@@ -83,7 +83,7 @@ function summarize(doc, write) {
   const counts = countBuckets(rows, (m) => [m.kind, `${m.kind} @${m.source ?? m.item?.split(':')[0] ?? '?'}`], msOf);
   console.log(countsText(counts, 'action'));
   console.log(`items ${doc.items}  actions ${rows.length}  timeouts ${rows.filter((m) => m.timeout).length}  re-measured ${rows.filter((m) => m.confirm).length}  slowest ${Math.round(Math.max(...rows.map(msOf)))} ms  (commit ${doc.commit ?? 'unknown'})`);
-  console.log(workSummary(rows, 'exact solves'));
+  console.log(workSummary(rows, 'line reads + exact solves'));
   console.log('\n      ms  action      item@action | last line | verdict | parts | work');
   for (const m of [...rows].sort((a, b) => msOf(b) - msOf(a)).slice(0, only || args.has('--list') ? 40 : 12))
     console.log(String(Math.round(msOf(m))).padStart(8), ' ' + `${m.kind}#${m.step}`.padEnd(11), `${m.item}@${actionOf(m)}`, '|', (m.seq ?? []).at(-1) ?? '', '|', m.verdict ?? '', '|', JSON.stringify(m.parts ?? {}), '|', workText(m.work), m.confirm ? `confirm ${JSON.stringify(m.confirm)}` : '');

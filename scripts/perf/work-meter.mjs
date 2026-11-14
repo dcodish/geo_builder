@@ -44,7 +44,7 @@ const BUILDERS = Object.fromEntries(
     .map(([tree, t]) => [t.label, tree])
     .filter(([, tree]) => existsSync(path.join(REPO, tree, '__tests__', 'work-meter-gate.test.ts'))),
 );
-const UNIT = { '2d': 'evaluateCore calls', '3d': 'residual evaluations (leastSquares)', analytic: 'residual evaluations (solveLM, rank, root scan)', complex: 'exact solves' };
+const UNIT = { '2d': 'evaluateCore calls', '3d': 'residual evaluations (leastSquares)', analytic: 'residual evaluations (solveLM, rank, root scan)', complex: 'line reads + exact solves' };
 
 function usage(code) {
   console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 27).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
