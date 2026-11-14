@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>Part 1 — one bug (#2848)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/*__BPMN_CSS__*/
+:root { --ink: #1b1f2a; --accent: #e8590c; --accent-soft: #fff1e6; --band: rgba(16, 19, 28, 0.86); --paper: #ffffff; }
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #0d1017; font-family: Heebo, Arial, sans-serif; }
+#stage { position: absolute; inset: 0; background: var(--paper); direction: ltr; } /* bpmn-js lays its SVG text out left-to-right */
+#canvas { position: absolute; inset: 0; }
+.bjs-powered-by, .bjs-breadcrumbs, .bjs-drilldown { display: none !important; }
+.djs-element.active .djs-visual > :first-child { stroke: var(--accent) !important; stroke-width: 4px !important; fill: var(--accent-soft) !important; }
+.djs-connection.active .djs-visual > path { stroke: var(--accent) !important; stroke-width: 3px !important; }
+.djs-connection.pulse .djs-visual > path { stroke: var(--accent) !important; stroke-width: 3.5px !important; animation: dash 1s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -20; } }
+#caption { position: absolute; left: 50%; bottom: 54px; transform: translateX(-50%); max-width: 1500px; background: var(--band); color: #fff; font-size: 46px; font-weight: 500; line-height: 1.35; padding: 18px 40px 22px; border-radius: 14px; text-align: center; opacity: 0; transition: opacity .35s; }
+#caption.on { opacity: 1; }
+#clock { position: absolute; top: 40px; right: 48px; display: grid; justify-items: end; gap: 2px; opacity: 0; transition: opacity .4s; }
+#clock.on { opacity: 1; }
+#clock .t { font: 600 64px "IBM Plex Mono", monospace; color: var(--ink); background: #fff; padding: 2px 18px; border-radius: 10px; border: 3px solid var(--ink); }
+#clock .d { font: 500 22px "IBM Plex Mono", monospace; color: #4a5263; }
+#actor { position: absolute; top: 172px; right: 48px; font-size: 32px; font-weight: 700; color: #fff; background: var(--accent); padding: 8px 22px; border-radius: 999px; opacity: 0; transition: opacity .35s; }
+#actor.on { opacity: 1; }
+#actor small { font: 500 22px "IBM Plex Mono", monospace; opacity: .9; margin-inline-start: 10px; }
+#card { position: absolute; top: 120px; left: 70px; width: 980px; border-radius: 14px; overflow: hidden; box-shadow: 0 24px 70px rgba(10, 14, 24, .45); border: 2px solid #c9ced8; transform: translateX(-1200px); transition: transform .6s cubic-bezier(.2, .8, .2, 1); background: #fff; }
+#card.on { transform: none; }
+#card img { display: block; width: 100%; }
+#card .hl { position: absolute; border: 5px solid var(--accent); border-radius: 6px; box-shadow: 0 0 0 9999px rgba(255, 255, 255, .0); }
+#chip { position: absolute; font: 600 30px "IBM Plex Mono", monospace; color: #fff; background: #1a7f37; padding: 4px 16px; border-radius: 999px; opacity: 0; transition: opacity .3s, transform .3s; transform: scale(.7); }
+#chip.on { opacity: 1; transform: scale(1); }
+#title { position: absolute; inset: 0; background: #0d1017; color: #fff; display: grid; place-content: center; text-align: center; gap: 26px; opacity: 1; transition: opacity .6s; }
+#title.off { opacity: 0; pointer-events: none; }
+#title .big { font: 600 150px "IBM Plex Mono", monospace; letter-spacing: -.02em; direction: ltr; }
+#title .line { font-size: 54px; font-weight: 500; min-height: 80px; }
+#title .row { display: flex; gap: 60px; justify-content: center; direction: ltr; }
+#title .row > div { opacity: 0; transition: opacity .5s; }
+#title .row > div.on { opacity: 1; }
+#title .lbl { font-size: 40px; font-weight: 500; color: #c6cbd6; direction: rtl; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="canvas"></div></div>
+<div id="card"><img id="cardImg" alt=""><div class="hl" id="cardHl" hidden></div></div>
+<div id="chip"></div>
+<div id="clock"><div class="t" id="clockT">08:51</div><div class="d">12.11.2026</div></div>
+<div id="actor"></div>
+<div id="caption"></div>
+<div id="title"><div class="row"><div id="tA"><div class="big">08:51</div><div class="lbl">מתגלה באג</div></div><div id="tB"><div class="big">12:25</div><div class="lbl">התיקון באוויר</div></div></div><div class="line" id="tLine"></div></div>
+<script src="https://unpkg.com/bpmn-js@18.31.1/dist/bpmn-navigated-viewer.production.min.js"></script>
+<script>
+const BPMN_XML = /*__BPMN_XML__*/null;
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ease = (t) => (t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+function tween(ms, f) { return new Promise((res) => { const t0 = performance.now(); const step = (now) => { const k = Math.min(1, (now - t0) / ms); f(ease(k), k); if (k < 1) requestAnimationFrame(step); else res(); }; requestAnimationFrame(step); }); }
+
+const viewer = new BpmnJS({ container: '#canvas' });
+let canvas, reg, layer;
+const SVG = (tag, attrs) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+// ---------- camera ----------
+function boxOf(ids, pad = 60, captionRoom = true) {
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  for (const id of ids) {
+    const e = reg.get(id); if (!e) throw new Error('no element ' + id);
+    const pts = e.waypoints || [{ x: e.x, y: e.y }, { x: e.x + e.width, y: e.y + e.height }];
+    for (const p of pts) { x1 = Math.min(x1, p.x); y1 = Math.min(y1, p.y); x2 = Math.max(x2, p.x); y2 = Math.max(y2, p.y); }
+  }
+  x1 -= pad; y1 -= pad; x2 += pad; y2 += pad;
+  if (captionRoom) y2 += (y2 - y1) * 0.32; // keep the subtitle band clear
+  let w = x2 - x1, h = y2 - y1; const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+  if (w / h > 16 / 9) h = w * 9 / 16; else w = h * 16 / 9;
+  if (w < 1000) { w = 1000; h = w * 9 / 16; } // never zoom past readable-at-a-glance
+  return { x: cx - w / 2, y: cy - h / 2, width: w, height: h };
+}
+async function cam(target, ms = 1400) {
+  const from = canvas.viewbox(); const a = { x: from.x, y: from.y, width: from.width, height: from.height };
+  await tween(ms, (k) => canvas.viewbox({ x: a.x + (target.x - a.x) * k, y: a.y + (target.y - a.y) * k, width: a.width + (target.width - a.width) * k, height: a.height + (target.height - a.height) * k }));
+}
+
+// ---------- tokens ----------
+function makeToken() {
+  const g = SVG('g', { opacity: 0 });
+  g.appendChild(SVG('circle', { r: 20, fill: '#e8590c', opacity: .22 }));
+  g.appendChild(SVG('circle', { r: 11, fill: '#e8590c', stroke: '#fff', 'stroke-width': 3 }));
+  layer.appendChild(g); return { g, x: 0, y: 0 };
+}
+function makeEnvelope() {
+  const g = SVG('g', { opacity: 0 });
+  g.appendChild(SVG('rect', { x: -17, y: -12, width: 34, height: 24, rx: 3, fill: '#fff', stroke: '#e8590c', 'stroke-width': 3 }));
+  g.appendChild(SVG('path', { d: 'M-17 -12 L0 2 L17 -12', fill: 'none', stroke: '#e8590c', 'stroke-width': 3 }));
+  layer.appendChild(g); return { g, x: 0, y: 0 };
+}
+const place = (t, x, y) => { t.x = x; t.y = y; t.g.setAttribute('transform', `translate(${x} ${y})`); };
+const show = (t, on = true) => t.g.setAttribute('opacity', on ? 1 : 0);
+const center = (id) => { const e = reg.get(id); return [e.x + e.width / 2, e.y + e.height / 2]; };
+function flow(a, b) {
+  const c = reg.filter((e) => e.waypoints && e.source && e.target && e.source.id === a && e.target.id === b)[0];
+  if (!c) throw new Error(`no flow ${a} -> ${b}`); return c;
+}
+async function along(t, pts, speed = 420) {
+  let len = 0; const seg = [];
+  for (let i = 0; i < pts.length - 1; i++) { const d = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y); seg.push(d); len += d; }
+  await tween(Math.max(250, (len / speed) * 1000), (k) => {
+    let d = k * len, i = 0; while (i < seg.length - 1 && d > seg[i]) { d -= seg[i]; i++; }
+    const r = seg[i] ? d / seg[i] : 1; place(t, pts[i].x + (pts[i + 1].x - pts[i].x) * r, pts[i].y + (pts[i + 1].y - pts[i].y) * r);
+  });
+}
+const mark = (id, on = true, cls = 'active') => (on ? canvas.addMarker(id, cls) : canvas.removeMarker(id, cls));
+async function walk(t, ids, { dwell = 380, speed = 420 } = {}) {
+  const [x, y] = center(ids[0]); place(t, x, y); show(t); mark(ids[0]);
+  await sleep(dwell);
+  for (let i = 0; i < ids.length - 1; i++) {
+    const c = flow(ids[i], ids[i + 1]); mark(c.id);
+    const pts = [{ x: t.x, y: t.y }, ...c.waypoints, { x: center(ids[i + 1])[0], y: center(ids[i + 1])[1] }];
+    await along(t, pts, speed);
+    mark(ids[i], false); mark(c.id, false); mark(ids[i + 1]);
+    await sleep(dwell);
+  }
+}
+async function message(a, b, { speed = 650, camFollow = null } = {}) {
+  const env = makeEnvelope(); const c = flow(a, b); mark(c.id); show(env);
+  const pts = c.waypoints.map((p) => ({ x: p.x, y: p.y }));
+  place(env, pts[0].x, pts[0].y);
+  const moving = along(env, pts, speed); if (camFollow) cam(camFollow, 1800);
+  await moving; mark(c.id, false); show(env, false); env.g.remove();
+}
+
+// ---------- overlays ----------
+async function say(text, ms) { const c = $('caption'); c.classList.remove('on'); await sleep(200); c.textContent = text; c.classList.add('on'); if (ms) await sleep(ms); }
+const hush = () => $('caption').classList.remove('on');
+const clock = (t) => { $('clockT').textContent = t; $('clock').classList.add('on'); };
+const actor = (he, en) => { const a = $('actor'); a.innerHTML = `${he}<small>${en}</small>`; a.classList.add('on'); };
+const noActor = () => $('actor').classList.remove('on');
+function card(src, hl) { $('cardImg').src = src; const h = $('cardHl'); if (hl) { Object.assign(h.style, { left: hl[0] + '%', top: hl[1] + '%', width: hl[2] + '%', height: hl[3] + '%' }); h.hidden = false; } else h.hidden = true; $('card').classList.add('on'); }
+const uncard = () => $('card').classList.remove('on');
+function chip(text, nearId, color = '#1a7f37') {
+  const ch = $('chip'); ch.textContent = text; ch.style.background = color;
+  const e = reg.get(nearId); const vb = canvas.viewbox(); const s = vb.scale;
+  ch.style.left = ((e.x - vb.x) * s) + 'px'; ch.style.top = ((e.y - vb.y) * s - 60) + 'px'; ch.classList.add('on');
+}
+const unchip = () => $('chip').classList.remove('on');
+
+// ---------- the script: issue #2848, 12 Nov 2026 (times are Israel time) ----------
+async function play() {
+  await viewer.importXML(BPMN_XML, 'Diagram_Overview');
+  canvas = viewer.get('canvas'); reg = viewer.get('elementRegistry'); layer = canvas.getLayer('tokens', 1000);
+  canvas.zoom('fit-viewport', 'auto');
+  const overview = canvas.viewbox(); const ov = { x: overview.x - 40, y: overview.y - 20, width: overview.width + 80, height: overview.height + 40 };
+  canvas.viewbox(ov);
+  if (window.__started) window.__started();
+
+  // 0 — the hook
+  await sleep(700); $('tA').classList.add('on'); await sleep(1800); $('tB').classList.add('on');
+  $('tLine').textContent = 'באג אחד. מדיווח ועד ייצור.'; await sleep(2600);
+  $('title').classList.add('off'); await sleep(600);
+
+  // 1 — the map, and the four ways in
+  await say('זה התהליך כולו: מגילוי באג ועד פריסה לייצור.', 2600);
+  for (const [a, b] of [['op_t2', 'b_s'], ['sc_t4', 'b_s'], ['r_mi', 'b_s']]) mark(flow(a, b).id, true, 'pulse');
+  await say('באג נכנס מכמה כיוונים: בדיקה ידנית, סריקת יומני הייצור, או סוכן שמצא אותו תוך כדי תיקון אחר.', 4200);
+  for (const [a, b] of [['op_t2', 'b_s'], ['sc_t4', 'b_s'], ['r_mi', 'b_s']]) mark(flow(a, b).id, false, 'pulse');
+
+  // 2 — the operator finds it (08:51)
+  const bug = makeToken();
+  clock('08:51'); actor('המפעיל', 'Operator');
+  const camOp = cam(boxOf(['op_s1', 'op_t2', 'op_e1'], 70), 1500);
+  say('המפעיל בודק את הכלי לגאומטריה אנליטית — והפרמטר k לא נפתר, למרות שיש לו שני ערכים.');
+  await camOp; await walk(bug, ['op_s1', 'op_t1', 'op_gm', 'op_t2'], { dwell: 420 });
+  show(bug, false); mark('op_t2', false);
+  await message('op_t2', 'b_s', { camFollow: boxOf(['op_t2', 'b_s', 'b_sp'], 80) });
+
+  // 3 — triage
+  actor('סוכן הטריאז׳', 'Triage session');
+  const camTr = cam(boxOf(['b_s', 'b_sp', 'b_g2'], 90), 1200);
+  say('סוכן הטריאז׳ בודק שאין Issue קיים, פותח אחד, ומאבחן את שורש הבעיה.');
+  await camTr; await walk(bug, ['b_s', 'b_gm0', 'b_sp'], { dwell: 350 });
+  card('assets/issue-2848.png'); await sleep(3800);
+  await say('ואז כותב תוכנית תיקון — כולל שורה לכל דבר שהתלמיד יראה אחרת.', 3200);
+  uncard(); await sleep(500);
+
+  // 4 — no question for anyone: every line is already ruled
+  const camArm = cam(boxOf(['b_g1', 'b_ca', 'b_t2', 'b_eg'], 80), 1300);
+  say('כל שורה כבר מכוסה בפסיקה קודמת של המפעיל. השופט לא נדרש, ואף אחד לא מחכה.');
+  await camArm; await walk(bug, ['b_sp', 'b_g1', 'b_g2', 'b_gm2', 'b_t2'], { dwell: 300 });
+  chip('auto-ok', 'b_t2'); await sleep(1400);
+  await walk(bug, ['b_t2', 'b_eg'], { dwell: 200 }); unchip();
+  await say('התוכנית מאושרת לתיקון אוטומטי. הבאג ממתין לסבב התיקונים.', 2600);
+
+  // 5 — a round starts (09:53)
+  clock('09:53'); actor('המפעיל', 'Operator');
+  const op2 = makeToken();
+  const camR = cam(boxOf(['op_s3', 'op_e3'], 90), 1500);
+  say('המפעיל מפעיל סבב תיקונים.');
+  await camR; await walk(op2, ['op_s3', 'op_t4', 'op_e3'], { dwell: 350 });
+  show(op2, false); mark('op_e3', false);
+  await message('op_e3', 'r_s', { speed: 1100, camFollow: boxOf(['r_s', 'r_mi', 'r_t1'], 120) });
+
+  // 6 — the orchestrator hands the item to a fixer (11:27)
+  actor('המתזמר', 'Orchestrator');
+  const round = makeToken();
+  say('המתזמר אוסף את כל התוכניות המאושרות, ונותן כל אחת לסוכן מתקן — בעותק נפרד של הקוד.');
+  await walk(round, ['r_s', 'r_t1', 'r_gm', 'r_mi'], { dwell: 330 });
+  clock('11:27'); actor('סוכן מתקן', 'Fixer agent');
+  card('assets/commit-862ffd81.png');
+  await say('הסוכן המתקן מתקן את שורש הבעיה, נועל את הבאג בבדיקה קבועה, ומריץ את כל הבדיקות.', 4200);
+  uncard(); await sleep(400);
+
+  // 7 — blind review, then ship the wave (12:25)
+  actor('סוקר עיוור', 'Blind reviewer');
+  const camV = cam(boxOf(['r_mi', 'r_ca', 'r_g1', 'r_sp', 'r_t3'], 90), 1300);
+  say('מקרי הבדיקה של הגל: עשרה נסגרים בבדיקה אוטומטית, ואחד בסוקר עיוור — שלא יודע מה תוקן.');
+  await camV; await walk(round, ['r_mi', 'r_ca', 'r_g1', 'r_sp'], { dwell: 420 });
+  await sleep(1200);
+  clock('12:25'); actor('המתזמר', 'Orchestrator');
+  say('אין מקרה שדורש את המפעיל — הגל נפרס לבד.');
+  await message('r_sp', 'P_Prod', { speed: 500 });
+  await message('P_Prod', 'r_sp', { speed: 500 });
+  chip('smoke 13/13', 'r_sp'); await sleep(900);
+  card('assets/deploy-log.png', [33, 42.5, 66, 3.2]);
+  await say('בדיקת עשן בייצור: 13 מתוך 13. הכול נרשם ביומן הפריסות.', 3600);
+  uncard(); unchip();
+
+  // 8 — the bug closes
+  actor('המתזמר', 'Orchestrator');
+  const camC = cam(boxOf(['r_sp', 'r_t3', 'b_eg', 'b_e3'], 90), 1400);
+  await walk(round, ['r_sp', 'r_t3'], { dwell: 250 }); await camC;
+  show(round, false); mark('r_t3', false);
+  await message('r_t3', 'b_ic2', { speed: 700 });
+  actor('סוכן הטריאז׳', 'Triage session');
+  say('הבאג נסגר.');
+  await walk(bug, ['b_eg', 'b_ic2', 'b_e3'], { dwell: 450 });
+  await sleep(1200); hush(); noActor(); $('clock').classList.remove('on');
+
+  // 9 — out
+  await cam(ov, 1800);
+  $('tLine').textContent = '3 שעות ו־34 דקות. אדם אחד, כמה סוכנים, ו־GitHub באמצע.';
+  $('title').classList.remove('off'); await sleep(4200);
+  window.__done = true;
+}
+play().catch((e) => { document.body.insertAdjacentHTML('beforeend', `<pre style="position:absolute;top:0;left:0;color:red;font-size:28px;background:#fff">${e.stack}</pre>`); window.__done = true; window.__error = String(e); });
+</script>
+</body>
+</html>
