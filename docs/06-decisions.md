@@ -21197,7 +21197,7 @@ The slow corpus (`baseline-slow.jsonl`: 185 lines; 34 added, 100 rose, 2 fell):
 
 **Determinism of the three-heap walk**, each run a fresh process: the record, `--order reverse` and `--order shuffle:11` over the 171 fixtures (173 of 173 tests each; 570 s, 567 s and 576 s) and a second walk of the slow corpus (18 of 18) gave the same counts: no rise and no fall in any run. Each walk still ends by walking two figures again, after the whole corpus and twice in a row, with equal counts.
 
-**What the gate costs now.** Alone, 9.5 min for the 171 fixtures (570 s on the dev PC, with other sessions' suites running; it was 6.3 min in one heap, Am. 1): the walk is longer by the content two heaps each solve and by the toggle's search. The slow corpus takes 9.8 min (587 s). Inside `npm run test:full` it was not measured.
+**What the gate costs now.** Alone, 9.5 min for the 171 fixtures (570 s on the dev PC, with other sessions' suites running; it was 6.3 min in one heap, Am. 1): the walk is longer by the content two heaps each solve and by the toggle's search. The slow corpus takes 9.8 min (587 s). Inside the 2-D slice (`npm run test:run:2d`, 542 files) the gate took 11.2 min (675 s) and the slice 11.9 min; inside `npm run test:full` it was not measured.
 
 **Measured in a browser** (the dev servers of `main` @ `bda48f42` and of this branch, through `scripts/lib/browser-harness.mjs`; the full table is in ADR-W-210 Am. 4).
 - The first line of a fresh session, Enter to the row: 133 ms → 67 ms (median of 8 sessions each); the second line 85 ms and 84 ms. On `main` the worker's files are asked for after Enter in 8 of 8 sessions, on the branch in none.

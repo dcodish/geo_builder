@@ -109,7 +109,7 @@ press take 6 s was found by the operator's play.
 | One unit | one `evaluateCore` call | one residual evaluation of `leastSquares` | one residual evaluation of `solveLM`, `jacobianRank` or `scanRoots` | one executed line read (`parseLineV2`) or one exact solve of a fold ([ADR-CX-090](06d-decisions-complex.md#adr-cx-090)) |
 | Gate | `src/__tests__/work-meter-gate.test.ts` | `src3d/__tests__/work-meter-gate.test.ts` | `src-analytic/__tests__/work-meter-gate.test.ts` | `src-complex/__tests__/work-meter-gate.test.ts` |
 | Baseline | `src/__tests__/work-meter/baseline.jsonl` | `src3d/__tests__/work-meter/baseline.jsonl` | `src-analytic/__tests__/work-meter/baseline.jsonl` | `src-complex/__tests__/work-meter/baseline.jsonl` |
-| Gate's wall time alone (2026-11-13; analytic 2026-11-14; 2-D with three heaps 2026-11-14) · inside `test:full` (2026-11-14, after phase 2) | 9.5 min · not yet measured with three heaps (12 min before) | 5 min · 9 min | 8 min · 12 min | under 2 s |
+| Gate's wall time alone (2026-11-13; analytic 2026-11-14; 2-D with three heaps 2026-11-14) · inside `test:full` (2026-11-14, after phase 2) | 9.5 min · 11.2 min inside `npm run test:run:2d`; inside `test:full` not measured with three heaps (12 min before) | 5 min · 9 min | 8 min · 12 min | under 2 s |
 
 **What a gate does.** It walks **every** fixture of its tree through the student's actions, with the tree's
 action driver (`<tree>/__tests__/work-meter/driver*.ts`, the same code `scripts/perf/` times): re-typing each row
