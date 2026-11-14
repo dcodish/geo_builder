@@ -546,7 +546,7 @@ already its symbol (`ABCD: π = …`, but a plane named π prints `π = …`, ne
 Every knowledge gate decides "fixed" by agreement across resolves, so it sees only what the resolver varies; the
 funnel freezes rotation about a pinned point or axis (the ADR-3D-101 deferral) and the pivot's eight starts are
 seed-independent, so a turn the givens leave free landed in the same few basins at every seed. Stage 6 of the
-pivot block (`resolve3`) publishes `pivot.placementFreedom()`: lazily, `solvePivot`'s measuring probe takes the
+pivot block (`resolve3`) publishes `pivot.placementFreedom` (read through `placementFreedom3`): lazily, `solvePivot`'s measuring probe takes the
 central-difference Jacobian of the primary residuals — the full construction, plane pins and member pins included,
 over a snapshot of the resolved planes and lines — with respect to the six rigid unknowns in `rigidChart`'s
 coordinates (a world translation in figure scales, a world rotation about the origin; regular everywhere, unlike
@@ -869,6 +869,26 @@ What is NOT shared, measured in ADR-3D-491: the figure a new row makes is a new 
 at the drawn seed and the claim seeds. Starting those solves from the figure already drawn would change which solution
 a solve can reach, so it belongs to the solver, never to a key.
 
+**The pivot's lazy values are plain cells (#2890, [ADR-3D-492](06b-decisions-3d.md#adr-3d-492); [ADR-W-210](06w-decisions-workspace.md#adr-w-210) phase 3).**
+A resolved figure is plain data: `structuredClone` takes it whole, and `RESOLVED_CROSSES3` (`engine/evaluate.ts`)
+fails `tsc` when a function is added to `Resolved3` at any depth. The three values a reader may ask of the pivot's
+outcome after the solve (`scalarConsumed`, `placementFreedom`, `heldPins`) are each a CELL, `{ v }`
+(`engine/lazy3.ts`): the value once computed, `null` until then. How to compute a cell stays in the heap that
+solved the figure, in a table keyed by the cell object. A copy of the pivot shares the cell. `heldPins` names each
+pin by its place in `c.scalarPins`, never by the pin object.
+- **One reader**, `lazyValue3`, behind `scalarConsumed3(resolved)` and `placementFreedom3(resolved)`; never read
+  `pivot.<name>.v` at a call site. In order: the cell's value; computed here, where this heap solved the figure; the
+  value that FOLLOWED the figure (`keepLazyValue3`), addressed by the construction's content, the resolve key and the
+  name; and last the figure SOLVED AGAIN here, counted (`lazyStats3.solvedAgain`). Never a default: the DOF line's
+  `?? c.scalarPins.length` is for a pivot with no solution, so an absent value read as `undefined` would print a wrong
+  count as a fact.
+- **A figure this heap did not solve** enters its memo through `keepResolved3(figure, home, out)`: the construction's
+  own answers and its content's, an answer already held kept, its cells given the figure's home (representative,
+  resolve key, seed, options, one figure or parts) so that the fourth step knows what to solve. The construction's pin
+  origins are written first: they are part of its content.
+- Nothing is forced before a figure crosses. Forcing every lazy on every figure was measured at 8.4 % of a load's work
+  and up to 1.4 s on one figure, almost all of it `placementFreedom` on samples nobody reads.
+
 **A pin symbol's admissible roots are one set (#1769, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395)).** One
 root predicate decides whether a candidate joins the pool: `collect` admits it only when it is exact on the primary
 residuals, not collapsed, and every member pin holds by the verifier's own bar (`membersHold`, which reads
@@ -1005,7 +1025,7 @@ locks totality: every `c.*Pins` / `figure*(c)` family `solve3.ts` reads is a row
 
 **The leftover turn and size are measured, then drawn (#2378, #2504, [ADR-3D-379](06b-decisions-3d.md#adr-3d-379)).**
 The funnel still decides what the SOLVE may move and freezes a partial rotation (a turn about a pinned point or
-axis). After the solve, resolve stage 6 reads the rank probe (`pivot.placementFreedom()`, below) for any solid whose
+axis). After the solve, resolve stage 6 reads the rank probe (`pivot.placementFreedom`, below) for any solid whose
 rotation is anchored (`rotationAnchored3`: an absolute-frame object or a stated vector) and whose placement is not
 already sampled: it parks a free size at the seed's target (`freedom: 'size'`), then turns the figure by a seeded
 angle over the full turn about a seeded axis of the leftover turn (`freedom: 'turn'`), both in `originChart` (about
