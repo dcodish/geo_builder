@@ -113,12 +113,28 @@ press take 6 s was found by the operator's play.
 
 **What a gate does.** It walks **every** fixture of its tree through the student's actions, with the tree's
 action driver (`<tree>/__tests__/work-meter/driver*.ts`, the same code `scripts/perf/` times): re-typing each row
-(`submit#k`), one «הציגו תצורה אחרת» (`another#1`), a cold `load`, an `edit` of the last row to its own text, the
-`delete` of the first row, and in 2-D the background `detect` sweep. Each action gets three counts: `total` (all the
+(`submit#k`), one «הציגו תצורה אחרת» (`another#1`), a cold `load`, the `delete` of the first row, an `edit` of the last
+row, and in 2-D the background `detect` sweep. Each action gets three counts: `total` (all the
 work), `page` (the part on the page's UI thread, as against a worker) and `prePaint` (the part before the figure can
 paint). The baseline holds one line per figure-action, sorted, so two branches that each add a fixture merge as
 insertions. Nothing is sampled or skipped: a gate is one test file, in the slow tier, run by `npm run test:full` and by
 its product's `test:run:<product>` lane.
+
+**A walk is a session** ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 3, #2888). Every builder keeps solved
+content by its content, and the caches outlive the action, so a count is **what the action adds to its session**, and
+the walk states where a session starts. Each builder has ONE test-only function that empties every content-keyed cache
+(2-D `clearReplayCaches`, 3-D `clearSolveCaches3`, analytic `clearAnalyticCaches`, complex `clearComplexCaches`); a
+cache added later joins it, or the gate's determinism lock fails.
+- A fixture's walk starts from emptied caches and stays warm while the rows are typed: `submit#k` runs on the figure
+  of the rows before it, which that session has solved. The press follows in the same session.
+- `load` is cold: a saved file opened in a new session. `delete` runs in the loaded session.
+- `edit` is the walk's last action and has one definition in every builder: **a student who has built rows 1..n
+  changes the last row; the rows before it are solved in the session, the edited row's content is not.** The walk
+  builds that state (emptied caches; rows 1..n−1 shown, unmeasured; all n rows in the store, unsolved) and then
+  measures the edit of the last row to its own text. So an edit costs about what the submit of that row costs,
+  through the edit path. Re-typing a row on a session that has already solved it would count nothing.
+- 2-D's `detect` runs as a browser's detect worker does: on its own copy of the facts, with nothing another lane
+  computed.
 
 **The rule.** An action above its baseline in **any** of the three counts fails, and the message names the
 figure, the action, the numbers and the next step. So does an action with no baseline line, a baseline line the walk
