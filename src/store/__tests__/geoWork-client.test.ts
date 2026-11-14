@@ -47,10 +47,10 @@ describe('2-D’s worker client where a Worker exists', () => {
     vi.stubGlobal('Worker', FakeWorker);
     vi.stubGlobal('document', {});
     vi.resetModules(); // the client reads the environment when a request is made, and this instance is its own page
-    W = await import('../geoWork');
-    core = await import('@/replay/core');
-    meter = await import('../../../shell/workMeter');
-    const { factsOf } = await import('../../__tests__/scenario-pipeline');
+    W = await import('../geoWork'); // load-in-body-ok: a SECOND module instance, after vi.resetModules(), in a beforeAll with its own timeout
+    core = await import('@/replay/core'); // load-in-body-ok: a SECOND module instance, after vi.resetModules(), in a beforeAll with its own timeout
+    meter = await import('../../../shell/workMeter'); // load-in-body-ok: a SECOND module instance, after vi.resetModules(), in a beforeAll with its own timeout
+    const { factsOf } = await import('../../__tests__/scenario-pipeline'); // load-in-body-ok: a SECOND module instance, after vi.resetModules(), in a beforeAll with its own timeout
     facts = factsOf(['משולש ABC', 'M אמצע AB']);
   }, 60_000);
   afterAll(() => vi.unstubAllGlobals());

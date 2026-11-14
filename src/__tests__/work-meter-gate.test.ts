@@ -52,9 +52,9 @@ const gate = openWorkGate({
 /** One worker's heap: 2-D's operations as its worker entry serves them, in a module instance of their own. */
 const workerHeap = () =>
   secondInstance(async () => {
-    const { geoOps, takeCheckpoint } = await import('@/store/geoOps');
-    const { clearReplayCaches, replay } = await import('@/replay/core');
-    const { readWork } = await import('../../shell/workMeter');
+    const { geoOps, takeCheckpoint } = await import('@/store/geoOps'); // load-in-body-ok: a worker's heap is a second module instance, loaded from the beforeAll below
+    const { clearReplayCaches, replay } = await import('@/replay/core'); // load-in-body-ok: a worker's heap is a second module instance, loaded from the beforeAll below
+    const { readWork } = await import('../../shell/workMeter'); // load-in-body-ok: a worker's heap is a second module instance, loaded from the beforeAll below
     // a worker's table (the found view's fold crosses), under the suite's clock: none
     return { ops: geoOps({ transplant: true }), clear: clearReplayCaches, units: () => readWork().total, seed: takeCheckpoint, replay };
   });
