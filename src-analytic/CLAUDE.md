@@ -49,8 +49,7 @@ this tool *supplies* the one the exam withholds.
 | `engine/apply.ts` | **The M1 boundary** — the one place that decides new-object vs statement-about-an-existing-one. Here on day one because questions arrive in SECTIONS |
 | `engine/evaluate.ts` | Construction + seed → figure; `sampleParam`, and `isKnowledge` — the honesty gate |
 | `engine/derive.ts` | `parse → fold → evaluate`, written once so app and tests take the same route |
-| `engine/content.ts` | Solver memos keyed by content (ADR-AG-476) |
-| `engine/settle.ts` | A finished action as plain data and its adoption into another heap; `cloneLoss`, the lock on what crosses (ADR-AG-477). The line-list store is one per work-meter lane |
+| `engine/content.ts`, `settle.ts` | Content memos; hand-over (ADR-AG-476, 477) |
 | `engine/solve.ts` | Constraints (refs + residual + name) and the joint solve |
 | `engine/shapes.ts` | Shape registry: a noun is a table row of existing constraints |
 | `engine/statedMeasures.ts` | What the student stated, for the canvas |

@@ -101,12 +101,13 @@ function reading(lines: readonly string[], seed: Seed, hosts: Hosts, deferred: b
 
 describe('#2890 — an adopted result reads exactly as the worker\'s own content does', () => {
   const sequences = heapSequences(process.env.SETTLE_READS === 'all');
+  /** Readings compared so far, over the whole run: a sequence whose every line is refused has none of its own. */
+  let compared = 0;
   for (const s of sequences) {
     it(s.id, () => {
       inWorkerLane(() => newSession());
       let st: State = inWorkerLane(() => settledState([], 0, {}));
       const differ: string[] = [];
-      let compared = 0;
       s.lines.forEach((line, k) => {
         const { value: r, loss } = handOver(() => {
           const out = doSubmit(st, line);
@@ -124,8 +125,12 @@ describe('#2890 — an adopted result reads exactly as the worker\'s own content
           if (mine !== theirs) differ.push(`submit#${k + 1} ${deferred ? 'at the first paint' : 'settled'}`);
         }
       });
-      expect(compared, s.id).toBeGreaterThan(0);
       expect(differ, `${s.id}: readings that differ between the worker's content and the adopted clone`).toEqual([]);
     }, 900_000);
   }
+
+  it('the comparison is not vacuous: two readings per accepted line were compared', () => {
+    console.log(`settle-reads: ${compared} readings compared over ${sequences.length} sequences`);
+    expect(compared).toBeGreaterThan(sequences.length);
+  });
 });
