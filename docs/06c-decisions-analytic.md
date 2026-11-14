@@ -16592,64 +16592,80 @@ So one mechanism at one chokepoint removes the class: the same lines must give t
 
 **A result cannot depend on what is cached.** Every memoised function was already pure over (construction, its key): that is what let ADR-AG-144 share it inside one derivation. Nothing is warm-started from a kept result, analytic has no work budget that a hit would have to charge, and no clock reaches the solver. The one place where control flow read the memo's STATE, the pool, now reads the reader's own asks (point 5). Locked by `content-cache.test.ts`: for a sample of the saved fixtures, the figure, the refusals, the panel rows and what a deferred page shows first are identical from cold and after a scrambled warm session, at three configurations. `CONTENT_CACHE_SAMPLE=all` runs it over every saved sequence: all 208 are identical (run on this change, 296 s).
 
-**The work meter's walk says where a session starts.** This changes what a recorded number means, so it is stated here. `walkAnalytic.ts` empties the store at the start of each sequence (`newSession` → `clearAnalyticCaches`, this tree's one test-only clear, as 2-D has `clearReplayCaches`). Each action then runs on what the session's earlier actions solved, as the page does. `doLoad` empties it again: a load is a new session (a saved file opened in a new tab), and the edit and the delete that follow run in that loaded session. Before, every `derive` was cold, so an action's count was "this action from nothing". Now it is "what this action adds to its session". A sequence's counts still depend on nothing that ran before it: the gate's lock is unchanged and holds. After the re-record, `npm run work:check -- analytic --order reverse` and `--order shuffle:11` each walked the 208 sequences in a fresh process with 0 rises and 0 falls, and the gate's closing lock (two figures walked again after the whole corpus, twice in a row) passes. The timing harness (`scripts/perf/analytic/harness.ts`) starts a session per job, and per repetition of its confirm step, the same way.
+**The work meter's walk says where a session starts.** This changes what a recorded number means, so it is stated here. Before, every `derive` was cold, so an action's count was "this action from nothing". Now a count is "what this action adds to its session", and `walkAnalytic.ts` walks a sequence as three sessions:
 
-**Before → after** (`npm run work:record -- analytic`; units, never seconds; 208 sequences, 1 963 actions). No action rose in any of the three counts: 1 359 fell and 604 are unchanged.
+1. **The session that types the lines.** The store is emptied first (`newSession` → `clearAnalyticCaches`, this tree's one test-only clear, as 2-D has `clearReplayCaches`). Each `submit#k`, and the «הציגו תצורה אחרת» after them, runs on what the earlier actions solved, as the page does.
+2. **The loaded session.** `doLoad` empties the store: a load is a new session (a saved file opened in a new tab). The delete runs in it.
+3. **The edit's session**, by the meter's one definition of `edit`, the same in every builder: **a student who has built rows 1..n changes the LAST row; the rows before it are solved in the session, the edited row's content is not.** A cache keyed by content cannot forget one row. So re-typing the last row to its own text in the session that built it counted almost nothing (84 427 units over 207 edits, where phase 0 counted 20 787 496), while a student who changes a row solves the new row on the page. The walk therefore builds the state (`beforeLastRowEdit`): a new session; rows 1..n−1 on screen and settled, unmeasured (the render, the passive effects, the pool and its re-render, at the session's seed and with the hosts those rows recorded); then all n rows as the session's lines, with nothing of the n-row figure solved. The edit re-types the last row to its own text through `decideEditHost` and the render. For a one-row figure the prefix is empty and the edit is cold. It is the walk's LAST action, so the load and the delete mean what they meant: the re-record for this definition moved 189 `edit` lines and no other line (1 774 identical).
+
+A sequence's counts still depend on nothing that ran before it: the gate's lock is unchanged and holds. After the re-record, `npm run work:check -- analytic --order reverse` and `--order shuffle:11` each walked the 208 sequences in a fresh process with 0 rises and 0 falls, and the gate's closing lock (two figures walked again after the whole corpus, twice in a row) passes. The timing harness (`scripts/perf/analytic/harness.ts`) starts a session per job, and per repetition of its confirm step, the same way, and its fixture walk measures the edit by the same definition.
+
+**Before → after** (`npm run work:record -- analytic`; units, never seconds; 208 sequences, 1 963 actions). Against the phase 0 baseline no action rose in any of the three counts: 1 359 fell and 604 are unchanged.
 
 | Count | Before | After | Change |
 |---|---|---|---|
-| total | 189 345 082 | 107 722 804 | −43.1 % |
-| page | 189 345 082 | 107 722 804 | −43.1 % |
-| prePaint | 139 294 357 | 74 357 405 | −46.6 % |
+| total | 189 345 082 | 126 274 259 | −33.3 % |
+| page | 189 345 082 | 126 274 259 | −33.3 % |
+| prePaint | 139 294 357 | 83 773 335 | −39.9 % |
 
 | Action | Actions | Total before | Total after | Change | Before the paint, before | after | Change |
 |---|---|---|---|---|---|---|---|
 | submit | 1 139 | 88 141 833 | 76 473 359 | −13.2 % | 59 157 180 | 54 180 266 | −8.4 % |
 | «הציגו תצורה אחרת» | 207 | 49 200 930 | 769 177 | −98.4 % | 48 875 442 | 740 625 | −98.5 % |
 | load | 207 | 19 960 214 | 19 141 232 | −4.1 % | 10 249 793 | 9 430 811 | −8.0 % |
-| edit | 207 | 20 787 496 | 84 427 | −99.6 % | 11 079 121 | 72 882 | −99.3 % |
+| edit | 207 | 20 787 496 | 18 635 882 | −10.4 % | 11 079 121 | 9 488 812 | −14.4 % |
 | delete | 203 | 11 254 609 | 11 254 609 | 0.0 % | 9 932 821 | 9 932 821 | 0.0 % |
+
+The `edit` row is the edit of the definition above. Measured as the walk first had it (the row re-typed in the session that had solved it) it was 84 427 units, 72 882 of them before the paint, and the builder's total 107 722 804: a number that sized no edit a student makes.
+
+**The edit against the submit of the same line** (the check of the definition; the 207 sequences that record a line). In 197 the edit and the submit of that line count exactly the same, in `total` and in `prePaint`: through the edit path or the submit path, the row costs the same solver work. The edits sum to 18 635 882 units against 17 168 095 for those submits. The ten that differ were measured phase by phase, and again with the earlier rows TYPED instead of only shown:
+
+- **Seven count more, all of it after the paint** (the passive effects and the re-render after the pool): `corpus471.json#3/5` +1 500 329 (1 634 748 against 134 419), `corpus471.json#12/5` +35 744, `corpus471.json#4/4` +3 785, and `issue-2222-mixed-number-glyph`, `operator-letters-on-side-2691`, `operator-textbook-print-2688` and `issue-2225-before-free-line` by 149 to 302 units. The only new content those phases can solve is the sub-lists the notes derive (`narrowingNotesOf`, `circleNotesOf`). A session that typed rows 1..n−1 solved them at the earlier lines; the definition's session shows the n−1-row figure and nothing before it. With the earlier rows typed, the edit equals its submit exactly (six of the seven were re-run that way; the seventh has the same counts as one of the six). So the difference is the session's history, not the edit path.
+- **Three count less, all of it in the decision:** `corpus471.json#5/4` −44 550, `ellipse-book-p4-24a` −19 595, `ellipse-book-p5-28` −8 885. In each of the three the line moves the session to another configuration (seed 13 → 14, 3 → 4, 21 → 25). The submit's trial walks from the configuration on screen to the one it lands on; the edit's trial starts at the landed one.
+
+Neither is changed here. It is what an edit costs on the page, which is phase 3's to carry.
 
 The ten dearest actions of the phase 0 baseline, and what they are now:
 
 | Sequence · action | Before | After | Change |
 |---|---|---|---|
 | `exam-2379-q3-route-2392` · another#1 | 18 795 106 | 0 | −100 % |
-| `exam-2379-q3-route-2392` · edit | 3 545 964 | 11 118 | −99.7 % |
+| `exam-2379-q3-route-2392` · edit | 3 545 964 | 3 500 599 | −1.3 % |
 | `exam-2379-q3-route-2392` · submit#9 | 3 545 964 | 3 500 599 | −1.3 % |
 | `exam-2379-q3-route-2392` · load | 3 505 754 | 3 489 607 | −0.5 % |
 | `corpus471.json#18/4` · submit#3 | 2 590 987 | 2 522 864 | −2.6 % |
 | `exam-2379-q3-route-2392` · submit#8 | 2 573 090 | 2 527 725 | −1.8 % |
 | `corpus471.json#18/4` · delete | 2 309 166 | 2 309 166 | 0 % |
 | `issue-2231-rhombus-perp-foot` · another#1 | 2 210 252 | 119 | −100 % |
-| `issue-2231-rhombus-perp-foot` · edit | 2 152 678 | 119 | −100 % |
+| `issue-2231-rhombus-perp-foot` · edit | 2 152 678 | 2 093 380 | −2.8 % |
 | `issue-2231-rhombus-perp-foot` · load | 2 123 029 | 2 093 380 | −1.4 % |
 
-The ten largest falls are the «הציגו תצורה אחרת» and the edit of `exam-2379-q3-route-2392` (18 795 106 → 0; 3 545 964 → 11 118), `issue-2231-rhombus-perp-foot` (2 210 252 → 119; 2 152 678 → 119), `issue-2230-rhombus-strict-side` (2 102 975 → 85; 2 040 594 → 85), the edit and the ninth submit of `corpus471.json#3/5` (1 659 901 → 63; 1 651 529 → 134 419), and the «הציגו תצורה אחרת» of `corpus471.json#1/4` (1 458 661 → 102 835) and `issue-2233-rhombus-axes-stated` (1 396 388 → 0).
+The ten largest falls: the «הציגו תצורה אחרת» of `exam-2379-q3-route-2392` (18 795 106 → 0), `issue-2231-rhombus-perp-foot` (2 210 252 → 119), `issue-2230-rhombus-strict-side` (2 102 975 → 85), `corpus471.json#1/4` (1 458 661 → 102 835), `issue-2233-rhombus-axes-stated` (1 396 388 → 0), `corpus471.json#13/5` (1 147 301 → 48 652) and `corpus471.json#5/4` (1 130 461 → 105), and the seventh, eighth and ninth submits of `corpus471.json#3/5` (1 214 123 → 200 969; 1 161 007 → 158 601; 1 651 529 → 134 419).
 
 **What did not fall, and why.**
 - **Every delete (203), unchanged.** Deleting the first line leaves a line list the session never solved, and a delete has no decision before its render, so nothing in it repeats.
 - **347 submits, unchanged.** 324 do no solver work at all. 17 are lines whose decision is the whole action, with no render after it: 12 taught and 5 refused. Two of the refusals are dear (`corpus471.json#7/4` «D על BC» 763 370 units, `corpus471.json#23/5` «A מעל O» 619 835): a line that cannot hold, which is phase 5's. 6 are cevian lines recorded with a new host (73 460 units together): the page's line list carries the pin and the decision's did not, so they are two contents (below).
 - **18 sequences' «הציגו תצורה אחרת», edit and load:** no solver work before or after.
-- **A first solve costs what it cost.** The dearest action is now `exam-2379-q3-route-2392` · submit#9, 3 500 599 units, of which 58 734 are before the paint: the pool's 24 seeds of a line list nobody has solved. A load is cold by definition (−4.1 %: only the repeat between its audit and its render went).
+- **An edit falls by a tenth, not to nothing.** By its definition it solves the edited row, as the submit of that row does.
+- **A first solve costs what it cost.** The dearest actions are now `exam-2379-q3-route-2392` · submit#9 and its edit, 3 500 599 units each, of which 58 734 are before the paint: the pool's 24 seeds of a line list nobody has solved. A load is cold by definition (−4.1 %: only the repeat between its audit and its render went).
 
-**The slow corpus** (`npm run work:record -- analytic --slow`; 3 sequences, 37 actions): 5 916 217 → 3 605 728 units (−39.1 %). 20 actions fell, 17 are unchanged, none rose. `#1647 touch sentence`: «הציגו תצורה אחרת» 859 704 → 119 and the edit 834 934 → 119; its fifth line, the one the issue is about, 807 711 → 780 488, because it is a first solve. `#2737 nine+1 shapes`: «הציגו תצורה אחרת» 268 502 → 544, the edit 236 746 → 544.
+**The slow corpus** (`npm run work:record -- analytic --slow`; 3 sequences, 37 actions): 5 916 217 → 4 618 435 units (−21.9 %). 20 actions fell, 17 are unchanged, none rose. `#1647 touch sentence`: «הציגו תצורה אחרת» 859 704 → 119; its fifth line, the one the issue is about, 807 711 → 780 488, because it is a first solve, and the edit of that line 834 934 → 780 488, the same solve. `#2737 nine+1 shapes`: «הציגו תצורה אחרת» 268 502 → 544, the edit 236 746 → 232 882. (With the edit measured in the session that had the row, the corpus read 3 605 728 and its edits 663.)
 
-**The gate's own cost.** One walk of the corpus takes 382 s here, against 647–675 s for phase 0's (ADR-W-210 Am. 1), on the same machine with other suites running beside it.
+**The gate's own cost.** One walk of the corpus takes about 500 s here (three runs: 496–503 s), against 647–675 s for phase 0's (ADR-W-210 Am. 1), on the same machine with other suites running beside it. It was 371–399 s before the edit's session was added: the unmeasured prefix and the edit's own solve are a quarter of the walk.
 
 **Wall time** (`node scripts/perf/analytic/driver.mjs --only "exam-2379-q3-route-2392.analytic.json,issue-2231-rhombus-perp-foot.analytic.json"`; before = `main` @ `9cd61315`; the same machine, runs alternated, two or three of each, with other sessions' suites running beside them, so the long times are ±10 % here and more on another day). The first three rows are the three dearest actions of the phase 0 baseline.
 
 | Action | Before | After |
 |---|---|---|
 | `exam-2379-q3-route-2392` · «הציגו תצורה אחרת» (no other configuration exists) | 67.0 s, all of it before the answer | 2 ms |
-| `exam-2379-q3-route-2392` · edit | 12.6 s (0.40 s to the figure, 12.2 s of pool after it) | 44 ms |
+| `exam-2379-q3-route-2392` · the last row re-typed to the text it has, in the session that solved it | 12.6 s (0.40 s to the figure, 12.2 s of pool after it) | 44 ms |
 | `exam-2379-q3-route-2392` · submit#9 | 12.5–13.7 s (0.40–0.44 s to the figure) | 12.8–13.4 s (0.24 s to the figure) |
 | `exam-2379-q3-route-2392` · load | 12.3 s | 12.5–13.2 s |
 | `issue-2231-rhombus-perp-foot` · «הציגו תצורה אחרת», presses 1 to 6 | 8.2–9.8 s each | 8–10 ms each |
-| `issue-2231-rhombus-perp-foot` · edit | 7.8–7.9 s | 9–10 ms |
+| `issue-2231-rhombus-perp-foot` · the last row re-typed to the text it has, in the session that solved it | 7.8–7.9 s | 9–10 ms |
 | `issue-2231-rhombus-perp-foot` · submit#8 | 7.9–8.0 s, all before the figure | 8.1–8.7 s, all before the figure |
 
-A first solve takes as long as it did: the ninth line of the exam figure still fills its pool for 12 s after the figure is drawn, and the rhombus's eighth line still holds the page for 8 s before it. That is what phases 3 and 5 are for.
+The two "re-typed" rows are what the walk's `edit` was when these times were taken; by its definition now, an edit of the last row takes what the submit of that row takes. A first solve takes as long as it did: the ninth line of the exam figure still fills its pool for 12 s after the figure is drawn, and the rhombus's eighth line still holds the page for 8 s before it. That is what phases 3 and 5 are for.
 
 **Tests.** `src-analytic/__tests__/content-cache.test.ts`: the same lines are solved once (whichever array, call or spelling of the configuration asked, and a second press of «הציגו תצורה אחרת»); different content is never answered by a remembered one (a number, an added line, a seed name, a pin, a configuration); a caller's derivation and construction are its own, and a page's deferred pool is not a decision's; a deferred pool has read only what was asked through it, whatever is already solved; the two bounds; the clear function; a scan that keeps every per-construction memo of the tree a `ContentCache`; and the cold-against-warm lock. One existing file states its starting state: `issue-1473-perf-budget.test.ts` measures what a COLD derivation costs (the render-budget comparison and the two conic-memo measurements), so it calls `clearAnalyticCaches()` before each derivation it measures. No expectation changed. The analytic lane (`npm run test:run:analytic`) is otherwise untouched and green.
 
