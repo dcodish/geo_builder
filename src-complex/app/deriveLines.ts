@@ -43,6 +43,15 @@ import { type ExpVec, eq as modEq, mul as modMul, pow as modPow } from '../value
 import { type Angle, add as angAdd, scale as angScale, sub as angSub } from '../value/angle';
 import { isInt, rat } from '../value/rational';
 import { type Derived2, type FoldInput, type ResolvedSelection, type Untranslated, entailedBy, foldConstraints } from '../replay/derive2';
+import { clearContentMemos, contentMemo } from '../value/contentMemo';
+
+/**
+ * #2888 (ADR-CX-090) — every content-keyed memo of this builder, emptied: the state of a session that has just
+ * opened. TEST-ONLY. No result depends on it, only the work that is executed, so the work meter's walk starts each
+ * figure (and its cold load) from here, and the cold-equals-warm locks call it between their two runs. One function
+ * on purpose: the memos register themselves (`value/contentMemo`), so a memo added later cannot be left out.
+ */
+export const clearComplexCaches = (): void => clearContentMemos();
 
 /**
  * #2268 (ADR-CX-084) — does `raw`, read after `lines`, add nothing the exact solve does not already
@@ -71,6 +80,14 @@ export const lineEntailed = (lines: readonly string[], raw: string): boolean =>
  * asked. It was not asked at all until now: the enumeration lived inside the retiring prototype's
  * bridge, and on this path `z³ = 8` was one point with three configurations while `w = z1 * 2` invented
  * `z1` as a free number and printed a sampled position for it.
+ *
+ * ## A figure is folded once per content (#2888, ADR-CX-090)
+ *
+ * The fold is a pure function of its five arguments and nothing else (no clock, no random source, no language),
+ * so its result is kept under {@link deriveKey}, which is those five arguments. One action asks for the same figure
+ * several times (the gate folds the trial list, the render folds it again, the parameter note's gate folds the
+ * figure it is offered on), and so does the next action (its "before" is this action's "after"). The returned
+ * figure is FROZEN and shared: a caller reads it, never changes it.
  */
 export function deriveLines(
   lines: readonly string[],
@@ -82,6 +99,45 @@ export function deriveLines(
    * DISPLAY choice: it changes only what the canvas prints, never the figure, and the gate never passes it.
    */
   letterLines: ReadonlySet<number> = new Set(),
+): Derived2 {
+  const key = deriveKey(lines, configIndex, seed, asks, letterLines);
+  return figures.get(key) ?? figures.set(key, foldLines(lines, configIndex, seed, asks, letterLines));
+}
+
+/**
+ * How many folded figures are kept, least recently used out first. A submit asks for at most 11 distinct ones
+ * before its blame (the figure before, eight configurations of the trial list, the render's, and the same again per
+ * solved parameter for the teaching note), so the bound keeps the figures of about the last twenty actions.
+ * Measured: the heaviest fixture's figure holds 12.5 KB and a 112-line synthetic one 34.8 KB, so a full table is
+ * 3.2 MB of real figures and 8.9 MB of the synthetic ones (ADR-CX-090).
+ */
+export const DERIVE_MEMO_MAX = 256;
+const figures = contentMemo<Derived2>('figures', DERIVE_MEMO_MAX);
+
+/** One number of a key, so that no two numbers share a spelling (JSON writes NaN and the infinities as `null`). */
+const numberKey = (x: number): string => (Object.is(x, -0) ? '-0' : String(x));
+
+/**
+ * The memo key of one fold: EVERYTHING {@link deriveLines} is a function of. The line list and the questions as
+ * typed and in order (order is meaning: a second mention is a given, ADR-CX-005), the configuration index, the seed,
+ * and the chip choices as the set they are. JSON keeps the list boundaries, so no two inputs share a key.
+ */
+export const deriveKey = (
+  lines: readonly string[],
+  configIndex = 0,
+  seed = 0,
+  asks: readonly string[] = [],
+  letterLines: ReadonlySet<number> = new Set(),
+): string =>
+  `${numberKey(configIndex)}|${numberKey(seed)}|${JSON.stringify([lines, asks, [...letterLines].sort((a, b) => a - b)])}`;
+
+/** The fold itself, EXECUTED: read the declared letters, lower the lines and the questions, solve. */
+function foldLines(
+  lines: readonly string[],
+  configIndex: number,
+  seed: number,
+  asks: readonly string[],
+  letterLines: ReadonlySet<number>,
 ): Derived2 {
   const declaredBy = complexScopeOf(lines);
   const lowered = lowerLines(lines, declaredBy);

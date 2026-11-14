@@ -4535,7 +4535,7 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Status:** accepted · 2026-11-14 · debt (P2, complex) · branch `debt/2888-compute-once-complex` · phase 2 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (invariant 4), and the decision its Amendment 1 left to this phase · **LADDER stage:** none is added or moved; the memo sits in front of stage 0b (`parse()`), [LADDER-CX](LADDER-CX.md)
 **Operator:** 2026-11-13, in chat: *"I dont want local optimization - i want overall optimization so we dont end up fixing one issue just to discover later we have an issue somewhere else."* · 2026-11-14, in chat: *"go ahead with next phases"*
 
-**Requirements:** none (internal): no line, verdict, drawing or message changes · **Design:** [docs/08](08-testing-strategy.md) "The work meter" (the complex unit)
+**Requirements:** none (internal): no line, verdict, drawing or message changes · **Design:** [04d](04d-design-complex.md) § "Compute once: the line read and its memo"; [docs/08](08-testing-strategy.md) "The work meter" (the complex unit); [LADDER-CX](LADDER-CX.md) stage 0b
 
 **Measured before anything was built** (`main` @ `9cd61315`, the dev PC, node 24).
 
@@ -4586,6 +4586,82 @@ The unit changed, so the baseline was re-recorded once with `--accept-rise`, in 
 | `symbolic-cartesian-forced-1365` load | 19 | 161 |
 
 The gate's determinism held under the new unit before the memo: the record, a check, `--order reverse` and `--order shuffle:7` gave the same 305 counts.
+
+**Decision 2 — a line is read once per content, a figure is folded once per content, a pattern is compiled once.** Three memos, all made by one small table, `src-complex/value/contentMemo.ts`: from a content key to a frozen value, bounded, the least recently used entry out first.
+
+| Memo | Holds | Key | Lives | Bound | Cleared by |
+|---|---|---|---|---|---|
+| `readings` | the `ParseOutcome` of one line read | `parseKey`: the declared letter families as a sorted set, then the line as typed | `parser/rules.ts`, inside `parseLineV2`, so every caller of the read shares it | 1 024 entries; a reading holds about 4 KB with the atoms it registers, a full table 4.2 MB | `clearComplexCaches` |
+| `figures` | the `Derived2` of one fold | `deriveKey`: the configuration index, the seed, and the line list, the questions and the sorted chip set as JSON | `app/deriveLines.ts`, inside `deriveLines`, the one place the parser and the fold are composed | 256 entries; the heaviest fixture's figure holds 12.5 KB (3.2 MB full), a 112-line synthetic one 34.8 KB (8.9 MB full) | the same |
+| `patterns` | one compiled `RegExp` | the flags and the pattern's source | `parser/lexicon.ts`, inside `rx` | 512 entries; the grammar has 44 patterns | the same |
+
+- **The key of a reading is its whole input, found by reading what the parse reads.** `parseLineV2(raw, scope)` reads the text and the declared families, the families by membership alone (`isComplexName`). It reads nothing else: the grammar reads Hebrew and English in one rule list, so the interface language is not an input; and it is stateless per line by design ([ADR-CX-024](#adr-cx-024)), so no earlier line is an input. The readings that do depend on order (which of ADR-CX-005's modes `X^n = …` has, a selection's candidates, a reserved letter) are decided by `lowerLines`, which runs per fold over the memoized readings and is not memoized. The text is keyed as typed, before normalization. The scope part of a key is JSON, which cannot hold a raw NUL, and a NUL separates it from the text, so no text can imitate a scope.
+- **The read has one side effect, and the memo is sound with it.** Reading a literal registers its exact pair in the value layer's atom registries (`value/angle.ts`: `LITERAL_ATOMS`, `CERTIFIED_ATOMS`), which the fold reads back. A hit skips the read and so the registration. The registries are add-only, keyed by a name derived from the exact value, and never cleared, so the entry the first read made is there for every hit. They existed before this change (with `PRIME_CACHE` in `value/gaussian.ts`, a table of a pure function); they are not content memos of results and `clearComplexCaches` leaves them alone, which is the safe order.
+- **The key of a figure.** The fold is a pure function of its five arguments (no clock, no random source, no language: the seed is an argument). Order is meaning, so the lists are keyed in order with their boundaries; each number keeps its own spelling.
+- **A stored value is frozen and shared.** A hit returns the same object to every caller. `ParsedLine`'s channels became `readonly` arrays (nothing in the tree wrote to one: `tsc` is clean), and `deepFreeze` makes a write throw at the place it is made, in production as in the suite.
+- **A global or sticky pattern is never kept.** It carries `lastIndex` between calls. `rx` builds those fresh, as before (five call sites, all on a rule's matched path).
+- **Nothing is keyed by a clock, and there is no budget to charge.** A memo returns what the function would compute and nothing else decides a verdict.
+
+**What a walk now does differently.** The gate's walk (`__tests__/work-meter/walkCx.ts`) starts each figure from empty memos and then stays warm, as one student session does, and it empties them again before the `load`, which stays a cold load. The edit and the delete follow the load in that second session. The timing harness (`scripts/perf/complex/harness.ts`) does the same per corpus item. So a recorded count now means: the work this action executes in a session that has done the figure's earlier actions and nothing else. Nothing else about the walk changed, and the gate's determinism lock is untouched.
+
+**Measured after** (the same 305 recorded actions; record, then a check in the recorded order, `--order reverse`, `--order shuffle:7` and `--order shuffle:11`, each a fresh process, all identical).
+
+| Recorded actions (45 fixtures) | New unit, no memo | With the memos | Fall |
+|---|---|---|---|
+| total = page = before the paint | 9 307 | **1 043** | −88.8 % |
+| of which executed line reads | 8 076 | 354 | −95.6 % |
+| of which exact solves | 1 231 | 689 | −44.0 % |
+| submit (134) | 4 196 | 566 | −86.5 % |
+| load (45) | 2 437 | 383 | −84.3 % |
+| edit (45) | 1 521 | 0 | −100 % |
+| another (45) | 824 | 54 | −93.4 % |
+| delete (36) | 329 | 40 | −87.8 % |
+
+All 305 actions fell; none rose and none stayed. The 354 reads are the 177 distinct readings of the corpus (a line under one set of declared letters), each made once while its figure is typed and once in the cold load. Folds fell from 1 069 to 527. The ten largest falls:
+
+| Action | No memo | With the memos |
+|---|---|---|
+| `2b-capstone` load | 450 | 26 |
+| `2b-capstone` submit#13 «המרובע Oz2z3z4» | 146 | 3 |
+| `symbolic-cartesian-forced-1365` edit | 143 | 0 |
+| `symbolic-cartesian-forced-1365` submit#3 «b = 4» | 155 | 19 |
+| `symbolic-cartesian-forced-1365` load | 161 | 26 |
+| `2b-capstone` submit#12 «z1, z2, z4 סדרה הנדסית» | 133 | 3 |
+| `symbolic-cartesian-forced-1365` another#1 | 125 | 3 |
+| `2b-capstone` submit#10 «שטח Oz1z2z3 הוא 150r^2» | 118 | 3 |
+| `2b-capstone` submit#9 | 105 | 3 |
+| `param-modulus-1366` edit | 99 | 0 |
+
+Wall time, the dev PC with the other builders' suites running on it (two alternating rounds of before and after, minutes apart), before = this branch's first commit (the unit change, no memo), best of the runs shown:
+
+| Workload | Before | After |
+|---|---|---|
+| the 45 fixtures, every action, walked 20 times | 12.97 s | 2.42 s |
+| `2b-capstone`, every action, walked 200 times (the heaviest real fixture) | 12.38 s (62 ms a walk) | 1.82 s (9 ms a walk) |
+| the 112-line synthetic figure: typing its 113 lines (one is refused) | 4.30 s | 0.45 s |
+| … its last accepted line | 67.9 ms | 5.4 ms |
+| … «|z1| = -5», refused after 234 folds (the #2867 map's 3.3 s case) | 2.76 s | 0.82 s |
+| the three dearest recorded actions (`scripts/perf/complex/harness.ts`, the best of five fresh processes): `2b-capstone` load · `symbolic-cartesian-forced-1365` load · its submit#3 «b = 4» | 24.8 ms · 9.8 ms · 11.5 ms | 6.0 ms · 3.9 ms · 4.1 ms |
+
+Each memo was also switched off alone, in the same minutes. Without the fold memo `2b-capstone`'s 200 walks take 2.26 s (1.81 s with it), the synthetic figure's typing 0.77 s (0.43 s) and its last accepted line 14.1 ms (5.2 ms): the reads are already kept, so this is the fold memo's own share. Without the freeze the 200 walks take 1.73 s, so the freeze costs 4–5 %. Neither changes the synthetic refusal (0.78–0.84 s in all three states), whose folds are all different.
+
+**What one long session holds** (measured with a forced collection): every fixture typed in ONE session with its press, load, edit and delete and never a clear: 128 readings, 254 figures, 43 patterns, 3.4 MB. With the 112-line synthetic session and its refused line on top: 240 readings, 256 figures (the bound), 9.8 MB in all.
+
+**Nothing a student sees changed, and how that was checked.** No expectation of an existing test, fixture or scenario was changed; the only test files touched are the work meter's own (the gate's unit text, the walk's starting state, the baseline). And one transcript was taken twice: 45 fixtures and 24 hand-written sessions (the harness's probes, late declarations, every refusal kind), each driven through `submitLine`, three presses of «הציגו תצורה אחרת», `hydrateSession`, two edits, a mute, a restore, a delete and a retype, twice over in opposite orders in one process, writing after every step the store, the folded figure, the chips, the scene, the answers, the notes and the coincidences. 2 486 steps, 23.7 MB of text. On the product files as they were before the memos and as they are now it is the same bytes (sha256 `5d774762…2282590d`).
+
+**Not built, with the measurement.** The part of a fold that does not depend on the configuration, `lowerLines` and `exactSolve`, is executed once per distinct fold. Of the 689 exact solves left, 310 (45 %) solve a line list the session already solved: another seed or configuration of it, the same figure with the questions, or the entailment gate's two solves of the lists the gate's own folds just solved. Sharing them needs the lowering kept by content and a seam into `foldConstraints`. After the two memos `exactSolve` is 12.5 % of the walk's time and `lowerLines` 5.7 %, so the repeat is about 8 % of what is left, some 0.05 ms an action. It is left for the meter to rank, with phase 5.
+
+**Known limits.**
+- **The walk's `edit` now counts 0.** It re-types the last line's own text, which the session has already folded. The count still fails if an edit starts executing work, but it no longer sizes an edit that changes the text. Changing what the walk's edit types changes what the recorded numbers mean in every builder, so it is reported and not done here.
+- **The synthetic refusal is still 0.82 s.** Its 234 folds are 234 different line lists (the gate's differential blame, one earlier line removed at a time), so nothing is solved twice; what is left is the fold. That is ADR-W-210's third cause (a line that cannot hold costs more than one that can) and belongs to phase 5.
+- **A cold load recompiles the patterns** in the walk, because the one clear function empties that table too. A real session pays it once per page.
+- **The timings were taken while other suites used the machine.** The counts are exact; the times are the best of several runs and are comparable with each other only.
+
+**Sibling audit.** The same class in the other three builders is their own part of #2888. `server/adminConfig.ts` reads featured commands through `parseLineV2`: it now shares the memo, bounded as above.
+
+**Files changed outside tests and docs:** `src-complex/value/contentMemo.ts` (new); `src-complex/parser/rules.ts` (the memo, the unit, `ParsedLine`'s read-only channels); `src-complex/parser/lexicon.ts` (`rx`); `src-complex/app/deriveLines.ts` (the fold memo, `clearComplexCaches`); `scripts/perf/complex/harness.ts` (the same starting state as the walk).
+
+**Locks.** `src-complex/value/__tests__/content-memo-2888.test.ts`; `src-complex/__tests__/compute-once-2888.test.ts` (one read and one fold per content; the key is complete in each of its parts; cold equals warm for every corpus line under five sets of declared letters, and for every step of every fixture at the student's entry points; the bounds; the clear); the work-meter gate and its re-recorded baseline.
 
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)

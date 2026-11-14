@@ -12,6 +12,11 @@
  * where this builder's time goes. The complex tree has no worker and is the ADR's stated exception — its fold stays on
  * the page under a work ceiling — so every unit is page work, and this baseline is that ceiling.
  *
+ * A reading and a folded figure are kept by content and outlive the action, so a count depends on what the session
+ * already computed. The walk states that: each figure starts from EMPTY memos and stays warm, as one session does,
+ * and its load is cold again (`work-meter/walkCx.ts`). The lock at the end is what proves the counts depend on
+ * nothing run before the figure.
+ *
  * Re-record: `npm run work:record -- complex` (docs/08, "The work meter").
  */
 import { describe, expect, it } from 'vitest';

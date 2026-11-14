@@ -10,6 +10,9 @@
 // Also: --prod <events.jsonl> · --debug <debug-log.jsonl>. Prints one JSON line per action ({"ev":"begin"} before,
 // {"ev":"m"} after) so sweep.mjs can kill a hang; it writes no file except a --prof profile.
 //
+// THE CACHES (#2888, ADR-CX-090): each corpus item is one student session — it starts from empty memos
+// (clearComplexCaches) and stays warm; its load is cold again, as the work-meter gate's walk does it.
+//
 // WHAT IT MEASURES — all on the MAIN THREAD (there is no Worker anywhere in src-complex): submit / show-another /
 // load / edit / delete. "render" = what App.tsx's useMemo chain recomputes after the store changes
 // (deriveLines + coincidencesCx + realParamNotes + askRowsOf + buildScene); `parts` holds the split. The actions are
@@ -31,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { Session } from 'node:inspector';
 import { hydrateSession } from '../../../src-complex/app/submit';
+import { clearComplexCaches } from '../../../src-complex/app/deriveLines';
 // The actions themselves are the ONE driver this harness and the work-meter gate share (#2873).
 import { anotherCx, applyLineCx, blankCx, editLastCx, loadCx, removeFirstCx, savedFileCx, submitCx, type ActionRecordCx } from '../../../src-complex/__tests__/work-meter/driverCx';
 
@@ -163,6 +167,8 @@ const r1 = (x: number) => Math.round(x * 10) / 10;
 const shown = (r: ActionRecordCx) => ({ ms: r1(r.ms), parts: Object.fromEntries(Object.entries(r.parts).map(([k, x]) => [k, r1(x)])), ...(r.verdict !== undefined ? { verdict: r.verdict } : {}), nLines: r.nLines, ...(r.audit !== undefined ? { audit: r.audit } : {}), work: r.work });
 
 function runItem(it: Item, opts: { only?: string }) {
+  // #2888 (ADR-CX-090): an item is one session. It starts from empty memos and stays warm, as the gate's walk does.
+  clearComplexCaches();
   const s = blankCx();
   const prefix: string[] = [];
   const want = (kind: string) => !opts.only || opts.only === kind;
@@ -197,6 +203,8 @@ function runItem(it: Item, opts: { only?: string }) {
   s.seed = seed0;
   // load: a cold hydrate of the saved file (the fixture itself, or the final state as a save would write it)
   const file = it.file ?? savedFileCx(s);
+  // the load is COLD: a saved file opened in a new session (the edit and the delete after it are that session's)
+  clearComplexCaches();
   if (want('load')) {
     out({ ev: 'begin', item: it.id, kind: 'load', step: 0 });
     out({ ev: 'm', ...tag, kind: 'load', step: 0, seq: [...prefix], ...shown(loadCx(file)), thread: 'main' });
