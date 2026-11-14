@@ -32,6 +32,7 @@ import { partIndexOf, partsOf } from './components';
 import { carryingLines } from './carryingLines';
 import { segmentIdOf } from './cevian';
 import { followObjects } from './roles';
+import { ContentCache, contentOf } from './content';
 import { offInkExtensions } from '../../shell/offInk';
 import { curveByName, inDomain, isFree, isPositional, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
@@ -2164,7 +2165,7 @@ function constraintReads(raw: Construction): ReadonlyMap<Constraint, ReadonlySet
 const splitOf = (c: Construction): Construction[] => partsOf(c, constraintReads);
 
 /** Per construction and configuration: its resolved parts (`locusPartAt`). */
-const locusPartsMemo = new WeakMap<Construction, Map<string, Construction[]>>();
+const locusPartsMemo = new ContentCache<Map<string, Construction[]>>();
 
 /**
  * THE PART A POINT MOVES IN, AS ONE CONFIGURATION JUDGES IT (#2738, [ADR-AG-426](../../docs/06c-decisions-analytic.md#adr-ag-426)) —
@@ -2365,10 +2366,10 @@ function seedOrderParams(
  * `drawableAt` with the spread preference walks the seeds looking for an open ring, and on a DETERMINED
  * figure whose one triangle is narrow it walks all twenty-four; `distinctConfigSeeds` then evaluates the
  * same twenty-four for the panel. `evaluate` is pure over its two arguments, so the second walk is the
- * first one's work done again. Keyed weakly on the construction, which every consumer of one derivation
- * shares, so the memo lives exactly as long as the figure it describes.
+ * first one's work done again. Keyed weakly on the construction's CONTENT (#2888, ADR-AG-476; `content.ts`): every
+ * derivation of one line list shares it, whichever action asked, for as long as `derive`'s store holds that line list.
  */
-const evaluateMemo = new WeakMap<Construction, Map<number | string, Figure>>();
+const evaluateMemo = new ContentCache<Map<number | string, Figure>>();
 
 /**
  * How many evaluations were actually COMPUTED (a memo miss) — the operation count the #1473 perf lock
@@ -2387,7 +2388,9 @@ export const evaluateStats = { uncached: 0 };
  * `drawableAt` makes from configuration 0 to the seeds after it does not, so the first drawing is exactly the one it
  * always was (ADR-AG-022), however far that walk looks for a well-spread neighbour.
  */
-export function evaluate(raw: Construction, seed = 0, reach = 1, wide = seed !== 0): Figure {
+export function evaluate(given: Construction, seed = 0, reach = 1, wide = seed !== 0): Figure {
+  // #2888 (ADR-AG-476): solved on the content, so nothing a solve keeps (a part's frame, the prior figure) is one view's.
+  const raw = contentOf(given);
   let perSeed = evaluateMemo.get(raw);
   if (!perSeed) {
     perSeed = new Map();
@@ -2469,7 +2472,7 @@ function evaluateParts(raw: Construction, parts: Construction[], seed: number, r
   return mergeParts(raw, parts, figures, seed, figures.map((f) => f.choiceSeed ?? seed), partOf, false);
 }
 
-const partMemo = new WeakMap<Construction, Map<string, Figure>>();
+const partMemo = new ContentCache<Map<string, Figure>>();
 function evaluatePart(part: Construction, seed: number, reach: number, wide: boolean, choiceStart: number): Figure {
   let perKey = partMemo.get(part);
   if (!perKey) {
@@ -2680,7 +2683,7 @@ export function admissibleAt(c: Construction, pos: Map<Id, Pt>, env: Env): boole
  * points («∢ABC = 10», «∢ABC = α», a ratio of two angles), and a right angle stated as two perpendicular segments sharing
  * an end. Read structurally off the rows (every option of a choice included), memoized per construction.
  */
-const statedCornersCache = new WeakMap<Construction, ReadonlySet<string>>();
+const statedCornersCache = new ContentCache<ReadonlySet<string>>();
 function statedCornersOf(c: Construction): ReadonlySet<string> {
   const hit = statedCornersCache.get(c);
   if (hit) return hit;
@@ -2748,7 +2751,7 @@ function legiblePositions(c: Construction, pos: Map<Id, Pt>): boolean {
  * fit moves the seed's sample as little as the descent must, so another seed draws another circle.
  */
 /** The figure a created shape JOINS — the construction without it — evaluated once per (raw construction, seed, choice). */
-const priorMemo = new WeakMap<Construction, { prior: Construction; figures: Map<string, Figure> } | null>();
+const priorMemo = new ContentCache<{ prior: Construction; figures: Map<string, Figure> } | null>();
 function priorOf(raw: Construction, removed: ReadonlySet<Id>): { prior: Construction; figures: Map<string, Figure> } {
   let hit = priorMemo.get(raw);
   if (!hit) {
@@ -2827,7 +2830,7 @@ function placesByValue(c: Construction, k: Constraint): boolean {
   const known = new Set(c.objects.map((o) => o.id));
   return !mentionsAny(k.left, known) || !mentionsAny(k.right, known);
 }
-const lineGroupsCache = new WeakMap<Construction, LineGroups>();
+const lineGroupsCache = new ContentCache<LineGroups>();
 function lineGroupsOf(c: Construction): LineGroups {
   const lines = c.objectLine;
   if (!lines) return NO_GROUPS;
@@ -3382,7 +3385,7 @@ function fitLater(
 }
 
 /** The free vertices an object is placed from (itself when free), through its parents — `lineGroupsOf`'s `deps`. */
-const freeVerticesCache = new WeakMap<Construction, Map<Id, Set<Id>>>();
+const freeVerticesCache = new ContentCache<Map<Id, Set<Id>>>();
 function freeVerticesOf(c: Construction, id: Id): ReadonlySet<Id> {
   let deps = freeVerticesCache.get(c);
   if (!deps) {
@@ -3652,7 +3655,7 @@ function seedFreePairs(c: Construction, seeded: Map<Id, Pt>, env: Env, seed: num
  * every seed reuses them, and no evaluation is added.
  */
 const ROOT_STREAM = 200017;
-const pinMemo = new WeakMap<Construction, Map<string, Map<string, number[] | 'identity'>>>();
+const pinMemo = new ContentCache<Map<string, Map<string, number[] | 'identity'>>>();
 function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number, choiceSeed: number): { env: Env; pins: Pin[] } {
   const register = paramRegister(c);
   const scope = new Map(register.filter((p) => !isDirectionSymbol(p.sym)).map((p) => [p.sym, narrowedDomain(p.domain, impliedRange(c, p.sym))] as const));
@@ -3772,7 +3775,7 @@ interface BlockList {
   /** The admitted roots, each with its index in the listing (0 is configuration 0's own root). */
   roots: Array<{ x: number[]; index: number }>;
 }
-const blockMemo = new WeakMap<Construction, Map<string, BlockList | null>>();
+const blockMemo = new ContentCache<Map<string, BlockList | null>>();
 function blockRootsOf(raw: Construction, choiceSeed: number): BlockList | null {
   const akey = assignmentAt(raw, choiceSeed).key;
   let perRaw = blockMemo.get(raw);
@@ -5418,7 +5421,7 @@ const RING_REACH_TRIES = 8;
 // Keyed by seed AND by whether the spread preference was applied (#1174): the two modes answer
 // differently for the same seed, and sharing one cache would let whichever caller ran first
 // decide what the other one sees.
-const drawableCache = new WeakMap<Construction, Map<string, Figure>>();
+const drawableCache = new ContentCache<Map<string, Figure>>();
 
 /**
  * WHICH CONFIGURATION IS DRAWN (#2039 step 1, #1182, [ADR-AG-358](../../docs/06c-decisions-analytic.md#adr-ag-358)).
@@ -5484,7 +5487,61 @@ export function drawnSampleOf(f: Figure): string | undefined {
   return k ? `${k.seed}:${f.choiceSeed ?? k.seed}:${f.rootKey ?? ''}` : undefined;
 }
 /** Per construction and requested configuration: the configuration `drawableAt` drew (set beside `drawableCache`). */
-const drawnCache = new WeakMap<Construction, Map<string, Configuration>>();
+const drawnCache = new ContentCache<Map<string, Configuration>>();
+
+/**
+ * WHAT EACH READER HAS ASKED FOR (#2888, [ADR-AG-476](../../docs/06c-decisions-analytic.md#adr-ag-476)) — per construction
+ * OBJECT (a view, never its content): the configurations `drawableAt` was asked for through it.
+ *
+ * The configuration pool used to read "which seeds are evaluated" off `drawableCache`. That was the same question while
+ * every derivation had its own construction. With the solves shared by content it is not: a seed another action solved
+ * would count as read by a page that never asked for it, and a deferred pool decides what to SHOW from that set (a value
+ * the seeds read so far agree on is pending; one they already see differ makes the row walk the whole pool, before the
+ * paint). So what a pool has read is what was asked through ITS construction, exactly the set it was before: the
+ * sequence a page shows, and which side of the paint its work falls on, depend on the input alone, and only the COST of
+ * an ask depends on what is already solved.
+ */
+const askedOf = new WeakMap<Construction, Set<string>>();
+/** The derivation being computed: what its body asks of each content, for its views to start from ({@link recordAsks}). */
+let askRecorder: Map<Construction, Set<string>> | null = null;
+function noteAsked(c: Construction, key: string): void {
+  let mine = askedOf.get(c);
+  if (!mine) {
+    mine = new Set();
+    askedOf.set(c, mine);
+  }
+  mine.add(key);
+  if (askRecorder) {
+    const content = contentOf(c);
+    let recorded = askRecorder.get(content);
+    if (!recorded) {
+      recorded = new Set();
+      askRecorder.set(content, recorded);
+    }
+    recorded.add(key);
+  }
+}
+/**
+ * Run `fn` and report the configurations it asked `drawableAt` for, per construction content. `derive` runs its body under
+ * it and keeps what the body asked of the construction it RETURNS; every view of that derivation starts from those
+ * ({@link adoptAsks}), as the one construction a derivation used to build and return did.
+ */
+export function recordAsks<T>(fn: () => T): { value: T; askedOf: (c: Construction) => string[] } {
+  const outer = askRecorder;
+  const mine = new Map<Construction, Set<string>>();
+  askRecorder = mine;
+  try {
+    return { value: fn(), askedOf: (c) => [...(mine.get(contentOf(c)) ?? [])] };
+  } finally {
+    askRecorder = outer;
+  }
+}
+/** A new view of a derivation starts having asked what the derivation's own body asked. */
+export function adoptAsks(view: Construction, asked: readonly string[]): void {
+  for (const key of asked) noteAsked(view, key);
+}
+/** A configuration as one stable string — what `derive` keys a derivation of one line list by. */
+export const configurationKey = (at: Seed): string => drawableKey(at, false);
 
 /** The key a part's landing is recorded under: its first object, stable while lines are added to other parts. */
 export function partKey(part: Construction): string {
@@ -5567,11 +5624,9 @@ function drawableParts(c: Construction, at: Seed, preferSpread: boolean): Figure
  * is on the screen, and the next line is solved from there instead of from a configuration the student never saw.
  */
 export function drawnConfiguration(c: Construction, at: Seed, preferSpread = false): Configuration {
-  const key = drawableKey(at, preferSpread);
-  const hit = drawnCache.get(c)?.get(key);
-  if (hit) return hit;
+  // Always through `drawableAt` (a lookup when it is solved): the ask is then noted on the caller's construction (#2888).
   drawableAt(c, at, preferSpread);
-  return drawnCache.get(c)?.get(key) ?? configurationOf(at);
+  return drawnCache.get(c)?.get(drawableKey(at, preferSpread)) ?? configurationOf(at);
 }
 const drawableKey = (at: Seed, preferSpread: boolean): string => {
   const k = configurationOf(at);
@@ -5620,9 +5675,20 @@ export function drawableAt(
    */
   preferSpread = false,
 ): Figure {
+  const f = drawableOf(contentOf(c), at, preferSpread);
+  // #2888 (ADR-AG-476): the ask is the READER's (what its pool has read); the figure is the content's, shared.
+  noteAsked(c, drawableKey(at, preferSpread));
+  return f;
+}
+function drawableOf(c: Construction, at: Seed, preferSpread: boolean): Figure {
   // #2737 (ADR-AG-425): a figure of independent parts walks each part's configurations apart; one part walks as it always did.
   if (splitOf(c).length > 1) return drawableParts(c, at, preferSpread);
   return walkDrawable(c, at, preferSpread, (s, r, w) => evaluate(c, s, r, w), (f) => evaluatedAt.get(f), drawableCache, drawnCache);
+}
+/** A memo per construction: a `ContentCache`, or a plain `WeakMap` a walk keeps for itself. */
+interface PerConstruction<V> {
+  get(c: Construction): V | undefined;
+  set(c: Construction, value: V): unknown;
 }
 
 /**
@@ -5636,8 +5702,8 @@ function walkDrawable<K>(
   preferSpread: boolean,
   evalAt: (seed: number, reach: number, wide: boolean) => Figure,
   landedOf: (f: Figure) => K | undefined,
-  cache: WeakMap<Construction, Map<string, Figure>>,
-  drawnStore: WeakMap<Construction, Map<string, K | Configuration>>,
+  cache: PerConstruction<Map<string, Figure>>,
+  drawnStore: PerConstruction<Map<string, K | Configuration>>,
   /**
    * The parts already drawn beside this one (#2737): its points are kept visibly apart from theirs too, on the canvas they
    * share, so a point riding a carrier through another part's point («Y על הישר y=x» beside V(0,0)) is never opened on it.
@@ -6103,7 +6169,7 @@ function distinctCount(figs: readonly Figure[]): number {
  *  «תצורה אחרת» button use, for the same reason. */
 const DISTINCT_TRIES = 24;
 
-const distinctCache = new WeakMap<Construction, Map<number, number[]>>();
+const distinctCache = new ContentCache<Map<number, { seeds: number[]; walked: number }>>();
 
 /**
  * The seeds of up to `count` configurations that actually DIFFER (#1282).
@@ -6131,19 +6197,25 @@ export function distinctConfigSeeds(c: Construction, count = 3, tries = DISTINCT
     distinctCache.set(c, perCount);
   }
   const hit = perCount.get(count);
-  if (hit) return hit;
+  if (hit) {
+    // #2888 (ADR-AG-476): the walk's asks are this reader's too, whoever paid for the walk.
+    for (let seed = 0; seed < hit.walked; seed += 1) noteAsked(c, drawableKey(seed, false));
+    return hit.seeds;
+  }
 
   const seeds: number[] = [];
   const seen: Figure[] = [];
+  let walked = 0;
   for (let seed = 0; seed < tries && seeds.length < count; seed += 1) {
     const f = drawableAt(c, seed);
+    walked = seed + 1;
     // Tolerance-aware (#1539): two solves of one root are one configuration whatever their rounding.
     if (seen.some((g) => sameConfiguration(g, f))) continue;
     seen.push(f);
     seeds.push(seed);
   }
   const out = seeds.length > 0 ? seeds : [0];
-  perCount.set(count, out);
+  perCount.set(count, { seeds: out, walked });
   return out;
 }
 
@@ -6207,7 +6279,8 @@ class Pool implements ConfigurationPool {
   private done = false;
   constructor(private readonly c: Construction) {}
   private has(seed: number): boolean {
-    return drawableCache.get(this.c)?.has(drawableKey(seed, false)) ?? false;
+    // #2888 (ADR-AG-476): what THIS reader asked for, never what the shared content happens to hold (`askedOf`).
+    return askedOf.get(this.c)?.has(drawableKey(seed, false)) ?? false;
   }
   ready(): number[] {
     const out: number[] = [];
@@ -6230,7 +6303,12 @@ class Pool implements ConfigurationPool {
     return this.complete();
   }
   fill(): void {
-    if (this.done) return;
+    if (this.done) {
+      // #2888 (ADR-AG-476): a derivation being computed reads this pool as its own body always did — its asks are
+      // recorded even when an earlier derivation of the same content already filled it (`recordAsks`).
+      if (askRecorder) for (let s = 0; s < POOL_SIZE; s += 1) noteAsked(this.c, drawableKey(s, false));
+      return;
+    }
     for (let s = 0; s < POOL_SIZE; s += 1) drawableAt(this.c, s);
     this.done = true;
   }
@@ -6243,6 +6321,7 @@ class Pool implements ConfigurationPool {
   }
 }
 
+// Per construction OBJECT, never per content (#2888, ADR-AG-476): the mode and the pending flag are one reader's.
 const poolCache = new WeakMap<Construction, Pool>();
 
 export function configurationPool(c: Construction): ConfigurationPool {

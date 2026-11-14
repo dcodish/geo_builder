@@ -12,8 +12,12 @@
  * (`scanRoots`). The analytic tree has no worker, so every unit is page work today — the honest starting point of
  * invariant 1; the part after the paint is the pool and the passive effects.
  *
- * test-budget: the gate walks all 208 saved sequences through every student action (1 963 actions): about 11 min alone,
- * 15 min inside the full suite (ADR-W-210 Am. 1). One file, because the baseline is one file.
+ * A sequence is walked as ONE SESSION (#2888, ADR-AG-476): solved content is kept by content across actions, so the walk
+ * empties the store where a session starts (each sequence, and its load) and an action's count is what it adds to its
+ * session. `work-meter/walkAnalytic.ts` says exactly where.
+ *
+ * test-budget: the gate walks all 208 saved sequences through every student action (1 963 actions): about 6.5 min alone
+ * since #2888 (11 min before it, ADR-W-210 Am. 1). One file, because the baseline is one file.
  *
  * Re-record: `npm run work:record -- analytic` (docs/08, "The work meter").
  */

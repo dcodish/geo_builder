@@ -9,7 +9,7 @@
 import { centreIdOf, circleByName, commonTouchOf, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
-import { collapsedByGivens, completingStatement, pairsMetByGivens, partnerStatement, crossingHasNoPoint, curveAtOf, drawableAt, drawnConfiguration, hardRingFaults, holdsOn, lineCompareNoSide, seedNumber, viewBox, type Configuration, type Figure, type Seed } from './evaluate';
+import { adoptAsks, configurationKey, recordAsks, collapsedByGivens, completingStatement, pairsMetByGivens, partnerStatement, crossingHasNoPoint, curveAtOf, drawableAt, drawnConfiguration, hardRingFaults, holdsOn, lineCompareNoSide, seedNumber, viewBox, type Configuration, type Figure, type Seed } from './evaluate';
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure, type SideWord } from '../parser/parseAnalytic';
@@ -26,6 +26,7 @@ import { shapeRow } from './shapes';
 import { ringConvexityProofAg } from './rings';
 import { POINT_NAME } from './pointName';
 import type { CevianHost } from '../../shell/cevianHost';
+import { BoundedStore, clearContentCaches, viewOf } from './content';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 export interface LineFault {
@@ -215,8 +216,102 @@ export function derive(
   seedNames: Readonly<Record<string, string>> = {},
   pins: Readonly<Record<number, readonly string[]>> = {},
 ): Derivation {
-  /** #2039 (ADR-AG-358): `at` is a seed or a configuration a walk landed on; `seed` is its number. */
-  const seed = seedNumber(at);
+  const listKey = lineListKey(lines, seedNames, pins);
+  const key = configurationKey(at);
+  let list = lineLists.get(listKey);
+  let hit = list?.derivations.get(key);
+  if (!hit) {
+    // A line list asked for more configurations than its bound starts again: its solves go with the old entry.
+    if (!list || list.derivations.size >= CONFIGURATIONS_MAX) {
+      list = { front: foldLines(lines, seedNames, pins), derivations: new Map(), shown: new Map() };
+      lineLists.set(listKey, list);
+    }
+    const mine = list;
+    const { value, askedOf } = recordAsks(() => deriveAt(mine, lines, at, pins));
+    // What the body asked of the construction it returns is what a reader of the derivation starts from.
+    hit = { derivation: shared(value), asked: askedOf(value.construction) };
+    mine.derivations.set(key, hit);
+  }
+  const construction = viewOf(hit.derivation.construction);
+  adoptAsks(construction, hit.asked);
+  return { ...hit.derivation, construction };
+}
+
+/**
+ * COMPUTE ONCE (#2888, [ADR-AG-476](../../docs/06c-decisions-analytic.md#adr-ag-476); ADR-W-210 invariant 4) — `derive` is a
+ * pure function of `(lines, seed names, pins)` and the configuration asked for, and it is remembered as one.
+ *
+ * - **One construction per line list.** The fold does not depend on the configuration, so a line list is parsed and folded
+ *   once ({@link foldLines}) and every configuration of it is solved on that one construction. Every solver memo hangs off
+ *   it (`content.ts`), so the decision of a submit, the re-render after it, each step of «הציגו תצורה אחרת», an edit and an
+ *   undo all read one set of solves.
+ * - **One derivation per (line list, configuration).** The fault attribution, the stated measures and the drawn
+ *   configuration are remembered too; a second `derive` of the same input is a lookup.
+ * - **What a caller gets is its own.** The derivation object and its `construction` are fresh per call (a VIEW of the
+ *   shared content, `viewOf`), so the page's pool mode and React's identity checks behave as they always did; the lists
+ *   inside are shared and frozen, as `conic.ts` freezes what it shares.
+ *
+ * THE BOUND. At most {@link LINE_LISTS_MAX} line lists, least recently used first; a line list asked for more than
+ * {@link CONFIGURATIONS_MAX} configurations is folded again and starts cold. Dropping a line list frees every solve that
+ * hangs off its construction. Nothing here reads a clock.
+ */
+export const LINE_LISTS_MAX = 64;
+export const CONFIGURATIONS_MAX = 96;
+
+/** What a line list folds to: everything `derive` computes before a configuration is asked for. */
+interface FoldedLines {
+  facts: Fact[];
+  owner: number[];
+  /** The parse refusals; the fold's and the figure's are added per configuration. */
+  faults: LineFault[];
+  minted: Array<{ index: number; id: string }>;
+  /** The facts that offered the canonical circle's centre letter (`nameCanonicalCentres`). */
+  offered: number[];
+  folded: ReturnType<typeof fold>;
+  /** The folded construction, with the session's seed names: the CONTENT every configuration is solved on. */
+  construction: Construction;
+}
+interface LineList {
+  front: FoldedLines;
+  /** Per configuration (`configurationKey`): the derivation, and what its body asked of the construction it returns. */
+  derivations: Map<string, { derivation: Derivation; asked: string[] }>;
+  /** The construction as each configuration letters it (`followObjects`), one object per lettering. */
+  shown: Map<string, Construction>;
+}
+const lineLists = new BoundedStore<LineList>(LINE_LISTS_MAX);
+
+/** How many line lists the store holds now (test-visible: the bound's lock reads it). */
+export function heldLineLists(): number {
+  return lineLists.size;
+}
+
+/**
+ * EMPTY EVERY CONTENT-KEYED CACHE OF THIS TREE — test-only (2-D's `clearReplayCaches`): the line-list store and every
+ * solver memo that hangs off a construction. The work meter's walk calls it where a student's session starts.
+ */
+export function clearAnalyticCaches(): void {
+  clearContentCaches();
+}
+
+const lineListKey = (lines: readonly string[], seedNames: Readonly<Record<string, string>>, pins: Readonly<Record<number, readonly string[]>>): string =>
+  JSON.stringify([
+    lines,
+    Object.keys(seedNames).sort().map((k) => [k, seedNames[k]]),
+    Object.keys(pins).sort().map((k) => [k, pins[Number(k)]]),
+  ]);
+
+/** A derivation's lists are shared by every caller that asks for it: frozen, so a write throws instead of corrupting. */
+function shared(d: Derivation): Derivation {
+  for (const list of [d.lines, d.faults, d.outcomes, d.minted, d.created, d.createdCircles, d.hosts, d.notices, d.constraintLine, d.selectorLine]) if (list) Object.freeze(list);
+  return Object.freeze(d);
+}
+
+/** Lines → construction: parse, resolve the tool's letters and mints, fold. Pure over `(lines, seedNames, pins)`. */
+function foldLines(
+  lines: readonly string[],
+  seedNames: Readonly<Record<string, string>>,
+  pins: Readonly<Record<number, readonly string[]>>,
+): FoldedLines {
   const facts: Fact[] = [];
   const faults: LineFault[] = [];
   /** Which line produced each fact, so an apply refusal can be blamed on the right one. */
@@ -247,8 +342,37 @@ export function derive(
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
-  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices, created: factCreated, createdCircles: factCircles, hosts: factHosts } = fold(facts, owner);
-  const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded, seedNames: { ...seedNames } } : folded;
+  const folded = fold(facts, owner);
+  const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded.construction, seedNames: { ...seedNames } } : folded.construction;
+  return { facts, owner, faults, minted, offered: centred.offered, folded, construction };
+}
+
+/** The construction with its objects re-lettered — the same object for the same lettering of one line list. */
+function letteredAs(list: LineList, construction: Construction, objects: Construction['objects']): Construction {
+  const key = JSON.stringify(objects);
+  let hit = list.shown.get(key);
+  if (!hit) {
+    hit = { ...construction, objects };
+    list.shown.set(key, hit);
+  }
+  return hit;
+}
+
+/** One configuration of a folded line list: the figure, and every refusal, notice and measure read off it. */
+function deriveAt(
+  list: LineList,
+  lines: readonly string[],
+  at: Seed,
+  pins: Readonly<Record<number, readonly string[]>>,
+): Derivation {
+  /** #2039 (ADR-AG-358): `at` is a seed or a configuration a walk landed on; `seed` is its number. */
+  const seed = seedNumber(at);
+  const { facts, owner, construction } = list.front;
+  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices, created: factCreated, createdCircles: factCircles, hosts: factHosts } = list.front.folded;
+  // The line list's own records are shared by every configuration of it: this configuration's are copies.
+  const faults: LineFault[] = [...list.front.faults];
+  const minted = [...list.front.minted];
+  const centred = { offered: list.front.offered };
   // A tool letter whose point the fold did not create — the cevian ran to a point the figure already named the same
   // way (ADR-AG-211), or its line was refused — named nothing, and the row must not claim it did (#1263's rule).
   const present = new Set(construction.objects.map((o) => o.id));
@@ -1144,7 +1268,8 @@ export function derive(
    * which the cycling and the gates read. With no bound object this is the construction itself, unchanged.
    */
   const shownObjects = followObjects(construction.objects, construction.constraints.flatMap((k) => (k.t === 'choice' ? drawnOption(k) : [k])));
-  const shown: Construction = shownObjects === construction.objects ? construction : { ...construction, objects: shownObjects };
+  // #2888 (ADR-AG-476): one object per lettering of this line list, so the readers of every derivation that letters it so share its solves.
+  const shown: Construction = shownObjects === construction.objects ? construction : letteredAs(list, construction, shownObjects);
   // #1714: a constraint the parser built as a noun's or a correspondence's DEFINITION is not a stated measure; every
   // other one is a statement (the fold's own attribution, never a list of statement kinds).
   const stated = statedMeasures(

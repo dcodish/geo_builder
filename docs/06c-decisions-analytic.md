@@ -16548,3 +16548,117 @@ This also settles the open card about the «both» state zooming out to keep an 
 **Locks.** Unit: `derived.test.ts` (#2835 block: `parabola-point` focus and vertex on `y² = 8x`, `x² = 8y` and the translated frame; vacant when not a parabola). Fixtures: `parabola-vertex-2835.analytic.json`, `parabola-vertex-translated-2835.analytic.json` (the ruled sentence; V at (0, 0) and (2, 3)). `issue-2835-parabola-vertex.test.ts` (`pipeline-lock:`): every spelling, the ask on four parabolas and on `y² = 2px`, the pin, the conflicting restatement refused as the focus's is, the host refusals (none, two), the side refusal, the ellipse / focus / directrix controls, and each taught sentence recorded through the submit door. Re-based: the #2625 blocks of `parser.test.ts` (the letter rides along; the new texts) and `message-floor-2028.test.ts` (the key's two rows).
 
 **Behaviour change for a student:** «V קודקוד הפרבולה» (and its spellings) names the parabola's vertex V and draws it, on a canonical, y-axis or translated parabola; the ask box answers «שיעורי קודקוד הפרבולה» with its coordinates. Before, both went to the AI. «O מרכז הפרבולה» is still refused, and its sentence now ends «כתבו «O קודקוד הפרבולה».» instead of «הכלי עדיין לא קורא אותו.».
+
+## ADR-AG-476 — Compute once: one construction per line list, solved content keyed by content and kept across actions (#2888)
+
+**Status:** built, 2026-11-14 · **Issue:** [#2888](https://github.com/dcodish/geo_builder/issues/2888) (debt, `P2`; phase 2 of the program [#2867](https://github.com/dcodish/geo_builder/issues/2867)) · branch `debt/2888-compute-once-analytic`
+**Requirements:** none (internal): no line, verdict, drawing, label or message changes · **Design:** [04c](04c-design-analytic.md) § "Solved content is keyed by content" · **LADDER stage:** none (a memo around the solve; no stage of the ladder changes)
+**Implements** [ADR-W-210](06w-decisions-workspace.md#adr-w-210) invariant 4 for this builder. It changes how long [ADR-AG-144](#adr-ag-144)'s memo lives ("exactly as long as the figure it describes") and what [ADR-AG-180](#adr-ag-180)'s pool counts as read; neither rule's verdicts change.
+
+**Root cause.** Every solver memo of this tree hangs off a `Construction` object: the evaluation per seed, the drawable walk, the pin and block roots, the parts, the rank registers. `derive` parsed and folded a new construction on every call. So the memos were content-keyed in name only: the decision of a submit, the re-render after it, each of the up to 25 derivations of one «הציגו תצורה אחרת», an edit, the audit of a load and the render after it each started all of them cold and solved the same figure again.
+
+**Measured before building** (docs/17 §9; `main` @ `9cd61315`). A probe in `evaluateUncached` keyed each solve by the construction's content and its `(seed, choice, reach, wide)`, over the gate's own walk of all 208 saved sequences, one session per sequence. 189 254 930 of the 189 345 082 counted units (99.95 %) are inside `evaluateUncached`; the rest is counted outside it (solves, ranks and root scans a reader makes directly).
+
+| | Units | Share |
+|---|---|---|
+| Solved for the first time in its session | 89 218 055 | 47.1 % |
+| **A configuration of a line list the same session had already solved** | **100 036 875** | **52.8 %** |
+
+Where the repeats come from (the phases are the driver's: decide, render, post = the passive effects, pool, settle):
+
+| Action · phase | Repeated units | Why it repeats |
+|---|---|---|
+| «הציגו תצורה אחרת» · decide | 37 618 165 | the walk derives up to 24 seeds; each derivation folds its own construction and walks forward over seeds its neighbours and the pool had solved |
+| «הציגו תצורה אחרת» · render | 8 950 477 | the configuration found is derived again for the page |
+| edit · every phase | 20 776 108 (all of an edit to its own text) | the edit's trial and the page each derive lines the session has solved |
+| load · every phase | 19 908 342 | in the probe's single session a load repeats everything. A load is a NEW session, so this is **not** removed (below) |
+| submit · settle and post | 6 693 539 | the pool's re-render and the passive effects derive sub-lists again (the narrowing and circle notes, the trapezoid warning's prefixes) |
+| submit · render | 5 509 153 | the page derives the line list the decision's trial just solved |
+| submit · decide and pool; delete | 285 164 | small |
+
+By the kind of construction solved again: the fold's own product 99 747 795; an independent part of one 262 321; a re-lettered copy (`followObjects`) 10 964; the prior figure of a created shape 15 795; **the drop-one probe's constructions 0** (380 857 units, all first-time). `derive` was called 6 831 times in those walks: 1 750 calls repeated a (lines, configuration) already derived, and 3 460 more repeated the lines at another configuration.
+
+So one mechanism at one chokepoint removes the class: the same lines must give the SAME construction object. No memo was built for the drop-one probe, because nothing measured asks for one.
+
+**Decision.**
+
+1. **One construction per line list** (`derive.ts`). `derive` is split where the configuration first matters. `foldLines(lines, seedNames, pins)` (parse, the tool's letters and mints, the fold) is computed once per line list and kept. `deriveAt` computes one configuration of it (the drawable walk, the refusals, the stated measures). The key is the content `derive` reads and nothing else: `JSON.stringify([lines, seedNames, pins])` with the two maps sorted by key. No array identity, no clock.
+2. **One derivation per (line list, configuration).** The whole result of `deriveAt` is kept under `configurationKey(at)` (seed, reach, wide and the parts' landings), so a second `derive` of the same input is a lookup. A re-lettered construction (`followObjects`) is one object per lettering of its line list.
+3. **Every solver memo is keyed by content** (`engine/content.ts`). What `derive` returns is a VIEW of the kept construction: a fresh shallow copy per call (`viewOf`). `ContentCache` is the `WeakMap<Construction, V>` every memo was, read through `contentOf(view)`. The sixteen memos of `evaluate.ts`, `carriers.ts` and `components.ts` are `ContentCache`s, and nothing else about them changed. A plain copy (`{ ...c }`, the prior figure, a drop-one probe) is its own content, as before.
+4. **One reader's state about a figure is NOT shared.** The configuration pool's mode (`deferred`, `pendingShown`) stays keyed by the view. A decision that derives the lines the page is showing gets its own undeferred pool and a settled verdict, as it did when every call built its own construction. Shared, a verdict would depend on whether the page's pool had finished.
+5. **A pool has read what was asked through ITS construction** (`askedOf`). The pool used to read "which seeds are evaluated" off the drawable memo. With shared solves that set would grow with whatever another action solved, and a deferred pool decides what to SHOW from it: a value the seeds read so far agree on is «בודק…», and one they already see differ makes the point row walk the whole pool before the paint. So `drawableAt` notes each ask on the object it was asked through, a derivation's views start from what its own body asked (`recordAsks`, `adoptAsks`), and the pool reads that. The sequence a page shows and the side of the paint its work falls on depend on the input alone. Only the COST of an ask depends on what is already solved. This is what makes "no count rises" hold for `prePaint` as well as `total`.
+
+**The bound.** `LINE_LISTS_MAX = 64` line lists, least recently used dropped first, by count (`BoundedStore`). A line list asked for more than `CONFIGURATIONS_MAX = 96` configurations is folded again and starts cold. Every solver memo is weak on the construction, so dropping a line list frees all its solves. Measured as heap after forced collections, with the store and right after emptying it: one session on the dearest figure (`exam-2379-q3-route-2392`: nine lines typed, 20 presses of «הציגו תצורה אחרת», an edit, a delete) holds 11 line lists and 2.9 MB; a light figure walked the same way (`answer-in-parameter-q16-2735`) 9 line lists and 1.5 MB; ten of the heaviest fixtures typed one after another in one session fill the store to its 64 line lists and hold 20.1 MB. A session's working set is small: the current line list, the prefixes typed on the way to it (so an undo is a lookup), and the sub-lists the notes derive.
+
+**A result cannot depend on what is cached.** Every memoised function was already pure over (construction, its key): that is what let ADR-AG-144 share it inside one derivation. Nothing is warm-started from a kept result, analytic has no work budget that a hit would have to charge, and no clock reaches the solver. The one place where control flow read the memo's STATE, the pool, now reads the reader's own asks (point 5). Locked by `content-cache.test.ts`: for a sample of the saved fixtures, the figure, the refusals, the panel rows and what a deferred page shows first are identical from cold and after a scrambled warm session, at three configurations. `CONTENT_CACHE_SAMPLE=all` runs it over every saved sequence: all 208 are identical (run on this change, 296 s).
+
+**The work meter's walk says where a session starts.** This changes what a recorded number means, so it is stated here. `walkAnalytic.ts` empties the store at the start of each sequence (`newSession` → `clearAnalyticCaches`, this tree's one test-only clear, as 2-D has `clearReplayCaches`). Each action then runs on what the session's earlier actions solved, as the page does. `doLoad` empties it again: a load is a new session (a saved file opened in a new tab), and the edit and the delete that follow run in that loaded session. Before, every `derive` was cold, so an action's count was "this action from nothing". Now it is "what this action adds to its session". A sequence's counts still depend on nothing that ran before it: the gate's lock is unchanged and holds. After the re-record, `npm run work:check -- analytic --order reverse` and `--order shuffle:11` each walked the 208 sequences in a fresh process with 0 rises and 0 falls, and the gate's closing lock (two figures walked again after the whole corpus, twice in a row) passes. The timing harness (`scripts/perf/analytic/harness.ts`) starts a session per job, and per repetition of its confirm step, the same way.
+
+**Before → after** (`npm run work:record -- analytic`; units, never seconds; 208 sequences, 1 963 actions). No action rose in any of the three counts: 1 359 fell and 604 are unchanged.
+
+| Count | Before | After | Change |
+|---|---|---|---|
+| total | 189 345 082 | 107 722 804 | −43.1 % |
+| page | 189 345 082 | 107 722 804 | −43.1 % |
+| prePaint | 139 294 357 | 74 357 405 | −46.6 % |
+
+| Action | Actions | Total before | Total after | Change | Before the paint, before | after | Change |
+|---|---|---|---|---|---|---|---|
+| submit | 1 139 | 88 141 833 | 76 473 359 | −13.2 % | 59 157 180 | 54 180 266 | −8.4 % |
+| «הציגו תצורה אחרת» | 207 | 49 200 930 | 769 177 | −98.4 % | 48 875 442 | 740 625 | −98.5 % |
+| load | 207 | 19 960 214 | 19 141 232 | −4.1 % | 10 249 793 | 9 430 811 | −8.0 % |
+| edit | 207 | 20 787 496 | 84 427 | −99.6 % | 11 079 121 | 72 882 | −99.3 % |
+| delete | 203 | 11 254 609 | 11 254 609 | 0.0 % | 9 932 821 | 9 932 821 | 0.0 % |
+
+The ten dearest actions of the phase 0 baseline, and what they are now:
+
+| Sequence · action | Before | After | Change |
+|---|---|---|---|
+| `exam-2379-q3-route-2392` · another#1 | 18 795 106 | 0 | −100 % |
+| `exam-2379-q3-route-2392` · edit | 3 545 964 | 11 118 | −99.7 % |
+| `exam-2379-q3-route-2392` · submit#9 | 3 545 964 | 3 500 599 | −1.3 % |
+| `exam-2379-q3-route-2392` · load | 3 505 754 | 3 489 607 | −0.5 % |
+| `corpus471.json#18/4` · submit#3 | 2 590 987 | 2 522 864 | −2.6 % |
+| `exam-2379-q3-route-2392` · submit#8 | 2 573 090 | 2 527 725 | −1.8 % |
+| `corpus471.json#18/4` · delete | 2 309 166 | 2 309 166 | 0 % |
+| `issue-2231-rhombus-perp-foot` · another#1 | 2 210 252 | 119 | −100 % |
+| `issue-2231-rhombus-perp-foot` · edit | 2 152 678 | 119 | −100 % |
+| `issue-2231-rhombus-perp-foot` · load | 2 123 029 | 2 093 380 | −1.4 % |
+
+The ten largest falls are the «הציגו תצורה אחרת» and the edit of `exam-2379-q3-route-2392` (18 795 106 → 0; 3 545 964 → 11 118), `issue-2231-rhombus-perp-foot` (2 210 252 → 119; 2 152 678 → 119), `issue-2230-rhombus-strict-side` (2 102 975 → 85; 2 040 594 → 85), the edit and the ninth submit of `corpus471.json#3/5` (1 659 901 → 63; 1 651 529 → 134 419), and the «הציגו תצורה אחרת» of `corpus471.json#1/4` (1 458 661 → 102 835) and `issue-2233-rhombus-axes-stated` (1 396 388 → 0).
+
+**What did not fall, and why.**
+- **Every delete (203), unchanged.** Deleting the first line leaves a line list the session never solved, and a delete has no decision before its render, so nothing in it repeats.
+- **347 submits, unchanged.** 324 do no solver work at all. 17 are lines whose decision is the whole action, with no render after it: 12 taught and 5 refused. Two of the refusals are dear (`corpus471.json#7/4` «D על BC» 763 370 units, `corpus471.json#23/5` «A מעל O» 619 835): a line that cannot hold, which is phase 5's. 6 are cevian lines recorded with a new host (73 460 units together): the page's line list carries the pin and the decision's did not, so they are two contents (below).
+- **18 sequences' «הציגו תצורה אחרת», edit and load:** no solver work before or after.
+- **A first solve costs what it cost.** The dearest action is now `exam-2379-q3-route-2392` · submit#9, 3 500 599 units, of which 58 734 are before the paint: the pool's 24 seeds of a line list nobody has solved. A load is cold by definition (−4.1 %: only the repeat between its audit and its render went).
+
+**The slow corpus** (`npm run work:record -- analytic --slow`; 3 sequences, 37 actions): 5 916 217 → 3 605 728 units (−39.1 %). 20 actions fell, 17 are unchanged, none rose. `#1647 touch sentence`: «הציגו תצורה אחרת» 859 704 → 119 and the edit 834 934 → 119; its fifth line, the one the issue is about, 807 711 → 780 488, because it is a first solve. `#2737 nine+1 shapes`: «הציגו תצורה אחרת» 268 502 → 544, the edit 236 746 → 544.
+
+**The gate's own cost.** One walk of the corpus takes 382 s here, against 647–675 s for phase 0's (ADR-W-210 Am. 1), on the same machine with other suites running beside it.
+
+**Wall time** (`node scripts/perf/analytic/driver.mjs --only "exam-2379-q3-route-2392.analytic.json,issue-2231-rhombus-perp-foot.analytic.json"`; before = `main` @ `9cd61315`; the same machine, runs alternated, two or three of each, with other sessions' suites running beside them, so the long times are ±10 % here and more on another day). The first three rows are the three dearest actions of the phase 0 baseline.
+
+| Action | Before | After |
+|---|---|---|
+| `exam-2379-q3-route-2392` · «הציגו תצורה אחרת» (no other configuration exists) | 67.0 s, all of it before the answer | 2 ms |
+| `exam-2379-q3-route-2392` · edit | 12.6 s (0.40 s to the figure, 12.2 s of pool after it) | 44 ms |
+| `exam-2379-q3-route-2392` · submit#9 | 12.5–13.7 s (0.40–0.44 s to the figure) | 12.8–13.4 s (0.24 s to the figure) |
+| `exam-2379-q3-route-2392` · load | 12.3 s | 12.5–13.2 s |
+| `issue-2231-rhombus-perp-foot` · «הציגו תצורה אחרת», presses 1 to 6 | 8.2–9.8 s each | 8–10 ms each |
+| `issue-2231-rhombus-perp-foot` · edit | 7.8–7.9 s | 9–10 ms |
+| `issue-2231-rhombus-perp-foot` · submit#8 | 7.9–8.0 s, all before the figure | 8.1–8.7 s, all before the figure |
+
+A first solve takes as long as it did: the ninth line of the exam figure still fills its pool for 12 s after the figure is drawn, and the rhombus's eighth line still holds the page for 8 s before it. That is what phases 3 and 5 are for.
+
+**Tests.** `src-analytic/__tests__/content-cache.test.ts`: the same lines are solved once (whichever array, call or spelling of the configuration asked, and a second press of «הציגו תצורה אחרת»); different content is never answered by a remembered one (a number, an added line, a seed name, a pin, a configuration); a caller's derivation and construction are its own, and a page's deferred pool is not a decision's; a deferred pool has read only what was asked through it, whatever is already solved; the two bounds; the clear function; a scan that keeps every per-construction memo of the tree a `ContentCache`; and the cold-against-warm lock. One existing file states its starting state: `issue-1473-perf-budget.test.ts` measures what a COLD derivation costs (the render-budget comparison and the two conic-memo measurements), so it calls `clearAnalyticCaches()` before each derivation it measures. No expectation changed. The analytic lane (`npm run test:run:analytic`) is otherwise untouched and green.
+
+**Not done, and what belongs to a later phase.**
+- **Phase 3 (off the page).** 100 % of the work is still on the page, and 69.0 % of it before the paint. The largest part is a new line list's pool: the point rows' option walk fills it before the paint (cluster R; 46.5 M units of submit · render were first-time), and the scheduler fills the rest after it.
+- **Phase 5 (solver internals, a cheap "no").** One seed of the common-tangent chain costs what it did (cluster S: the retry walk inside one evaluation is first-time work, not a repeat). On a refusal, the drop-one probe solves constructions the configuration walk never saw (cluster F's within-call half); a second `derive` of the same refused lines is now a lookup, which is the cross-call half.
+- **A recorded cevian host is part of the content.** A line accepted with a host is derived without the pin (the decision) and then with it (the page): two line lists, and the six submits above still solve both. Keying a pinned list to the unpinned one whose fold chose the same ring would need the fold to prove the two constructions equal; 73 460 units in the walks, left.
+- **A re-lettered construction is solved apart from the one it re-letters** (`followObjects`: the same constraints, other letters on role-bound objects). Not identical content, 21 196 units in the walks, and left.
+- **PR #2860** (unmerged) adds `drawingConstructionOf` (a `WeakMap` keyed by the derivation object `derive` builds) and a `cycleMemo` in `app/another.ts`. On merge: the first is redundant (one fold per line list is now `derive`'s own property; keyed by the object `deriveAt` builds, it misses the copy a caller holds and falls back to deriving per seed, which is now cheap), and the second has to be emptied by `clearAnalyticCaches` (make it a `BoundedStore`), or the gate's counts would depend on fixture order.
+
+**What the student will see.**
+- [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)

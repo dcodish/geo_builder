@@ -15,8 +15,13 @@
  *             was shown.
  *
  * There is NO Worker in the analytic tree: every unit is page work, and the meter says so rather than this file.
+ *
+ * WHAT IS ALREADY SOLVED WHEN AN ACTION STARTS (#2888, ADR-AG-476). `derive` keeps solved content by content, and the
+ * store outlives the action, as it does in the page. So an action's count is the work it adds to its SESSION:
+ * {@link newSession} empties the store where a session starts, and `doLoad` is a session of its own (a saved file opened in
+ * a new tab finds nothing solved). Everything else runs on what the session's earlier actions left.
  */
-import { derive, type Derivation } from '../../engine/derive';
+import { clearAnalyticCaches, derive, type Derivation } from '../../engine/derive';
 import { decideSubmit, decideEditHost, isHeld } from '../../app/submit';
 import { decideRename, decideSwap } from '../../app/rename';
 import { anotherConfiguration } from '../../app/another';
@@ -221,8 +226,17 @@ function anotherBody(st: State, onPhase: (p: string) => void): { ph: Phases; nex
   return { ph, next: { lines: st.lines, seed: r.seed, hosts: st.hosts, d } };
 }
 
-/** Load (file / share link / restored session): the audit's cold derive at seed 0 (loadSession.ts), then the App's render. */
+/** A student's session starts: nothing is solved yet. The walk and the timing harness call it per sequence. */
+export function newSession(): void {
+  clearAnalyticCaches();
+}
+
+/**
+ * Load (file / share link / restored session): the audit's cold derive at seed 0 (loadSession.ts), then the App's render.
+ * A load is a NEW SESSION — the page was opened on the file — so it starts from an empty store (#2888).
+ */
 function loadBody(lines: string[], seed: Seed, hosts: Hosts, onPhase: (p: string) => void): { ph: Phases; next: State } {
+  newSession();
   const ph = blank();
   onPhase('decide');
   const t = now();

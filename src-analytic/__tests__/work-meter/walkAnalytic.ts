@@ -4,11 +4,18 @@
  *
  * `submit#k` types the k-th line on the settled figure of the lines before it. Then, on the figure the lines built: one
  * «הציגו תצורה אחרת», the cold load of the saved file (its own seed when it has one), an edit of the last line to its
- * own text, and the delete of the first line. The analytic engine keeps its caches on the construction, and `derive`
- * builds a new one each time, so a sequence's counts depend on nothing run before it.
+ * own text, and the delete of the first line.
+ *
+ * ONE SEQUENCE IS ONE SESSION, THEN A SECOND ONE (#2888, ADR-AG-476). `derive` keeps solved content by content and the
+ * store outlives the action, so the walk says where a session starts: it empties the store first (`newSession`), and each
+ * action then runs on what the session's earlier actions solved, as the page does — `submit#k` on the figure of the lines
+ * before it, «הציגו תצורה אחרת» on the figure the lines built. The load is a session of its own (`doLoad` empties the store:
+ * a saved file opened in a new tab), and the edit and the delete after it run in that loaded session. So a sequence's
+ * counts depend on nothing run before it, exactly as before, and a count is no longer "this action from cold" but "what
+ * this action adds to its session".
  */
 import type { Seed } from '../../engine/evaluate';
-import { doAnother, doDelete, doEdit, doLoad, doSubmit, settledState, type Phases, type State } from './driverAnalytic';
+import { doAnother, doDelete, doEdit, doLoad, doSubmit, newSession, settledState, type Phases, type State } from './driverAnalytic';
 import type { WorkCounts } from '../../../shell/workMeter';
 
 export interface WalkedActionA {
@@ -36,6 +43,7 @@ export function walkSequence(lines: readonly string[], saveSeed: Seed | undefine
     return r.next;
   };
 
+  newSession();
   let st = settledState([], 0, {});
   if (plan.submits === 'all') {
     lines.forEach((line, k) => {

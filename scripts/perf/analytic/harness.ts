@@ -39,7 +39,7 @@ import { fileURLToPath } from 'node:url';
 import { Session } from 'node:inspector';
 import type { Seed } from '../../../src-analytic/engine/evaluate';
 // The App's work per action is the ONE driver this harness and the work-meter gate share (#2873).
-import { doAnother, doDelete, doEdit, doLoad, doSubmit, settledState, type Hosts, type Phases, type State } from '../../../src-analytic/__tests__/work-meter/driverAnalytic';
+import { doAnother, doDelete, doEdit, doLoad, doSubmit, newSession, settledState, type Hosts, type Phases, type State } from '../../../src-analytic/__tests__/work-meter/driverAnalytic';
 import type { WorkCounts } from '../../../shell/workMeter';
 import { SLOW_CORPUS_ANALYTIC } from '../../../src-analytic/__tests__/work-meter/slowCorpusAnalytic';
 
@@ -186,6 +186,8 @@ type PhaseCb = (job: number, step: number, kind: string, p: string) => void;
 function runJob(ji: number, job: Job, emit: Emit, phase: PhaseCb): void {
   let step = 0;
   const base = { job: ji, source: job.source, id: job.id, ...(job.kind === 'prod' ? { iph: job.iph } : {}) };
+  // #2888 (ADR-AG-476): a job is one session — nothing is solved when it starts, and each action runs on what it left.
+  newSession();
   let st = settledState([], 0, {});
   const pre = (s: State): Pre => ({ lines: s.lines, seed: s.seed, hosts: s.hosts });
   const act = (kind: ActionKind, utterance: string | undefined, fn: (cb: (p: string) => void) => { ph: Phases; work: WorkCounts; next: State | null }, extra: { pre?: Pre; index?: number } = {}): State | null => {
@@ -353,6 +355,8 @@ function confirm(): void {
     if (!r) { process.stdout.write(`MISSING ${k}\n`); continue; }
     out[k] = [];
     for (let i = 0; i < reps; i += 1) {
+      // #2888 (ADR-AG-476): each repetition is its own session — the settled figure before the action, and nothing else.
+      newSession();
       const st = settledState(r.pre.lines, r.pre.seed, r.pre.hosts);
       const cb = () => {};
       // --prof <file>: the LAST repetition of the action (and only the action) is CPU-profiled
