@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { limitReached, unitsLeft, withWorkLimit } from '../workLimit';
 import { isNotDecided, notDecided } from '../notDecided';
 import { meterWork } from '../workMeter';
+import { afterRename, afterSwap } from '../frame/letterOffer';
 
 /** A search that tries candidates, one unit each, until its loop sees the limit or it runs out of candidates. */
 function search(candidates: number, solvesAt: number | null): { found: number | null; tried: number } {
@@ -76,8 +77,7 @@ describe('"not decided"', () => {
 });
 
 describe('the letter popover answers "not decided" (#2893)', () => {
-  it('a rename or swap whose decision reached the limit is not the invalid note, and carries what «המשיכו לחפש» runs', async () => {
-    const { afterRename, afterSwap } = await import('../frame/letterOffer');
+  it('a rename or swap whose decision reached the limit is not the invalid note, and carries what «המשיכו לחפש» runs', () => {
     expect(afterRename({ ok: false, reason: 'not-decided', round: 1 }, 'K')).toEqual({ close: false, note: 'not-decided', takenBy: null, retry: { kind: 'rename', to: 'K', round: 1 } });
     expect(afterSwap({ ok: false, notDecided: { round: 2 } }, 'K')).toEqual({ close: false, note: 'not-decided', retry: { kind: 'swap', to: 'K', round: 2 } });
     expect(afterRename({ ok: false, reason: 'bad' }, 'K').note).toBe('bad');
