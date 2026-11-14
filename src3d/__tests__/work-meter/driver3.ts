@@ -15,12 +15,18 @@
  *   rename / swap   = store.rename / store.swap + the render
  *   ask     = store.addQuery + the answer read for the row to highlight + the render (which answers every saved question)
  *
- * "The render" is what App3 recomputes on a new `(facts, seed)`: derive3 (memo), freeDofCount3, the plane / dihedral /
- * parameter chips (collectWedges), dataView (the panel is open by default on wide screens) and buildScene3 at the
- * home camera. 3-D has no worker and no work after the paint: every unit is page work before the paint, and the
- * meter says so rather than this file.
+ * "The render" is what App3 recomputes on a new `(facts, seed)`, in two parts (`app/readers3.ts`): the FIGURE (derive3,
+ * freeDofCount3, the plane / dihedral / parameter chips, buildScene3 at the home camera with its crossing dots), then
+ * the VALUES (dataView and every saved question's answer, when the panel is open).
+ *
+ * #2890 round 2 ([ADR-3D-493](../../../docs/06b-decisions-3d.md#adr-3d-493)): EVERY ACTION GOES THROUGH THE APP'S OWN
+ * JOB PATH (`app/offPage3.ts`, `app/work3.ts`'s `act3`): solved by 3-D's worker, the figure's journal adopted, the
+ * page's own action and figure readers run, and the values read when their journal is in. Where nothing is off the
+ * page (the timing harness, the suites) that path is the page's own action, as before. The work-meter gate hands it an
+ * executor over a second module instance: the worker's heap. So is every step the walk takes between two actions (a
+ * figure shown, a row committed from its saved commands): what the session solved lives in the worker's heap.
  */
-import { useGeo3, clearSolveCaches3, derive3, deriveStats3, redo3, undo3, type Derived3, type Fact3 } from '../../store/store3';
+import { useGeo3, clearSolveCaches3, decideCommands3, derive3, deriveStats3, type Fact3 } from '../../store/store3';
 import { answerQuery, parseQuery } from '../../engine/queries';
 import { nextFreeLabel3 } from '../../engine/crossings3';
 import { decideDeterministic3 } from '../../app/decideDeterministic3';
@@ -36,6 +42,9 @@ import { collectWedges, competingArcSymbols } from '../../render/wedges';
 import { buildScene3 } from '../../render/scene3';
 import { HOME_CAMERA } from '../../render/camera';
 import { meterAction, type WorkCounts } from '../../../shell/workMeter';
+import { latestValues3, offPage3, offPageAction3, setPanelOpen3, values3, type OffPage3 } from '../../app/offPage3';
+import { act3 } from '../../app/work3';
+import type { Step3 } from '../../app/ops3';
 
 export interface Outcome3 {
   verdict: string;
@@ -54,30 +63,24 @@ export interface ActionRecord3 extends Outcome3 {
 type Seed = ReturnType<typeof useGeo3.getState>['seed'];
 const now = (): number => performance.now();
 
-
-/**
- * #2890 (ADR-3D-492) — THE RENDER HAS TWO PARTS: the FIGURE (the derive, the DOF line, the chips, the scene) and the
- * VALUES (the open data panel). A job hands them over one after the other, so a walk on two heaps has to say where
- * the first ends: `beforeValues` is called at that point, and with `values` off the render stops short of the
- * values (a heap that has not been handed them yet); {@link renderValues3} then reads them alone. A walk on one heap
- * touches neither.
- *
- * The scene is read BEFORE the values, where the App reads it after (the panel is computed in App3's body, the scene in
- * its child). The scene's one solver reach is the crossing dots' other configurations, and those cost no unit in either
- * order (measured over every fixture and the slow corpus: the claims' samples have solved them), so no count depends on
- * it; but the dots belong to the FIGURE's hand-over, and a heap that is handed the figure alone must find them in it.
- */
-export const stages3: { beforeValues: (() => void) | null; values: boolean } = { beforeValues: null, values: true };
-
-/** The values a render reads: what the open data panel shows, and the answer to every saved question (App3's `queryResults`). */
-function readValues3(d: Derived3, seed: Seed): void {
-  dataView(d.construction, seed);
-  for (const q of useGeo3.getState().queries) answerQuery(d.construction, q, seed);
+/** Is the data panel open (App3's `showData`)? The walk opens it, closes it for the readers' session, and opens it again. */
+let panelOpen = true;
+function setPanel(open: boolean): void {
+  panelOpen = open;
+  setPanelOpen3(open);
 }
 
-/** The App's render-side derivations for the store's current `(facts, seed)`. Returns its wall time. */
-export function render3(): number {
-  const t = now();
+/** The session's other heaps (the worker's), cleared where a session starts. The gate sets it. */
+export const sessionHooks3: { clearOthers: (() => void) | null } = { clearOthers: null };
+
+/** A new session: every cache emptied, in every heap. */
+export function newSession3(): void {
+  clearSolveCaches3();
+  sessionHooks3.clearOthers?.();
+}
+
+/** The figure's part of the render (App3's body and its canvas). */
+function renderFigure3(): void {
   const { facts, seed } = useGeo3.getState();
   try {
     const d = derive3(facts, seed);
@@ -86,22 +89,33 @@ export function render3(): number {
     dihedralChipsByFact(facts, (id) => d.status[id] === 'ok');
     paramChipsByFact(facts, competingArcSymbols(collectWedges(d.construction, d.resolved.positions)));
     buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1, {}, true, () => 'value', []);
-    stages3.beforeValues?.();
-    if (stages3.values) readValues3(d, seed);
   } catch {
     /* a render throw is not a timing concern here */
   }
-  return now() - t;
 }
 
-/** The values alone, for the figure on screen: the second part of a render whose first ran with `values` off. */
+/** The values' part: what the open data panel shows and every saved question's answer, those in hand (App3). */
 export function renderValues3(): void {
-  const { facts, seed } = useGeo3.getState();
+  if (!panelOpen) return;
+  const { facts, seed, queries } = useGeo3.getState();
+  const v = values3(facts, seed);
+  if (!v.panel) return;
   try {
-    readValues3(derive3(facts, seed), seed);
+    const d = derive3(facts, seed);
+    dataView(d.construction, seed);
+    for (const q of queries) if (v.answered(q)) answerQuery(d.construction, q, seed);
   } catch {
-    /* as render3 */
+    /* as renderFigure3 */
   }
+}
+
+/** The App's render for the store's current `(facts, seed)`: the figure, then the values when they are in. Returns its wall time. */
+export async function render3(h?: OffPage3): Promise<number> {
+  const t = now();
+  renderFigure3();
+  await h?.settled;
+  renderValues3();
+  return now() - t;
 }
 
 /** Put a figure in the store without measuring anything. No saved question comes with it. */
@@ -109,9 +123,26 @@ export function setFigure3(facts: Fact3[], seed: Seed): void {
   useGeo3.setState({ facts, seed, queries: [], lastError: null, lastNotice: null });
 }
 
+/** Show a figure, unmeasured: solved off the page as any job is, put in the store, rendered. */
+export async function showFigure3(facts: Fact3[], seed: Seed): Promise<void> {
+  const h = await offPage3([], { state: { facts, seed, queries: [] } });
+  setFigure3(facts, seed);
+  h.after();
+  await render3(h);
+}
+
+/** A job the walk takes between two actions, unmeasured: `steps` solved off the page, then `runLocal`, then the render. */
+async function step3(steps: Step3[], runLocal: () => void): Promise<void> {
+  const h = await offPage3(steps);
+  runLocal();
+  h.after();
+  await render3(h);
+}
+
 /** Submit one typed line exactly as App3.submitSentence3 does (deterministic lane only — never the LLM). */
-export function submitLine3(raw: string): Required<Outcome3> {
+export async function submitLine3(raw: string): Promise<Required<Outcome3>> {
   const t = now();
+  const h = await offPage3([{ kind: 'line', raw }]);
   const v = decideDeterministic3(useGeo3.getState(), raw);
   let verdict: string = v.kind;
   if (v.kind === 'guided') useGeo3.setState({ lastError: null });
@@ -119,40 +150,74 @@ export function submitLine3(raw: string): Required<Outcome3> {
     useGeo3.getState().dispatchVerdict(v);
     if (v.kind === 'refused') verdict = `refused:${(v.error as { code?: string })?.code}`;
   }
+  h.after();
   const decideMs = now() - t;
-  return { verdict, decideMs, renderMs: v.kind === 'record' || v.kind === 'retick' || v.kind === 'rename' || v.kind === 'swap' ? render3() : 0 };
+  const drawn = v.kind === 'record' || v.kind === 'retick' || v.kind === 'rename' || v.kind === 'swap';
+  return { verdict, decideMs, renderMs: drawn ? await render3(h) : (await h.settled, 0) };
 }
 
-/** «הציגו תצורה אחרת». */
-export function another3(): Required<Outcome3> {
-  const t = now();
-  useGeo3.getState().resample();
-  const decideMs = now() - t;
-  return { verdict: `seed:${JSON.stringify(useGeo3.getState().seed)}`, decideMs, renderMs: render3() };
+/** A row committed from its saved commands, unmeasured (the walk's fallback for a row the grammar no longer records). */
+export function commitSaved3(utterance: string, cmds: Fact3['cmds']): Promise<void> {
+  return step3([{ kind: 'saved', utterance, cmds }], () => {
+    const v = decideCommands3(useGeo3.getState(), utterance, cmds, { twins: false, seedSearch: true });
+    if (v.kind === 'record') useGeo3.getState().dispatchVerdict(v);
+  });
 }
 
-/** Load a figure as App3.onLoadFile does: the store transition, then the load audit, then the render. */
-export function loadFacts3(facts: Fact3[], seed: Seed, ...rest: unknown[]): Required<Outcome3> {
+/** The render that follows a job whose handle the caller did not keep: the figure, then the values once in hand. */
+async function renderAfterJob3(): Promise<number> {
   const t = now();
-  (useGeo3.getState().loadFigure as (...a: unknown[]) => void)(facts, seed, ...rest);
+  renderFigure3();
+  await latestValues3();
+  renderValues3();
+  return now() - t;
+}
+
+/** «הציגו תצורה אחרת» (App3: a job on its own lane). */
+export function another3(): Promise<Required<Outcome3>> {
+  return routed3(() => offPageAction3('resample', [], () => useGeo3.getState().resample()), () => `seed:${JSON.stringify(useGeo3.getState().seed)}`);
+}
+
+/** Load a figure as App3.onLoadFile does: solved off the page, the store transition, the load audit, the render. */
+export async function loadFacts3(facts: Fact3[], seed: Seed): Promise<Required<Outcome3>> {
+  const t = now();
+  const h = await offPage3([{ kind: 'load', facts, seed }]);
+  useGeo3.getState().loadFigure(facts, seed);
   const a = auditLoad3(facts, seed);
+  h.after();
   const decideMs = now() - t;
-  return { verdict: a.failed.length ? `load-failed:${a.failed.length}/${a.total}` : 'ok', decideMs, renderMs: render3() };
+  return { verdict: a.failed.length ? `load-failed:${a.failed.length}/${a.total}` : 'ok', decideMs, renderMs: await render3(h) };
 }
 
-/** Load a saved file's text (the rows get new ids; the load is cold when the caller cleared the caches, as the walk does). */
-export function loadText3(text: string): Required<Outcome3> {
-  const r = deserializeFigure3(text);
-  if (!r.ok) return { verdict: `load-refused:${r.reason}`, decideMs: 0, renderMs: 0 };
-  return loadFacts3(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode, r.dihedralShown);
-}
-
-/** Delete the first row. */
-export function removeFirst3(): Required<Outcome3> {
+/** Load a saved file's text as App3.onLoadFile does (the rows get new ids, drawn by the job; cold when the caller cleared the caches). */
+export async function loadText3(text: string): Promise<Required<Outcome3>> {
   const t = now();
-  useGeo3.getState().remove(useGeo3.getState().facts[0].id);
+  const h = await offPage3([{ kind: 'open', text }]);
+  const r = deserializeFigure3(text);
+  if (!r.ok) {
+    h.after();
+    return { verdict: `load-refused:${r.reason}`, decideMs: 0, renderMs: 0 };
+  }
+  useGeo3.getState().loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode, r.dihedralShown);
+  const a = auditLoad3(r.facts, r.seed);
+  h.after();
   const decideMs = now() - t;
-  return { verdict: `err:${(useGeo3.getState().lastError as { code?: string } | null)?.code ?? 'none'}`, decideMs, renderMs: render3() };
+  return { verdict: a.failed.length ? `load-failed:${a.failed.length}/${a.total}` : 'ok', decideMs, renderMs: await render3(h) };
+}
+
+/** A routed store action as App3 calls it (`act3`: a job, solved off the page), then the render. */
+async function routed3<T>(run: () => Promise<T>, verdictOf: (out: T) => string, draws: (out: T) => boolean = () => true): Promise<Required<Outcome3>> {
+  const t = now();
+  const out = await run();
+  const decideMs = now() - t;
+  return { verdict: verdictOf(out), decideMs, renderMs: draws(out) ? await renderAfterJob3() : (await latestValues3(), 0) };
+}
+
+const errorCode = (): string => (useGeo3.getState().lastError as { code?: string } | null)?.code ?? 'none';
+
+/** Delete the first row (App3 → `act3.remove`). */
+export function removeFirst3(): Promise<Required<Outcome3>> {
+  return routed3(() => act3.remove(useGeo3.getState().facts[0].id), () => `err:${errorCode()}`);
 }
 
 /**
@@ -163,70 +228,54 @@ export function removeFirst3(): Required<Outcome3> {
  * in the store with nothing solved. `editLast3` is measured after it. A one-row figure has no rows before it, so its
  * edit is cold.
  */
-export function beforeEdit3(facts: Fact3[], seed: Seed): void {
-  clearSolveCaches3();
-  showBeforeEdit3(facts, seed);
+export async function beforeEdit3(facts: Fact3[], seed: Seed): Promise<void> {
+  newSession3();
+  await showBeforeEdit3(facts, seed);
 }
 
 /** {@link beforeEdit3} after its clear: the rows before the last shown, then all of them in the store, unsolved. */
-export function showBeforeEdit3(facts: Fact3[], seed: Seed): void {
-  setFigure3(facts.slice(0, -1), seed);
-  render3();
+export async function showBeforeEdit3(facts: Fact3[], seed: Seed): Promise<void> {
+  await showFigure3(facts.slice(0, -1), seed);
   setFigure3(facts, seed);
 }
 
-/** Edit the last row to its own text (App3's onEditCommit → replaceFact). */
-export function editLast3(): Required<Outcome3> {
+/** Edit the last row to its own text (App3's onEditCommit → `act3.replaceFact`). */
+export function editLast3(): Promise<Required<Outcome3>> {
   const { facts } = useGeo3.getState();
   const last = facts[facts.length - 1];
-  const t = now();
-  const ok = useGeo3.getState().replaceFact(last.id, last.utterance);
-  const decideMs = now() - t;
-  return { verdict: ok ? 'ok' : 'refused', decideMs, renderMs: render3() };
+  return routed3(() => act3.replaceFact(last.id, last.utterance), (ok) => (ok ? 'ok' : 'refused'));
 }
 
 /* ── #2890 (ADR-3D-492 part 3): the actions the walk left out. Each is what App3 runs for it. ── */
 
-const errorCode = (): string => (useGeo3.getState().lastError as { code?: string } | null)?.code ?? 'none';
-
-/** «בטל» (App3 → `undo3`), then the render. */
-export function undoStep3(): Required<Outcome3> {
-  const t = now();
-  undo3();
-  const decideMs = now() - t;
-  return { verdict: `rows:${useGeo3.getState().facts.length}`, decideMs, renderMs: render3() };
+/** «בטל» (App3 → `act3.undo`), then the render. */
+export function undoStep3(): Promise<Required<Outcome3>> {
+  return routed3(() => act3.undo(), () => `rows:${useGeo3.getState().facts.length}`);
 }
 
-/** «בצע שוב» (App3 → `redo3`), then the render. */
-export function redoStep3(): Required<Outcome3> {
-  const t = now();
-  redo3();
-  const decideMs = now() - t;
-  return { verdict: `rows:${useGeo3.getState().facts.length}`, decideMs, renderMs: render3() };
+/** «בצע שוב» (App3 → `act3.redo`), then the render. */
+export function redoStep3(): Promise<Required<Outcome3>> {
+  return routed3(() => act3.redo(), () => `rows:${useGeo3.getState().facts.length}`);
 }
 
-/** Tick or untick the first row (App3's `onToggle` → `toggle`), then the render. */
-export function toggleFirst3(): Required<Outcome3> {
-  const t = now();
-  useGeo3.getState().toggle(useGeo3.getState().facts[0].id);
-  const decideMs = now() - t;
-  return { verdict: `err:${errorCode()}`, decideMs, renderMs: render3() };
+/** Tick or untick the first row (App3's `onToggle` → `act3.toggle`), then the render. */
+export function toggleFirst3(): Promise<Required<Outcome3>> {
+  return routed3(() => act3.toggle(useGeo3.getState().facts[0].id), () => `err:${errorCode()}`);
 }
 
-/** The figure on screen with the data panel CLOSED: everything a render reads but the values. Unmeasured. */
-export function showPanelClosed3(): void {
-  const was = stages3.values;
-  stages3.values = false;
-  try {
-    render3();
-  } finally {
-    stages3.values = was;
-  }
+/** The figure on screen with the data panel CLOSED: shown, unmeasured. */
+export async function showPanelClosed3(facts: Fact3[], seed: Seed): Promise<void> {
+  setPanel(false);
+  await showFigure3(facts, seed);
 }
 
-/** The data panel opened on the figure on screen: the values alone (the figure is drawn). */
-export function openPanel3(): Required<Outcome3> {
+/** The data panel opened on the figure on screen (App3: a job on the values lane): the values alone (the figure is drawn). */
+export async function openPanel3(): Promise<Required<Outcome3>> {
   const t = now();
+  setPanel(true);
+  const h = await offPage3([], { panel: true });
+  h.after();
+  await h.settled;
   renderValues3();
   return { verdict: 'ok', decideMs: 0, renderMs: now() - t };
 }
@@ -234,25 +283,21 @@ export function openPanel3(): Required<Outcome3> {
 /** The figure's point letters, in the order the figure made them. */
 const pointIds3 = (): string[] => [...derive3(useGeo3.getState().facts, useGeo3.getState().seed).construction.points.keys()];
 
-/** The first point renamed to the first free letter (the canvas popover and the typed rewrite both reach `rename`), then the render. */
-export function renameFirst3(): Required<Outcome3> {
+/** The first point renamed to the first free letter (the canvas popover and the typed rewrite both reach `act3.rename`), then the render. */
+export function renameFirst3(): Promise<Required<Outcome3>> {
   const { facts, seed } = useGeo3.getState();
   const c = derive3(facts, seed).construction;
   const [from] = c.points.keys();
   const to = nextFreeLabel3(c);
-  const t = now();
-  const r = from !== undefined && to !== null ? useGeo3.getState().rename(from, to) : { ok: false as const, reason: 'no-letter' };
-  const decideMs = now() - t;
-  return { verdict: r.ok ? 'ok' : `refused:${r.reason}`, decideMs, renderMs: r.ok ? render3() : 0 };
+  if (from === undefined || to === null) return Promise.resolve({ verdict: 'refused:no-letter', decideMs: 0, renderMs: 0 });
+  return routed3(() => act3.rename(from, to), (r) => (r.ok ? 'ok' : `refused:${r.reason}`), (r) => r.ok);
 }
 
-/** The first two points' letters swapped (the popover's offer and «החלף בין A ל-B» both reach `swap`), then the render. */
-export function swapFirstTwo3(): Required<Outcome3> {
+/** The first two points' letters swapped (the popover's offer and «החלף בין A ל-B» both reach `act3.swap`), then the render. */
+export function swapFirstTwo3(): Promise<Required<Outcome3>> {
   const [a, b] = pointIds3();
-  const t = now();
-  const r = a !== undefined && b !== undefined ? useGeo3.getState().swap(a, b) : { ok: false as const, reason: 'no-letter' };
-  const decideMs = now() - t;
-  return { verdict: r.ok ? 'ok' : `refused:${r.reason}`, decideMs, renderMs: r.ok ? render3() : 0 };
+  if (a === undefined || b === undefined) return Promise.resolve({ verdict: 'refused:no-letter', decideMs: 0, renderMs: 0 });
+  return routed3(() => act3.swap(a, b), (r) => (r.ok ? 'ok' : `refused:${r.reason}`), (r) => r.ok);
 }
 
 /**
@@ -267,19 +312,21 @@ export function questionsOf3(): string[] {
   return asks.filter((text): text is string => text !== undefined && parseQuery(c, text) !== null);
 }
 
-/** One question asked (App3's ask lane: `addQuery`, the answer read for the row to highlight), then the render, which answers every saved question. */
-export function ask3(text: string): Required<Outcome3> {
-  const { facts, seed } = useGeo3.getState();
-  const c = derive3(facts, seed).construction;
+/** One question asked (App3's ask lane: a job on the values lane; the answer read for the row to highlight once in hand), then the render. */
+export async function ask3(text: string): Promise<Required<Outcome3>> {
   const t = now();
+  const h = await offPage3([{ kind: 'ask', text }], { panel: true });
   useGeo3.getState().addQuery(text);
-  const a = answerQuery(c, text, seed);
+  h.after();
+  await h.settled;
+  const { facts, seed } = useGeo3.getState();
+  const a = answerQuery(derive3(facts, seed).construction, text, seed);
   const decideMs = now() - t;
-  return { verdict: a.answer !== null ? 'answered' : `note:${a.note}`, decideMs, renderMs: render3() };
+  return { verdict: a.answer !== null ? 'answered' : `note:${a.note}`, decideMs, renderMs: await render3() };
 }
 
 /** Run one action under the meter and the engine's counters. A throw is an outcome, never a lost record. */
-export function metered3(fn: () => Outcome3): ActionRecord3 {
+export async function metered3(fn: () => Outcome3 | Promise<Outcome3>): Promise<ActionRecord3> {
   const u0 = deriveStats3.uncached;
   const r0 = resolveStats3.uncached;
   const s0 = leastSquaresStats.solves;
@@ -288,7 +335,7 @@ export function metered3(fn: () => Outcome3): ActionRecord3 {
   const t0 = now();
   let r: Outcome3;
   try {
-    r = fn();
+    r = await fn();
   } catch (e) {
     r = { verdict: `throw:${String((e as Error)?.message ?? e).slice(0, 80)}` };
   }

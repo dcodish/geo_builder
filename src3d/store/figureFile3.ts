@@ -10,7 +10,7 @@
  * a future schema refuses `newer-schema` — never a half-loaded session.
  */
 
-import { nanoid } from 'nanoid';
+import { rowId3 } from './rowIds3';
 import { cleanSeed3, seedNumber3, seedPartsOf3, type Seed3 } from '../engine/components3';
 import { ingestTypedText } from '../../shell/bidi';
 import { figureTooLarge } from '../../shell/save';
@@ -297,7 +297,7 @@ export function deserializeFigure3(text: string): LoadResult3 {
     // #751 (ADR-W-029): clean on LOAD too — a file saved before the invariant carries the
     // app's display isolates, and those saves are already in the wild.
     // #509: and so are files carrying the pre-affine symbolic components — migrate them.
-    facts.push({ id: nanoid(8), utterance: ingestTypedText(f.utterance), cmds: f.cmds.map(migrateSymExprs), enabled: f.enabled !== false });
+    facts.push({ id: rowId3(), utterance: ingestTypedText(f.utterance), cmds: f.cmds.map(migrateSymExprs), enabled: f.enabled !== false });
   }
   const queries = Array.isArray(file.queries) ? file.queries.filter((q): q is string => typeof q === 'string') : [];
   // #318: lenient like `queries` — keep only well-formed entries; anything else falls back to 'full'

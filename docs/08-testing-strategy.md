@@ -156,6 +156,11 @@ counts come back in the meter envelope. So:
 - a result that does not clone fails the walk, at the action that produced it;
 - an adoption that misses (phase 3's later steps) shows as page work, which the one-instance gate could not see.
 
+**3-D's gate walks two heaps** ([ADR-3D-493](06b-decisions-3d.md#adr-3d-493), #2890 round 2): the page (the test file's
+own instance) and 3-D's worker (`app/ops3.ts` loaded with `secondInstance`, served by `isolatedExecutor`). Every action
+and every step the walk takes between actions goes through the App's own job path (`app/offPage3.ts`), so the page's
+count is zero, `total` is the worker's work and `prePaint` is its figure's part. `newSession3` empties both heaps.
+
 A builder's first worker joins the same way: load its op table with `secondInstance`, hand it to `isolatedExecutor`,
 and inject the executor into its worker client. A driver whose client has separate heaps says so (2-D's
 `WorkerOps.reset`), and empties those heaps where a session starts.

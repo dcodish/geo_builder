@@ -903,9 +903,8 @@ be filled from outside the heap. `store/journal3.ts`:
   An entry already held is kept. Nothing is applied as a result: the adopting heap then runs its OWN store action and
   readers, and every solve is a hit. An entry that is missing is solved there and counted, never read as a default.
 - **A memo added to this tree joins the journal** (its write noted, its adoption written), or the adopting heap solves
-  what the solving heap solved. `__tests__/two-heaps-2890.test.ts` is what catches it: it walks every fixture on two
-  heaps (two module instances) in step and asserts that the second solves 0 units, with 0 derives and 0 resolves not
-  answered from a memo.
+  what the solving heap solved. The work-meter gate catches it: since ADR-3D-493 it walks every fixture on two heaps
+  (the page and the worker, two module instances, every message cloned), and the page's recorded count is zero.
 - **Beside its entries a journal carries** each construction's pin origins, as an array aligned with `c.scalarPins`
   in the same message (a clone's pin objects are new, and a construction without its origins is "not settled": it
   keeps the identity rule and nothing adopted is found under it). **The new row's id is the caller's**
@@ -916,9 +915,38 @@ be filled from outside the heap. `store/journal3.ts`:
   order the action asked for them and dropped the oldest; they all arrive at once, after it has finished, and the
   adopting heap's action then asks from the start. The surplus goes when the next journal arrives
   (`releaseAdopted3`).
-- The walk is a sequence of steps (`stepsOfFixture3`, `stepsOfLines3`) so that two heaps can take them in turn; a new
-  session is a step of its own. The driver's render says where the figure ends and the values begin (`stages3`): the
-  derive, the DOF line, the chips and the scene, then the data panel.
+- The walk is a sequence of steps (`stepsOfFixture3`, `stepsOfLines3`); a new session is a step of its own.
+
+**The page does not solve (#2890 round 2, [ADR-3D-493](06b-decisions-3d.md#adr-3d-493); [ADR-W-210](06w-decisions-workspace.md#adr-w-210) invariant 1).**
+3-D has one worker (`app/worker3.ts`, on the shared host), started with the page (`startWork3`, `main.tsx`), and one
+operation, `act` (`app/ops3.ts`): set the worker's store to the page's data, run the action's steps (a typed line, a
+store action by name, a file / link / session read, a question), read the FIGURE (`app/readers3.ts`: the derive, the
+DOF line, the crossing dots), send its journal as the part `figure`, read the VALUES (the open panel's `dataView` and
+every saved question), and answer with their journal. The page (`app/offPage3.ts`):
+- `offPage3(steps)` posts the job with the page's data and the new rows' ids (`store/rowIds3.ts`: every id a store
+  action or a load draws comes from there, so both heaps name a row alike), adopts the figure's journal, and waits for
+  the values while the student would not see the wait: up to the shell's threshold from the job's start. Then, if the
+  store still holds the figure the job was posted for (the basis), it installs the ids and returns; otherwise it posts
+  again. The caller runs its OWN action (unchanged), then `after()`: the values are marked ready for the figure that
+  action left when their journal is in (`values3`, `useValues3`). A journal for a figure the student has left is
+  adopted (keyed by content: useless, never wrong) and never marked ready.
+- Every route that changes or reads the figure goes through it: `act3` (`work3.ts`, the queue's `around`: toggle,
+  delete, edit, rename, swap; undo and redo run the worker on the figure zundo goes back to), and App3's job bodies
+  (a typed sentence and the model's lines, a named crossing, a load, a link, a restored session, «הציגו תצורה אחרת»,
+  clear). The panel opened on a figure whose values were not read, and a question asked, are jobs on the `values`
+  lane (behind the student's actions; the submit button does not say «חושב…»).
+- App3 reads the values only when they are ready (`dataPanel`, `queryResults`, the canvas coordinate labels); until
+  then the panel shows one grey «בודק…» line, after the shell's threshold (`useShownWorking`). The page's thread is
+  free while the worker solves, so the threshold is counted on it.
+- The meter: the worker's units come back in the envelope; those of the figure's part are before the paint, those of
+  the values after it. The page's count is zero.
+- Where there is no `Worker` (node, the suites), `offPage3` posts nothing and the values are always ready: the page's
+  own action solves, as before. The work-meter gate hands the client an `isolatedExecutor` over a second module
+  instance of `ops3` (the worker's heap).
+- A crashed or replaced worker is handed the figure on screen (`heldJournal3`: the page's derive, its construction's
+  answers and their lazy values, read without solving).
+- `derive3` hands the fold the fact list's REPRESENTATIVE (`factLists3`), so a memo below it keyed by the array (the
+  narrowing notes) is keyed by content: a worker is handed every list as a clone.
 
 **A pin symbol's admissible roots are one set (#1769, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395)).** One
 root predicate decides whether a candidate joins the pool: `collect` admits it only when it is exact on the primary

@@ -1026,6 +1026,20 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   opens the panel, and the row is highlighted. Where the panel has no such row, the answer is «לא נקבע על ידי הנתונים».
   The question never goes to the model.
   - Sources: ADR-3D-480; #2062.
+- **FR-SP-33 (Must)** — **The page is never frozen, and the values follow the figure** (#2890; operator 2026-11-13,
+  *"user should know the engine is working and not frozen"*, *"3d can behave like analytics"*; 2026-11-14, three
+  rulings). While 3-D computes, the page scrolls, answers clicks, and the figure on screen can be turned, zoomed and
+  panned; save, share, the exports, the language and the guide act on the figure on screen, as in 2-D. An action
+  pressed meanwhile waits its turn. After every action that changes or redraws the figure (a line, an edit,
+  «הציגו תצורה אחרת», a load, a delete, a row ticked or unticked, undo, redo, a letter renamed or swapped) and when
+  the data panel is opened, the figure is drawn as soon as it is solved (*"Figure first, both tools"*), with its rows'
+  statuses, notices, chips, DOF line and crossing dots; the data panel's values follow. While they are computed the
+  panel shows ONE grey line «בודק…» where its empty-state line sits (*"One «בודק…» line"*), shown only after the
+  suite's working threshold (0.3 s), and the rows appear together when ready; a number from the previous figure is
+  never shown (*"Yes, all redraws"*). The coordinate labels the open panel puts on the canvas follow with the
+  values. A question asked in the panel reads «<השאלה> = בודק…» until its answer is ready. An action whose values
+  are ready within the threshold is drawn whole, figure and values together.
+  - Sources: ADR-3D-493; ADR-W-210; #2890.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

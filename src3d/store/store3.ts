@@ -26,7 +26,7 @@ import { buildNotices3, shapeWarnings3, type BuildNotice3, type ShapeWarning3 } 
 import { narrowingNotes3 } from './narrowing3';
 import { normalizeLabel3, pointLabels3, renameFacts3, renamePlaneDisplay3, renameQueries3, swapSession3, type RenameResult3, type SwapResult3 } from './rename3';
 import { temporal } from 'zundo';
-import { nanoid } from 'nanoid';
+import { rowId3 } from './rowIds3';
 import { ingestTypedText } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
@@ -896,10 +896,22 @@ export function derive3(facts: Fact3[], seed: Seed3): Derived3 {
     deriveMemoStats3.hits++;
     return hit.out;
   }
-  const out = derive3Uncached(facts, seed);
+  // #2890 round 2 (ADR-3D-493): the fold is handed the list's REPRESENTATIVE, so a memo below it that is keyed by the
+  // array (the narrowing notes, `narrowing3.ts`) is keyed by the list's content too. A heap that is handed a list as a
+  // clone (a worker, every job) would otherwise compute the notes again for the content it has already noted.
+  const out = derive3Uncached(list as Fact3[], seed);
   if (storeJournal3) storeJournal3.derives.push({ facts: list as Fact3[], seed, out });
   keepDerive3(key, out);
   return out;
+}
+
+/**
+ * #2890 round 2 (ADR-3D-493): the derive this heap HOLDS for a fact list and a configuration, or undefined. Never
+ * derives: the page's checkpoint reads what is on screen without solving anything.
+ */
+export function heldDerive3(facts: readonly Fact3[], seed: Seed3): Derived3 | undefined {
+  const id = factListIds3.get(factLists3.of(facts));
+  return id === undefined ? undefined : deriveMemo3.get(`${id}|${seedKey3(seed)}`)?.out;
 }
 
 /** The derive memo's write: the newest entry in, the least recently used out. */
@@ -3121,7 +3133,7 @@ export type Verdict3 =
 export function decideSubmit3(
   st: { facts: Fact3[]; seed: Seed3 },
   raw: string,
-  newId: () => string = () => nanoid(8),
+  newId: () => string = rowId3,
 ): Verdict3 {
   const utterance = ingestTypedText(raw); // #751 (ADR-W-029) — the store-side ingest invariant
   // #578 (ADR-3D-211): «שנה שם E ל-O» is a rewrite of HISTORY, not a statement about the figure,
@@ -3150,7 +3162,7 @@ export function decideCommands3(
   utterance: string,
   commands: readonly Command3[],
   opts: { twins: boolean; seedSearch: boolean; unread?: readonly string[]; readExtent?: boolean; lane?: 'grammar' | 'model' },
-  newId: () => string = () => nanoid(8),
+  newId: () => string = rowId3,
 ): Verdict3 {
   const { facts, seed } = st;
   /**
@@ -3393,7 +3405,7 @@ export function decideSteps3(
   st: { facts: Fact3[]; seed: Seed3 },
   rawUtterance: string,
   steps: readonly string[],
-  newId: () => string = () => nanoid(8),
+  newId: () => string = rowId3,
 ): Verdict3 {
   const utterance = ingestTypedText(rawUtterance); // #751 (ADR-W-029)
   const all: Command3[] = [];

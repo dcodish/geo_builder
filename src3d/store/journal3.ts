@@ -35,6 +35,9 @@
  */
 import {
   adoptEngineJournal3,
+  heldResolves3,
+  LAZY_NAMES3,
+  peekLazy3,
   pinOrigins3,
   recordEngineJournal3,
   takeEngineJournal3,
@@ -43,7 +46,8 @@ import {
   type PinOrigins3,
 } from '../engine/evaluate';
 import type { Construction3 } from '../engine/types';
-import { adoptStoreJournal3, recordStoreJournal3, takeStoreJournal3, type StoreJournal3 } from './store3';
+import { adoptStoreJournal3, heldDerive3, recordStoreJournal3, takeStoreJournal3, type Fact3, type StoreJournal3 } from './store3';
+import type { Seed3 } from '../engine/components3';
 
 /** What an action wrote into the content-keyed memos, as plain data. */
 export interface Journal3 extends EngineJournal3, StoreJournal3 {
@@ -103,4 +107,33 @@ export function adoptJournal3(journal: Journal3): void {
   for (const f of journal.figures) writePinOrigins3(f.c, f.origins); // first: they are part of each construction's content
   adoptEngineJournal3(journal);
   adoptStoreJournal3(journal);
+}
+
+/**
+ * #2890 round 2 ([ADR-3D-493](../../docs/06b-decisions-3d.md#adr-3d-493)) — A JOURNAL OF WHAT THIS HEAP HOLDS for the
+ * figure `(facts, seed)`: its derive, the answers its construction holds, and their lazy values in hand. Nothing is
+ * solved: a figure this heap does not hold gives `null`. The page hands it to a fresh worker (the client's
+ * checkpoint, after a crash), so the next action does not solve again the figure the student is looking at.
+ */
+export function heldJournal3(facts: readonly Fact3[], seed: Seed3): Journal3 | null {
+  const d = heldDerive3(facts, seed);
+  if (!d) return null;
+  const c = d.construction;
+  const resolves = heldResolves3(c).map((r) => ({ figure: c, ...r }));
+  const lazies: Journal3['lazies'] = [];
+  for (const r of resolves)
+    for (const name of LAZY_NAMES3) {
+      const value = peekLazy3(r.out, name);
+      if (value !== null) lazies.push({ figure: c, key: r.home.key, name, value });
+    }
+  return {
+    v: 1,
+    figures: [{ c, origins: pinOrigins3(c) }],
+    derives: [{ facts: facts as Fact3[], seed, out: d }],
+    readings: [],
+    resolves,
+    verdicts: [],
+    reaches: [],
+    lazies,
+  };
 }

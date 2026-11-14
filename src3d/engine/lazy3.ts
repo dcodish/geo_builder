@@ -63,7 +63,7 @@ export function computeHere3<T>(cell: Lazy3<T>): T {
  * What in `T` a `structuredClone` refuses: a function or a symbol, at any depth; `never` when `T` crosses whole.
  * `Resolved3` asserts it (`RESOLVED_CROSSES3`, `engine/evaluate.ts`), so a closure added to a resolved figure fails
  * `tsc`. It cannot be asked of a type that refers to itself (a command that holds commands): the journal of a job
- * is checked by cloning every fixture's (`__tests__/two-heaps-2890.test.ts`).
+ * is checked by cloning every fixture's (the work-meter gate walks the worker's heap and the page's, every message cloned).
  */
 export type Uncloneable3<T> = T extends (...args: never[]) => unknown
   ? T
