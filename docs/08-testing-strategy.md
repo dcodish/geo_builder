@@ -135,6 +135,13 @@ cache added later joins it, or the gate's determinism lock fails.
   builds that state (emptied caches; rows 1..n−1 shown, unmeasured; all n rows in the store, unsolved) and then
   measures the edit of the last row to its own text. So an edit costs about what the submit of that row costs,
   through the edit path. Re-typing a row on a session that has already solved it would count nothing.
+- **3-D's walk also drives what a walk of five actions leaves out** ([ADR-3D-492](06b-decisions-3d.md#adr-3d-492) part 3,
+  #2890): after the delete, in its session, `undo`, `redo`, `untick` and `retick` of the first row; and after the
+  edit, in a session of their own (emptied caches, the built figure shown with the data panel closed), `panel` (the
+  panel opened on a standing figure), `rename`, `swap` and `ask#k` (three questions the ask lane reads on the
+  figure). The asks alone are 4 164 843 units on the fixtures that no line counted before. A gate proves
+  its invariant for the actions it walks: an action a student can take and the walk does not drive is a hole in the
+  page count, and it is closed by driving it.
 - 2-D's `detect` runs as a browser's detect worker does: on its own copy of the facts, with nothing another lane
   computed.
 

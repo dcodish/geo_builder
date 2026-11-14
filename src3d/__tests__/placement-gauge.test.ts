@@ -12,7 +12,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
-import { freeDofCount3, hasAbsoluteFrameObject, placementSampled3, translationSlideSampled3 } from '../engine/evaluate';
+import { freeDofCount3, hasAbsoluteFrameObject, placementFreedom3, placementSampled3, translationSlideSampled3 } from '../engine/evaluate';
 import { absoluteFrameObjects3, absolutePointCount } from '../engine/types';
 import { dataView } from '../engine/dataView';
 import { answerQuery } from '../engine/queries';
@@ -736,7 +736,7 @@ describe('#2793 — a solid’s vertex on half an axis, and a sign beside a fixe
   });
 
   it('PlacementFreedom3.translation: one direction, along the axis, for a whole-axis pin; none for a full pin', () => {
-    const tr = (lines: readonly string[]) => drawn(lines, 0).resolved.pivot!.placementFreedom!().translation;
+    const tr = (lines: readonly string[]) => placementFreedom3(drawn(lines, 0).resolved)!.translation;
     const t1 = tr([CUBE, 'הקודקוד A נמצא על ציר ה-x']);
     expect(t1).toHaveLength(1);
     expect(Math.abs(t1[0][0])).toBeCloseTo(1, 6);

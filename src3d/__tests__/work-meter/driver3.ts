@@ -9,13 +9,20 @@
  *   load    = store.loadFigure + auditLoad3 + the render (cold: the walk clears the content-keyed caches before it)
  *   edit    = store.replaceFact(the last row, its own text) + the render, in the session `beforeEdit3` builds
  *   delete  = store.remove(the first row) + the render
+ *   undo / redo     = undo3() / redo3() + the render
+ *   untick / retick = store.toggle(the first row) + the render
+ *   panel   = the values alone, on a figure shown with the data panel closed
+ *   rename / swap   = store.rename / store.swap + the render
+ *   ask     = store.addQuery + the answer read for the row to highlight + the render (which answers every saved question)
  *
  * "The render" is what App3 recomputes on a new `(facts, seed)`: derive3 (memo), freeDofCount3, the plane / dihedral /
  * parameter chips (collectWedges), dataView (the panel is open by default on wide screens) and buildScene3 at the
  * home camera. 3-D has no worker and no work after the paint: every unit is page work before the paint, and the
  * meter says so rather than this file.
  */
-import { useGeo3, clearSolveCaches3, derive3, deriveStats3, type Fact3 } from '../../store/store3';
+import { useGeo3, clearSolveCaches3, derive3, deriveStats3, redo3, undo3, type Derived3, type Fact3 } from '../../store/store3';
+import { answerQuery, parseQuery } from '../../engine/queries';
+import { nextFreeLabel3 } from '../../engine/crossings3';
 import { decideDeterministic3 } from '../../app/decideDeterministic3';
 import { deserializeFigure3 } from '../../store/figureFile3';
 import { auditLoad3 } from '../../store/loadAudit3';
@@ -47,6 +54,27 @@ export interface ActionRecord3 extends Outcome3 {
 type Seed = ReturnType<typeof useGeo3.getState>['seed'];
 const now = (): number => performance.now();
 
+
+/**
+ * #2890 (ADR-3D-492) — THE RENDER HAS TWO PARTS: the FIGURE (the derive, the DOF line, the chips, the scene) and the
+ * VALUES (the open data panel). A job hands them over one after the other, so a walk on two heaps has to say where
+ * the first ends: `beforeValues` is called at that point, and with `values` off the render stops short of the
+ * values (a heap that has not been handed them yet); {@link renderValues3} then reads them alone. A walk on one heap
+ * touches neither.
+ *
+ * The scene is read BEFORE the values, where the App reads it after (the panel is computed in App3's body, the scene in
+ * its child). The scene's one solver reach is the crossing dots' other configurations, and those cost no unit in either
+ * order (measured over every fixture and the slow corpus: the claims' samples have solved them), so no count depends on
+ * it; but the dots belong to the FIGURE's hand-over, and a heap that is handed the figure alone must find them in it.
+ */
+export const stages3: { beforeValues: (() => void) | null; values: boolean } = { beforeValues: null, values: true };
+
+/** The values a render reads: what the open data panel shows, and the answer to every saved question (App3's `queryResults`). */
+function readValues3(d: Derived3, seed: Seed): void {
+  dataView(d.construction, seed);
+  for (const q of useGeo3.getState().queries) answerQuery(d.construction, q, seed);
+}
+
 /** The App's render-side derivations for the store's current `(facts, seed)`. Returns its wall time. */
 export function render3(): number {
   const t = now();
@@ -57,17 +85,28 @@ export function render3(): number {
     planeChipsByFact(facts, (id) => d.status[id] === 'ok', (n) => d.resolved.planes.has(n));
     dihedralChipsByFact(facts, (id) => d.status[id] === 'ok');
     paramChipsByFact(facts, competingArcSymbols(collectWedges(d.construction, d.resolved.positions)));
-    dataView(d.construction, seed);
     buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1, {}, true, () => 'value', []);
+    stages3.beforeValues?.();
+    if (stages3.values) readValues3(d, seed);
   } catch {
     /* a render throw is not a timing concern here */
   }
   return now() - t;
 }
 
-/** Put a figure in the store without measuring anything. */
+/** The values alone, for the figure on screen: the second part of a render whose first ran with `values` off. */
+export function renderValues3(): void {
+  const { facts, seed } = useGeo3.getState();
+  try {
+    readValues3(derive3(facts, seed), seed);
+  } catch {
+    /* as render3 */
+  }
+}
+
+/** Put a figure in the store without measuring anything. No saved question comes with it. */
 export function setFigure3(facts: Fact3[], seed: Seed): void {
-  useGeo3.setState({ facts, seed, lastError: null, lastNotice: null });
+  useGeo3.setState({ facts, seed, queries: [], lastError: null, lastNotice: null });
 }
 
 /** Submit one typed line exactly as App3.submitSentence3 does (deterministic lane only — never the LLM). */
@@ -126,6 +165,11 @@ export function removeFirst3(): Required<Outcome3> {
  */
 export function beforeEdit3(facts: Fact3[], seed: Seed): void {
   clearSolveCaches3();
+  showBeforeEdit3(facts, seed);
+}
+
+/** {@link beforeEdit3} after its clear: the rows before the last shown, then all of them in the store, unsolved. */
+export function showBeforeEdit3(facts: Fact3[], seed: Seed): void {
   setFigure3(facts.slice(0, -1), seed);
   render3();
   setFigure3(facts, seed);
@@ -139,6 +183,99 @@ export function editLast3(): Required<Outcome3> {
   const ok = useGeo3.getState().replaceFact(last.id, last.utterance);
   const decideMs = now() - t;
   return { verdict: ok ? 'ok' : 'refused', decideMs, renderMs: render3() };
+}
+
+/* ── #2890 (ADR-3D-492 part 3): the actions the walk left out. Each is what App3 runs for it. ── */
+
+const errorCode = (): string => (useGeo3.getState().lastError as { code?: string } | null)?.code ?? 'none';
+
+/** «בטל» (App3 → `undo3`), then the render. */
+export function undoStep3(): Required<Outcome3> {
+  const t = now();
+  undo3();
+  const decideMs = now() - t;
+  return { verdict: `rows:${useGeo3.getState().facts.length}`, decideMs, renderMs: render3() };
+}
+
+/** «בצע שוב» (App3 → `redo3`), then the render. */
+export function redoStep3(): Required<Outcome3> {
+  const t = now();
+  redo3();
+  const decideMs = now() - t;
+  return { verdict: `rows:${useGeo3.getState().facts.length}`, decideMs, renderMs: render3() };
+}
+
+/** Tick or untick the first row (App3's `onToggle` → `toggle`), then the render. */
+export function toggleFirst3(): Required<Outcome3> {
+  const t = now();
+  useGeo3.getState().toggle(useGeo3.getState().facts[0].id);
+  const decideMs = now() - t;
+  return { verdict: `err:${errorCode()}`, decideMs, renderMs: render3() };
+}
+
+/** The figure on screen with the data panel CLOSED: everything a render reads but the values. Unmeasured. */
+export function showPanelClosed3(): void {
+  const was = stages3.values;
+  stages3.values = false;
+  try {
+    render3();
+  } finally {
+    stages3.values = was;
+  }
+}
+
+/** The data panel opened on the figure on screen: the values alone (the figure is drawn). */
+export function openPanel3(): Required<Outcome3> {
+  const t = now();
+  renderValues3();
+  return { verdict: 'ok', decideMs: 0, renderMs: now() - t };
+}
+
+/** The figure's point letters, in the order the figure made them. */
+const pointIds3 = (): string[] => [...derive3(useGeo3.getState().facts, useGeo3.getState().seed).construction.points.keys()];
+
+/** The first point renamed to the first free letter (the canvas popover and the typed rewrite both reach `rename`), then the render. */
+export function renameFirst3(): Required<Outcome3> {
+  const { facts, seed } = useGeo3.getState();
+  const c = derive3(facts, seed).construction;
+  const [from] = c.points.keys();
+  const to = nextFreeLabel3(c);
+  const t = now();
+  const r = from !== undefined && to !== null ? useGeo3.getState().rename(from, to) : { ok: false as const, reason: 'no-letter' };
+  const decideMs = now() - t;
+  return { verdict: r.ok ? 'ok' : `refused:${r.reason}`, decideMs, renderMs: r.ok ? render3() : 0 };
+}
+
+/** The first two points' letters swapped (the popover's offer and «החלף בין A ל-B» both reach `swap`), then the render. */
+export function swapFirstTwo3(): Required<Outcome3> {
+  const [a, b] = pointIds3();
+  const t = now();
+  const r = a !== undefined && b !== undefined ? useGeo3.getState().swap(a, b) : { ok: false as const, reason: 'no-letter' };
+  const decideMs = now() - t;
+  return { verdict: r.ok ? 'ok' : `refused:${r.reason}`, decideMs, renderMs: r.ok ? render3() : 0 };
+}
+
+/**
+ * The questions the walk asks of the figure on screen: its first point, the segment of its first two points, the
+ * angle of its first three. Only those the ask lane reads on this figure. A length is where the ask lane's work is.
+ */
+export function questionsOf3(): string[] {
+  const { facts, seed } = useGeo3.getState();
+  const c = derive3(facts, seed).construction;
+  const [p, q, r] = c.points.keys();
+  const asks = [p, p !== undefined && q !== undefined ? `${p}${q}` : undefined, r !== undefined ? `זווית ${p}${q}${r}` : undefined];
+  return asks.filter((text): text is string => text !== undefined && parseQuery(c, text) !== null);
+}
+
+/** One question asked (App3's ask lane: `addQuery`, the answer read for the row to highlight), then the render, which answers every saved question. */
+export function ask3(text: string): Required<Outcome3> {
+  const { facts, seed } = useGeo3.getState();
+  const c = derive3(facts, seed).construction;
+  const t = now();
+  useGeo3.getState().addQuery(text);
+  const a = answerQuery(c, text, seed);
+  const decideMs = now() - t;
+  return { verdict: a.answer !== null ? 'answered' : `note:${a.note}`, decideMs, renderMs: render3() };
 }
 
 /** Run one action under the meter and the engine's counters. A throw is an outcome, never a lost record. */

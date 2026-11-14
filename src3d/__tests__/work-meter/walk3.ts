@@ -4,7 +4,8 @@
  * `load` is the cold load of the file. `submit#k` re-types the file's k-th row on the figure of the rows before it (a
  * row the deterministic lane no longer records is committed from its saved commands, unmeasured, so the rest of the
  * file still steps — as the timing harness does). Then one «הציגו תצורה אחרת», the delete of the first row, and an edit
- * of the last row.
+ * of the last row. Since #2890 the walk also drives what it had left out (below): undo and redo, a row unticked and
+ * ticked again, the data panel opened, a rename, a swap and the ask lane.
  *
  * THE SESSION THE WALK IS (#2888, [ADR-3D-491](../../../docs/06b-decisions-3d.md#adr-3d-491)). Solved content is keyed by
  * content and outlives the action, so a count depends on what the session solved before it, and the walk says what
@@ -15,7 +16,7 @@
  *  - the caches are cleared again, and the rows are then typed in ONE session that stays warm, as a student's does:
  *    `submit#k` runs on the figure of the rows before it, which that session has solved, and the press and the delete
  *    follow in the same session;
- *  - `edit` is the walk's LAST action and has a session of its own (`beforeEdit3`), the same in every builder: a
+ *  - `edit` has a session of its own (`beforeEdit3`), the same in every builder: a
  *    student who has built rows 1..n changes the last row. The rows before it are solved in the session (in the store
  *    and rendered, unmeasured, at the configuration the figure stood at before the delete); the edited row's content is
  *    not. The edit rewrites the row to its own text, so its count is what the last row costs through the EDIT path.
@@ -25,13 +26,51 @@
  *    The phase 0 walk carried one memo from its load into the typed session (the reading of a two-reading segment
  *    equation), so three recorded submits did not pay the reading's trial folds; they do now (ADR-3D-491 has the
  *    before and after).
+ *  - **the actions the walk had left out** (#2890, [ADR-3D-492](../../../docs/06b-decisions-3d.md#adr-3d-492) part 3) are
+ *    NEW lines; no line recorded before them depends on them:
+ *      · after the delete, in the same session: `undo` (the figure before the delete comes back: the session has it),
+ *        `redo`, the delete undone once more (unmeasured), then `untick` of the first row and `retick`;
+ *      · after the edit, in a session of their own, THE READERS' SESSION: cleared caches, the built figure shown with
+ *        the data panel CLOSED (unmeasured); then `panel` (the panel opened on that standing figure: the values
+ *        alone), `rename` (the first point to the first free letter), `swap` (the first two letters), and `ask#k`
+ *        (the figure's first point, the segment of its first two, the angle of its first three, those the ask lane
+ *        reads). The asks are last because a saved question is answered again by every later render.
  * The slow corpus's walk types first: it starts from cleared caches, and its `load` (the saved figure, with the
- * session's own row ids) is made cold by clearing the solve caches before it. Its delete follows in the loaded session
- * and its edit is last, by the same definition.
+ * session's own row ids) is made cold by clearing the solve caches before it. Its delete follows in the loaded session,
+ * then its edit and the readers' session, by the same definitions.
+ *
+ * THE WALK IS A SEQUENCE OF STEPS (#2890, [ADR-3D-492](../../../docs/06b-decisions-3d.md#adr-3d-492)). `stepsOfFixture3`
+ * and `stepsOfLines3` yield after every step: each measured action, and each thing the walk does between them (a new
+ * session, a figure put in the store and shown, a row committed from its saved commands). `walkFixture3` and
+ * `walkLines3` run them to the end and keep the measured ones, as before. The steps exist so that TWO heaps can walk
+ * in step (`twoHeaps3.ts`): one runs a step, what it wrote crosses, the other adopts it and runs the same step. A new
+ * session is a step of its own for that reason: the second heap must clear BEFORE it adopts the next step's entries.
  */
 import { useGeo3, clearSolveCaches3, decideCommands3, type Fact3 } from '../../store/store3';
 import { deserializeFigure3 } from '../../store/figureFile3';
-import { another3, beforeEdit3, editLast3, loadFacts3, loadText3, metered3, removeFirst3, render3, setFigure3, submitLine3, type ActionRecord3, type Outcome3 } from './driver3';
+import {
+  another3,
+  ask3,
+  editLast3,
+  loadFacts3,
+  loadText3,
+  metered3,
+  openPanel3,
+  questionsOf3,
+  redoStep3,
+  removeFirst3,
+  renameFirst3,
+  render3,
+  setFigure3,
+  showBeforeEdit3,
+  showPanelClosed3,
+  submitLine3,
+  swapFirstTwo3,
+  toggleFirst3,
+  undoStep3,
+  type ActionRecord3,
+  type Outcome3,
+} from './driver3';
 
 export interface WalkedAction3 {
   /** The action's name inside its fixture: `load`, `submit#3`, `another#1`, `edit`, `delete`. */
@@ -41,6 +80,13 @@ export interface WalkedAction3 {
   rec: ActionRecord3;
 }
 
+/** One step of a walk: a measured action (`rec`), or what the walk does between two of them (named in brackets). */
+export interface WalkStep3 {
+  action: string;
+  utterance?: string;
+  rec?: ActionRecord3;
+}
+
 export interface WalkPlan3 {
   /** Which rows are re-typed: every one, only the last, or none. */
   submits: 'all' | 'last' | 'none';
@@ -48,77 +94,133 @@ export interface WalkPlan3 {
   presses: number;
 }
 
+type Seed = ReturnType<typeof useGeo3.getState>['seed'];
+type Steps3 = Generator<WalkStep3, void, void>;
+
 const clean = (fs: Fact3[]): Fact3[] => fs.map((f) => ({ id: f.id, enabled: f.enabled !== false, utterance: f.utterance, cmds: f.cmds }) as Fact3);
 
-export function walkFixture3(text: string, plan: WalkPlan3, onAction?: (action: string) => void): WalkedAction3[] {
-  const out: WalkedAction3[] = [];
-  const r = deserializeFigure3(text);
-  if (!r.ok) return out;
-  const run = (action: string, fn: () => Outcome3, utterance?: string): void => {
-    onAction?.(action);
-    out.push({ action, ...(utterance ? { utterance } : {}), rec: metered3(fn) });
-  };
-  /** The last action: the edit of the figure as it stood before the delete, in its own session (`beforeEdit3`). */
-  const edit = (built: { facts: Fact3[]; seed: ReturnType<typeof useGeo3.getState>['seed'] }): void => {
-    onAction?.('edit');
-    beforeEdit3(built.facts, built.seed);
-    out.push({ action: 'edit', rec: metered3(editLast3) });
-  };
-  /** A typed row; a row that no longer records is committed from its saved commands, outside the measurement. */
-  const submit = (f: Fact3, k: number): void => {
-    run(`submit#${k + 1}`, () => submitLine3(f.utterance), f.utterance);
-    const last = out[out.length - 1].rec;
-    if (last.verdict !== 'record' && last.verdict !== 'retick') {
-      const v = decideCommands3(useGeo3.getState(), f.utterance, f.cmds, { twins: false, seedSearch: true });
-      if (v.kind === 'record') useGeo3.getState().dispatchVerdict(v);
-      last.verdict += '(+saved-cmds)';
-    }
-  };
+/** A measured action, as a step. */
+function measured(action: string, fn: () => Outcome3, onAction?: (action: string) => void, utterance?: string): WalkStep3 & { rec: ActionRecord3 } {
+  onAction?.(action);
+  return { action, ...(utterance ? { utterance } : {}), rec: metered3(fn) };
+}
 
+/** A new session: every cache cleared. Its own step (see the header). */
+function* newSession(): Steps3 {
   clearSolveCaches3();
+  yield { action: '(new session)' };
+}
+
+/** The edit, in its own session (`beforeEdit3`): the rows before the last shown, then all of them in the store unsolved. */
+function* editSteps(built: { facts: Fact3[]; seed: Seed }, onAction?: (action: string) => void): Steps3 {
+  onAction?.('edit');
+  yield* newSession();
+  showBeforeEdit3(built.facts, built.seed);
+  yield { action: '(rows before the edit)' };
+  yield { action: 'edit', rec: metered3(editLast3) };
+}
+
+/** After the delete, in its session: the delete undone and done again, then the first row unticked and ticked again. */
+function* afterDeleteSteps(onAction?: (action: string) => void): Steps3 {
+  yield measured('undo', undoStep3, onAction);
+  yield measured('redo', redoStep3, onAction);
+  undoStep3();
+  yield { action: '(the delete undone again)' };
+  yield measured('untick', toggleFirst3, onAction);
+  yield measured('retick', toggleFirst3, onAction);
+}
+
+/** The readers' session (see the header): the panel opened on a standing figure, a rename, a swap, the asks. */
+function* readerSteps(built: { facts: Fact3[]; seed: Seed }, onAction?: (action: string) => void): Steps3 {
+  yield* newSession();
+  setFigure3(built.facts, built.seed);
+  showPanelClosed3();
+  yield { action: '(figure, panel closed)' };
+  yield measured('panel', openPanel3, onAction);
+  yield measured('rename', renameFirst3, onAction);
+  yield measured('swap', swapFirstTwo3, onAction);
+  let k = 0;
+  for (const q of questionsOf3()) yield measured(`ask#${++k}`, () => ask3(q), onAction, q);
+}
+
+export function* stepsOfFixture3(text: string, plan: WalkPlan3, onAction?: (action: string) => void): Steps3 {
+  const r = deserializeFigure3(text);
+  if (!r.ok) return;
+  /** A typed row; a row that no longer records is committed from its saved commands, outside the measurement. */
+  function* submit(f: Fact3, k: number): Steps3 {
+    const step = measured(`submit#${k + 1}`, () => submitLine3(f.utterance), onAction, f.utterance);
+    const recorded = step.rec.verdict === 'record' || step.rec.verdict === 'retick';
+    if (!recorded) step.rec.verdict += '(+saved-cmds)';
+    yield step;
+    if (recorded) return;
+    const v = decideCommands3(useGeo3.getState(), f.utterance, f.cmds, { twins: false, seedSearch: true });
+    if (v.kind === 'record') useGeo3.getState().dispatchVerdict(v);
+    yield { action: '(saved commands)' };
+  }
+
+  yield* newSession();
   setFigure3([], 0);
-  run('load', () => loadText3(text));
-  clearSolveCaches3();
+  yield measured('load', () => loadText3(text), onAction);
+  yield* newSession();
   if (plan.submits === 'all') {
     setFigure3([], 0);
     render3();
-    r.facts.forEach((f, k) => submit(f, k));
+    yield { action: '(empty figure)' };
+    for (const [k, f] of r.facts.entries()) yield* submit(f, k);
   } else if (plan.submits === 'last') {
     // the figure of the rows before the last, as the student had it on screen
     setFigure3(clean(r.facts.slice(0, -1)), 0);
     render3();
-    submit(r.facts[r.facts.length - 1], r.facts.length - 1);
+    yield { action: '(rows before the last)' };
+    yield* submit(r.facts[r.facts.length - 1], r.facts.length - 1);
   }
-  for (let p = 1; p <= plan.presses; p++) run(`another#${p}`, another3);
+  for (let p = 1; p <= plan.presses; p++) yield measured(`another#${p}`, another3, onAction);
   const built = { facts: useGeo3.getState().facts, seed: useGeo3.getState().seed };
-  if (built.facts.length > 1) run('delete', removeFirst3);
-  if (built.facts.length > 0) edit(built);
-  return out;
+  if (built.facts.length > 1) {
+    yield measured('delete', removeFirst3, onAction);
+    yield* afterDeleteSteps(onAction);
+  }
+  if (built.facts.length > 0) {
+    yield* editSteps(built, onAction);
+    yield* readerSteps(built, onAction);
+  }
 }
 
 /**
  * A sequence of typed lines (the slow corpus): each line submitted on the figure of the lines before it, then
  * «הציגו תצורה אחרת», the cold load of what a save of the figure writes, an edit of the last row and the delete of the first.
  */
-export function walkLines3(lines: readonly string[], plan: WalkPlan3, onAction?: (action: string) => void): WalkedAction3[] {
-  const out: WalkedAction3[] = [];
-  const run = (action: string, fn: () => Outcome3, utterance?: string): void => {
-    onAction?.(action);
-    out.push({ action, ...(utterance ? { utterance } : {}), rec: metered3(fn) });
-  };
-  clearSolveCaches3();
+export function* stepsOfLines3(lines: readonly string[], plan: WalkPlan3, onAction?: (action: string) => void): Steps3 {
+  yield* newSession();
   setFigure3([], 0);
   render3();
-  lines.forEach((u, k) => run(`submit#${k + 1}`, () => submitLine3(u), u));
-  if (useGeo3.getState().facts.length === 0) return out;
-  for (let p = 1; p <= plan.presses; p++) run(`another#${p}`, another3);
+  yield { action: '(empty figure)' };
+  for (const [k, u] of lines.entries()) yield measured(`submit#${k + 1}`, () => submitLine3(u), onAction, u);
+  if (useGeo3.getState().facts.length === 0) return;
+  for (let p = 1; p <= plan.presses; p++) yield measured(`another#${p}`, another3, onAction);
   const saved = JSON.stringify(useGeo3.getState().facts);
-  clearSolveCaches3();
-  run('load', () => loadFacts3(JSON.parse(saved), 0));
+  yield* newSession();
+  yield measured('load', () => loadFacts3(JSON.parse(saved), 0), onAction);
   const built = { facts: useGeo3.getState().facts, seed: useGeo3.getState().seed };
-  if (built.facts.length > 1) run('delete', removeFirst3);
-  onAction?.('edit');
-  beforeEdit3(built.facts, built.seed);
-  out.push({ action: 'edit', rec: metered3(editLast3) });
+  if (built.facts.length > 1) {
+    yield measured('delete', removeFirst3, onAction);
+    yield* afterDeleteSteps(onAction);
+  }
+  yield* editSteps(built, onAction);
+  yield* readerSteps(built, onAction);
+}
+
+/** The measured actions of a walk, in order. */
+const measuredOf = (steps: Steps3): WalkedAction3[] => {
+  const out: WalkedAction3[] = [];
+  for (const s of steps) if (s.rec) out.push({ action: s.action, ...(s.utterance ? { utterance: s.utterance } : {}), rec: s.rec });
   return out;
+};
+
+export function walkFixture3(text: string, plan: WalkPlan3, onAction?: (action: string) => void): WalkedAction3[] {
+  return measuredOf(stepsOfFixture3(text, plan, onAction));
+}
+
+export function walkLines3(lines: readonly string[], plan: WalkPlan3, onAction?: (action: string) => void): WalkedAction3[] {
+  return measuredOf(stepsOfLines3(lines, plan, onAction));
 }

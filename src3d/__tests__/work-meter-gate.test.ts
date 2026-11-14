@@ -2,7 +2,8 @@
  * THE 3-D WORK-METER GATE (#2873, [ADR-W-210](../../docs/06w-decisions-workspace.md#adr-w-210) phase 0).
  *
  * Every saved figure in `fixtures3/` is walked through the student's actions — a cold load, re-typing each row,
- * «הציגו תצורה אחרת», an edit, a delete — and each action's solver work is held against `work-meter/baseline.jsonl`. An
+ * «הציגו תצורה אחרת», a delete, undo and redo, a row unticked and ticked, an edit, the data panel opened, a rename, a
+ * swap and the ask lane (#2890) — and each action's solver work is held against `work-meter/baseline.jsonl`. An
  * action that does MORE work than its baseline fails; the message says which figure, which action, the numbers, and
  * what to do. The rule, the tolerance (zero) and the re-record are `shell/__tests__/work-gate.ts`'s; the actions are
  * `work-meter/driver3.ts`'s, the same driver the timing harness runs.
@@ -14,8 +15,9 @@
  * stays warm, as one student session does (`work-meter/walk3.ts` says exactly where). That is what keeps a count
  * independent of the figures walked before it, which the reproducibility lock below still asserts.
  *
- * test-budget: the gate walks all 176 fixtures through every student action (1 266 actions): about 5 min alone, 10 min
- * inside the full suite (ADR-W-210 Am. 1). One file, because the baseline is one file.
+ * test-budget: the gate walks all 176 fixtures through every student action (2 914 actions since #2890; 1 266 before):
+ * about 9 min alone (5 min before the walk gained its ten actions, ADR-3D-492 part 3). One file, because the baseline
+ * is one file.
  *
  * Re-record: `npm run work:record -- 3d` (docs/08, "The work meter").
  */

@@ -35,7 +35,27 @@ import { fileURLToPath } from 'node:url';
 import { useGeo3, clearSolveCaches3, decideSteps3, decideCommands3, type Fact3 } from '../../../src3d/store/store3';
 import { deserializeFigure3 } from '../../../src3d/store/figureFile3';
 // The actions themselves are the ONE driver this harness and the work-meter gate share (#2873).
-import { another3, beforeEdit3, editLast3, loadFacts3, loadText3, metered3, removeFirst3, render3 as render, submitLine3 as submitLine } from '../../../src3d/__tests__/work-meter/driver3';
+import {
+  another3,
+  ask3,
+  beforeEdit3,
+  editLast3,
+  loadFacts3,
+  loadText3,
+  metered3,
+  openPanel3,
+  questionsOf3,
+  redoStep3,
+  removeFirst3,
+  renameFirst3,
+  render3 as render,
+  setFigure3,
+  showPanelClosed3,
+  submitLine3 as submitLine,
+  swapFirstTwo3,
+  toggleFirst3,
+  undoStep3,
+} from '../../../src3d/__tests__/work-meter/driver3';
 import { SLOW_CORPUS_3D } from '../../../src3d/__tests__/work-meter/slowCorpus3';
 
 (globalThis as any).fetch = async () => {
@@ -70,7 +90,7 @@ const PROF = arg('--prof'); // with --only/--action: write a .cpuprofile of the 
 
 type St = { facts: Fact3[]; seed: any };
 type Action = {
-  kind: 'submit' | 'another' | 'load' | 'edit' | 'delete' | 'llm-step';
+  kind: 'submit' | 'another' | 'load' | 'edit' | 'delete' | 'llm-step' | 'undo' | 'redo' | 'untick' | 'retick' | 'panel' | 'rename' | 'swap' | 'ask';
   prior: string[]; // enabled utterances on the figure before the action
   utterance?: string;
   run: () => { verdict: string; decideMs?: number; renderMs?: number };
@@ -124,13 +144,30 @@ function fixtureTasks(): Task[] {
           await emit({ kind: 'another', prior: priorOf(), fn: another3 });
         const built = { facts: useGeo3.getState().facts, seed: useGeo3.getState().seed };
         // delete the first fact
-        if (built.facts.length > 1)
+        if (built.facts.length > 1) {
           await emit({ kind: 'delete', prior: priorOf(), utterance: built.facts[0].utterance, fn: removeFirst3 });
-        // LAST: edit the last fact to its own text, in the session the meter's walk states (beforeEdit3: the rows before
+          // #2890 (ADR-3D-492 part 3), as the meter's walk states them: the delete undone and done again, undone once
+          // more (untimed), then the first row unticked and ticked again
+          await emit({ kind: 'undo', prior: priorOf(), fn: undoStep3 });
+          await emit({ kind: 'redo', prior: priorOf(), fn: redoStep3 });
+          undoStep3();
+          await emit({ kind: 'untick', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: toggleFirst3 });
+          await emit({ kind: 'retick', prior: priorOf(), utterance: useGeo3.getState().facts[0].utterance, fn: toggleFirst3 });
+        }
+        // the edit of the last fact to its own text, in the session the meter's walk states (beforeEdit3: the rows before
         // it solved, the edited row's content not)
         if (built.facts.length > 0) {
           beforeEdit3(built.facts, built.seed);
           await emit({ kind: 'edit', prior: priorOf(), utterance: built.facts[built.facts.length - 1].utterance, fn: editLast3 });
+          // the readers' session (walk3.ts): the built figure shown with the data panel closed, then the panel opened,
+          // a rename, a swap and the asks
+          clearSolveCaches3();
+          setFigure3(built.facts, built.seed);
+          showPanelClosed3();
+          await emit({ kind: 'panel', prior: priorOf(), fn: openPanel3 });
+          await emit({ kind: 'rename', prior: priorOf(), fn: renameFirst3 });
+          await emit({ kind: 'swap', prior: priorOf(), fn: swapFirstTwo3 });
+          for (const q of questionsOf3()) await emit({ kind: 'ask', prior: priorOf(), utterance: q, fn: () => ask3(q) });
         }
       },
     }));
