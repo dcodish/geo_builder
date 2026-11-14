@@ -4,7 +4,8 @@
  * `load` is the cold load of the file. `submit#k` re-types the file's k-th row on the figure of the rows before it (a
  * row the deterministic lane no longer records is committed from its saved commands, unmeasured, so the rest of the
  * file still steps — as the timing harness does). Then one «הציגו תצורה אחרת», the delete of the first row, and an edit
- * of the last row.
+ * of the last row. Since #2890 the walk also drives what it had left out (below): undo and redo, a row unticked and
+ * ticked again, the data panel opened, a rename, a swap and the ask lane.
  *
  * THE SESSION THE WALK IS (#2888, [ADR-3D-491](../../../docs/06b-decisions-3d.md#adr-3d-491)). Solved content is keyed by
  * content and outlives the action, so a count depends on what the session solved before it, and the walk says what
@@ -25,9 +26,18 @@
  *    The phase 0 walk carried one memo from its load into the typed session (the reading of a two-reading segment
  *    equation), so three recorded submits did not pay the reading's trial folds; they do now (ADR-3D-491 has the
  *    before and after).
+ *  - **the actions the walk had left out** (#2890, [ADR-3D-492](../../../docs/06b-decisions-3d.md#adr-3d-492) part 3) are
+ *    NEW lines; no line recorded before them depends on them:
+ *      · after the delete, in the same session: `undo` (the figure before the delete comes back: the session has it),
+ *        `redo`, the delete undone once more (unmeasured), then `untick` of the first row and `retick`;
+ *      · after the edit, in a session of their own, THE READERS' SESSION: cleared caches, the built figure shown with
+ *        the data panel CLOSED (unmeasured); then `panel` (the panel opened on that standing figure: the values
+ *        alone), `rename` (the first point to the first free letter), `swap` (the first two letters), and `ask#k`
+ *        (the figure's first point, the segment of its first two, the angle of its first three, those the ask lane
+ *        reads). The asks are last because a saved question is answered again by every later render.
  * The slow corpus's walk types first: it starts from cleared caches, and its `load` (the saved figure, with the
- * session's own row ids) is made cold by clearing the solve caches before it. Its delete follows in the loaded session
- * and its edit is last, by the same definition.
+ * session's own row ids) is made cold by clearing the solve caches before it. Its delete follows in the loaded session,
+ * then its edit and the readers' session, by the same definitions.
  *
  * THE WALK IS A SEQUENCE OF STEPS (#2890, [ADR-3D-492](../../../docs/06b-decisions-3d.md#adr-3d-492)). `stepsOfFixture3`
  * and `stepsOfLines3` yield after every step: each measured action, and each thing the walk does between them (a new
@@ -38,7 +48,29 @@
  */
 import { useGeo3, clearSolveCaches3, decideCommands3, type Fact3 } from '../../store/store3';
 import { deserializeFigure3 } from '../../store/figureFile3';
-import { another3, editLast3, loadFacts3, loadText3, metered3, removeFirst3, render3, setFigure3, showBeforeEdit3, submitLine3, type ActionRecord3, type Outcome3 } from './driver3';
+import {
+  another3,
+  ask3,
+  editLast3,
+  loadFacts3,
+  loadText3,
+  metered3,
+  openPanel3,
+  questionsOf3,
+  redoStep3,
+  removeFirst3,
+  renameFirst3,
+  render3,
+  setFigure3,
+  showBeforeEdit3,
+  showPanelClosed3,
+  submitLine3,
+  swapFirstTwo3,
+  toggleFirst3,
+  undoStep3,
+  type ActionRecord3,
+  type Outcome3,
+} from './driver3';
 
 export interface WalkedAction3 {
   /** The action's name inside its fixture: `load`, `submit#3`, `another#1`, `edit`, `delete`. */
@@ -88,6 +120,29 @@ function* editSteps(built: { facts: Fact3[]; seed: Seed }, onAction?: (action: s
   yield { action: 'edit', rec: metered3(editLast3) };
 }
 
+/** After the delete, in its session: the delete undone and done again, then the first row unticked and ticked again. */
+function* afterDeleteSteps(onAction?: (action: string) => void): Steps3 {
+  yield measured('undo', undoStep3, onAction);
+  yield measured('redo', redoStep3, onAction);
+  undoStep3();
+  yield { action: '(the delete undone again)' };
+  yield measured('untick', toggleFirst3, onAction);
+  yield measured('retick', toggleFirst3, onAction);
+}
+
+/** The readers' session (see the header): the panel opened on a standing figure, a rename, a swap, the asks. */
+function* readerSteps(built: { facts: Fact3[]; seed: Seed }, onAction?: (action: string) => void): Steps3 {
+  yield* newSession();
+  setFigure3(built.facts, built.seed);
+  showPanelClosed3();
+  yield { action: '(figure, panel closed)' };
+  yield measured('panel', openPanel3, onAction);
+  yield measured('rename', renameFirst3, onAction);
+  yield measured('swap', swapFirstTwo3, onAction);
+  let k = 0;
+  for (const q of questionsOf3()) yield measured(`ask#${++k}`, () => ask3(q), onAction, q);
+}
+
 export function* stepsOfFixture3(text: string, plan: WalkPlan3, onAction?: (action: string) => void): Steps3 {
   const r = deserializeFigure3(text);
   if (!r.ok) return;
@@ -121,8 +176,14 @@ export function* stepsOfFixture3(text: string, plan: WalkPlan3, onAction?: (acti
   }
   for (let p = 1; p <= plan.presses; p++) yield measured(`another#${p}`, another3, onAction);
   const built = { facts: useGeo3.getState().facts, seed: useGeo3.getState().seed };
-  if (built.facts.length > 1) yield measured('delete', removeFirst3, onAction);
-  if (built.facts.length > 0) yield* editSteps(built, onAction);
+  if (built.facts.length > 1) {
+    yield measured('delete', removeFirst3, onAction);
+    yield* afterDeleteSteps(onAction);
+  }
+  if (built.facts.length > 0) {
+    yield* editSteps(built, onAction);
+    yield* readerSteps(built, onAction);
+  }
 }
 
 /**
@@ -141,8 +202,12 @@ export function* stepsOfLines3(lines: readonly string[], plan: WalkPlan3, onActi
   yield* newSession();
   yield measured('load', () => loadFacts3(JSON.parse(saved), 0), onAction);
   const built = { facts: useGeo3.getState().facts, seed: useGeo3.getState().seed };
-  if (built.facts.length > 1) yield measured('delete', removeFirst3, onAction);
+  if (built.facts.length > 1) {
+    yield measured('delete', removeFirst3, onAction);
+    yield* afterDeleteSteps(onAction);
+  }
   yield* editSteps(built, onAction);
+  yield* readerSteps(built, onAction);
 }
 
 /** The measured actions of a walk, in order. */

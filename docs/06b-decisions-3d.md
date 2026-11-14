@@ -16139,13 +16139,69 @@ Before, every past fact array in the undo history kept its own derives alive, so
 
 | Corpus | Figures | Steps (in two stages) | Units solved in W | **Units solved in P** | P's derives and resolves not answered from a memo | Figures P solved again for a lazy value | Same step, verdict and view |
 |---|---|---|---|---|---|---|---|
-| Every fixture | 176 | 2 146 (1 266) | 92 199 532 | **0** | 0 and 0 | 0 | 2 146 of 2 146 |
+| Every fixture, the five actions recorded before this ADR | 176 | 2 146 (1 266) | 92 199 532 | **0** | 0 and 0 | 0 | 2 146 of 2 146 |
+| Every fixture, with part 3's ten actions | 176 | 4 307 (2 709) | 152 825 005 | **0** | 0 and 0 | 0 | 4 307 of 4 307 |
+| The slow corpus, with the ten actions | 14 | 346 (220) | 78 332 972 | **0** | 0 and 0 | 0 | 346 of 346 |
 
-W's units include the walk's unmeasured steps (the sessions it builds between actions), which are handed over like any job; its measured actions are the baseline's, to the unit (the gate). The view compared after every measured action that rendered: the store, every row's status, every position, the notices, the DOF count and the whole data panel. After each load P's construction is the same content as W's, pin origins included, in 176 of 176. The journals: 14 880 530 bytes in all (6 934 a step on average), the largest 252 242 bytes (the 200-seed search: its resolved figures cross although only its verdicts are read; a later trim). `npm run test:locked -- npx vitest run src3d/__tests__/two-heaps-2890.test.ts`, about 5 min; with `WORK_METER_CORPUS=slow` it walks the slow corpus.
+W's units include the walk's unmeasured steps (the sessions it builds between actions), which are handed over like any job; its measured actions are the baseline's, to the unit (the gate). The view compared after every measured action that rendered: the store, every row's status, every position, the notices, the DOF count and the whole data panel. After each load P's construction is the same content as W's, pin origins included, in 176 of 176. The journals of the second row: 23 284 474 bytes in all (5 406 a step on average), the largest 264 373 bytes (the 200-seed search: its resolved figures cross although only its verdicts are read; a later trim). `npm run test:locked -- npx vitest run src3d/__tests__/two-heaps-2890.test.ts`, about 9 min; with `WORK_METER_CORPUS=slow` it walks the slow corpus.
 
 **Not built here, on purpose:** the worker's entry, its mirror of the store, and anything on the page that records or adopts. `src3d/app/work3.ts` is untouched. The journal is inert until the shared client lands (ADR-W-210 phase 3, the plan on #2890).
 
-**Files.** Part 1: `src3d/engine/lazy3.ts` (new) · `src3d/engine/evaluate.ts` (the `pivot` type, `lazyValue3` and its readers, `keepResolved3`, `keepLazyValue3`, `solveParts3`, the cells at the pivot's four build sites, `RESOLVED_CROSSES3`) · `src3d/store/__tests__/lazy-values-2890.test.ts` (new) · `src3d/__tests__/issue-2368-leftover-turn.test.ts`, `placement-gauge.test.ts` (the reader's call). Part 2: `src3d/store/journal3.ts` (new) · `src3d/engine/evaluate.ts` (`EngineJournal3`, the notes at `rememberResolve3`, `sharedResolve3`, `seedVerdict3`, `ringReachValue3` and `lazyValue3`; `adoptEngineJournal3`, `releaseAdopted3`, `pinOrigins3`, `writePinOrigins3`) · `src3d/store/store3.ts` (`StoreJournal3`, the notes at `derive3` and `readSegmentEquation3`, `adoptStoreJournal3`; `submit` and `submitSteps` take the row's id) · `src3d/__tests__/work-meter/walk3.ts` (the walk as steps), `driver3.ts` (`stages3`, `renderValues3`, the scene before the values), `twoHeaps3.ts` (new) · `src3d/__tests__/two-heaps-2890.test.ts`, `src3d/store/__tests__/journal-2890.test.ts` (new).
+### Part 3 — the walk drives the actions it left out
+
+**Root cause.** The work meter's walk drove a load, the typed rows, one «הציגו תצורה אחרת», a delete and an edit. Everything else a student does that reaches the solver was outside it, so the 87 785 971 units of 3-D's `page` count were a lower bound, and phase 3's exit ("`page` is zero") would have been claimed for less than the page does. The design pass measured one of the gaps by hand: 619 probe questions asked after the panel was read solved 4 169 322 units on the page, up to 791 346 units and 2.3 s for one. Class: *a gate that walks a subset of the actions proves its invariant for that subset.*
+
+**Decision.** The walk (`__tests__/work-meter/walk3.ts`, the driver `driver3.ts`) gains ten actions a figure. They are NEW baseline lines; each runs after every action recorded before it in its session, or in a session of its own, so **no existing line moves** (re-recorded with no `--accept-rise`: 0 rose, 0 fell).
+- **After the delete, in the same session:** `undo` (`undo3`: the figure before the delete comes back) · `redo` · the delete undone once more, unmeasured · `untick` (`toggle` of the first row) · `retick`.
+- **After the edit, in THE READERS' SESSION** (cleared caches; the built figure shown with the data panel CLOSED, unmeasured): `panel` (the panel opened on that standing figure: the values alone) · `rename` (the first point to the first free letter, `store.rename`) · `swap` (the first two letters, `store.swap`) · `ask#k` (`addQuery`, the answer read for the row to highlight, then the render, which answers every saved question). The questions are the figure's first point, the segment of its first two points and the angle of its first three, those the ask lane reads on that figure. The asks are last because a saved question is answered again by every later render.
+- The driver's render reads what App3 reads and it had left out: every saved question's answer (`queryResults`, `App3.tsx:520`). No fixture holds a saved question, so no recorded line changes. `setFigure3` puts a figure in the store with no saved question.
+- The timing harness (`scripts/perf/3d/sweep3.ts`) drives the same actions through the same driver, so a new line has a time beside its count.
+
+**Recorded** (`npm run work:record -- 3d`, and `--slow`; every unit is still on the page and before the paint: 3-D has no worker yet).
+
+Fixtures (176 figures):
+
+| Action | Lines | With work | Units (= page = before the paint) | The dearest |
+|---|---|---|---|---|
+| `undo` | 161 | 0 | 0 | 0 |
+| `redo` | 161 | 0 | 0 | 0 |
+| `untick` | 161 | 59 | 19 599 314 | 1 297 243 (`length-letter-2092` · `untick`) |
+| `retick` | 161 | 0 | 0 | 0 |
+| `panel` | 176 | 77 | 2 294 103 | 1 466 570 (`symbolic-line-equation-863` · `panel`) |
+| `rename` | 176 | 90 | 12 210 782 | 2 228 056 (`rider-length-1735` · `rename`) |
+| `swap` | 176 | 88 | 11 990 504 | 2 228 674 (`rider-length-1735` · `swap`) |
+| `ask` | 476 | 90 | 4 164 843 | 791 068 (`vector-creates-head-sym-1613` · `ask#2`) |
+| **the new actions** | 1 648 | 404 | **50 259 546** | |
+| the actions recorded before (load, submit, another, delete, edit) | 1 266 | 585 | 87 785 971 (unchanged, line by line) | |
+| **all** | 2 914 | | **138 045 517** | |
+
+Slow corpus (14 sequences):
+
+| Action | Lines | With work | Units (= page = before the paint) | The dearest |
+|---|---|---|---|---|
+| `undo` | 14 | 0 | 0 | 0 |
+| `redo` | 14 | 0 | 0 | 0 |
+| `untick` | 14 | 5 | 1 832 151 | 633 275 (`#2749 narrowed` · `untick`) |
+| `retick` | 14 | 0 | 0 | 0 |
+| `panel` | 14 | 14 | 3 436 621 | 858 432 (`#863 equation` · `panel`) |
+| `rename` | 14 | 14 | 7 047 043 | 1 269 902 (`#863 equation` · `rename`) |
+| `swap` | 14 | 14 | 9 901 365 | 1 982 903 (`#863 equation` · `swap`) |
+| `ask` | 42 | 14 | 10 574 297 | 2 520 301 (`#863 equation` · `ask#2`) |
+| **the new actions** | 140 | 61 | **32 791 477** | |
+| the actions recorded before (load, submit, another, delete, edit) | 94 | 85 | 38 903 940 (unchanged, line by line) | |
+| **all** | 234 | | **71 695 417** | |
+
+**What the new lines say.**
+- **The ask lane solves on the page**: 4 164 843 units over 476 questions on the fixtures (90 of them solve), and 10 574 297 over 42 on the slow corpus. It is on the page today, at the click, with no working indicator (#2886).
+- **A rename and a swap each solve the whole figure again** (12 210 782 and 11 990 504 units on the fixtures, against 12 375 388 for the loads): the letters are in the construction's content, so the renamed figure is a new content. A letter is a name, and the figure under it does not move; that this costs a solve is material for phase 5, not for a key.
+- **Opening the data panel on a standing figure** costs the panel's own samples (2 294 103 units), paid at the click.
+- **Undo and redo cost nothing** while the figure is among the kept derives (0 units in 322 lines), and a row ticked again costs 0.
+- **Unticking the first row** costs 19 599 314 units, in the session that has just deleted and restored that row. In 102 of the 161 figures the list with its first row muted folds to the construction the delete solved, and the untick costs nothing; in 58 it costs exactly what the delete cost, and in 1 less: there the muted list is another content. 45 of those 59 hold scalar pins, whose origin records the list position of the row that stated them, and a muted row keeps its place; the other 14 were not looked into.
+- **By question**: the first point's coordinates cost nothing in 168 asks (the panel has read them); the segment's length solves in 89 of 158 (3 996 799 units, up to 791 068 for one); the angle in 1 of 150.
+
+**Each new action also walks on two heaps** (part 2's lock walks the same steps): the page solves 0 in every one.
+
+**Files.** Part 1: `src3d/engine/lazy3.ts` (new) · `src3d/engine/evaluate.ts` (the `pivot` type, `lazyValue3` and its readers, `keepResolved3`, `keepLazyValue3`, `solveParts3`, the cells at the pivot's four build sites, `RESOLVED_CROSSES3`) · `src3d/store/__tests__/lazy-values-2890.test.ts` (new) · `src3d/__tests__/issue-2368-leftover-turn.test.ts`, `placement-gauge.test.ts` (the reader's call). Part 2: `src3d/store/journal3.ts` (new) · `src3d/engine/evaluate.ts` (`EngineJournal3`, the notes at `rememberResolve3`, `sharedResolve3`, `seedVerdict3`, `ringReachValue3` and `lazyValue3`; `adoptEngineJournal3`, `releaseAdopted3`, `pinOrigins3`, `writePinOrigins3`) · `src3d/store/store3.ts` (`StoreJournal3`, the notes at `derive3` and `readSegmentEquation3`, `adoptStoreJournal3`; `submit` and `submitSteps` take the row's id) · `src3d/__tests__/work-meter/walk3.ts` (the walk as steps), `driver3.ts` (`stages3`, `renderValues3`, the scene before the values), `twoHeaps3.ts` (new) · `src3d/__tests__/two-heaps-2890.test.ts`, `src3d/store/__tests__/journal-2890.test.ts` (new). Part 3: `src3d/__tests__/work-meter/driver3.ts` (the ten actions, the saved questions in the render), `walk3.ts`, `baseline.jsonl`, `baseline-slow.jsonl` · `src3d/__tests__/work-meter-gate.test.ts` (its header) · `scripts/perf/3d/sweep3.ts`.
 
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)

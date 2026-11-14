@@ -1,95 +1,235 @@
 {"_":"THE WORK-METER BASELINE (#2873, ADR-W-210). One line per figure-action, sorted by key: solver work in units, never seconds (total = all of it, page = on the UI thread, prePaint = before the figure can paint). Never edited by hand: `npm run work:record -- <builder>` rewrites it, and docs/08 says when."}
 {"k":"#2749 narrowed AC|another#1","total":17505,"page":17505,"prePaint":17505}
+{"k":"#2749 narrowed AC|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed AC|ask#2","total":4429,"page":4429,"prePaint":4429}
+{"k":"#2749 narrowed AC|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#2749 narrowed AC|delete","total":9374,"page":9374,"prePaint":9374}
 {"k":"#2749 narrowed AC|edit","total":17339,"page":17339,"prePaint":17339}
 {"k":"#2749 narrowed AC|load","total":17339,"page":17339,"prePaint":17339}
+{"k":"#2749 narrowed AC|panel","total":159,"page":159,"prePaint":159}
+{"k":"#2749 narrowed AC|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed AC|rename","total":17512,"page":17512,"prePaint":17512}
+{"k":"#2749 narrowed AC|retick","total":0,"page":0,"prePaint":0}
 {"k":"#2749 narrowed AC|submit#1","total":5942,"page":5942,"prePaint":5942}
 {"k":"#2749 narrowed AC|submit#2","total":2970,"page":2970,"prePaint":2970}
 {"k":"#2749 narrowed AC|submit#3","total":17339,"page":17339,"prePaint":17339}
+{"k":"#2749 narrowed AC|swap","total":17487,"page":17487,"prePaint":17487}
+{"k":"#2749 narrowed AC|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed AC|untick","total":9374,"page":9374,"prePaint":9374}
 {"k":"#2749 narrowed|another#1","total":633327,"page":633327,"prePaint":633327}
+{"k":"#2749 narrowed|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed|ask#2","total":158356,"page":158356,"prePaint":158356}
+{"k":"#2749 narrowed|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#2749 narrowed|delete","total":633275,"page":633275,"prePaint":633275}
 {"k":"#2749 narrowed|edit","total":633262,"page":633262,"prePaint":633262}
 {"k":"#2749 narrowed|load","total":633262,"page":633262,"prePaint":633262}
+{"k":"#2749 narrowed|panel","total":174,"page":174,"prePaint":174}
+{"k":"#2749 narrowed|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed|rename","total":633327,"page":633327,"prePaint":633327}
+{"k":"#2749 narrowed|retick","total":0,"page":0,"prePaint":0}
 {"k":"#2749 narrowed|submit#1","total":5942,"page":5942,"prePaint":5942}
 {"k":"#2749 narrowed|submit#2","total":2970,"page":2970,"prePaint":2970}
 {"k":"#2749 narrowed|submit#3","total":2970,"page":2970,"prePaint":2970}
 {"k":"#2749 narrowed|submit#4","total":633262,"page":633262,"prePaint":633262}
+{"k":"#2749 narrowed|swap","total":633301,"page":633301,"prePaint":633301}
+{"k":"#2749 narrowed|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed|untick","total":633275,"page":633275,"prePaint":633275}
 {"k":"#2787 control apex|another#1","total":15720,"page":15720,"prePaint":15720}
+{"k":"#2787 control apex|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2787 control apex|ask#2","total":4376,"page":4376,"prePaint":4376}
+{"k":"#2787 control apex|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#2787 control apex|delete","total":8968,"page":8968,"prePaint":8968}
 {"k":"#2787 control apex|edit","total":17596,"page":17596,"prePaint":17596}
 {"k":"#2787 control apex|load","total":17596,"page":17596,"prePaint":17596}
+{"k":"#2787 control apex|panel","total":129,"page":129,"prePaint":129}
+{"k":"#2787 control apex|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 control apex|rename","total":14193,"page":14193,"prePaint":14193}
+{"k":"#2787 control apex|retick","total":0,"page":0,"prePaint":0}
 {"k":"#2787 control apex|submit#1","total":5942,"page":5942,"prePaint":5942}
 {"k":"#2787 control apex|submit#2","total":7918,"page":7918,"prePaint":7918}
 {"k":"#2787 control apex|submit#3","total":17596,"page":17596,"prePaint":17596}
+{"k":"#2787 control apex|swap","total":17450,"page":17450,"prePaint":17450}
+{"k":"#2787 control apex|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 control apex|untick","total":8968,"page":8968,"prePaint":8968}
 {"k":"#2787 rectangle|another#1","total":633341,"page":633341,"prePaint":633341}
+{"k":"#2787 rectangle|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2787 rectangle|ask#2","total":158356,"page":158356,"prePaint":158356}
+{"k":"#2787 rectangle|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#2787 rectangle|delete","total":590267,"page":590267,"prePaint":590267}
 {"k":"#2787 rectangle|edit","total":633301,"page":633301,"prePaint":633301}
 {"k":"#2787 rectangle|load","total":633301,"page":633301,"prePaint":633301}
+{"k":"#2787 rectangle|panel","total":213,"page":213,"prePaint":213}
+{"k":"#2787 rectangle|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 rectangle|rename","total":633327,"page":633327,"prePaint":633327}
+{"k":"#2787 rectangle|retick","total":0,"page":0,"prePaint":0}
 {"k":"#2787 rectangle|submit#1","total":5942,"page":5942,"prePaint":5942}
 {"k":"#2787 rectangle|submit#2","total":5942,"page":5942,"prePaint":5942}
 {"k":"#2787 rectangle|submit#3","total":633301,"page":633301,"prePaint":633301}
+{"k":"#2787 rectangle|swap","total":633327,"page":633327,"prePaint":633327}
+{"k":"#2787 rectangle|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 rectangle|untick","total":590267,"page":590267,"prePaint":590267}
 {"k":"#2787 square|another#1","total":633327,"page":633327,"prePaint":633327}
+{"k":"#2787 square|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2787 square|ask#2","total":158330,"page":158330,"prePaint":158330}
+{"k":"#2787 square|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#2787 square|delete","total":590267,"page":590267,"prePaint":590267}
 {"k":"#2787 square|edit","total":633275,"page":633275,"prePaint":633275}
 {"k":"#2787 square|load","total":633275,"page":633275,"prePaint":633275}
+{"k":"#2787 square|panel","total":187,"page":187,"prePaint":187}
+{"k":"#2787 square|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 square|rename","total":633314,"page":633314,"prePaint":633314}
+{"k":"#2787 square|retick","total":0,"page":0,"prePaint":0}
 {"k":"#2787 square|submit#1","total":3050,"page":3050,"prePaint":3050}
 {"k":"#2787 square|submit#2","total":3050,"page":3050,"prePaint":3050}
 {"k":"#2787 square|submit#3","total":633275,"page":633275,"prePaint":633275}
+{"k":"#2787 square|swap","total":633314,"page":633314,"prePaint":633314}
+{"k":"#2787 square|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 square|untick","total":590267,"page":590267,"prePaint":590267}
 {"k":"#2806 kite|another#1","total":14549,"page":14549,"prePaint":14549}
+{"k":"#2806 kite|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2806 kite|ask#2","total":1717,"page":1717,"prePaint":1717}
+{"k":"#2806 kite|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#2806 kite|delete","total":0,"page":0,"prePaint":0}
 {"k":"#2806 kite|edit","total":6027,"page":6027,"prePaint":6027}
 {"k":"#2806 kite|load","total":6027,"page":6027,"prePaint":6027}
+{"k":"#2806 kite|panel","total":448,"page":448,"prePaint":448}
+{"k":"#2806 kite|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 kite|rename","total":5878,"page":5878,"prePaint":5878}
+{"k":"#2806 kite|retick","total":0,"page":0,"prePaint":0}
 {"k":"#2806 kite|submit#1","total":49715,"page":49715,"prePaint":49715}
 {"k":"#2806 kite|submit#2","total":6027,"page":6027,"prePaint":6027}
+{"k":"#2806 kite|swap","total":5796,"page":5796,"prePaint":5796}
+{"k":"#2806 kite|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 kite|untick","total":0,"page":0,"prePaint":0}
 {"k":"#2806 origin|another#1","total":7365,"page":7365,"prePaint":7365}
+{"k":"#2806 origin|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2806 origin|ask#2","total":1892,"page":1892,"prePaint":1892}
+{"k":"#2806 origin|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#2806 origin|delete","total":0,"page":0,"prePaint":0}
 {"k":"#2806 origin|edit","total":7347,"page":7347,"prePaint":7347}
 {"k":"#2806 origin|load","total":7347,"page":7347,"prePaint":7347}
+{"k":"#2806 origin|panel","total":174,"page":174,"prePaint":174}
+{"k":"#2806 origin|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 origin|rename","total":7392,"page":7392,"prePaint":7392}
+{"k":"#2806 origin|retick","total":0,"page":0,"prePaint":0}
 {"k":"#2806 origin|submit#1","total":3050,"page":3050,"prePaint":3050}
 {"k":"#2806 origin|submit#2","total":7347,"page":7347,"prePaint":7347}
+{"k":"#2806 origin|swap","total":7292,"page":7292,"prePaint":7292}
+{"k":"#2806 origin|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 origin|untick","total":0,"page":0,"prePaint":0}
 {"k":"#2806 rhombus|another#1","total":12418,"page":12418,"prePaint":12418}
+{"k":"#2806 rhombus|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|ask#2","total":1579,"page":1579,"prePaint":1579}
+{"k":"#2806 rhombus|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#2806 rhombus|delete","total":0,"page":0,"prePaint":0}
 {"k":"#2806 rhombus|edit","total":11962,"page":11962,"prePaint":11962}
 {"k":"#2806 rhombus|load","total":6376,"page":6376,"prePaint":6376}
+{"k":"#2806 rhombus|panel","total":461,"page":461,"prePaint":461}
+{"k":"#2806 rhombus|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|rename","total":6316,"page":6316,"prePaint":6316}
+{"k":"#2806 rhombus|retick","total":0,"page":0,"prePaint":0}
 {"k":"#2806 rhombus|submit#1","total":108513,"page":108513,"prePaint":108513}
 {"k":"#2806 rhombus|submit#2","total":6047,"page":6047,"prePaint":6047}
+{"k":"#2806 rhombus|swap","total":6011,"page":6011,"prePaint":6011}
+{"k":"#2806 rhombus|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|untick","total":0,"page":0,"prePaint":0}
 {"k":"#2806 x-axis|another#1","total":8025,"page":8025,"prePaint":8025}
+{"k":"#2806 x-axis|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|ask#2","total":1980,"page":1980,"prePaint":1980}
+{"k":"#2806 x-axis|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#2806 x-axis|delete","total":0,"page":0,"prePaint":0}
 {"k":"#2806 x-axis|edit","total":7918,"page":7918,"prePaint":7918}
 {"k":"#2806 x-axis|load","total":7918,"page":7918,"prePaint":7918}
+{"k":"#2806 x-axis|panel","total":461,"page":461,"prePaint":461}
+{"k":"#2806 x-axis|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|rename","total":8097,"page":8097,"prePaint":8097}
+{"k":"#2806 x-axis|retick","total":0,"page":0,"prePaint":0}
 {"k":"#2806 x-axis|submit#1","total":3050,"page":3050,"prePaint":3050}
 {"k":"#2806 x-axis|submit#2","total":7918,"page":7918,"prePaint":7918}
+{"k":"#2806 x-axis|swap","total":7868,"page":7868,"prePaint":7868}
+{"k":"#2806 x-axis|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|untick","total":0,"page":0,"prePaint":0}
 {"k":"#2806 z-axis|another#1","total":7953,"page":7953,"prePaint":7953}
+{"k":"#2806 z-axis|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|ask#2","total":2078,"page":2078,"prePaint":2078}
+{"k":"#2806 z-axis|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#2806 z-axis|delete","total":0,"page":0,"prePaint":0}
 {"k":"#2806 z-axis|edit","total":7821,"page":7821,"prePaint":7821}
 {"k":"#2806 z-axis|load","total":7821,"page":7821,"prePaint":7821}
+{"k":"#2806 z-axis|panel","total":487,"page":487,"prePaint":487}
+{"k":"#2806 z-axis|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|rename","total":8079,"page":8079,"prePaint":8079}
+{"k":"#2806 z-axis|retick","total":0,"page":0,"prePaint":0}
 {"k":"#2806 z-axis|submit#1","total":3050,"page":3050,"prePaint":3050}
 {"k":"#2806 z-axis|submit#2","total":7821,"page":7821,"prePaint":7821}
+{"k":"#2806 z-axis|swap","total":7907,"page":7907,"prePaint":7907}
+{"k":"#2806 z-axis|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|untick","total":0,"page":0,"prePaint":0}
 {"k":"#863 equation|another#1","total":2038083,"page":2038083,"prePaint":2038083}
+{"k":"#863 equation|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 equation|ask#2","total":2520301,"page":2520301,"prePaint":2520301}
+{"k":"#863 equation|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#863 equation|delete","total":3112,"page":3112,"prePaint":3112}
 {"k":"#863 equation|edit","total":1603973,"page":1603973,"prePaint":1603973}
 {"k":"#863 equation|load","total":1603973,"page":1603973,"prePaint":1603973}
+{"k":"#863 equation|panel","total":858432,"page":858432,"prePaint":858432}
+{"k":"#863 equation|redo","total":0,"page":0,"prePaint":0}
+{"k":"#863 equation|rename","total":1269902,"page":1269902,"prePaint":1269902}
+{"k":"#863 equation|retick","total":0,"page":0,"prePaint":0}
 {"k":"#863 equation|submit#1","total":0,"page":0,"prePaint":0}
 {"k":"#863 equation|submit#2","total":384936,"page":384936,"prePaint":384936}
 {"k":"#863 equation|submit#3","total":1603973,"page":1603973,"prePaint":1603973}
+{"k":"#863 equation|swap","total":1982903,"page":1982903,"prePaint":1982903}
+{"k":"#863 equation|undo","total":0,"page":0,"prePaint":0}
+{"k":"#863 equation|untick","total":0,"page":0,"prePaint":0}
 {"k":"#863 fixture|another#1","total":2038083,"page":2038083,"prePaint":2038083}
+{"k":"#863 fixture|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 fixture|ask#2","total":2520301,"page":2520301,"prePaint":2520301}
+{"k":"#863 fixture|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#863 fixture|delete","total":3112,"page":3112,"prePaint":3112}
 {"k":"#863 fixture|edit","total":1603973,"page":1603973,"prePaint":1603973}
 {"k":"#863 fixture|load","total":1603973,"page":1603973,"prePaint":1603973}
+{"k":"#863 fixture|panel","total":858432,"page":858432,"prePaint":858432}
+{"k":"#863 fixture|redo","total":0,"page":0,"prePaint":0}
+{"k":"#863 fixture|rename","total":1269902,"page":1269902,"prePaint":1269902}
+{"k":"#863 fixture|retick","total":0,"page":0,"prePaint":0}
 {"k":"#863 fixture|submit#1","total":0,"page":0,"prePaint":0}
 {"k":"#863 fixture|submit#2","total":384936,"page":384936,"prePaint":384936}
 {"k":"#863 fixture|submit#3","total":1603973,"page":1603973,"prePaint":1603973}
+{"k":"#863 fixture|swap","total":1982903,"page":1982903,"prePaint":1982903}
+{"k":"#863 fixture|undo","total":0,"page":0,"prePaint":0}
+{"k":"#863 fixture|untick","total":0,"page":0,"prePaint":0}
 {"k":"#863 on-line|another#1","total":2038083,"page":2038083,"prePaint":2038083}
+{"k":"#863 on-line|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 on-line|ask#2","total":2520301,"page":2520301,"prePaint":2520301}
+{"k":"#863 on-line|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#863 on-line|delete","total":3112,"page":3112,"prePaint":3112}
 {"k":"#863 on-line|edit","total":1603973,"page":1603973,"prePaint":1603973}
 {"k":"#863 on-line|load","total":1603973,"page":1603973,"prePaint":1603973}
+{"k":"#863 on-line|panel","total":858432,"page":858432,"prePaint":858432}
+{"k":"#863 on-line|redo","total":0,"page":0,"prePaint":0}
+{"k":"#863 on-line|rename","total":1269902,"page":1269902,"prePaint":1269902}
+{"k":"#863 on-line|retick","total":0,"page":0,"prePaint":0}
 {"k":"#863 on-line|submit#1","total":0,"page":0,"prePaint":0}
 {"k":"#863 on-line|submit#2","total":384936,"page":384936,"prePaint":384936}
 {"k":"#863 on-line|submit#3","total":1603973,"page":1603973,"prePaint":1603973}
+{"k":"#863 on-line|swap","total":1982903,"page":1982903,"prePaint":1982903}
+{"k":"#863 on-line|undo","total":0,"page":0,"prePaint":0}
+{"k":"#863 on-line|untick","total":0,"page":0,"prePaint":0}
 {"k":"#863 pair|another#1","total":2038083,"page":2038083,"prePaint":2038083}
+{"k":"#863 pair|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 pair|ask#2","total":2520301,"page":2520301,"prePaint":2520301}
+{"k":"#863 pair|ask#3","total":0,"page":0,"prePaint":0}
 {"k":"#863 pair|delete","total":3112,"page":3112,"prePaint":3112}
 {"k":"#863 pair|edit","total":1603973,"page":1603973,"prePaint":1603973}
 {"k":"#863 pair|load","total":1603973,"page":1603973,"prePaint":1603973}
+{"k":"#863 pair|panel","total":858432,"page":858432,"prePaint":858432}
+{"k":"#863 pair|redo","total":0,"page":0,"prePaint":0}
+{"k":"#863 pair|rename","total":1269902,"page":1269902,"prePaint":1269902}
+{"k":"#863 pair|retick","total":0,"page":0,"prePaint":0}
 {"k":"#863 pair|submit#1","total":0,"page":0,"prePaint":0}
 {"k":"#863 pair|submit#2","total":384936,"page":384936,"prePaint":384936}
 {"k":"#863 pair|submit#3","total":1603973,"page":1603973,"prePaint":1603973}
+{"k":"#863 pair|swap","total":1982903,"page":1982903,"prePaint":1982903}
+{"k":"#863 pair|undo","total":0,"page":0,"prePaint":0}
+{"k":"#863 pair|untick","total":0,"page":0,"prePaint":0}
