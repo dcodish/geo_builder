@@ -52,7 +52,9 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     const s2 = triageSrc.slice(triageSrc.indexOf('async function session2d'), triageSrc.indexOf('/* 3-D: #1692'));
     expect(s2, 'session2d must call the App decision').toContain('decideDeterministic2D(');
     expect(pipeSrc, 'runSubmit must dispatch the same decision').toContain('decidePreParse(');
-    expect(pipeSrc, 'runSubmit must dispatch the same decision').toContain('decideFromParse(');
+    // #2890 (ADR-830): the decision runs in the geometry worker's operation, which runSubmit calls (`geoJobs.decide`)
+    expect(pipeSrc, 'runSubmit must dispatch the same decision').toContain('geoJobs.decide(');
+    expect(readFileSync(path.join(root, 'src/store/geoOps.ts'), 'utf8'), "the worker's decide operation runs the same decision").toContain('decideFromParse(');
   });
 
   it('#1395 — no hand mirror of the 2-D lane survives in triage.mjs', () => {

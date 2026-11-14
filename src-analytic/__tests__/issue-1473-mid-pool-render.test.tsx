@@ -116,9 +116,12 @@ describe('#1473 — mid-pool, the page shows «בודק…» and never a number'
     }
   });
 
-  it('App renders the pool’s completion from a LAYOUT effect, keyed on the derivation', () => {
+  // #2890 (ADR-AG-478, operator ruling 2026-11-14 "Figure first"): the pool is completed in the worker, never on the
+  // page. This replaces "App renders the pool's completion from a LAYOUT effect": the page holds its pool until the
+  // worker's values are adopted, and completes no pool itself.
+  it('App holds the pool until the worker’s values are adopted, and completes no pool itself', () => {
     const src = readFileSync(path.resolve(__dirname, '../App.tsx'), 'utf8');
-    expect(src).toMatch(/useLayoutEffect\(\(\) => completePoolAfterRender\(configurationPool\(d\.construction\)/);
-    expect(src).toContain('configurationPool(out.construction).defer()');
+    expect(src).toContain('if (!valuesShown) configurationPool(out.construction).hold()');
+    expect(src).not.toMatch(/completePoolAfterRender|poolScheduler/);
   });
 });
