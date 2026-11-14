@@ -24,6 +24,9 @@ import {
   looksCompound,
   lowercaseLabelFold,
   inscribedCircles,
+  BISECT_VERB,
+  REGION_SUBJECT_ITEM,
+  MIDSEGMENT_ITEM,
 } from '@/parser';
 import { droppedPropertyWords } from '@/parser/propertyWords';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
@@ -124,7 +127,7 @@ export function judgeModelAnswer(input: JudgeInput): JudgeOutcome {
       circleMembers: circleMembers(llmFig),
       inscribedCircles: inscribedCircles(llmFig),
     },
-    { skip: lostVerbs.includes('חוצה/bisect') ? ['angle-bisector', 'bisect'] : [] },
+    { skip: lostVerbs.includes(BISECT_VERB) ? ['angle-bisector', 'bisect'] : [] },
   );
   const stillDropped: string[] = mergeWordItems(
     unreadItems(
@@ -136,8 +139,8 @@ export function judgeModelAnswer(input: JudgeInput): JudgeOutcome {
       droppedCompoundRelation(utterance, llmCmds),
       droppedComparison(utterance, llmCmds) ? ['<>'] : [],
       droppedRadiusSymbol(utterance, llmCmds),
-      droppedRegionSubject(utterance, llmCmds) ? ['בתוך/מחוץ'] : [],
-      droppedMidsegment(utterance, llmCmds) ? ['קטע אמצעים'] : [],
+      droppedRegionSubject(utterance, llmCmds) ? [REGION_SUBJECT_ITEM] : [],
+      droppedMidsegment(utterance, llmCmds) ? [MIDSEGMENT_ITEM] : [],
       droppedConstructNoun(utterance, llmCmds),
       unaccountedSpans(utterance, llmCmds, {
         existingPoints: llmFig.objects.filter(isGeoPoint).map((o) => o.id),
