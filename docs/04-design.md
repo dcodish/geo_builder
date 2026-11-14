@@ -1848,7 +1848,9 @@ solves: the page, the interactive worker and the detect worker each have their o
   net's per-figure check, where each prefix is folded, then the whole figure, and no prefix's construction may have
   changed.
 - **`clearReplayCaches`** (test-only) clears all of it. Each work-meter walk starts from it, so a count depends on
-  nothing run before the figure ([docs/08](08-testing-strategy.md), "The work meter").
+  nothing run before the figure ([docs/08](08-testing-strategy.md), "The work meter"). It cannot empty the replay memo,
+  which is weak in the facts array; so the meter's `detect` action hands its lane a structured clone of the facts, as a
+  browser's detect worker receives them (ADR-827, step 4).
 
 ## The knowledge pool
 

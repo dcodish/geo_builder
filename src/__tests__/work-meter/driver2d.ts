@@ -13,8 +13,13 @@
  *   edit    = runEditCommit on the last row, to its own text (page) → the render → the resolve. The walk measures it
  *             through `editLastRow`: a session that has built the rows BEFORE the last one and not that row (#2888)
  *   delete  = removeGroup of the first row (page; the seed resets) → the render → the resolve
- *   detect  = the worker's `detect` — the background sweep that follows every step, from cold caches (its lane is a
- *             second worker instance). Nothing waits for it. It leaves the caches cold, so it is an item's last action.
+ *   detect  = the worker's `detect` — the background sweep that follows every step, as a browser's detect worker runs
+ *             it: over a STRUCTURED CLONE of the facts (what a `postMessage` delivers) and from caches that hold
+ *             nothing another lane computed (its lane is a second worker instance). Nothing waits for it. It leaves
+ *             the caches cold, so it is the last action that reads them (the walk's `edit` starts a new session).
+ *             The clone CORRECTS a phase 0 measurement, it is not new work (ADR-827): phase 0 handed the sweep the
+ *             page's own facts array, and `replay`'s memo is keyed by that array's identity and is not one of the
+ *             caches cleared, so the sweep was served the page's replay of the figure and every solve behind it.
  *
  * "The render" is what App.tsx recomputes when `(facts, seed)` change: `replay`, and the readers its JSX and memos
  * call on the result. Everything up to the last render is BEFORE THE PAINT (while a resolve is pending the App
@@ -378,13 +383,16 @@ export function createDriver2d(ops: WorkerOps, opts: { searchBudgetMs?: number }
     },
 
     detect(facts = figure.facts) {
-      // the detect lane is its own worker instance: it has folded nothing the page or the interactive worker folded
+      // the detect lane is its own worker instance: it has folded nothing the page or the interactive worker folded,
+      // and it is handed the facts as a worker receives them, a structured clone. The page's own array would be a
+      // hit on `replay`'s identity memo, which is not a cache `clearReplayCaches` can empty (see the header).
       clearReplayCaches();
+      const received = structuredClone(facts);
       return metered(async (rec, painted) => {
         painted(); // the figure is on screen; nothing waits for the sweep
         rec.nfacts = facts.length;
         const t = now();
-        await ops.detect(facts);
+        await ops.detect(received);
         rec.detect_bg = r1(now() - t);
         rec.total_ms = rec.detect_bg;
         rec.main_ms = 0;

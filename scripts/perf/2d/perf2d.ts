@@ -21,7 +21,8 @@
 //             → auditLoadedFigure (main, App.tsx runLoad)
 //   edit    = runEditCommit(last row, its own text) (main) → render → resolve
 //   delete  = removeGroup (seed 0) → render (main, cold content) → meetsRequirements (main) → autoResolve (worker)
-//   detect  = detectAll (bg lane, caches cleared first = the detect worker's own cold memo), over the figure as it
+//   detect  = detectAll (bg lane, caches cleared first = the detect worker's own cold memo), over a structured clone
+//             (what the worker receives; the driver makes it, ADR-827) of the figure as it
 //             stood BEFORE the delete
 // CORPORA: the slow corpus (src/__tests__/work-meter/slowCorpus2d.ts: the open speed issues), src/__tests__/fixtures, the scenario corpus (scenarios-export.ts), prod sessions
 // (logs/perf-prod-events.jsonl, else the log-triage pull logs/prod-events-2d.jsonl) and the operator's dev sessions
