@@ -7819,6 +7819,20 @@ Slow corpora (`baseline-slow.jsonl`): analytic 5 916 217 → 4 618 435 (−21.9 
 
 Wall time, the same actions through `scripts/perf/`: analytic `exam-2379-q3-route-2392` «הציגו תצורה אחרת» 67 s → 2 ms, and `issue-2231`'s presses 8–10 s → about 10 ms; 3-D `stated-length-7-9999-2361`'s press 500 439 units → 12 813; 2-D `hexagon-regular-by-angles-2797`'s press 23.7 s (cut off by the clock) → 9.0 s; complex `2b-capstone`'s whole walk 62 ms → 9 ms. In 3-D a long session's memory also fell (`nine-separate-shapes-2764`, 120 presses with edits and undos: 149.6 MB → 30.9 MB), because every past fact array used to keep its own derives alive.
 
+**Measured in a browser** (the two dev servers, `main` @ `9cd61315` and this branch, a real browser through `scripts/lib/browser-harness.mjs`; from the press to the last change of the page; one run each, so a reading, not a benchmark):
+
+| Action | `main` | Branch |
+|---|---|---|
+| Analytic «מעוין BADC» · «שכל קודקודיו מונחים על הצירים» · «CA=10» · «O(0,0)» · «מרחק נקודה O מהצלע DA הוא √5» · «x_A > 0»: lines 5 and 6 | 7.7 s, 10.9 s | 4.0 s, 5.5 s |
+| on that figure, «הציגו תצורה אחרת» twice | 11.0 s, 11.2 s | 0.09 s, 0.08 s |
+| on that figure, deleting row 6, then «בטל» | 7.7 s, 10.7 s | 0.06 s, 0.09 s |
+| 3-D «ריבוע ABCD» · «קטע AS» · «|SA| = 5»: the third line, then «הציגו תצורה אחרת» | 1.85 s, 1.78 s | 1.86 s, 1.81 s |
+| on that figure, row 3 turned off and on again | 1.94 s | 0.09 s |
+| 2-D «מעגל O» · «ריבוע ABCD חסום במעגל O» · «ריבוע חוסם את מעגל O»: the third line | 5.2 s | 5.2 s |
+| 2-D «משולש ABC» · «המשולש ישר זווית»: three presses of «הציגו תצורה אחרת» | 2.3 s, then the button is gone; the figure does not change | 0.13 s, 0.11 s, 0.09 s; the right angle at A, B, C |
+| Complex «w1 = 3+4i» · «w2 = 2cis150» · «w = w1*w2» · «z^5 = w^2», and row 4 off and on | 60–83 ms each | 62–83 ms each |
+
+The gates' wall time inside `npm run test:full` after the change: analytic 12.3 min (15.5 before), 2-D 11.7 min (11.4), 3-D 9.4 min (9.7); the whole suite 18.1 min, 1 475 files.
 **What phase 2 did not buy, said plainly.** A first-time solve costs what it did. The dearest submits, loads and deletes are first-time work and did not move: analytic's first submit of its dearest lines still takes 8–13 s, 3-D's loads and deletes are unchanged to the unit, and 2-D's submits and deletes are unchanged. The scoping map's sizing was wrong for two builders: 3-D's repeats were 15 % of its work, not most of it, and 2-D's main repeat is between the page's heap and the worker's (the page's gates fold a line and the worker's prefold folds it again: 4.89 M units in the fixtures' submits, 6.77 M after a delete, 5.23 M when a press's result is drawn), which one process cannot remove. Those are phases 3 and 5.
 
 **The meter's walk changed, and what each change does to the numbers.** A cache keyed by content cannot be told which fixture it serves, so the walk has to say where a session starts. [docs/08](08-testing-strategy.md) "A walk is a session" is the standing statement; this is the record of the change.
