@@ -1889,9 +1889,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // generic driveOrCheck would grab B's perp-offset `dist` first — a stability violation). Only
         // when c is itself a fresh, movable free vertex; otherwise fall back to driveOrCheck (c
         // pre-exists ⇒ a pure check that the existing triangle is right-angled at c).
-        const cObj = objects.find((o) => o.id === c);
+        const cAt = objects.findIndex((o) => o.id === c);
+        const cObj = objects[cAt];
         if (cObj && cObj.kind === 'free-point' && !(cObj as Extract<GeoObject, { kind: 'free-point' }>).pinned) {
-          (cObj as Extract<GeoObject, { kind: 'free-point' }>).solve = { constraint: con, branch: 0 };
+          // #2888 (ADR-827): the vertex is REPLACED, never written into. `objects` is a copy of the array, not of its
+          // elements, so writing `solve` onto a vertex an earlier line placed wrote it into the construction this step
+          // was derived from, and into the fold memo's entry for the lines before it (ADR-624's class, its second
+          // site): «משולש ABC» kept a right angle at C once «משולש ישר זווית ABC» had been folded after it.
+          objects[cAt] = { ...(cObj as Extract<GeoObject, { kind: 'free-point' }>), solve: { constraint: con, branch: 0 } };
           constraints.push(con);
         } else {
           driveOrCheck(objects, constraints, con);

@@ -10,10 +10,16 @@
  *             → [the worker's `autoResolve`] → the render of the found view (page)
  *   another = the worker's `resample` → applyView → the render (page)
  *   load    = loadFigureText (refresh + smoke replay page; prefold worker) → the render → the resolve → the load audit
- *   edit    = runEditCommit on the last row, to its own text (page) → the render → the resolve
+ *   edit    = runEditCommit on the last row, to its own text (page) → the render → the resolve. The walk measures it
+ *             through `editLastRow`: a session that has built the rows BEFORE the last one and not that row (#2888)
  *   delete  = removeGroup of the first row (page; the seed resets) → the render → the resolve
- *   detect  = the worker's `detect` — the background sweep that follows every step, from cold caches (its lane is a
- *             second worker instance). Nothing waits for it. It leaves the caches cold, so it is an item's last action.
+ *   detect  = the worker's `detect` — the background sweep that follows every step, as a browser's detect worker runs
+ *             it: over a STRUCTURED CLONE of the facts (what a `postMessage` delivers) and from caches that hold
+ *             nothing another lane computed (its lane is a second worker instance). Nothing waits for it. It leaves
+ *             the caches cold, so it is the last action that reads them (the walk's `edit` starts a new session).
+ *             The clone CORRECTS a phase 0 measurement, it is not new work (ADR-827): phase 0 handed the sweep the
+ *             page's own facts array, and `replay`'s memo is keyed by that array's identity and is not one of the
+ *             caches cleared, so the sweep was served the page's replay of the figure and every solve behind it.
  *
  * "The render" is what App.tsx recomputes when `(facts, seed)` change: `replay`, and the readers its JSX and memos
  * call on the result. Everything up to the last render is BEFORE THE PAINT (while a resolve is pending the App
@@ -84,6 +90,14 @@ export interface Driver2d {
   load(text: string): Promise<ActionRecord>;
   /** Edit the last row to its own text. Null when the figure has no row with text. */
   edit(): Promise<ActionRecord | null>;
+  /**
+   * THE METER'S `edit` (#2888, one definition for all four builders): a student who has built rows 1..n changes the
+   * LAST row. A new session; rows 1..n-1 put on screen unmeasured (the render and the resolve gate, as `show` does);
+   * then all n rows put in the store UNSOLVED; then the edit of the last row to its own text, measured. The rows
+   * before it are solved in the session and the edited row's content is not, so this costs about what typing row n
+   * costs, through the edit path. Null when the last row has no text.
+   */
+  editLastRow(all: Snap): Promise<ActionRecord | null>;
   /** Delete one row (the first by default). Null when the figure has fewer than two rows. */
   remove(key?: string): Promise<ActionRecord | null>;
   /** The background sweep over `facts` (the figure on screen by default). Leaves the caches cold. */
@@ -342,6 +356,17 @@ export function createDriver2d(ops: WorkerOps, opts: { searchBudgetMs?: number }
       });
     },
 
+    async editLastRow(all) {
+      const last = all.facts[all.facts.length - 1];
+      if (!last?.utterance) return null;
+      const key = groupKey(last);
+      this.reset();
+      this.show({ facts: all.facts.filter((f) => groupKey(f) !== key), seed: all.seed });
+      figure = all;
+      setStore(all); // the n rows, in the store and not solved: no render, no resolve, no audit
+      return this.edit();
+    },
+
     async remove(key) {
       const keys = [...new Set(figure.facts.map(groupKey))];
       if (keys.length < 2) return null;
@@ -358,13 +383,16 @@ export function createDriver2d(ops: WorkerOps, opts: { searchBudgetMs?: number }
     },
 
     detect(facts = figure.facts) {
-      // the detect lane is its own worker instance: it has folded nothing the page or the interactive worker folded
+      // the detect lane is its own worker instance: it has folded nothing the page or the interactive worker folded,
+      // and it is handed the facts as a worker receives them, a structured clone. The page's own array would be a
+      // hit on `replay`'s identity memo, which is not a cache `clearReplayCaches` can empty (see the header).
       clearReplayCaches();
+      const received = structuredClone(facts);
       return metered(async (rec, painted) => {
         painted(); // the figure is on screen; nothing waits for the sweep
         rec.nfacts = facts.length;
         const t = now();
-        await ops.detect(facts);
+        await ops.detect(received);
         rec.detect_bg = r1(now() - t);
         rec.total_ms = rec.detect_bg;
         rec.main_ms = 0;

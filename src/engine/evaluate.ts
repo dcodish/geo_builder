@@ -29,7 +29,7 @@ import {
 import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostRowCount, jointCostRows, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
 import { sideRecordsOf, sideShortfall, statedTangency, type SideRecord } from './requirements';
 import { solveLM } from './solveLM';
-import { budgetExceeded, chargeHit, computeWithCell, countWork, solveBudget, type WorkCell } from './solveBudget';
+import { budgetExceeded, chargeHit, computeWithCell, countWork, registerLedger, solveBudget, type WorkCell } from './solveBudget';
 import { GLUED_NAME_WHOLE } from '../../shell/indexedName';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
@@ -1563,6 +1563,7 @@ export function drivenConstraintsOf(c: Construction): Constraint[] {
  * the ADR-123 heavy figure this halves a cold replay; it changes NO result, only reuse.
  */
 const evalMemo = new WeakMap<Construction, { r: EvalResult; cell: WorkCell }>();
+registerLedger((c) => evalMemo.get(c as Construction)?.cell);
 
 export function evaluate(c: Construction): EvalResult {
   const hit = evalMemo.get(c);
@@ -1581,6 +1582,7 @@ export function evaluate(c: Construction): EvalResult {
  * was already evaluated — the DOF accountant's Jacobian (#1264) — pays no second solve.
  */
 const resolvedMemo = new WeakMap<Construction, { r: Construction; cell: WorkCell }>();
+registerLedger((c) => resolvedMemo.get(c as Construction)?.cell);
 export function resolveDrivenMemo(c: Construction): Construction {
   const hit = resolvedMemo.get(c);
   if (hit && chargeHit(hit.cell)) return hit.r; // #1605 (ADR-582): charged like every memo on the counted path

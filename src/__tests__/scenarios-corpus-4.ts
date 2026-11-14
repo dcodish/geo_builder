@@ -59,7 +59,7 @@ import { latinAngleLetters, latinProseLabels, parse } from '@/parser';
 import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
 import { stripFormatControls } from '../../shell/bidi';
 import { parseValueQuery } from '@/parser/valueQuery';
-import { COLLAPSED_VS, computeValues, detectAll, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
+import { clearReplayCaches, COLLAPSED_VS, computeValues, detectAll, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { roleReadings } from '@/app/roleReadings';
 import { drivenSolveStats } from '@/engine/evaluate';
@@ -6792,7 +6792,62 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'right-angle-seat-cycles-on-drawn-triangle-2370',
+    title: '#2370: «משולש ABC» · «המשולש ישר זווית» — «הציגו תצורה אחרת» moves the right angle from C to A, to B and back (ADR-828)',
+    guards:
+      "#2370 (P3; found while triaging #2363, measured again at 9cd61315 through the submit pipeline and the worker's resample): after «משולש ABC» · «המשולש ישר זווית» every press of «הציגו תצורה אחרת» answered «only-config» and the right angle stayed at C, though ADR-481 makes the seat a cyclable axis and the one-line «משולש ישר זווית ABC» cycled C → A → B. Root cause: `applyCommand`'s right-triangle seat on a placed vertex wrote `solve` INTO the vertex object of the construction it started from, which is the fold memo's held entry for «משולש ABC» (ADR-280); every candidate the search folded then resumed (ADR-406) from a triangle whose C was already driven, so the seat at A or B had no free vertex left and other seeds sampled nothing. Fix (ADR-828): the vertex is replaced, never written into; the class is locked by a deep-frozen walk of every fixture and catalog example (`engine/__tests__/apply-purity.test.ts`) and the memo by `replay/__tests__/fold-resume.test.ts`.",
+    steps: ['משולש ABC', 'המשולש ישר זווית'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(rightAngleSeat(fig), 'typed: the right angle is at C').toBe('C');
+      // the student's button, three presses, on the session that typed the two lines (the first line's fold is held)
+      for (const lines of [['משולש ABC', 'המשולש ישר זווית'], ['משולש ABC', 'ABC ישר זווית'], ['משולש ישר זווית ABC']]) {
+        const views = pressAll(factsOf(lines), 3);
+        expect(views.length, `${lines.join(' · ')}: every press finds another view`).toBe(4);
+        for (const view of views) expect(Object.values(view.status).every((st) => st === 'ok'), `${lines.join(' · ')}: every view is green`).toBe(true);
+        expect(views.map(rightAngleSeat), `${lines.join(' · ')}: the right angle visits C, A and B, and returns`).toEqual(['C', 'A', 'B', 'C']);
+      }
+      // «משולש ABC» typed again in the same session is a plain triangle: no right angle nobody stated, at any seed
+      const plain = factsOf(['משולש ABC']);
+      for (let seed = 0; seed < 4; seed++) expect(rightAngleSeat(replay(plain, seed)), `«משולש ABC» alone, seed ${seed}`).toBe('');
+    },
+  },
+  {
+    id: 'same-facts-same-figure-whatever-was-built-before-2444',
+    title: '#2444: three right-triangle figures built in one session — each shows what it shows from nothing (ADR-828)',
+    guards:
+      "#2444 (found while planning #2355; merged into #2370): in ONE process «משולש ישר זווית ABC», then «משולש ABC» · «ABC משולש ישר זווית», then «משולש ABC» · «משולש ישר זווית ABC חסום במעגל»; the last figure's rows replayed with ∠C = 90.00 where a cold replay of the same rows gave 60.95. The same in-place write as #2370: the right triangle composed on the drawn triangle left `solve` on C inside the held fold of «משולש ABC», and every later figure that begins with «משולש ABC» resumed from it. Asserts the exact sequence: after the three figures, each of them and «משולש ABC» alone replays, at seeds 0–3, to the positions and row statuses a session that built nothing gives (the caches cleared, a JSON clone of the rows), and the held «משולש ABC» carries no driven vertex.",
+    steps: ['משולש ABC', 'משולש ישר זווית ABC חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const figures = [['משולש ישר זווית ABC'], ['משולש ABC', 'ABC משולש ישר זווית'], ['משולש ABC', 'משולש ישר זווית ABC חסום במעגל'], ['משולש ABC']].map((lines) => factsOf(lines));
+      const shown = (facts: Fact[]) =>
+        [0, 1, 2, 3].map((seed) => {
+          const d = replay(facts, seed);
+          return JSON.stringify({ positions: [...d.positions].sort(([a], [b]) => (a < b ? -1 : 1)), status: facts.map((f) => d.status[f.id]), lastError: d.lastError });
+        });
+      const warm = figures.map(shown);
+      const held = replay(figures[3], 0).construction.objects.find((o) => o.id === 'C');
+      expect(JSON.stringify(held), 'the held «משולש ABC»: C is a free vertex, nothing drives it').not.toContain('solve');
+      for (let seed = 0; seed < 4; seed++) expect(rightAngleSeat(replay(figures[3], seed)), `«משולש ABC» alone, seed ${seed}: no right angle nobody stated`).toBe('');
+      // the same rows in a session that built nothing
+      clearReplayCaches();
+      const cold = figures.map((facts) => shown(JSON.parse(JSON.stringify(facts)) as Fact[]));
+      expect(warm).toEqual(cold);
+    },
+  },
 ];
+/** #2370 / #2444 (ADR-828): the vertex of ABC that carries a right angle ('' = none, two letters never happen in a triangle). */
+function rightAngleSeat(f: ReturnType<typeof replay>): string {
+  const ids = ['A', 'B', 'C'] as const;
+  return ids
+    .filter((v) => {
+      const [p, q] = ids.filter((x) => x !== v);
+      return Math.abs(angle(at(f, p), at(f, v), at(f, q)) - 90) < 1e-4;
+    })
+    .join('');
+}
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
 function ringEnclosesCircle(f: ReturnType<typeof replay>, ids: string[]): boolean {
   const c = f.circles.get('circle-O');
