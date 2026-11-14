@@ -34,6 +34,7 @@ import { clearAnalyticCaches, derive, type Derivation } from '../../engine/deriv
 import { decideSubmit, decideEditHost, decideToggle, isHeld } from '../../app/submit';
 import { decideRename, decideSwap } from '../../app/rename';
 import { anotherConfiguration } from '../../app/another';
+import { auditLoadedLines } from '../../app/loadAudit';
 import { activeOf, activePins } from '../../app/active';
 import { configurationPool, knownCurve, settled, canonicalSeed, type Seed } from '../../engine/evaluate';
 import { locusChips } from '../../app/locusChip';
@@ -294,7 +295,7 @@ export function newSession(): void {
 }
 
 /**
- * Load (file / share link / restored session): the audit's cold derive at seed 0 (loadSession.ts), then the App's render.
+ * Load (file / share link / restored session): the audit's cold derive at seed 0 (`app/loadAudit.ts`), then the App's render.
  * A load is a NEW SESSION — the page was opened on the file — so it starts from an empty store (#2888).
  */
 function loadBody(lines: string[], seed: Seed, hosts: Hosts, onPhase: (p: string) => void): { ph: Phases; next: State } {
@@ -302,7 +303,7 @@ function loadBody(lines: string[], seed: Seed, hosts: Hosts, onPhase: (p: string
   const ph = blank();
   onPhase('decide');
   const t = now();
-  derive(lines, 0, {}, activePins(hosts, lines.length, []));
+  auditLoadedLines(lines, [], hosts);
   ph.decide = now() - t;
   const d = renderAndAfter(lines, seed, hosts, ph, onPhase);
   return { ph, next: { lines, seed, hosts, d } };

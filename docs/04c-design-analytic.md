@@ -1567,6 +1567,11 @@ shown as «בודק…»: the page does, from the same configurations.
 not share one. An unnamed memo is not sent, so its answers would be solved again on the page: every memo of the product
 is named, and a lock scans for one that is not.
 
+**What will run off the page imports no page.** The decisions (`app/submit`, `another`, `rename`, `loadAudit`), the
+readers that force a lazy and all of `engine/` reach neither the store, nor React, nor a component by any value import
+(`__tests__/off-page-graph.test.ts`). The load's audit is `app/loadAudit.ts` for that reason: `loadSession.ts` restores
+the store and calls it.
+
 ### Independent parts are evaluated and walked apart ([ADR-AG-425](06c-decisions-analytic.md#adr-ag-425), #2737)
 
 A figure whose statements share no unknown is several independent PARTS. `components.ts` `partsOf` finds them with a

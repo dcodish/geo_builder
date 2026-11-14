@@ -16760,5 +16760,13 @@ What the table says: on `main` a session with questions asked paid for every tra
 
 **The gate's own cost.** One walk of the corpus takes 681 s here (one run, other suites running beside it), where it took about 500 s with five actions (ADR-AG-476); the slow corpus 16 s. Most of the added time is the rename (22.3 M units: a whole figure solved from nothing, once in the decision and its pool after it) and the first row ticked off (a figure the session has not seen, as the delete is). It is still one file, the longest of the suite; splitting it in two by fixture is as open as it was (ADR-W-210 Am. 1). `scripts/perf/analytic/harness.ts` times the five old actions and does not yet walk the six new ones: a failing new line's `scripts/perf` command times the figure, not that action.
 
+### Part 4 — the load's audit leaves the store's module
+
+**Root cause.** The solver work of a load is its audit: the saved lines replayed, so that a line that no longer builds is reported. It lived inside `loadAnalyticSession` (`app/loadSession.ts`), which also restores the store. Measured in the design pass: a worker bundle that imported the audit that way carried `store/`, zustand, zundo and React.
+
+**Decision.** `app/loadAudit.ts` `auditLoadedLines(lines, disabled, hosts)` is the audit alone: lines in, failures out (the active lines replayed with the recorded hosts, and every muted line that no longer parses). `loadAnalyticSession` restores the store and calls it; the work meter's `load` calls it instead of repeating its `derive`. Nothing a load does or reports changes, and no baseline line moves.
+
+**The lock.** `src-analytic/__tests__/off-page-graph.test.ts` follows every VALUE import (a type-only import is erased) from what a worker entry will import (all of `engine/`, the decisions `app/submit`, `another`, `rename`, `loadAudit`, and the readers `ask`, `locusChip`, `panelRows`, `pointText`, `curveText`, `lineAngle`, `conicMarks`, `narrowing`, `shapeWarnings`, `coincidences`) and fails on the first path into the page: the store, `ui/`, the i18n bootstrap, any component, React, zustand, zundo. It finds none, and it is live: `loadSession.ts` itself is caught. Not in the set, because they stay on the page: `app/questionLines.ts` (it reads the store's `spokenSentence`) and `app/fallback.ts` (the model call).
+
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)
