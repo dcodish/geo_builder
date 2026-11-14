@@ -568,6 +568,8 @@ Locks: `shell/__tests__/worker-client.test.ts` (the host; the client against a f
 - `shell/notDecided.ts`: `NotDecided<R> = { kind: 'not-decided', resume: R, spent }`, the third outcome of a search beside a verdict and a refusal. `resume` is opaque to everything but the search that made it (what it already tried, so the next round does not repeat it). It is never a verdict, never a refusal naming a statement, never cached as a verdict, never stored as a fact or committed to the undo history, and it crosses the worker client as plain data.
 - `shell/frame/NotDecidedNote.tsx`: the page's face, placed where the builder shows a refusal. String-free: the caller passes `t('suite.notDecided.message')` («עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.») and `t('suite.notDecided.continue')` («המשיכו לחפש»); `onContinue` runs one more round of the same size from `resume` (operator, 2026-11-14, #2893 questions 1 and 2). A `status`, not an `alert`: nothing was refused.
 
+- **The letter popover** (`frame/letterOffer.ts`, `LetterPopover`): a rename answers `{ ok: false, reason: 'not-decided', round }` and a swap `{ ok: false, notDecided: { round } }` when the product's decision reached its work limit. That is not a refusal: the popover shows `NotDecidedNote` where it shows the invalid note (the caller passes `strings.notDecided` / `strings.keepSearching`, its `suite.notDecided` keys), and «המשיכו לחפש» calls the same callback again with `round`.
+
 ### The created-points notice ([ADR-W-162](06w-decisions-workspace.md#adr-w-162), #1467)
 
 `shell/frame/CreatedNotice.tsx` is a string-free `Banner kind="notice"` whose dismiss is the undo: ✕ (accessible
