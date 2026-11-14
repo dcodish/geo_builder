@@ -24,6 +24,10 @@
  * made it a memo in the first place. `content-cache.test.ts` locks cold against warm.
  *
  * {@link BoundedStore} is the bound of whatever outlives an action: least recently used first, by count.
+ *
+ * A NAMED cache can be handed to another heap (#2890, [ADR-AG-477](../../docs/06c-decisions-analytic.md#adr-ag-477);
+ * `settle.ts`): its name is how an entry computed in a worker finds the same memo on the page. Every memo of the product
+ * is named; an unnamed one (a test's) stays in the heap that made it.
  */
 import type { Construction } from './types';
 
@@ -45,13 +49,21 @@ export function viewOf(content: Construction): Construction {
 /** Every content-keyed cache and store, so one call can empty them all ({@link clearContentCaches}). */
 const registry: Array<() => void> = [];
 
+/** The named caches, by name ({@link namedContentCaches}): what a settled result carries from one heap to another. */
+const named = new Map<string, ContentCache<unknown>>();
+
 /** A memo per construction CONTENT: the `WeakMap` every solver memo was, read through {@link contentOf}. */
 export class ContentCache<V> {
   private map = new WeakMap<Construction, V>();
-  constructor() {
+  /** `name`: the memo's identity across heaps. Two memos may not share one. */
+  constructor(readonly name?: string) {
     registry.push(() => {
       this.map = new WeakMap();
     });
+    if (name !== undefined) {
+      if (named.has(name)) throw new Error(`ContentCache: the name «${name}» is taken`);
+      named.set(name, this as ContentCache<unknown>);
+    }
   }
   get(c: Construction): V | undefined {
     return this.map.get(contentOf(c));
@@ -65,6 +77,11 @@ export class ContentCache<V> {
   }
 }
 
+/** Every named content cache, in declaration order. */
+export function namedContentCaches(): ReadonlyMap<string, ContentCache<unknown>> {
+  return named;
+}
+
 /**
  * A store that outlives the student's action, bounded by COUNT: at most `max` entries, the least recently used dropped
  * first. A read refreshes its entry. Dropping an entry frees everything that hangs off it (the solver memos are weak).
@@ -76,6 +93,14 @@ export class BoundedStore<V> {
   }
   get size(): number {
     return this.map.size;
+  }
+  /** The entry, without refreshing it (a reader that is not a use: `settle.ts`). */
+  peek(key: string): V | undefined {
+    return this.map.get(key);
+  }
+  /** The keys held, least recently used first. */
+  keys(): string[] {
+    return [...this.map.keys()];
   }
   get(key: string): V | undefined {
     const hit = this.map.get(key);

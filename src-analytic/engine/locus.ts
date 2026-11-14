@@ -31,7 +31,8 @@
  * So: solve once, step along the null space of the Jacobian by a fixed arclength, re-solve, repeat —
  * outward in both directions, to the view box or to closure.
  */
-import { admissibleAt, carrierSystem, choiceSeedOf, configurationOf, drawableAt, drawnChoiceSeed, locusPartAt, seedNumber, someCrossingHasNoPoint, viewBox, type CarrierSystem, type Seed } from './evaluate';
+import { adoptAsks, admissibleAt, carrierSystem, choiceSeedOf, configurationKey, configurationOf, drawableAt, drawnChoiceSeed, locusPartAt, recordAsks, seedNumber, someCrossingHasNoPoint, viewBox, type CarrierSystem, type Seed } from './evaluate';
+import { ContentCache } from './content';
 import {
   agreeingUnion,
   conicPointsIn,
@@ -679,10 +680,43 @@ export function locusOf(
   seeds: readonly [Seed, number] = [0, 1],
   bounds?: TraceOptions['bounds'],
 ): LocusResult | null {
+  let kept = locusMemo.get(c);
+  if (!kept) {
+    kept = new Map();
+    locusMemo.set(c, kept);
+  }
+  const key = JSON.stringify([id, configurationKey(seeds[0]), seeds[1], bounds ? [bounds.minX, bounds.minY, bounds.maxX, bounds.maxY] : null]);
+  let hit = kept.get(key);
+  if (!hit) {
+    const { value, askedOf } = recordAsks(() => tracedLocusOf(c, id, seeds, bounds));
+    hit = { result: value, asked: askedOf(c) };
+    if (kept.size >= LOCI_KEPT) kept.delete(kept.keys().next().value as string);
+    kept.set(key, hit);
+  }
+  // What the trace asked of the figure is asked by THIS reader too, whoever paid for the trace: a page's deferred pool
+  // has read exactly the configurations it would have read tracing it (ADR-AG-476, as `distinctConfigSeeds` does).
+  adoptAsks(c, hit.asked);
+  return hit.result;
+}
+
+/**
+ * A LOCUS IS TRACED ONCE PER FIGURE (#2890, [ADR-AG-477](../../docs/06c-decisions-analytic.md#adr-ag-477); ADR-W-210
+ * invariant 4). The ask lane answers every stored question inside the page's render, and again on every render after it
+ * (`App.tsx` `answers`): a traced locus was walked again each time a row was ticked, an undo pressed or another question
+ * asked. Measured over the saved figures: the 34 locus chips cost 3 386 703 units to answer once, and the same again per
+ * render. The trace is a pure function of the construction, the point, the two configurations and the frame, so it is
+ * kept under them, on the construction's content like every solver memo (`content.ts`), and travels with the line list
+ * in a settled result. Kept WITH what it asked of the figure, so a remembered trace leaves a reader's pool as a walked
+ * one does. Shared by every caller, so frozen.
+ */
+export const LOCI_KEPT = 64;
+const locusMemo = new ContentCache<Map<string, { result: LocusResult | null; asked: string[] }>>('locusMemo');
+
+function tracedLocusOf(c: Construction, id: Id, seeds: readonly [Seed, number], bounds: TraceOptions['bounds'] | undefined): LocusResult | null {
   const walked = walkedLocusOf(c, id, seeds, bounds);
   if (!walked) return null;
   const components = walked.components.filter((cp) => cp.trace.pieces.length > 0 && moves(cp.trace));
-  return components.length > 0 ? { components } : null;
+  return components.length > 0 ? Object.freeze({ components: Object.freeze(components) as LocusComponent[] }) : null;
 }
 
 /**

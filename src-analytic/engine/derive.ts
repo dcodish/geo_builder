@@ -27,6 +27,7 @@ import { ringConvexityProofAg } from './rings';
 import { POINT_NAME } from './pointName';
 import type { CevianHost } from '../../shell/cevianHost';
 import { BoundedStore, clearContentCaches, viewOf } from './content';
+import { workLane } from '../../shell/workMeter';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 export interface LineFault {
@@ -217,7 +218,9 @@ export function derive(
   pins: Readonly<Record<number, readonly string[]>> = {},
 ): Derivation {
   const listKey = lineListKey(lines, seedNames, pins);
+  touched?.add(listKey);
   const key = configurationKey(at);
+  const lineLists = storeOfLane();
   let list = lineLists.get(listKey);
   let hit = list?.derivations.get(key);
   if (!hit) {
@@ -271,18 +274,69 @@ interface FoldedLines {
   /** The folded construction, with the session's seed names: the CONTENT every configuration is solved on. */
   construction: Construction;
 }
-interface LineList {
+export interface LineList {
   front: FoldedLines;
   /** Per configuration (`configurationKey`): the derivation, and what its body asked of the construction it returns. */
   derivations: Map<string, { derivation: Derivation; asked: string[] }>;
   /** The construction as each configuration letters it (`followObjects`), one object per lettering. */
   shown: Map<string, Construction>;
 }
-const lineLists = new BoundedStore<LineList>(LINE_LISTS_MAX);
+/**
+ * ONE STORE PER LANE (#2890, [ADR-AG-477](../../docs/06c-decisions-analytic.md#adr-ag-477); ADR-W-210 phase 3). The store
+ * is the one cache of this tree that is reached by a STRING, so it is the one place where two heaps could meet: every
+ * solver memo hangs off a construction object, and a construction is reachable only through here. A browser's page and
+ * its worker are two module instances and each has its own store. Under node they are one module instance, so the store
+ * is chosen by the work meter's lane (`shell/workMeter.ts`): work run through `inWorkerLane` reads and writes the
+ * worker's, everything else the page's. Nothing reaches the page's store from the worker's except what `settle.ts`
+ * adopts from a clone, which is exactly what a browser does. Outside `inWorkerLane` this is the single store it was.
+ */
+const stores: Record<'page' | 'worker', BoundedStore<LineList>> = {
+  page: new BoundedStore<LineList>(LINE_LISTS_MAX),
+  worker: new BoundedStore<LineList>(LINE_LISTS_MAX),
+};
+const storeOfLane = (): BoundedStore<LineList> => stores[workLane()];
 
-/** How many line lists the store holds now (test-visible: the bound's lock reads it). */
+/** How many line lists this lane's store holds now (test-visible: the bound's lock reads it). */
 export function heldLineLists(): number {
-  return lineLists.size;
+  return storeOfLane().size;
+}
+
+/** The keys of the line lists this lane's store holds, least recently used first (what a reseed hands back). */
+export function heldLineListKeys(): string[] {
+  return storeOfLane().keys();
+}
+
+/** The store's entry for a key, as it is (`settle.ts` reads it; a read here is not a use and refreshes nothing). */
+export function lineListOf(key: string): LineList | undefined {
+  return storeOfLane().peek(key);
+}
+
+/**
+ * Install a line list that another heap computed (`settle.ts` `adoptSettled`), under the key that heap kept it by. Its
+ * derivations are shared by every caller from here on, so they are frozen again: a clone is not.
+ */
+export function adoptLineList(key: string, list: LineList): void {
+  for (const hit of list.derivations.values()) shared(hit.derivation);
+  storeOfLane().set(key, list);
+}
+
+/** The line lists `derive` is being asked for, while {@link touchedLineLists} listens. */
+let touched: Set<string> | null = null;
+
+/**
+ * Run `fn` and report the keys of the line lists `derive` was asked for meanwhile, in this lane: what a settled result
+ * of that work has to carry. Re-entrant; an inner listener's keys are the outer one's too.
+ */
+export function touchedLineLists<T>(fn: () => T): { value: T; keys: string[] } {
+  const outer = touched;
+  const mine = new Set<string>();
+  touched = mine;
+  try {
+    return { value: fn(), keys: [...mine] };
+  } finally {
+    touched = outer;
+    if (outer) for (const key of mine) outer.add(key);
+  }
 }
 
 /**
