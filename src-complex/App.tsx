@@ -51,12 +51,14 @@ import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { useStore } from 'zustand';
 import { useComplexStore } from './store/useComplexStore';
-import { ANOTHER, armBasisGuardCx, jobStoreCx, workCx } from './app/workCx';
+import { ANOTHER, armBasisGuardCx, armCeilingCx, jobStoreCx, workCx } from './app/workCx';
 import { WorkingFace, useLatest, useWorking, workingDim } from '../shell/frame/WorkingMark';
 
 // #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
 // without the work queue shows up the first time anyone presses it.
 if (import.meta.env.DEV) armBasisGuardCx((message) => console.error(message));
+// #2890 (ADR-CX-091): in development an action that charges more than the work ceiling to the page is reported too
+if (import.meta.env.DEV) armCeilingCx((message) => console.error(message));
 import { SYMBOLS } from './ui/symbols';
 import { AskText } from './ui/askText';
 import { RadicalText } from './render/radicalText';

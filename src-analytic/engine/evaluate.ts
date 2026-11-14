@@ -2165,7 +2165,7 @@ function constraintReads(raw: Construction): ReadonlyMap<Constraint, ReadonlySet
 const splitOf = (c: Construction): Construction[] => partsOf(c, constraintReads);
 
 /** Per construction and configuration: its resolved parts (`locusPartAt`). */
-const locusPartsMemo = new ContentCache<Map<string, Construction[]>>();
+const locusPartsMemo = new ContentCache<Map<string, Construction[]>>('locusPartsMemo');
 
 /**
  * THE PART A POINT MOVES IN, AS ONE CONFIGURATION JUDGES IT (#2738, [ADR-AG-426](../../docs/06c-decisions-analytic.md#adr-ag-426)) —
@@ -2369,7 +2369,7 @@ function seedOrderParams(
  * first one's work done again. Keyed weakly on the construction's CONTENT (#2888, ADR-AG-476; `content.ts`): every
  * derivation of one line list shares it, whichever action asked, for as long as `derive`'s store holds that line list.
  */
-const evaluateMemo = new ContentCache<Map<number | string, Figure>>();
+const evaluateMemo = new ContentCache<Map<number | string, Figure>>('evaluateMemo');
 
 /**
  * How many evaluations were actually COMPUTED (a memo miss) — the operation count the #1473 perf lock
@@ -2472,7 +2472,7 @@ function evaluateParts(raw: Construction, parts: Construction[], seed: number, r
   return mergeParts(raw, parts, figures, seed, figures.map((f) => f.choiceSeed ?? seed), partOf, false);
 }
 
-const partMemo = new ContentCache<Map<string, Figure>>();
+const partMemo = new ContentCache<Map<string, Figure>>('partMemo');
 function evaluatePart(part: Construction, seed: number, reach: number, wide: boolean, choiceStart: number): Figure {
   let perKey = partMemo.get(part);
   if (!perKey) {
@@ -2683,7 +2683,7 @@ export function admissibleAt(c: Construction, pos: Map<Id, Pt>, env: Env): boole
  * points («∢ABC = 10», «∢ABC = α», a ratio of two angles), and a right angle stated as two perpendicular segments sharing
  * an end. Read structurally off the rows (every option of a choice included), memoized per construction.
  */
-const statedCornersCache = new ContentCache<ReadonlySet<string>>();
+const statedCornersCache = new ContentCache<ReadonlySet<string>>('statedCornersCache');
 function statedCornersOf(c: Construction): ReadonlySet<string> {
   const hit = statedCornersCache.get(c);
   if (hit) return hit;
@@ -2751,7 +2751,7 @@ function legiblePositions(c: Construction, pos: Map<Id, Pt>): boolean {
  * fit moves the seed's sample as little as the descent must, so another seed draws another circle.
  */
 /** The figure a created shape JOINS — the construction without it — evaluated once per (raw construction, seed, choice). */
-const priorMemo = new ContentCache<{ prior: Construction; figures: Map<string, Figure> } | null>();
+const priorMemo = new ContentCache<{ prior: Construction; figures: Map<string, Figure> } | null>('priorMemo');
 function priorOf(raw: Construction, removed: ReadonlySet<Id>): { prior: Construction; figures: Map<string, Figure> } {
   let hit = priorMemo.get(raw);
   if (!hit) {
@@ -2830,7 +2830,7 @@ function placesByValue(c: Construction, k: Constraint): boolean {
   const known = new Set(c.objects.map((o) => o.id));
   return !mentionsAny(k.left, known) || !mentionsAny(k.right, known);
 }
-const lineGroupsCache = new ContentCache<LineGroups>();
+const lineGroupsCache = new ContentCache<LineGroups>('lineGroupsCache');
 function lineGroupsOf(c: Construction): LineGroups {
   const lines = c.objectLine;
   if (!lines) return NO_GROUPS;
@@ -3385,7 +3385,7 @@ function fitLater(
 }
 
 /** The free vertices an object is placed from (itself when free), through its parents — `lineGroupsOf`'s `deps`. */
-const freeVerticesCache = new ContentCache<Map<Id, Set<Id>>>();
+const freeVerticesCache = new ContentCache<Map<Id, Set<Id>>>('freeVerticesCache');
 function freeVerticesOf(c: Construction, id: Id): ReadonlySet<Id> {
   let deps = freeVerticesCache.get(c);
   if (!deps) {
@@ -3655,7 +3655,7 @@ function seedFreePairs(c: Construction, seeded: Map<Id, Pt>, env: Env, seed: num
  * every seed reuses them, and no evaluation is added.
  */
 const ROOT_STREAM = 200017;
-const pinMemo = new ContentCache<Map<string, Map<string, number[] | 'identity'>>>();
+const pinMemo = new ContentCache<Map<string, Map<string, number[] | 'identity'>>>('pinMemo');
 function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number, choiceSeed: number): { env: Env; pins: Pin[] } {
   const register = paramRegister(c);
   const scope = new Map(register.filter((p) => !isDirectionSymbol(p.sym)).map((p) => [p.sym, narrowedDomain(p.domain, impliedRange(c, p.sym))] as const));
@@ -3775,7 +3775,7 @@ interface BlockList {
   /** The admitted roots, each with its index in the listing (0 is configuration 0's own root). */
   roots: Array<{ x: number[]; index: number }>;
 }
-const blockMemo = new ContentCache<Map<string, BlockList | null>>();
+const blockMemo = new ContentCache<Map<string, BlockList | null>>('blockMemo');
 function blockRootsOf(raw: Construction, choiceSeed: number): BlockList | null {
   const akey = assignmentAt(raw, choiceSeed).key;
   let perRaw = blockMemo.get(raw);
@@ -5421,7 +5421,7 @@ const RING_REACH_TRIES = 8;
 // Keyed by seed AND by whether the spread preference was applied (#1174): the two modes answer
 // differently for the same seed, and sharing one cache would let whichever caller ran first
 // decide what the other one sees.
-const drawableCache = new ContentCache<Map<string, Figure>>();
+const drawableCache = new ContentCache<Map<string, Figure>>('drawableCache');
 
 /**
  * WHICH CONFIGURATION IS DRAWN (#2039 step 1, #1182, [ADR-AG-358](../../docs/06c-decisions-analytic.md#adr-ag-358)).
@@ -5487,7 +5487,7 @@ export function drawnSampleOf(f: Figure): string | undefined {
   return k ? `${k.seed}:${f.choiceSeed ?? k.seed}:${f.rootKey ?? ''}` : undefined;
 }
 /** Per construction and requested configuration: the configuration `drawableAt` drew (set beside `drawableCache`). */
-const drawnCache = new ContentCache<Map<string, Configuration>>();
+const drawnCache = new ContentCache<Map<string, Configuration>>('drawnCache');
 
 /**
  * WHAT EACH READER HAS ASKED FOR (#2888, [ADR-AG-476](../../docs/06c-decisions-analytic.md#adr-ag-476)) — per construction
@@ -5551,6 +5551,32 @@ export function partKey(part: Construction): string {
 const partConfigOf = new WeakMap<Figure, PartConfiguration>();
 /** A figure assembled from parts: the parts' samples, as `drawnSampleOf` spells one (#2633's "same sample" test). */
 const mergedSample = new WeakMap<Figure, string>();
+
+/**
+ * WHICH CONFIGURATION A FIGURE IS, AS DATA (#2890, [ADR-AG-477](../../docs/06c-decisions-analytic.md#adr-ag-477)). The
+ * three tables above are keyed by the figure OBJECT, so a structured clone of a figure has none of them, and says
+ * nothing: `drawnSampleOf` would answer "not a figure `evaluate` computed" and «הציגו תצורה אחרת» would stop skipping the
+ * sample on screen. `settle.ts` carries these beside the figures it hands to another heap and re-attaches them there.
+ */
+export interface FigureTags {
+  evaluated?: Configuration;
+  part?: PartConfiguration;
+  merged?: string;
+}
+/** A figure's entries in the three tables; null for a figure that has none (a hand-built one). */
+export function figureTagsOf(f: Figure): FigureTags | null {
+  const evaluated = evaluatedAt.get(f);
+  const part = partConfigOf.get(f);
+  const merged = mergedSample.get(f);
+  if (!evaluated && !part && merged === undefined) return null;
+  return { ...(evaluated ? { evaluated } : {}), ...(part ? { part } : {}), ...(merged !== undefined ? { merged } : {}) };
+}
+/** Attach to a figure (a clone, in another heap) the entries its original had. First writer wins, as in `evaluate`. */
+export function tagFigure(f: Figure, tags: FigureTags): void {
+  if (tags.evaluated && !evaluatedAt.has(f)) evaluatedAt.set(f, tags.evaluated);
+  if (tags.part && !partConfigOf.has(f)) partConfigOf.set(f, tags.part);
+  if (tags.merged !== undefined && !mergedSample.has(f)) mergedSample.set(f, tags.merged);
+}
 
 /**
  * THE CONFIGURATION WALK OF A FIGURE OF INDEPENDENT PARTS (#2737, [ADR-AG-425](../../docs/06c-decisions-analytic.md#adr-ag-425)).
@@ -6169,7 +6195,7 @@ function distinctCount(figs: readonly Figure[]): number {
  *  «תצורה אחרת» button use, for the same reason. */
 const DISTINCT_TRIES = 24;
 
-const distinctCache = new ContentCache<Map<number, { seeds: number[]; walked: number }>>();
+const distinctCache = new ContentCache<Map<number, { seeds: number[]; walked: number }>>('distinctCache');
 
 /**
  * The seeds of up to `count` configurations that actually DIFFER (#1282).

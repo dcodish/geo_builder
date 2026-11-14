@@ -1515,10 +1515,62 @@ where a session starts (`newSession`: each sequence, each load, and the session 
 `beforeLastRowEdit`, which has solved the rows before the edited one and not that row), and a test that measures a cold
 derivation calls it first.
 
+**Two readers of the page are memos too** ([ADR-AG-477](06c-decisions-analytic.md#adr-ag-477), #2890). `app/locusChip.ts`
+`locusChips` keeps a figure's chips under the construction and the configuration drawn (at most `LOCUS_CHIPS_KEPT` = 96
+per figure), with the two figures they were read from, compared by identity. `engine/locus.ts` `locusOf` keeps a traced
+locus under the point, the two configurations and the frame (at most `LOCI_KEPT` = 64 per figure), together with what
+the trace asked of the figure, which it replays on a hit. The chips ask the figure before they look in their memo. So
+the page's pool has read the same configurations whether an answer was computed or remembered. The ask lane's ANSWER is
+not kept: it is worded for a locale and may be pending; the trace under it is the solver work.
+
 **Adding a memo.** A pure function of a construction is memoised in a `ContentCache`, never a bare `WeakMap`, or it is
 cold on every `derive`. Anything that says how one reader treats a figure (a mode, a "shown" flag) is keyed by the
 object, like the pool. A memo that outlives an action and is NOT reached through a construction is a `BoundedStore`, so
 the clear function and the bound cover it.
+
+### A settled result, and its adoption ([ADR-AG-477](06c-decisions-analytic.md#adr-ag-477), #2890; ADR-W-210 phase 3)
+
+The page may not solve (ADR-W-210 invariant 1). The route is "settle, then hand over": the heap that solved hands the
+page what it solved as plain data, the page adopts it into its own memos, and its synchronous readers find their answers
+there. `engine/settle.ts` is both halves. Nothing on the page calls it yet.
+
+- **`settling(fn)`** runs an action and reports the keys of the line lists `derive` was asked for.
+- **`settledOf(keys)`** reads those lists from the store of the heap it runs in and returns ONE object graph: the
+  store's entries under `lineListKey`; every named `ContentCache`'s entry for every construction reachable from them
+  (found by walking the memo values for constructions: parts, prior figures, locus parts, lettered copies); and the three
+  figure-keyed side tables (`evaluatedAt`, `partConfigOf`, `mergedSample`) as `[figure, tags]` pairs
+  (`figureTagsOf`).
+- **`adoptSettled(clone)`** installs a structured clone of that graph: the lists (`adoptLineList`, which freezes their
+  derivations again), each memo entry under its construction, the tags (`tagFigure`). `derive` of those lines is then a
+  lookup and returns a view of the ADOPTED construction, so every gate reads the adopted memos.
+- **`cloneLoss(value)`** lists what a structured clone would refuse, flatten or leave behind. A clone of a figure never
+  throws and is never whole: the four lazy rank readers (`DROPPED_BY_A_CLONE`) are non-enumerable and stay behind. That
+  is by design, since only `deriveAt` and the walk read them. Anything else hidden, any function, class instance or
+  accessor in a result is a failure of the lock.
+
+**One graph, one clone.** A memo's key is the construction its line list holds, `figure.unsatisfied[i]` is a constraint
+of that construction, and `construction.rowLine` is keyed by constraints. Sent apart, each of those identities breaks.
+Sent together they survive, which is why a result is the lists AND the memos AND the tags, never a figure alone.
+
+**The store is one per lane.** `derive.ts` keeps a `BoundedStore` for the page's lane and one for the worker's
+(`shell/workMeter.ts` `workLane()`). Every solver memo is reached only through a construction, and a construction only
+through the store, so two lanes are two heaps: nothing a worker's lane solves is readable from the page's until it is
+adopted from a clone. A browser's page and worker are two module instances with one lane each. Under node, a test runs
+both in one process (`__tests__/settle-heaps.ts`). A memo reached by a STRING (a future `BoundedStore`) must be per lane
+too, or the two heaps meet there.
+
+**What is not carried.** A reader's asks and its pool's mode stay its own. The page's view of an adopted figure defers
+its pool and asks seeds exactly as it does today; each ask is a lookup. So the hand-over decides nothing about what is
+shown as «בודק…»: the page does, from the same configurations.
+
+**The memos are named.** `new ContentCache<V>('name')`: the name is the memo's identity across heaps, and two memos may
+not share one. An unnamed memo is not sent, so its answers would be solved again on the page: every memo of the product
+is named, and a lock scans for one that is not.
+
+**What will run off the page imports no page.** The decisions (`app/submit`, `another`, `rename`, `loadAudit`), the
+readers that force a lazy and all of `engine/` reach neither the store, nor React, nor a component by any value import
+(`__tests__/off-page-graph.test.ts`). The load's audit is `app/loadAudit.ts` for that reason: `loadSession.ts` restores
+the store and calls it.
 
 ### Independent parts are evaluated and walked apart ([ADR-AG-425](06c-decisions-analytic.md#adr-ag-425), #2737)
 

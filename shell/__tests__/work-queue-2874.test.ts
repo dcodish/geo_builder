@@ -4,11 +4,11 @@
  * The claims of `shell/work`, each as a lock: a job is counted from the moment it is asked for; an
  * interactive job runs only after a paint and stays counted until the paint after its work; jobs of one
  * lane run one at a time in the order asked; the count is released when a job THROWS; work a job joined
- * belongs to it; a lane is counted on its own; the basis stamp is taken at the action; and the basis guard
- * reports a figure that changed outside a job.
+ * belongs to it; a lane is counted on its own; the basis stamp is read when the job's turn starts (#2890); and the
+ * basis guard reports a figure that changed outside a job.
  */
 import { describe, expect, it } from 'vitest';
-import { INTERACTIVE, createWorkQueue, queuedActions, watchBasis, type Paint } from '../work';
+import { INTERACTIVE, createWorkQueue, queuedActions, watchBasis, type Paint, type WorkQueue } from '../work';
 
 /** A paint the test releases by hand, and a log of when each was asked for. */
 function gatedPaint() {
@@ -194,19 +194,27 @@ describe('#2874 — the count is released in a finally', () => {
 });
 
 describe('#2874 — the basis stamp and the basis guard', () => {
-  it('a job carries the basis it was ASKED for, and knows when the figure has moved on', async () => {
+  // #2890 (ADR-W-210 Am. 4): the stamp is read when the job's TURN starts. Read when the job was asked for, as phase 1
+  // built it, every job that waited its turn behind another looked stale, though it acts on the figure as it then is.
+  it('a job carries the basis it STARTED on: one that waited its turn is not stale, one whose figure moves meanwhile is', async () => {
     let figure = { facts: ['a'], seed: 0 };
     const q = createWorkQueue({ basis: () => figure, sameBasis: (a, b) => a.facts === b.facts && a.seed === b.seed });
-    const stamped = figure;
     let release!: () => void;
     const first = q.run(() => new Promise<void>((r) => (release = r)));
     const second = q.run((job) => ({ basis: job.basis, stale: job.stale() }));
-    figure = { facts: ['a', 'b'], seed: 0 }; // the first job changes the figure while the second waits
+    const changed = { facts: ['a', 'b'], seed: 0 };
+    figure = changed; // the first job changes the figure while the second waits
     await settle();
     release();
     await first;
-    expect(await second).toEqual({ basis: stamped, stale: true });
-    expect(await q.run((job) => job.stale())).toBe(false);
+    expect(await second, 'the second job acts on the figure the first left').toEqual({ basis: changed, stale: false });
+    // and a figure that moves on WHILE a job works makes that job's own result stale
+    const third = q.run(async (job) => {
+      const before = job.stale();
+      figure = { facts: ['a', 'b', 'c'], seed: 0 }; // another lane commits meanwhile
+      return { before, after: job.stale(), basis: job.basis };
+    });
+    expect(await third).toEqual({ before: false, after: true, basis: changed });
   });
 
   it('the guard reports a figure that changed with no job running, and is quiet inside one', async () => {
@@ -244,5 +252,114 @@ describe('#2874 — the basis stamp and the basis guard', () => {
     await gate.release();
     await gate.release();
     expect(await done).toBe('removed r1 from the current store');
+  });
+});
+
+describe('#2890 — ordering across lanes, the span of a job, and the wrapper of a routed action', () => {
+  it('a lane declared BEHIND another waits for the jobs that lane had been asked for, and is counted on its own meanwhile', async () => {
+    const q = createWorkQueue({ behind: { another: INTERACTIVE } });
+    const order: string[] = [];
+    let endSubmit!: () => void;
+    const submit = q.run(() => new Promise<void>((r) => (endSubmit = r)).then(() => void order.push('the submit ends')));
+    const press = q.run(() => void order.push('the press runs'), { lane: 'another' });
+    await settle();
+    expect(q.working('another'), 'its own button shows it while it waits its turn').toBe(true);
+    expect(order).toEqual([]);
+    endSubmit();
+    await Promise.all([submit, press]);
+    expect(order).toEqual(['the submit ends', 'the press runs']);
+    expect(q.working('another')).toBe(false);
+  });
+
+  it('the other lane does not wait for it: a line entered while a search runs is taken and runs', async () => {
+    const q = createWorkQueue({ behind: { another: INTERACTIVE } });
+    let endSearch!: () => void;
+    const search = q.run(() => new Promise<void>((r) => (endSearch = r)), { lane: 'another' });
+    await settle();
+    expect(q.working(INTERACTIVE)).toBe(false);
+    const line = q.runIfIdle(() => 'committed');
+    expect(line).not.toBeNull();
+    expect(await line).toBe('committed');
+    expect(q.working('another')).toBe(true);
+    endSearch();
+    await search;
+  });
+
+  it('a job reads the figure the job before it left: behind another lane, its stamp is that figure', async () => {
+    let figure = { facts: ['a'], seed: 0 };
+    const q = createWorkQueue({ basis: () => figure, sameBasis: (a, b) => a.facts === b.facts && a.seed === b.seed, behind: { another: INTERACTIVE } });
+    const left = { facts: ['a', 'b'], seed: 0 };
+    const submit = q.run(async () => {
+      await settle();
+      figure = left;
+    });
+    const press = q.run((job) => ({ basis: job.basis, stale: job.stale() }), { lane: 'another' });
+    await submit;
+    expect(await press).toEqual({ basis: left, stale: false });
+  });
+
+  it('run({ behind }) orders one job, and a lane behind itself is its own order', async () => {
+    const q = createWorkQueue();
+    const order: string[] = [];
+    let end!: () => void;
+    const first = q.run(() => new Promise<void>((r) => (end = r)).then(() => void order.push('first')), { lane: 'a' });
+    const second = q.run(() => void order.push('second'), { lane: 'b', behind: 'a' });
+    const third = q.run(() => void order.push('third'), { lane: 'b', behind: 'b' });
+    await settle();
+    expect(order).toEqual([]);
+    end();
+    await Promise.all([first, second, third]);
+    expect(order).toEqual(['first', 'second', 'third']);
+  });
+
+  it("a span opens when the job's turn starts and closes after its closing paint, before the job is released", async () => {
+    const gate = gatedPaint();
+    const log: string[] = [];
+    const q: WorkQueue = createWorkQueue({
+      paint: gate.paint,
+      span: (job) => {
+        log.push(`opened on ${job.lane}`);
+        return () => void log.push(`closed, working: ${q.working()}`);
+      },
+    });
+    const done = q.run(() => void log.push('work'));
+    await settle();
+    expect(log, 'not before the opening paint').toEqual([]);
+    await gate.release();
+    expect(log).toEqual(['opened on interactive', 'work']);
+    await gate.release();
+    await done;
+    expect(log).toEqual(['opened on interactive', 'work', 'closed, working: true']);
+    expect(q.working()).toBe(false);
+  });
+
+  it('a span is closed when the work throws, and a span that throws still releases the job', async () => {
+    const log: string[] = [];
+    const q = createWorkQueue({ span: () => () => void log.push('closed') });
+    await expect(q.run(() => Promise.reject(new Error('no figure')))).rejects.toThrow('no figure');
+    expect(log).toEqual(['closed']);
+    const broken = createWorkQueue({
+      span: () => () => {
+        throw new Error('the meter broke');
+      },
+    });
+    await expect(broken.run(() => 1)).rejects.toThrow('the meter broke');
+    expect(broken.working()).toBe(false);
+    expect(await broken.run(() => 2).catch(() => 'still runs')).toBe('still runs');
+  });
+
+  it("queuedActions hands every routed action to the builder's wrapper, which decides how it reaches the store", async () => {
+    const q = createWorkQueue();
+    const calls: string[] = [];
+    const store = { remove: (key: string) => (calls.push(`store.remove(${key})`), `removed ${key}`), rename: (a: string, b: string) => (calls.push(`store.rename(${a},${b})`), true) };
+    const act = queuedActions(q, () => store, ['remove', 'rename'] as const, {
+      around: (name, args, job, runLocal) => {
+        calls.push(`around ${name}(${args.join(',')}) on ${job.lane}, inside a job: ${q.inJob()}`);
+        return name === 'rename' ? 'answered elsewhere' : runLocal();
+      },
+    });
+    expect(await act.remove('g1')).toBe('removed g1');
+    expect(await act.rename('A', 'B')).toBe('answered elsewhere');
+    expect(calls).toEqual(['around remove(g1) on interactive, inside a job: true', 'store.remove(g1)', 'around rename(A,B) on interactive, inside a job: true']);
   });
 });

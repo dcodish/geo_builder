@@ -16084,3 +16084,124 @@ Before, every past fact array in the undo history kept its own derives alive, so
 
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)
+
+## ADR-3D-492 — What a job solved can leave the heap that solved it: the pivot's lazy values are plain cells, a job's memo entries are a journal, and the walk drives the actions it left out (#2890)
+
+**Status:** built · 2026-11-14 · `P2` · phase 3 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (invariant 1, "the page never solves"), the parts of 3-D that stand alone on `main` · **Issue:** [#2890](https://github.com/dcodish/geo_builder/issues/2890), parent program [#2867](https://github.com/dcodish/geo_builder/issues/2867) · branch `debt/2890-3d-journal` off `main` @ `bda48f42` · three commits, one per part below
+**Requirements:** none (internal: no line is accepted, refused, drawn or worded differently) · **Design:** [04b](04b-design-3d.md) — "The solver", *The pivot's lazy values are plain cells* and *A job's journal, and its adoption*; [docs/08](08-testing-strategy.md) "A walk is a session" (the walk's added actions) · **LADDER stage:** none (no stage moves; the solve is untouched)
+**Amends** [ADR-3D-491](#adr-3d-491): its memos gain a way in from outside the heap (part 2), and its walk gains actions (part 3). [ADR-3D-248](#adr-3d-248), [ADR-3D-375](#adr-3d-375) and [ADR-3D-483](#adr-3d-483) keep their measurements; what changes is where each measured value is held (part 1).
+
+**Why (the design pass, measured on `main` @ `cbada4e1`; the full file is on #2890).** Phase 3 moves a student action's solving into a worker. 3-D's route is "adopt, then run the page's own action": the worker runs the store action and the page's readers, what it wrote into the phase 2 memos crosses to the page as plain data, the page adopts it under the same content keys and then runs its own unchanged action, in which every solve is a memo hit. Two heaps in one process reached 0 page units over all 176 fixtures (87 785 971 units in the solving heap) and over the slow corpus. Three things stood in the way, and each is one part of this ADR. None of them changes what a student sees, and none needs the worker: they land first.
+
+### Part 1 — the pivot's lazy values are plain cells
+
+**Root cause.** The pivot's outcome on a resolved figure carried three CLOSURES: `scalarConsumed` (ADR-3D-248), `heldPins` (ADR-3D-483) and `placementFreedom` (ADR-3D-375), each a value a reader may ask for after the solve, computed on the first ask. A closure is not data: `structuredClone(derive3(facts, seed))` threw on **82 of 176** fixtures, every one whose resolve ran the pivot, and on nothing else (a walk of every `Derived3` graph found these three functions only: no class instance, no cycle, no symbol; `Construction3` alone cloned in 176 of 176). Class: *a value held as a function cannot leave the heap that made it.*
+
+**Why not force them before the figure crosses** (ADR-W-210's wording, "every lazy value already forced"). Measured: forcing all three on every resolved figure a construction holds after its load (709 figures over the 176 loads) costs **1 034 026 units, 8.4 % of those loads' 12.4 M, and up to 206 800 units and 1.4 s on one figure** (`parallel-planes-free-2707`). It is `placementFreedom` on the claims' samples, which nobody reads: its first read runs `solvePivot(…, { freedom: 'measure' })`, a counted solve. Who reads what today, over the 176 loads: `heldPins` 337 times, all by `resolveHeld3` on the figure it has just solved; `placementFreedom` 721 times, 616 inside the solve, 91 by the panel's read-back, 14 by the DOF line; `scalarConsumed` 91 times, all by the DOF line.
+
+**Decision.** `engine/lazy3.ts`: on the figure a lazy value is a plain CELL, the marker `{ lazy: true }`: "this figure has such a value". The value, once computed, and the way to compute it are kept BESIDE the figure, in two tables of the heap that solved it, keyed by the cell object. The cell holds no value on purpose: a figure is then the same data whether or not a reader has asked yet. The first cut kept the value in the cell (`{ v }`), and `store/__tests__/compute-once-2888.test.ts` failed on it: the view of `stated-length-7-9999-2361` after «הציגו תצורה אחרת» differed between a cold and a warm session by which cells had been read, which is a result depending on what was solved before. So a value never rides in the figure; it crosses addressed by the figure's content (below, and part 2).
+- `Resolved3['pivot']` holds `scalarConsumed?: Lazy3<{ dims, block }>`, `placementFreedom?: Lazy3<PlacementFreedom3>` and `heldPins?: Lazy3<readonly number[]>`. A held pin is named by its PLACE in `c.scalarPins`, never by the pin object, so the value means the same in a copy of the construction (`resolveHeld3` already keyed its released construction by those places).
+- A copy of the pivot (`{ ...pivot, … }`, four sites in `resolve3Uncached`) shares the cell as it shared the closure. Where the closure's own memo was reset (the size park and the leftover turn re-measure the freedom at the moved placement), the value is forgotten at the same two lines.
+- **One reader**, `lazyValue3` (`engine/evaluate.ts`), behind `scalarConsumed3(resolved)` and `placementFreedom3(resolved)`:
+  1. this heap has the value in hand: that is the answer;
+  2. this heap solved the figure: it computes the value, exactly as the closure did, and keeps it;
+  3. this heap did not solve the figure and the value has FOLLOWED it (`keepLazyValue3`): that is the answer. A value is addressed like the figure it belongs to: the construction's content, the resolve key, the value's name. `resolve3` is a pure function of that address, so every object that stands for the figure shares the one value. (The design pass measured why the address cannot be the figure object: the solving heap drops and re-solves a figure during a long search, the other heap keeps its first copy, and a value sent to "that object" reaches the wrong one: 4 reads of a value that never arrived on `stated-length-7-9999-2361`.)
+  4. otherwise the figure is SOLVED AGAIN HERE and counted (`lazyStats3.solvedAgain`, and the work meter through the solve). A value is never answered with a default: the DOF line's fallback (`sc?.dims ?? c.scalarPins.length`) is for a pivot that found no solution, and an absent value read as "no solution" would have been a wrong count shown as a fact.
+  A heap that solves its own figures stops at 2, so nothing it computes, and no count, changes. 3 and 4 are for a figure that crossed.
+- `keepResolved3(figure, home, out)` puts a resolved figure this heap did not solve into its memo at the home it was solved for (the construction's own answers and its content's; an answer already held is kept), and gives its cells that home. A figure in NO memo of this heap that is asked for an absent value throws.
+- **A type-level check**, `RESOLVED_CROSSES3` (`engine/evaluate.ts`): a function or a symbol added to `Resolved3`, at any depth, fails `tsc`.
+
+**Two tests changed their call, not their expectation.** `issue-2368-leftover-turn.test.ts:97` and `placement-gauge.test.ts:739` called the closure (`pivot.placementFreedom!()`); they call the reader (`placementFreedom3(resolved)`). Every assertion is as it was.
+
+**Measured.** `npm run work:check -- 3d`: every one of the 1 266 recorded actions counts what it counted (no line moves; a heap that solves its own figures takes the same path). `store/__tests__/lazy-values-2890.test.ts`: a derived figure clones, and it is the same data before and after its readers have asked for its lazy values, on five figures that between them read every lazy (a held release, the read-back, a figure of nine parts); a value sent beside the figure is read with no solve; a value that follows by content is found through another object of the same construction; an absent value costs one solve, counted, and is the same value; a stray figure throws.
+
+### Part 2 — a job's journal, and its adoption
+
+**Root cause.** Phase 2 made every memo of this tree content-keyed (ADR-3D-491), but each one could only be FILLED by solving in its own heap. So a figure one heap had solved could not be given to another, and the page of phase 3 would have had to solve again everything its worker had solved. Class: *a content-keyed memo with no way in from outside is content-keyed for one heap only.*
+
+**What has to cross is the action's memo entries, not a figure** (the design pass, `main` @ `cbada4e1`). 82–94 % of an action's units are spent inside the store action, before any render: load 86.6 % (`loadFigure` → `loadedSeed3`), submit 81.7 % (`decideCommands3`), «הציגו תצורה אחרת» 81.7 % (`resample` → `seedForRequirements`), delete 94.0 % (`remove` → `dependentsBroken`), edit 83.0 %. Handing over only the figure the action ends on leaves **1 718 983 units on the page (2.0 %), in 32 of the 1 266 actions**: a search's seeds (`stated-length-7-9999-2361` submit#4 and edit: 491 998 and 490 716), the panel's pinned-letter samples, which are solved on OTHER constructions (`vector-answer-in-parameter-1829` delete: 342 581), a trial list the decision derives and does not keep.
+
+**Decision.**
+- **The journal** (`store/journal3.ts`, `recordJournal3()` → `take()`): while a recording is on, every entry written into a content-keyed memo is noted, in the order written: a derive (`derive3`'s miss), a resolved figure (`rememberResolve3`, and `sharedResolve3` when a construction object takes its content's answer as its own), a seed's verdict (`seedVerdict3`), a ring-reach value (`ringReachValue3`), a segment-equation reading (`readSegmentEquation3`), and every lazy value in hand, addressed like its figure, since a cell carries none (part 1): those of the take's own figures, and those computed since on a figure an earlier take carried. `take()` returns what was written since the take before, as plain data, so a job can be handed over in stages. An answer on a construction that is not settled (a probe with a temporary pin) is not noted: it has no content, and serves no other heap.
+- **Adoption** (`adoptJournal3(journal)`): each entry goes into the memo its own function reads, under the key that function builds: `deriveMemo3` by the fact list's content and `seedKey3`; the resolve memo's two tiers by the construction's content and `resolve3`'s key (`keepResolved3`); `seedVerdicts3`; `ringReachMemo3`; `readingMemo3`; the lazy values by content (`keepLazyValue3`). An entry already held is kept, so a journal adopted twice, or after the heap solved the content itself, changes nothing a reader holds. A journal whose `v` this code does not know is dropped whole, and the heap solves for itself.
+- **A missing entry is never a wrong figure.** Nothing is applied: the adopting heap runs its own action, and what it does not find it solves, and the work meter counts it.
+
+**Three things a journal carries beside its entries, each with the lock that shows what its absence costs** (`store/__tests__/journal-2890.test.ts`):
+1. **The pin-origin table.** `scalarPinOrigin3` maps a scalar pin OBJECT to the row and the claim it came from, and is part of a construction's content (`figureContent3`'s annotation and its `settled` test). A clone has new pin objects and no entry, so it is "not settled" and keeps the identity rule: 63 of the 176 fixtures have scalar pins (154 pins, 134 with a claim), and in those a construction the adopting heap folds itself would find none of the adopted answers. The journal lists each construction it names once, with its origins as an array aligned with `c.scalarPins`, in the SAME message: the claim an origin points at is then the very object in `c.claims`, because one `structuredClone` call keeps sharing. Adoption writes them first. Lock: with the origins blanked, the load solves everything again; with them, 0.
+2. **The new row's id.** It is drawn inside the decision (`nanoid`) and is part of `derive3`'s key. `store.submit(text, newId)` and `store.submitSteps(text, steps, newId)` take it from the caller, as `decideSubmit3` and `decideDeterministic3` already did. Measured in the design pass with the two heaps drawing their own ids: the page folds again in every action and solves 466 781 units over 16 fixtures. Lock: the same id, 0 derives; another id, the fold repeats.
+3. **A lazy value that is computed after its figure has crossed.** The panel's read-back reads `placementFreedom` on figures the derive wrote; in a two-stage hand-over those have crossed. The later take carries the value, addressed by content (part 1). Measured without it: 110 reads of a value that never arrived, on seven fixtures. Lock: without the late values the panel is the same and the page solves for it, counted.
+
+**An adopted answer outlives its job's replay** (the one leftover of the design pass, removed at its cause). The resolve memo keeps 64 answers a construction and drops the oldest. A job's answers arrive when the solving heap has FINISHED, so the adopting heap's tier would end where that one's ended, while the action it then runs starts where that one started. `stated-length-7-9999-2361` submit#4 writes 409 figures under one construction in its 200-seed search; the first the replay asks for had been dropped, and the page solved it: **3 058 units, in 1 action of 1 266.** So `keepResolved3` does not drop on arrival; the surplus goes when the next journal arrives, by which time the action has run (`releaseAdopted3`, which a caller that knows the replay is over may call sooner). That one action now replays with 0. The memo's own bound is unchanged for everything a heap solves itself.
+
+**The walk is a sequence of steps** (`__tests__/work-meter/walk3.ts`): `stepsOfFixture3` and `stepsOfLines3` yield after each measured action and after each thing the walk does between two of them (a new session, a figure put in the store and shown, a row committed from its saved commands); `walkFixture3` and `walkLines3` run them to the end and keep the measured ones, so the gate walks what it walked. A new session is a step of its own because a second heap has to clear before it adopts the next step's entries. The driver's render says where the figure ends and the values begin (`stages3`), and reads the scene before the values where it read it after: the scene's one solver reach is the crossing dots' other configurations, which cost no unit in either order, and a heap handed the figure alone must find the dots in it (13 coordinate-letter fixtures resolved three figures there, at 0 units, until the order said so). No recorded count moves.
+
+**Measured: two heaps, walking every fixture in step** (`__tests__/two-heaps-2890.test.ts`, the lock; `__tests__/work-meter/twoHeaps3.ts`, a module instance a heap). W solves and records; each journal is passed through `structuredClone`; P adopts it and runs the same step with its own store action and readers. A measured action that renders is handed over in two stages, cut where the worker would cut.
+
+| Corpus | Figures | Steps (in two stages) | Units solved in W | **Units solved in P** | P's derives and resolves not answered from a memo | Figures P solved again for a lazy value | Same step, verdict and view |
+|---|---|---|---|---|---|---|---|
+| Every fixture, the five actions recorded before this ADR | 176 | 2 146 (1 266) | 92 199 532 | **0** | 0 and 0 | 0 | 2 146 of 2 146 |
+| Every fixture, with part 3's ten actions | 176 | 4 307 (2 709) | 152 825 005 | **0** | 0 and 0 | 0 | 4 307 of 4 307 |
+| The slow corpus, with the ten actions | 14 | 346 (220) | 78 332 972 | **0** | 0 and 0 | 0 | 346 of 346 |
+
+W's units include the walk's unmeasured steps (the sessions it builds between actions), which are handed over like any job; its measured actions are the baseline's, to the unit (the gate). The view compared after every measured action that rendered: the store, every row's status, every position, the notices, the DOF count and the whole data panel. After each load P's construction is the same content as W's, pin origins included, in 176 of 176. The journals of the second row: 23 284 474 bytes in all (5 406 a step on average), the largest 264 373 bytes (the 200-seed search: its resolved figures cross although only its verdicts are read; a later trim). `npm run test:locked -- npx vitest run src3d/__tests__/two-heaps-2890.test.ts`, about 9 min; with `WORK_METER_CORPUS=slow` it walks the slow corpus.
+
+**Not built here, on purpose:** the worker's entry, its mirror of the store, and anything on the page that records or adopts. `src3d/app/work3.ts` is untouched. The journal is inert until the shared client lands (ADR-W-210 phase 3, the plan on #2890).
+
+### Part 3 — the walk drives the actions it left out
+
+**Root cause.** The work meter's walk drove a load, the typed rows, one «הציגו תצורה אחרת», a delete and an edit. Everything else a student does that reaches the solver was outside it, so the 87 785 971 units of 3-D's `page` count were a lower bound, and phase 3's exit ("`page` is zero") would have been claimed for less than the page does. The design pass measured one of the gaps by hand: 619 probe questions asked after the panel was read solved 4 169 322 units on the page, up to 791 346 units and 2.3 s for one. Class: *a gate that walks a subset of the actions proves its invariant for that subset.*
+
+**Decision.** The walk (`__tests__/work-meter/walk3.ts`, the driver `driver3.ts`) gains ten actions a figure. They are NEW baseline lines; each runs after every action recorded before it in its session, or in a session of its own, so **no existing line moves** (re-recorded with no `--accept-rise`: 0 rose, 0 fell).
+- **After the delete, in the same session:** `undo` (`undo3`: the figure before the delete comes back) · `redo` · the delete undone once more, unmeasured · `untick` (`toggle` of the first row) · `retick`.
+- **After the edit, in THE READERS' SESSION** (cleared caches; the built figure shown with the data panel CLOSED, unmeasured): `panel` (the panel opened on that standing figure: the values alone) · `rename` (the first point to the first free letter, `store.rename`) · `swap` (the first two letters, `store.swap`) · `ask#k` (`addQuery`, the answer read for the row to highlight, then the render, which answers every saved question). The questions are the figure's first point, the segment of its first two points and the angle of its first three, those the ask lane reads on that figure. The asks are last because a saved question is answered again by every later render.
+- The driver's render reads what App3 reads and it had left out: every saved question's answer (`queryResults`, `App3.tsx:520`). No fixture holds a saved question, so no recorded line changes. `setFigure3` puts a figure in the store with no saved question.
+- The timing harness (`scripts/perf/3d/sweep3.ts`) drives the same actions through the same driver, so a new line has a time beside its count.
+
+**Recorded** (`npm run work:record -- 3d`, and `--slow`; every unit is still on the page and before the paint: 3-D has no worker yet).
+
+Fixtures (176 figures):
+
+| Action | Lines | With work | Units (= page = before the paint) | The dearest |
+|---|---|---|---|---|
+| `undo` | 161 | 0 | 0 | 0 |
+| `redo` | 161 | 0 | 0 | 0 |
+| `untick` | 161 | 59 | 19 599 314 | 1 297 243 (`length-letter-2092` · `untick`) |
+| `retick` | 161 | 0 | 0 | 0 |
+| `panel` | 176 | 77 | 2 294 103 | 1 466 570 (`symbolic-line-equation-863` · `panel`) |
+| `rename` | 176 | 90 | 12 210 782 | 2 228 056 (`rider-length-1735` · `rename`) |
+| `swap` | 176 | 88 | 11 990 504 | 2 228 674 (`rider-length-1735` · `swap`) |
+| `ask` | 476 | 90 | 4 164 843 | 791 068 (`vector-creates-head-sym-1613` · `ask#2`) |
+| **the new actions** | 1 648 | 404 | **50 259 546** | |
+| the actions recorded before (load, submit, another, delete, edit) | 1 266 | 585 | 87 785 971 (unchanged, line by line) | |
+| **all** | 2 914 | | **138 045 517** | |
+
+Slow corpus (14 sequences):
+
+| Action | Lines | With work | Units (= page = before the paint) | The dearest |
+|---|---|---|---|---|
+| `undo` | 14 | 0 | 0 | 0 |
+| `redo` | 14 | 0 | 0 | 0 |
+| `untick` | 14 | 5 | 1 832 151 | 633 275 (`#2749 narrowed` · `untick`) |
+| `retick` | 14 | 0 | 0 | 0 |
+| `panel` | 14 | 14 | 3 436 621 | 858 432 (`#863 equation` · `panel`) |
+| `rename` | 14 | 14 | 7 047 043 | 1 269 902 (`#863 equation` · `rename`) |
+| `swap` | 14 | 14 | 9 901 365 | 1 982 903 (`#863 equation` · `swap`) |
+| `ask` | 42 | 14 | 10 574 297 | 2 520 301 (`#863 equation` · `ask#2`) |
+| **the new actions** | 140 | 61 | **32 791 477** | |
+| the actions recorded before (load, submit, another, delete, edit) | 94 | 85 | 38 903 940 (unchanged, line by line) | |
+| **all** | 234 | | **71 695 417** | |
+
+**What the new lines say.**
+- **The ask lane solves on the page**: 4 164 843 units over 476 questions on the fixtures (90 of them solve), and 10 574 297 over 42 on the slow corpus. It is on the page today, at the click, with no working indicator (#2886).
+- **A rename and a swap each solve the whole figure again** (12 210 782 and 11 990 504 units on the fixtures, against 12 375 388 for the loads): the letters are in the construction's content, so the renamed figure is a new content. A letter is a name, and the figure under it does not move; that this costs a solve is material for phase 5, not for a key.
+- **Opening the data panel on a standing figure** costs the panel's own samples (2 294 103 units), paid at the click.
+- **Undo and redo cost nothing** while the figure is among the kept derives (0 units in 322 lines), and a row ticked again costs 0.
+- **Unticking the first row** costs 19 599 314 units, in the session that has just deleted and restored that row. In 102 of the 161 figures the list with its first row muted folds to the construction the delete solved, and the untick costs nothing; in 58 it costs exactly what the delete cost, and in 1 less: there the muted list is another content. 45 of those 59 hold scalar pins, whose origin records the list position of the row that stated them, and a muted row keeps its place; the other 14 were not looked into.
+- **By question**: the first point's coordinates cost nothing in 168 asks (the panel has read them); the segment's length solves in 89 of 158 (3 996 799 units, up to 791 068 for one); the angle in 1 of 150.
+
+**Each new action also walks on two heaps** (part 2's lock walks the same steps): the page solves 0 in every one.
+
+**Files.** Part 1: `src3d/engine/lazy3.ts` (new) · `src3d/engine/evaluate.ts` (the `pivot` type, `lazyValue3` and its readers, `keepResolved3`, `keepLazyValue3`, `solveParts3`, the cells at the pivot's four build sites, `RESOLVED_CROSSES3`) · `src3d/store/__tests__/lazy-values-2890.test.ts` (new) · `src3d/__tests__/issue-2368-leftover-turn.test.ts`, `placement-gauge.test.ts` (the reader's call). Part 2: `src3d/store/journal3.ts` (new) · `src3d/engine/evaluate.ts` (`EngineJournal3`, the notes at `rememberResolve3`, `sharedResolve3`, `seedVerdict3`, `ringReachValue3` and `lazyValue3`; `adoptEngineJournal3`, `releaseAdopted3`, `pinOrigins3`, `writePinOrigins3`) · `src3d/store/store3.ts` (`StoreJournal3`, the notes at `derive3` and `readSegmentEquation3`, `adoptStoreJournal3`; `submit` and `submitSteps` take the row's id) · `src3d/__tests__/work-meter/walk3.ts` (the walk as steps), `driver3.ts` (`stages3`, `renderValues3`, the scene before the values), `twoHeaps3.ts` (new) · `src3d/__tests__/two-heaps-2890.test.ts`, `src3d/store/__tests__/journal-2890.test.ts` (new). Part 3: `src3d/__tests__/work-meter/driver3.ts` (the ten actions, the saved questions in the render), `walk3.ts`, `baseline.jsonl`, `baseline-slow.jsonl` · `src3d/__tests__/work-meter-gate.test.ts` (its header) · `scripts/perf/3d/sweep3.ts`.
+
+**What the student will see.**
+- [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)

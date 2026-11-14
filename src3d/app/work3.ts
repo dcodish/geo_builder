@@ -14,7 +14,7 @@
  * on a free action that writes the basis, and on a component that reaches a job action through the store
  * instead of through {@link act3} or {@link jobStore3}.
  */
-import { createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
+import { INTERACTIVE, createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
 import { redo3, undo3, useGeo3, type Fact3 } from '../store/store3';
 import type { Seed3 } from '../engine/components3';
 
@@ -27,16 +27,23 @@ export interface Basis3 {
   seed: Seed3;
 }
 
+/** The lane of «הציגו תצורה אחרת»: shown on its own button, as 2-D shows it (measured at `main`, 2026-11-13). */
+export const ANOTHER = 'another';
+/**
+ * #2890 ([ADR-W-210](../../docs/06w-decisions-workspace.md#adr-w-210) Am. 4, ruled): «הציגו תצורה אחרת» pressed while
+ * another action runs WAITS ITS TURN and then searches the figure that action left. It is still counted and shown on
+ * its own button, and a line entered while a search runs does not wait for the search.
+ */
+const BEHIND = { [ANOTHER]: INTERACTIVE };
+
 export const work3 = createWorkQueue<Basis3>({
   basis: () => {
     const s = useGeo3.getState();
     return { facts: s.facts, seed: s.seed };
   },
   sameBasis: (a, b) => a.facts === b.facts && a.seed === b.seed,
+  behind: BEHIND,
 });
-
-/** The lane of «הציגו תצורה אחרת»: shown on its own button, as 2-D shows it (measured at `main`, 2026-11-13). */
-export const ANOTHER = 'another';
 /** The lane of the model call a submit makes: nested in the submit's job, it hides the stale notices while the answer is awaited. */
 export const MODEL = 'model';
 

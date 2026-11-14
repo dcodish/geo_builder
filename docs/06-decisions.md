@@ -21125,3 +21125,90 @@ That was measured, reported, and ruled: the detect lane is handed a clone, and s
 **What the student will see.**
 - [ruled] ([ADR-481](#adr-481), the seat is cyclable; plus [2-D] the cold replay, measured at `8a5372be` in the issue and at `9cd61315` here): after «משולש ABC» · «המשולש ישר זווית», «הציגו תצורה אחרת» moves the right angle to A, then B, then back to C. This already happened for «משולש ישר זווית ABC». Before, the button did not move the right angle.
 - [ruled] (#2444; CLAUDE.md: the figure is derived from `(facts, seed)` only): the same facts draw the same figure, whatever was built before in the session.
+
+## ADR-829 — 2-D's worker client is the shared one, its workers start with the page, and its work meter walks three heaps (#2890)
+
+**Status:** built, 2026-11-14 · **Issue:** [#2890](https://github.com/dcodish/geo_builder/issues/2890) (feature, `P2`, workspace; this entry is 2-D's part of the first build round) · parent program [#2867](https://github.com/dcodish/geo_builder/issues/2867) · branch `feat/2890-shell-client`
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-37 (the ruled turn of «הציגו תצורה אחרת», with its parity row); nothing else a student reads changes · **Design:** [04w](04w-design-shell.md) § *The worker client*; [04](04-design.md) § *Compute once* ("Where each memo lives", the checkpoint); [docs/08](08-testing-strategy.md) § *The work meter* (three heaps, the corrected actions) · **LADDER stage:** none (transport and measurement; no rung, budget or verdict changes)
+**Builds** round 1 of phase 3 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (its Amendment 4) for 2-D · **amends** [ADR-290](#adr-290) (the worker seam: the client and the entry are now the shared ones) and [ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1 and Am. 3 (how 2-D's actions are measured) · **keeps** [ADR-401](#adr-401) (two lanes, one shared sweep per fact list), [ADR-812](#adr-812) (a search answers for the figure it was started on), [ADR-296](#adr-296) (the worker's search budget), [ADR-827](#adr-827) (the lane rule of the one-heap executor) · no input reading changes, so there is nothing to port to analytic ([ADR-W-157](06w-decisions-workspace.md#adr-w-157)).
+
+**Root cause (class).** 2-D was the only builder with a worker, and everything about talking to one lived in two 2-D files that each spelled the five operations out: `geoWorker.ts`'s `onmessage` and `geoWork.ts`'s no-`Worker` fallback. Three consequences, each measured in the design pass on #2890:
+1. *The transport could not be shared.* Analytic and 3-D need the same request ids, cancel, restart and meter envelope for their first worker; they would have copied it.
+2. *The worker was created by the first request.* The first line of a session paid for the chunk: about 0.4 s on the live site (ADR-W-210 Am. 2).
+3. *A terminated worker came back cold and was told nothing.* After the search's ✕ the next line's prefold ran in a heap with no fold, no sample and no module yet loaded.
+
+**Built (the client).**
+- **`src/store/geoOps.ts`** is the ONE table of 2-D's operations (`resample`, `autoResolve`, `prefold`, `detect`, `values`), each `(args, ctx)`. The two things that differ between a worker and the page's own thread are the table's options, not a second copy of the bodies: `searchBudgetMs` (a worker gets [ADR-296](#adr-296)'s 12 s; the page's thread its default, and no clock under vitest) and `transplant` (a separate heap ships the found view's fold; the page's own heap already holds it).
+- **`src/store/geoWorker.ts`** is one call: `serveWorker(geoOps({ searchBudgetMs: WORKER_SEARCH_BUDGET_MS, transplant: true }), { seed: takeCheckpoint })` (`shell/workerHost`).
+- **`src/store/geoWork.ts`** keeps what is 2-D's: which lane each operation runs on, the search basis and the supersede ([ADR-812](#adr-812)), the one shared detection sweep per fact list ([ADR-401](#adr-401)), and the checkpoint. The transport is `shell/workerClient`. Its exported surface is unchanged (`geoWork`, `geoValues`, `cancelGeoWork`, `isCancelled`, `isStaleBasis`, `supersedeStaleSearches`, `ViewBasis`), plus `startGeoWork()` and the test seam `useGeoWorkExecutor(executor | null)`.
+- **Both workers start with the page**: `src/main.tsx` calls `startGeoWork()` before the first render.
+- **The checkpoint is the fold of the figure on screen.** `supersedeStaleSearches`, which the store already calls on every change of `(facts, seed)`, remembers the facts; a worker spawned after a cancel or a crash is sent `{ facts, fold }` first and primes it (`takeCheckpoint` → `primeFoldFor`). After a cancel the replacement is spawned at once, not at the next request.
+- **Without a `Worker`** (node, the suites, an old browser) the same table runs in the page's module instance, charged to the worker lane, by reference: `sameInstanceExecutor(geoOps({ transplant: false }))`. This is what the fallback did, call for call, and the promise depth of each client method is kept, so no test that drives the store, a pipeline or the client changed.
+
+**One existing test's harness changed, and none of its expectations.** `src/replay/__tests__/issue-443-macro-convexity.test.ts` loads the worker entry under a fake `self` and speaks to it directly. Its two harness lines now send `{ t: 'run', id, op, args }` and read `{ t: 'done', value }`; what it asserts of the search (the stored reflex seat yields at the `current` tier, and the next line is refused structurally) is as it was. It also asserts what it relied on silently: a synchronous operation is answered inside its own message.
+
+**Locks.** `src/store/__tests__/geoWork-client.test.ts` gives the module a recording `Worker` and locks what only a browser exercised: both workers spawned with the page; one `run` message per operation on its lane; the worker's units joined to the page's meter as worker work, before the paint on the interactive lane and after it on the detect lane; the ✕ terminates the interactive worker and the replacement's FIRST message is the checkpoint, the fold the page holds for the figure on screen; a superseded sweep costs only the detect worker. The shared half is `shell/__tests__/worker-client.test.ts`. `src/store/__tests__/geoWork.test.ts` (the in-process path, the basis, the lane) passes unchanged.
+
+**Root cause (class), the meter.** ADR-W-210 Am. 1 recorded it as a known limit: "2-D's `page` count is a lower bound. Under node the page and the worker are one module instance and share one memo." Phase 2 separated what it could inside one instance (the lane in the sampled table's key, a fold readable by the lane that folded it, a clone for the detect lane). What it could not separate is everything keyed by identity (`replay` by the facts array, `evaluate`, the baked construction and the DOF count by the construction), the fold memo's first eight entries, the search folds, the sample pool and the narrowing notes: the worker's in-process stand-in was handed the page's own array. Two consequences: the page's count read low (the drawing of a press's result was recorded at 1 396 units over 171 figures), and a result a worker returned could never fail to be "adopted", because it was the page's own object. And three of the walk's actions were not the App's (below).
+
+**Built (the meter).**
+- **The gate walks three heaps.** `src/__tests__/work-meter-gate.test.ts` loads `geoOps` a second and a third time (`shell/__tests__/isolated-ops.ts`, `secondInstance`), each with its own `replay/core` and its own `shell/workMeter`, and hands the client one `isolatedExecutor` per lane (`useGeoWorkExecutor`). Every argument and result passes through `structuredClone`; the units a worker's instance counts come back in the envelope and join the page's meter as worker work. The workers' table is a worker's (`transplant: true`: the found view's fold crosses), under the suite's clock, which is none.
+- **The driver knows whether its lanes are heaps** (`WorkerOps.reset`). With separate heaps it empties the workers' where a session starts (`reset`, `load`) and the detect worker's alone before a sweep. The timing harness (`scripts/perf/2d`) hands operations with no `reset` and is walked as before, in one instance.
+- **`delete` is the App's delete**: `removeGroup`, then the render. The driver used to run the resolve gate and the worker's search after it. The App does not (`act.removeGroup`, `App.tsx`): a whole row's deletion is exempt from the search by a measured decision ([ADR-518](#adr-518), `editPipeline.ts`). The walk deletes the FIRST row, which orphans the rows built on it, so that search ran to its end for nothing in 42 of 143 recorded deletes.
+- **`edit` puts a clone of its n rows in the store.** `editLastRow` used the loaded session's own facts array, which still carried its replay under the array's identity (no clear empties that memo), so rows defined as "in the store and not solved" were served it.
+- **`undo` and `toggle` are walked**: the undo of that delete, and the first row turned off through `runSetGroupEnabled`, with the resolve gate the App runs after a toggle. The walk's order on the loaded figure is press, delete, undo, toggle, detect, edit.
+
+**The same code, the old driver: the committed baseline to the unit.** `npm run work:check -- 2d` at this entry's first commit (the client re-based, the driver untouched): 173 of 173, 171 figures, 1 327 actions, total 139 720 597, page 42 023 998, before the paint 97 386 118, no rise, no fall. So every number below is the measurement changing, and none is the code.
+
+**Re-recorded, with `--accept-rise`, for those reasons only** (`src/__tests__/work-meter/baseline.jsonl`: 1 613 lines; 286 added, 838 rose, 42 fell).
+
+| Action | Lines | Total, before → after | On the page, before → after | Lines whose total is higher / lower / equal | What moved it |
+|---|---|---|---|---|---|
+| submit | 500 | 25 770 577 → 31 827 026 | 12 248 498 → 13 354 116 | 500 / 0 / 0 | the worker's prefold and search fold in their own heap what the page's gates folded in theirs; the page renders a found view from its fold alone |
+| load | 171 | 21 975 313 → 25 211 251 | 4 043 448 → 4 806 498 | 171 / 0 / 0 | the same; and the page's smoke replay is a tail on the transplanted fold |
+| another | 171 | 17 977 623 → 20 436 504 | 1 396 → 2 448 681 | 154 / 0 / 17 | the page folds the found view cold: the search hands back facts and a seed, no fold |
+| delete | 143 | 17 541 583 → 11 624 269 | 11 624 282 → 11 624 269 | 0 / 42 / 101 | the search the App never runs after a delete is gone (42 lines); one page count falls by 13, the render of that search's found view |
+| edit | 171 | 14 121 022 → 14 587 581 | 14 106 374 → 14 389 922 | 13 / 0 / 158 | 7 lines: the rows are a clone, so the loaded session's replay no longer serves them; 6 lines: the edit's own search, in the worker's heap |
+| detect | 171 | 42 334 479 → 42 334 479 | 0 → 0 | 0 / 0 / 171 | nothing: it has been walked on its own copy of the facts since Am. 3 |
+| undo (new) | 143 | 0 | 0 | | the earlier figure comes back by reference: nothing is solved, in any of the 143 |
+| toggle (new) | 143 | 24 325 285 | 11 636 855 | | the page's cold fold of the rows left on, then the search the App does run after a toggle (80 of the 143) |
+| **all lines** | 1 327 → 1 613 | 139 720 597 → 170 346 395 | 42 023 998 → 58 260 341 | 838 rose, 42 fell, 286 added | before the paint 97 386 118 → 128 011 916 |
+| **the 1 327 lines both have** | | 139 720 597 → 146 021 110 | 42 023 998 → 46 623 486 | | before the paint 97 386 118 → 103 686 631 |
+
+- On the lines both baselines have, the page's count is 46.6 M where 42.0 M was recorded (+4.6 M, +10.9 %): the lower bound Am. 1 named, now measured in the gate. The design pass read 46.4 M with the old `edit`.
+- The total on those lines is 6.3 M higher: +12.2 M is content two heaps each solve (what plan step 5 removes: in one heap an action costs its old recorded total, measured in the design pass on 1 156 of 1 156 actions), 0.26 M of it the clone of the edit's rows; and −5.9 M is the search `delete` no longer runs.
+- No line of any action moved for another reason. `detect` is identical to the unit in 171 of 171, which is the check that the three-heap walk itself changes no count: its lane was already walked this way.
+- The ten largest moves of the page count are eight presses of «הציגו תצורה אחרת» (for example `issue-2405-all-common-tangents-apart` 29 → 500 179), the clone of `issue-2407-tangent-at-touch`'s edit (713 976 → 946 407) and one load (`issue-855-tangency-sampled-seat` 3 928 → 121 337). The largest falls are deletes (`issue-1604-saved-reload` 3 157 124 → 293 821).
+
+The slow corpus (`baseline-slow.jsonl`: 185 lines; 34 added, 100 rose, 2 fell):
+
+| Action | Lines | Total, before → after | On the page, before → after | Lines whose total is higher / lower / equal |
+|---|---|---|---|---|
+| submit | 66 | 55 657 874 → 65 517 698 | 13 434 599 → 13 779 190 | 66 / 0 / 0 |
+| load | 17 | 25 992 640 → 26 590 444 | 5 009 069 → 5 133 562 | 17 / 0 / 0 |
+| another | 17 | 10 331 972 → 10 509 532 | 136 → 177 530 | 13 / 0 / 4 |
+| delete | 17 | 15 489 207 → 1 513 549 | 1 513 549 → 1 513 549 | 0 / 2 / 15 (`1768-kite-area` 13 521 613 → 149 153; `2860-tangent-right-triangle` 809 981 → 206 783) |
+| edit | 17 | 23 460 994 → 32 362 694 | 15 533 320 → 15 533 320 | 4 / 0 / 13 (the edit's search, folded again in the worker's heap) |
+| detect | 17 | 26 693 801 → 26 693 801 | 0 → 0 | 0 / 0 / 17 |
+| undo (new) | 17 | 0 | 0 | |
+| toggle (new) | 17 | 15 845 169 | 1 513 549 | |
+| **all lines** | 151 → 185 | 157 626 488 → 179 032 887 | 35 490 673 → 37 650 700 | 100 rose, 2 fell, 34 added |
+| **the 151 lines both have** | | 157 626 488 → 163 187 718 | 35 490 673 → 36 137 151 | |
+
+**Determinism of the three-heap walk**, each run a fresh process: the record, `--order reverse` and `--order shuffle:11` over the 171 fixtures (173 of 173 tests each; 570 s, 567 s and 576 s) and a second walk of the slow corpus (18 of 18) gave the same counts: no rise and no fall in any run. Each walk still ends by walking two figures again, after the whole corpus and twice in a row, with equal counts.
+
+**What the gate costs now.** Alone, 9.5 min for the 171 fixtures (570 s on the dev PC, with other sessions' suites running; it was 6.3 min in one heap, Am. 1): the walk is longer by the content two heaps each solve and by the toggle's search. The slow corpus takes 9.8 min (587 s). Inside the 2-D slice (`npm run test:run:2d`, 542 files) the gate took 11.2 min (675 s) and the slice 11.9 min; inside `npm run test:full` it was not measured.
+
+**Measured in a browser** (the dev servers of `main` @ `bda48f42` and of this branch, through `scripts/lib/browser-harness.mjs`; the full table is in ADR-W-210 Am. 4).
+- The first line of a fresh session, Enter to the row: 133 ms → 67 ms (median of 8 sessions each); the second line 85 ms and 84 ms. On `main` the worker's files are asked for after Enter in 8 of 8 sessions, on the branch in none.
+- The search's ✕ pressed 1.5 s into a search, then the next line: accepted on both, after 763 and 801 ms on `main` and 187 and 200 ms on the branch (99–108 ms with no search before it, on both).
+- The same on `hexagon-regular-by-angles-2797`, loaded from its file, three runs each: accepted on both; 21.4–21.8 s on `main` and 21.2–22.2 s on the branch after the ✕, against 20.4–21.0 s and 20.3–21.2 s with no search (about 14 s in the worker, then about 7.2 s with the page's thread busy, on both). The checkpoint did not shorten that line measurably.
+- «הציגו תצורה אחרת» pressed during «ריבוע חוסם את מעגל O»: `main` drops the press; the branch searches the new figure when the line is done and shows another configuration.
+
+**Not done.** The page solves what it solved: this entry moves no work off the page, and adopts nothing. The asks, rename, swap, merge, the cycle chips and a clicked crossing are still outside the walk. `scripts/perf/2d` still walks one module instance.
+
+**Rejected.** *Charging a page hit on a worker-computed entry* (ADR-558's rule applied across lanes, Am. 1's other option): every identity-keyed memo would need the lane of the entry and a ledger, nine of them, and a missed adoption would still read as a hit. *A real `Worker` in the gate*: node's `worker_threads` would need the worker entry bundled under vitest, and gives nothing the second module instance and the clone do not, at the price of an asynchronous walk.
+
+**What the student will see.**
+- [ruled] «הציגו תצורה אחרת» pressed while another action runs waits its turn and then searches the figure that action left. ADR-W-210 Am. 2, question 1 (operator, 2026-11-13: *"i go with your recommendations"*, on "an action pressed while the tool is working waits its turn"); the plan on #2890 records it. Until now 2-D dropped the press when the action finished: measured on `main` @ `bda48f42`, above.
+- [asked] 2-D's first line of a session no longer waits about 0.4 s for the worker to download. *"Speed is very important."* (operator, 2026-11-12)

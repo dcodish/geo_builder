@@ -16678,3 +16678,95 @@ The two "re-typed" rows are what the walk's `edit` was when these times were tak
 
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)
+
+## ADR-AG-477 — Off the page, the parts that need no worker: the locus chips and a traced locus kept by content, a settled result as data, and the walk's missing actions (#2890)
+
+**Status:** built, 2026-11-14 · **Issue:** [#2890](https://github.com/dcodish/geo_builder/issues/2890) (feature, `P2`; phase 3 of the program [#2867](https://github.com/dcodish/geo_builder/issues/2867)) · branch `debt/2890-analytic-settle`
+**Requirements:** none (internal): no line, verdict, drawing, label or message changes · **Design:** [04c](04c-design-analytic.md) § "Solved content is keyed by content" (the two memos) and § "A settled result, and its adoption" · **LADDER stage:** none (memos around the solve, and data about it; no stage of the ladder changes)
+**Implements** the first round of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) invariant 1 ("the page never solves") for this builder: the three parts that need nothing from the shared worker client. It extends [ADR-AG-476](#adr-ag-476) (two more memos by content; the line-list store per lane). No page handler moves in this ADR: that is the next round.
+
+**Measured before building** (the design pass on #2890; `main` @ `cbada4e1`, all 208 saved sequences, 1 963 actions). With a whole action run on one heap, its result passed through `structuredClone` and adopted on a second heap, the page's own readers count 89 924 units of the 126 274 259 they count today, and 0 once one reader is kept by content. So the route ADR-W-210 chose ("settle, then hand over") reaches zero here, and three things stand between `main` and it that need no worker. They are this ADR's three parts.
+
+### Part 1 — two readers solved again what the session had solved
+
+**Root cause.** ADR-AG-476 keyed every solver memo by content, and two readers of the page are not behind one:
+- **`locusChips(d)`** (`app/locusChip.ts`) takes a rank or two per point (`hasLocus`, `onFixedCarrier`) on every render of a figure. Measured: 89 924 units in 1 212 of the 1 963 recorded actions, and the only page work left after a hand-over.
+- **`locusOf`** (`engine/locus.ts`), the walk behind a locus answer. `App.tsx` answers every stored question inside the render (`answers`, one memo over the whole list), so a traced locus was walked again whenever a row was ticked, an undo pressed or another question asked. Measured on the settled figure of every saved sequence: 25 offer a locus chip (34 chips); answering each once costs 3 386 703 units, and answering it a second time costs the same 3 386 703. No fixture carries a question, so the baseline counted none of it.
+
+**Decision.**
+1. **The chips of a figure are kept** in a `ContentCache` under the construction and `configurationKey(d.configuration)`, bounded at `LOCUS_CHIPS_KEPT` (= `CONFIGURATIONS_MAX`, 96) configurations per figure, oldest dropped first. The two figures the answer was read from (the one drawn, and `drawableAt` at the drawn configuration) are kept beside it and compared by identity, so a derivation built by hand around another figure is never answered by this one's. A caller gets its own copy.
+2. **A locus is traced once per figure**: `locusOf` keeps its result in a `ContentCache` under the point, the configuration shown, the configuration compared against and the frame, bounded at `LOCI_KEPT` (64) per figure. A point with no locus is remembered as having none. The result is shared, so it is frozen.
+3. **A remembered answer leaves a reader's pool as a computed one does.** Both readers ask the figure for configurations through the caller's construction, and a deferred pool decides what to show from what was asked (ADR-AG-476 point 5). The chips ask before they look in the memo; the trace is kept WITH what it asked (`recordAsks`) and replays it on a hit (`adoptAsks`), as `distinctConfigSeeds` does. So what a page shows as «בודק…» does not depend on what is kept.
+4. Both are `ContentCache`s: weak on the construction (a dropped line list's chips and traces go with it), emptied by `clearAnalyticCaches`, and carried by a settled result (part 2).
+
+**Why the locus memo is in the engine and not around the answer.** The answer (`ask`) is worded with two functions the page injects for the locale (`fmt`, `kindWord`) and reads the knowledge gates, which may be pending. A memo of the answer would have to key on the locale and could remember a pending row. The trace is the solver work, is pure, and is the same in every locale.
+
+**Tests.** `src-analytic/__tests__/locus-memo.test.ts` (17): the same figure is answered once, whichever derivation asked; another configuration, other lines, another point and another frame are each asked again; a hand-built derivation is not answered by a kept one; a caller's copy is its own; a remembered answer leaves the pool as a computed one does; the two bounds; the clear.
+
+### Part 2 — a finished action as data, and its adoption (`engine/settle.ts`)
+
+**Why it is needed, and what was wrong with the obvious way.** ADR-W-210 says the derived figure "crosses a worker boundary as data" in this builder. It clones without throwing, and that is the trap: measured on 1 850 clones, none threw, and each silently lost (a) the four lazy rank readers of a figure and of a ring fault, which are non-enumerable closures; (b) three tables keyed by the figure OBJECT that say which configuration it is (`evaluatedAt`, `partConfigOf`, `mergedSample`), so `drawnSampleOf` answered "unknown" and «הציגו תצורה אחרת» stopped skipping the sample on screen; (c) every identity between a memo's key and the construction, because each memo hangs off a construction OBJECT. A cloned derivation alone is a figure whose every gate is cold.
+
+**Decision.**
+1. **A settled result is one object graph** (`Settled`): `lists`, the line-list store's own entries under `lineListKey`; `memos`, every NAMED content cache's entry for every construction reachable from those lists (their folds, lettered copies, parts, prior figures, locus parts); `figures`, the three side tables as `[figure, tags]` pairs. Cloned in one `structuredClone`, every identity inside it survives. `settledOf(keys)` builds it from the store of the heap it runs in; `settling(fn)` reports the keys an action touched.
+2. **`adoptSettled(message)`** installs a clone: the lists into the store (their derivations frozen again), each memo entry under its construction, the tags on their figures. After it `derive` of those lines is a lookup and every gate the worker settled answers from memory. A memo name this build does not have is an error, never a silent drop.
+3. **Every memo of the product is named** (`ContentCache`'s optional name, unique): the name is how an entry finds the same memo in another heap. All 18 are sent, not only the four the page was measured to read (`drawableCache`, `partsMemo`, `sizeCache`, `locusPartsMemo`): sending only the figure memos saved 15.5 % of the bytes on a sample, and a terminated worker reseeded from the page needs the rest (measured: going back one line after a terminate costs 7.34 M units cold over 16 sessions, and what it cost before the terminate once the new worker adopts the page's store).
+4. **One line-list store per lane.** The store is the only cache of this tree reached by a string, so it is the only place two heaps could meet in one process. It is chosen by the work meter's lane: work run through `inWorkerLane` uses the worker's, everything else the page's. Under node that gives a test two real heaps, with nothing crossing except through a clone; in a browser each module instance has one lane and one store. Outside `inWorkerLane` it is the single store it was, so no existing test sees a change.
+5. **What a clone drops by design is a short named list** (`DROPPED_BY_A_CLONE`: `separationDof`, `freedomOfRead`, `ringDof`, `shapeDof`). They are read only by `deriveAt` and the configuration walk, where the figure was solved; no page code reads them, and a lock keeps it so.
+6. **`cloneLoss(message)` is the lock on what crosses**: it names, with its path, everything a structured clone would refuse (a function, a symbol), flatten (an instance of a class, an accessor) or leave behind (a non-enumerable member not on the list above). A memo that one day holds one of those fails it, instead of reaching a page that solves again or shows something else.
+7. **Not carried, on purpose:** what a reader asked through its view, and its pool's mode (ADR-AG-476 point 4). The page's own view asks again, and every ask is a lookup, so what is «בודק…» at the first paint is decided on the page from the same seeds as today.
+
+**Inert.** Nothing on the page calls `settle.ts`. The page step (the worker entry, the handlers, the pool's loop in the worker) waits for the shared client.
+
+**Measured** (`src-analytic/__tests__/settle-walk.test.ts` with `SETTLE_WALK=all`): the two-heap walk of every saved sequence (208 sequences, 3 205 actions, 643 s). In every action the worker's lane did exactly the work the baseline records, no message lost anything in its clone, and **the page's lane counted 0 units**, where the page counts 165 433 537 today. `settle-reads.test.ts` with `SETTLE_READS=all`: after every accepted line of every sequence, the whole page's reading of the adopted clone against the worker's own content, at the first paint and settled: **2 238 readings, none different**.
+
+**Tests.** `settle.test.ts` (20): the two lanes are two heaps; an adopted result makes `derive` a lookup and every gate warm, in either direction; the side tables cross; an unknown memo is an error; `cloneLoss` on a function, a symbol, a class instance, an accessor, a hidden member, and on real results (none); the four hidden readers are on a real figure and read by no page code; every memo is named, by a name of its own. `settle-reads.test.ts`: an adopted result reads exactly as a computed one (the whole page's reading, at the first paint and settled, after every accepted line). `settle-walk.test.ts`: the two-heap walk, where the worker's lane does exactly the baseline's work, no message loses anything, and the page's lane counts zero. The last two run a sample of eleven sequences in the suite and every sequence on demand. `settle-heaps.ts` is the two-heap helper; it gives way to the shared client's isolated executor.
+
+### Part 3 — the work meter's walk gains the actions it left out
+
+**Root cause.** The gate proves "the page never solves" only for what its walk drives, and the walk drove five actions. A row ticked off or on, undo, redo, a letter renamed and the whole ask lane ran on the page and were counted nowhere, so a page step measured at zero would not have been zero for a student who asked a question.
+
+**Decision.** The walk (`work-meter/walkAnalytic.ts`) continues the edit's session with six more actions, after the edit, so that no earlier action finds anything it did not find before. They run on a `Session` (`driverAnalytic.ts`): the store's whole basis, with the muted rows, the seed names and the questions asked.
+- `ask`: the questions the figure's own menus offer, pressed one after another through the page's own helpers (`pressChip` for a locus chip, the measure menu's `toggleDrawn` for the questions of each point, curve and segment, in figure order), up to the lane's limit of eight. After each press the page answers EVERY stored question again (`askSettled` over the list, as `App.tsx`'s `answers` memo does). The questions stay asked for the rest of the session, so every later render answers them too, as the page does.
+- `toggle#1`, `toggle#2`: the first row ticked off (`decideToggle`, then the render of the figure without it), and on again (the trial, then the render).
+- `undo`, `redo`: the store restores a basis and the page renders it (back to the row ticked off, and forward again).
+- `rename`: the figure's first lettered point takes the first capital no line uses (`decideRename` over the whole session, then the render of the rewritten lines with the seed names the change left). A figure with no lettered point or no free capital renames nothing.
+A swap is not walked: it is the same decision module and the same full re-solve as a rename, and would add about a fifth to the walk's time. The model's lines are not walked: the walk makes no model call.
+
+**The walk can be run across two heaps** (`WalkHooks`): `setup` wraps what the walk prepares unmeasured, `each` wraps an action and is handed what the page renders after it. The gate uses neither; `settle-walk.test.ts` does (part 2), and the shared client's isolated executor will.
+
+**Recorded** (`npm run work:record -- analytic`; 208 sequences, 3 205 actions where there were 1 963). **No existing line moved**: all 1 963 lines of the five old actions are identical in `total`, `page` and `prePaint` to `main`'s baseline. The 1 242 new lines, as `main`'s readers count them ("before": the same walk on `main`'s `locusChip.ts` and `locus.ts`) and as recorded with part 1:
+
+| Action | Lines | Total before | Total recorded | Change | Before the paint, before | recorded |
+|---|---|---|---|---|---|---|
+| ask | 207 | 25 223 282 | 3 403 045 | −86.5 % | 25 223 282 | 3 403 045 |
+| toggle | 414 | 21 938 121 | 13 418 427 | −38.8 % | 15 511 072 | 12 096 639 |
+| undo | 207 | 4 099 918 | 0 | −100.0 % | 2 172 335 | 0 |
+| redo | 207 | 6 592 111 | 0 | −100.0 % | 3 414 433 | 0 |
+| rename | 207 | 25 489 238 | 22 337 806 | −12.4 % | 13 134 639 | 13 134 639 |
+| the six new actions | 1 242 | 83 342 670 | 39 159 278 | −53.0 % | 59 455 761 | 28 634 323 |
+| submit | 1 139 | 76 473 359 | 76 473 359 | 0.0 % | 54 180 266 | 54 180 266 |
+| load | 207 | 19 141 232 | 19 141 232 | 0.0 % | 9 430 811 | 9 430 811 |
+| edit | 207 | 18 635 882 | 18 635 882 | 0.0 % | 9 488 812 | 9 488 812 |
+| delete | 203 | 11 254 609 | 11 254 609 | 0.0 % | 9 932 821 | 9 932 821 |
+| another | 207 | 769 177 | 769 177 | 0.0 % | 740 625 | 740 625 |
+| all | 3 205 | 209 616 929 | 165 433 537 | −21.1 % | 143 229 096 | 112 407 658 |
+
+Of the new lines 623 are lower with part 1 than on `main`'s readers, 619 are equal and none is higher. 25 of the 207 `ask` lines do solver work. The largest falls: `corpus471.json#11/5` · ask 6 132 840 → 766 584; `exam-2024w-locus-param-1138` · ask 5 637 264 → 798 815; `exam-2024w-locus-1138` · ask 3 489 204 → 495 313; `exam-2024w-locus-param-1138` · undo 2 272 722 → 0; `corpus471.json#20/4` · ask 2 105 652 → 263 175; `exam-2024w-locus-param-1138` · redo 1 597 666 → 0.
+
+What the table says: on `main` a session with questions asked paid for every traced locus again on each press and each render; with part 1 a locus is traced once per figure, and what is left in `ask`, `toggle` and `rename` is first-time work (the first trace of each locus; the figure without its first row; the whole renamed figure, which is a line list the session has never seen). That first-time work is all on the page today, and it is what the page step moves.
+
+**The slow corpus** (`npm run work:record -- analytic --slow`): its 37 existing lines are identical; 18 new lines were added (4 618 435 → 5 598 781 units with them).
+
+**The gate's own cost.** One walk of the corpus takes 681 s here (one run, other suites running beside it), where it took about 500 s with five actions (ADR-AG-476); the slow corpus 16 s. Most of the added time is the rename (22.3 M units: a whole figure solved from nothing, once in the decision and its pool after it) and the first row ticked off (a figure the session has not seen, as the delete is). It is still one file, the longest of the suite; splitting it in two by fixture is as open as it was (ADR-W-210 Am. 1). `scripts/perf/analytic/harness.ts` times the five old actions and does not yet walk the six new ones: a failing new line's `scripts/perf` command times the figure, not that action.
+
+### Part 4 — the load's audit leaves the store's module
+
+**Root cause.** The solver work of a load is its audit: the saved lines replayed, so that a line that no longer builds is reported. It lived inside `loadAnalyticSession` (`app/loadSession.ts`), which also restores the store. Measured in the design pass: a worker bundle that imported the audit that way carried `store/`, zustand, zundo and React.
+
+**Decision.** `app/loadAudit.ts` `auditLoadedLines(lines, disabled, hosts)` is the audit alone: lines in, failures out (the active lines replayed with the recorded hosts, and every muted line that no longer parses). `loadAnalyticSession` restores the store and calls it; the work meter's `load` calls it instead of repeating its `derive`. Nothing a load does or reports changes, and no baseline line moves.
+
+**The lock.** `src-analytic/__tests__/off-page-graph.test.ts` follows every VALUE import (a type-only import is erased) from what a worker entry will import (all of `engine/`, the decisions `app/submit`, `another`, `rename`, `loadAudit`, and the readers `ask`, `locusChip`, `panelRows`, `pointText`, `curveText`, `lineAngle`, `conicMarks`, `narrowing`, `shapeWarnings`, `coincidences`) and fails on the first path into the page: the store, `ui/`, the i18n bootstrap, any component, React, zustand, zundo. It finds none, and it is live: `loadSession.ts` itself is caught. Not in the set, because they stay on the page: `app/questionLines.ts` (it reads the store's `spokenSentence`) and `app/fallback.ts` (the model call).
+
+**What the student will see.**
+- [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)

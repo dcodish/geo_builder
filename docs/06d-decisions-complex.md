@@ -4685,3 +4685,33 @@ Each memo was also switched off alone, in the same minutes. Without the fold mem
 
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)
+
+## ADR-CX-091 — Complex stays on the page's thread under a work ceiling: 256 units an action, asserted by its gate (#2890)
+
+**Status:** accepted · 2026-11-14 · feature (P2, workspace; this entry is complex's part) · branch `feat/2890-shell-client` · round 1 of phase 3 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (its Amendment 4), invariant 1's stated exception · **LADDER stage:** none is added or moved ([LADDER-CX](LADDER-CX.md)): nothing on the path from a line to the figure changes, only where an action's work is measured
+**Operator:** 2026-11-13, in chat: *"we must fix this for all tools. user should know the engine is working and not frozen"* · 2026-11-14, in chat: *"go ahead with next phases"*
+
+**Requirements:** none (internal): no line, verdict, drawing or message changes · **Design:** [04d](04d-design-complex.md) § "The work ceiling"; [04w](04w-design-shell.md) § "The worker client" (the page-lane executor, `pageLaneCeiling`); [docs/08](08-testing-strategy.md) "The work meter"
+
+**What ADR-W-210 left open.** Invariant 1 says the page never solves, and names complex as the exception: its fold is exact and cheap, so it "keeps the UI thread under a work ceiling and gets no worker until the meter says otherwise". No ceiling existed: nothing would have noticed a change that made a complex action a hundred times dearer, as long as each count stayed under its own baseline line by re-recording.
+
+**Measured** (the gate's walk of the 45 fixtures, the unit of [ADR-CX-090](#adr-cx-090): one executed line read or one exact solve): 305 recorded actions, 1 205 units, every one of them page work. Per action the median is 3, the 99th percentile 17, the maximum 26 (`2b-capstone` and `symbolic-cartesian-forced-1365`, both `load`). By kind the dearest is: load 26, submit 19, edit 17, another 3, delete 3. The slowest single action of the walk took 12 ms. The one loop that grows with the figure is the gate's differential blame on a refused line, two folds per earlier line: at the 64-statement cap of a saved file (`shell/save.ts`) that is 128 solves and at most 65 new reads, and ADR-CX-090 measured the 112-line synthetic refusal at 234 folds in 0.82 s.
+
+**Decision.**
+1. **The ceiling is 256 units for one student action** (`CEILING_CX`, `src-complex/app/workCx.ts`): ten times the dearest recorded action, above the blame loop at the file cap, and by ADR-CX-090's synthetic figure under about a second of page time. **Not measured:** a session at the cap was not walked; the number rests on the recorded corpus and that one synthetic figure.
+2. **The gate asserts it.** `src-complex/__tests__/work-meter-gate.test.ts` fails any walked action whose page count is above the ceiling, by figure, action and typed line, before the baseline comparison. So a rise that a re-record would accept still cannot pass the ceiling. A second row asserts the comparison is of real work: the dearest action charged the page, and every unit of every action is page work.
+3. **On the page an action over the ceiling is reported and never cut.** Every job of complex's work queue is measured WHOLE on the page lane, from its turn to its release after the paint that shows its result (the queue's `span`, `pageLaneCeiling` in `shell/workerExecutor`), because most of an action's work is in the App's own decision functions and in the render, not in the store action. In development the page logs the fault with the lane and the count, as the basis guard does (`armCeilingCx`, `App.tsx`). Nothing is stopped: the work is done by then, and stopping an exact fold honestly needs the "not decided" outcome of phase 4, which also bounds the blame loop.
+4. **The routed store actions run through the shared page-lane executor** (`pageLaneExecutor`, by reference, no clone, the same store and order of effects): `actCx` is the same table, routed as every builder's actions are, with the executor that fits a builder with no worker.
+
+**Before and after, on the meter.** The same 305 lines, to the unit: 1 205 total, 1 205 on the page, 1 205 before the paint. No baseline line moved.
+
+**Checked that the assertion bites.** With the ceiling lowered to 20 the gate fails on the two 26-unit loads, by name.
+
+**Locks.** `src-complex/__tests__/work-meter-gate.test.ts` (the ceiling over the corpus; the comparison is not of zeros). `src-complex/__tests__/work-ceiling.test.ts` (an action over the ceiling is reported with its count and still finishes; one at the ceiling, and a job of another lane under it, say nothing; a routed store action runs on the page lane with the store's own result). The shared half: `shell/__tests__/worker-client.test.ts` ("the page-lane work ceiling is a span of one action").
+
+**Is `figures` where a worker's result would be adopted?** Yes, if complex ever gets one (measured in the design pass on #2890: the folded figure clones as data on 45 of 45 fixtures, equal after the clone, 1 216 B at the median). Two things would have to travel with it: the clone is not frozen (the memo freezes what it stores), and a read registers its exact literals in two add-only registries the value layer reads back (`value/angle.ts`), which a worker would fill in its own heap. Nothing is adopted today, because nothing leaves the thread.
+
+**Not changed.** Any line, verdict, drawing, message or timing of the complex builder, apart from the one ruled line below.
+
+**What the student will see.**
+- [ruled] «הציגו תצורה אחרת» pressed while another action runs waits its turn and then searches the figure that action left. ADR-W-210 Am. 2, question 1 (operator, 2026-11-13: an action pressed while the tool works waits its turn); the plan on #2890 records it. It is built for all four builders in ADR-W-210 Am. 4; in complex an action is over in milliseconds, so the case can hardly be produced by hand.

@@ -395,6 +395,25 @@ least recently used entry out first.
   everything a student can see is identical with empty memos before every step and with memos full of a whole
   session.
 
+## The work ceiling ([ADR-CX-091](06d-decisions-complex.md#adr-cx-091), #2890)
+
+Complex has no worker: its fold is exact and costs milliseconds, so it solves on the page's own thread, by
+[ADR-W-210](06w-decisions-workspace.md#adr-w-210)'s stated exception. The exception has a bound. One student action may
+charge at most **256 units** to the page (`CEILING_CX`, `app/workCx.ts`; a unit is one executed line read or one exact
+solve, ADR-CX-090). The dearest recorded action charges 26.
+
+- **Where it is asserted.** The work-meter gate (`__tests__/work-meter-gate.test.ts`) fails a walked action above the
+  ceiling before it compares anything with the baseline, so re-recording cannot let one through.
+- **Where it is measured on the page.** The queue (`workCx`) is given a `span` (`pageLaneCeiling`, `shell/workerExecutor`):
+  the page lane is read when a job's turn starts and again when the job is released, after the paint that shows its
+  result. That is the whole action: the App's decision functions (`app/submit.ts`), the store action and the render's
+  `deriveLines`. Measuring the store action alone would see almost none of it.
+- **What happens over it.** The action finishes. In development the page logs it (`armCeilingCx`, armed in `App.tsx`
+  beside the basis guard). Nothing is cut before phase 4 of ADR-W-210 gives every builder the "not decided" outcome.
+- **The routing.** `actCx` runs the store's job actions through `pageLaneExecutor`: the routing every builder's actions
+  have (a worker client's executor, [04w](04w-design-shell.md) § "The worker client"), with the executor of a builder
+  that stays on the page. No clone, the same store, the same order of effects.
+
 ## Claims — three verdicts, and why the third is not optional
 
 `model/claim.ts` returns **`holds` / `refuted` / `unknown`**, where `unknown` means *not decidable from

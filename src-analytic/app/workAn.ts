@@ -16,7 +16,7 @@
  * on a component that reaches a job action through the store instead of through {@link actAn} or
  * {@link jobStoreAn}.
  */
-import { createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
+import { INTERACTIVE, createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
 import { useAnalyticStore } from '../store/useAnalyticStore';
 
 type State = ReturnType<typeof useAnalyticStore.getState>;
@@ -30,10 +30,16 @@ export type BasisAn = Pick<State, (typeof BASIS_FIELDS_AN)[number]>;
 const basisOf = (s: State): BasisAn => ({ lines: s.lines, disabled: s.disabled, seed: s.seed, seedNames: s.seedNames, hosts: s.hosts });
 const sameBasis = (a: BasisAn, b: BasisAn) => BASIS_FIELDS_AN.every((k) => a[k] === b[k]);
 
-export const workAn = createWorkQueue<BasisAn>({ basis: () => basisOf(useAnalyticStore.getState()), sameBasis });
-
 /** The lane of «הציגו תצורה אחרת»: shown on its own button, as 2-D shows it (measured at `main`, 2026-11-13). */
 export const ANOTHER = 'another';
+/**
+ * #2890 ([ADR-W-210](../../docs/06w-decisions-workspace.md#adr-w-210) Am. 4, ruled): «הציגו תצורה אחרת» pressed while
+ * another action runs WAITS ITS TURN and then searches the figure that action left. It is still counted and shown on
+ * its own button, and a line entered while a search runs does not wait for the search.
+ */
+const BEHIND = { [ANOTHER]: INTERACTIVE };
+
+export const workAn = createWorkQueue<BasisAn>({ basis: () => basisOf(useAnalyticStore.getState()), sameBasis, behind: BEHIND });
 /** The lane of the model call a submit makes, nested in the submit's job. */
 export const MODEL = 'model';
 

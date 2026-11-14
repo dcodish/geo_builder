@@ -7860,3 +7860,108 @@ So phase 2's exit, "no figure's count rises", holds for analytic outright, and f
 **What the student will see.**
 - [asked] Nothing but speed: an action that repeats work the session has already done is faster, most of all «הציגו תצורה אחרת» in analytic. No line, verdict, drawing or message changes. *"Speed is very important."* (2026-11-12) · *"go ahead with next phases"* (2026-11-14)
 - [ruled] In 2-D, after «משולש ABC» · «המשולש ישר זווית», «הציגו תצורה אחרת» moves the right angle to A, then B, then back to C, as it already did for «משולש ישר זווית ABC»; before, it answered that there is no other configuration. This is #2370's own ruled line ([ADR-481](06-decisions.md#adr-481)), recorded in [ADR-828](06-decisions.md#adr-828).
+
+### ADR-W-210 Amendment 4 (2026-11-14) — phase 3, round 1 as built: the shared worker client, the stamp of a job's turn, 2-D's honest meter, and complex's ceiling (#2890)
+
+**Status:** built · 2026-11-14 · feature (P2, workspace: `shell/`, 2-D, complex, and one declaration in each builder's work registry) · branch `feat/2890-shell-client` · plan steps 1, 2 and 6 of [#2890](https://github.com/dcodish/geo_builder/issues/2890), started on the operator's word (*"go ahead with next phases"*, 2026-11-14)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-37 (the ruled turn of «הציגו תצורה אחרת», and its parity row); nothing else a student reads changes · **Design:** [04w](04w-design-shell.md) § "The worker client", § "The work queue and the working indicator" (the stamp, `behind`, `span`, `around`), § "The work meter" (`meterRemote`); [docs/08](08-testing-strategy.md) "The work meter" (three heaps, the corrected actions); the builders' own entries: [ADR-829](06-decisions.md#adr-829) (2-D) and [ADR-CX-091](06d-decisions-complex.md#adr-cx-091) (complex)
+
+**What the design pass measured, and this round builds on** (the three design files are comments on #2890; measured at `cbada4e1`).
+- The page reaches zero in all three iterative builders when an action runs whole in another heap and its result is adopted, and each builder hands over something different (analytic adopts into `derive`'s line-list store, 3-D a journal of memo entries, 2-D the settled replay with its evaluation, freedom count and fold). So what is shared is a transport that carries opaque payloads.
+- A stateless worker is enough: starting every 2-D action from a fresh clone of the figure changes 7 of 1 327 recorded actions, because phase 2 keys solved content by content.
+- 2-D's meter under-counted its page, and two of its actions were wrong (below).
+- Phase 1's queue stamped a job's basis when the job was asked for. All three agents found it independently.
+
+**Root causes addressed.**
+1. *The only worker transport was 2-D's own*, in two files that each spelled its five operations out. Analytic and 3-D would have copied it for their first worker.
+2. *The stamp was read at the wrong moment* (`shell/work.ts`, Am. 2: "the stamp taken at the action"). A job that waits its turn acts on the figure as it is when it runs, so a stamp from before the wait made every such job stale by construction. Nothing read the stamp yet, which is why nothing failed; the first reader would have dropped every action a student pressed while the tool worked, against Am. 2's own ruling.
+3. *A lane was also an order.* «הציגו תצורה אחרת» is counted on its own lane so that its own button shows it, and so it ran beside the student's other actions.
+4. *2-D's page count was a lower bound, and the gate could not see a missed adoption* (Am. 1's known limit): under node the page and both workers were one module instance.
+5. *Complex's "work ceiling" (invariant 1) did not exist.*
+
+**Built.**
+
+*1. The worker client* (`shell/`, no product knowledge; the full contract is 04w § "The worker client").
+
+| Module | Holds |
+|---|---|
+| `shell/workerProtocol.ts` | page → worker `run { id, op, args }`, `seed { args }`, `drop { id }`; worker → page `ready`, `progress`, `part`, `done`, `error`, the last three with `units` (the meter envelope). An operation is `(args, ctx)`; `ctx.part`, `ctx.progress`, `ctx.tick()` |
+| `shell/workerHost.ts` | `serveWorker(ops, { seed })`: one request at a time; a synchronous operation is answered inside its own message; a value that does not clone is the request's error |
+| `shell/workerClient.ts` | `createWorkerClient({ lanes, executor, seed })`: `start()` spawns every lane with the page; `cancel(lane, which)` terminates only when the RUNNING request is cancelled, hands the new worker the builder's checkpoint and posts again what was not cancelled; a waiting request is dropped by message; a crash; the fall back to the executor |
+| `shell/workerExecutor.ts` | `sameInstanceExecutor` (the suites: this module instance, the worker lane, by reference), `pageLaneExecutor`, `isolatedExecutor` (a second module instance, `structuredClone` both ways, its units in the envelope), `executorByLane`, `pageLaneCeiling` |
+| `shell/workMeter.ts` | `meterRemote(units, prePaint)`: units counted in another heap join the page's counts under the LANE's phase, never as page work; `holdWorkerLane()` |
+
+Left out on purpose, against the design file: the client does not take the queue's job or drop a stale result itself. The sink that applies a result is the builder's, and it has to check there anyway; no builder needed the second check.
+
+*2. The queue* (`shell/work.ts`).
+- **The stamp is read when the job's turn starts**, after its opening paint and after every job it waited behind. `stale()` now means one thing: the figure changed while THIS job worked.
+- **`behind`**: a lane may be declared behind another (queue option, or per `run`). Its jobs are counted and shown on their own lane and also wait for every job the other lane had been asked for; the other lane does not wait for them.
+- **`span`**: called at a job's turn, and what it returns at the job's release after its closing paint. One student action, whole.
+- **`queuedActions(…, { around })`**: the builder's wrapper of every routed action.
+
+*3. The ruled ordering, in all four builders.* Each registry (`src/app/work.ts`, `src3d/app/work3.ts`, `src-analytic/app/workAn.ts`, `src-complex/app/workCx.ts`) declares `behind: { another: interactive }`. Two rows of the cross-product routing lock run it against each builder's real queue; with the declaration removed from 2-D's registry the row fails.
+
+*4. 2-D on the shared client* ([ADR-829](06-decisions.md#adr-829)): one table of operations (`geoOps.ts`), the worker entry as one `serveWorker` call, the client keeping what is 2-D's, both workers started with the page, and the checkpoint: the fold of the figure on screen, handed to a worker spawned after a cancel or a crash.
+
+*5. 2-D's honest meter* (ADR-829). The gate hands 2-D's client one isolated executor per lane: the interactive worker and the detect worker are each a module instance of their own (`shell/__tests__/isolated-ops.ts`) and every message is cloned. Three actions are corrected: `delete` no longer runs the resolve gate and the search the App never runs after a delete; `edit` puts a clone of its rows in the store; `undo` and `toggle` are walked.
+
+*6. Complex's ceiling* ([ADR-CX-091](06d-decisions-complex.md#adr-cx-091)): 256 units an action, asserted by its gate over the corpus and reported on the development console for a job measured whole; its routed store actions run through the page-lane executor. No baseline line of complex moved (1 205 units in 305 actions).
+
+**2-D's baseline, before and after** (`src/__tests__/work-meter/baseline.jsonl`; units are executed `evaluateCore` calls). The SAME code under the committed driver gives the committed baseline to the unit: `npm run work:check -- 2d` at this round's first commit, 173 of 173, total 139 720 597, page 42 023 998, before the paint 97 386 118, no rise and no fall. Everything below is the measurement changing.
+
+| Action | Lines | Total, before → after | On the page, before → after | Lines whose total is higher / lower / equal | What moved it |
+|---|---|---|---|---|---|
+| submit | 500 | 25 770 577 → 31 827 026 | 12 248 498 → 13 354 116 | 500 / 0 / 0 | the worker's prefold and search fold in their own heap what the page's gates folded in theirs; the page renders a found view from its fold alone |
+| load | 171 | 21 975 313 → 25 211 251 | 4 043 448 → 4 806 498 | 171 / 0 / 0 | the same; and the page's smoke replay is a tail on the transplanted fold |
+| another | 171 | 17 977 623 → 20 436 504 | 1 396 → 2 448 681 | 154 / 0 / 17 | the page folds the found view cold: the search hands back facts and a seed, no fold |
+| delete | 143 | 17 541 583 → 11 624 269 | 11 624 282 → 11 624 269 | 0 / 42 / 101 | the search the App never runs after a delete is gone (42 lines); one page count falls by 13, the render of that search's found view |
+| edit | 171 | 14 121 022 → 14 587 581 | 14 106 374 → 14 389 922 | 13 / 0 / 158 | 7 lines: the rows are a clone, so the loaded session's replay no longer serves them; 6 lines: the edit's own search, in the worker's heap |
+| detect | 171 | 42 334 479 → 42 334 479 | 0 → 0 | 0 / 0 / 171 | nothing: it has been walked on its own copy of the facts since Am. 3 |
+| undo (new) | 143 | 0 | 0 | | the earlier figure comes back by reference: nothing is solved, in any of the 143 |
+| toggle (new) | 143 | 24 325 285 | 11 636 855 | | the page's cold fold of the rows left on, then the search the App does run after a toggle (80 of the 143) |
+| **all lines** | 1 327 → 1 613 | 139 720 597 → 170 346 395 | 42 023 998 → 58 260 341 | 838 rose, 42 fell, 286 added | before the paint 97 386 118 → 128 011 916 |
+| **the 1 327 lines both have** | | 139 720 597 → 146 021 110 | 42 023 998 → 46 623 486 | | before the paint 97 386 118 → 103 686 631 |
+
+- On the lines both baselines have, the page's count is 46.6 M where 42.0 M was recorded (+4.6 M, +10.9 %): the lower bound Am. 1 named, now measured in the gate. The design pass read 46.4 M with the old `edit`.
+- The total on those lines is 6.3 M higher: +12.2 M is content two heaps each solve (what plan step 5 removes: in one heap an action costs its old recorded total, measured in the design pass on 1 156 of 1 156 actions), 0.26 M of it the clone of the edit's rows; and −5.9 M is the search `delete` no longer runs.
+- No line of any action moved for another reason. `detect` is identical to the unit in 171 of 171, which is the check that the three-heap walk itself changes no count: its lane was already walked this way.
+- The ten largest moves of the page count are eight presses of «הציגו תצורה אחרת» (for example `issue-2405-all-common-tangents-apart` 29 → 500 179), the clone of `issue-2407-tangent-at-touch`'s edit (713 976 → 946 407) and one load (`issue-855-tangency-sampled-seat` 3 928 → 121 337). The largest falls are deletes (`issue-1604-saved-reload` 3 157 124 → 293 821).
+
+The slow corpus (`baseline-slow.jsonl`, on demand):
+
+| Action | Lines | Total, before → after | On the page, before → after | Lines whose total is higher / lower / equal |
+|---|---|---|---|---|
+| submit | 66 | 55 657 874 → 65 517 698 | 13 434 599 → 13 779 190 | 66 / 0 / 0 |
+| load | 17 | 25 992 640 → 26 590 444 | 5 009 069 → 5 133 562 | 17 / 0 / 0 |
+| another | 17 | 10 331 972 → 10 509 532 | 136 → 177 530 | 13 / 0 / 4 |
+| delete | 17 | 15 489 207 → 1 513 549 | 1 513 549 → 1 513 549 | 0 / 2 / 15 (`1768-kite-area` 13 521 613 → 149 153; `2860-tangent-right-triangle` 809 981 → 206 783) |
+| edit | 17 | 23 460 994 → 32 362 694 | 15 533 320 → 15 533 320 | 4 / 0 / 13 (the edit's search, folded again in the worker's heap) |
+| detect | 17 | 26 693 801 → 26 693 801 | 0 → 0 | 0 / 0 / 17 |
+| undo (new) | 17 | 0 | 0 | |
+| toggle (new) | 17 | 15 845 169 | 1 513 549 | |
+| **all lines** | 151 → 185 | 157 626 488 → 179 032 887 | 35 490 673 → 37 650 700 | 100 rose, 2 fell, 34 added |
+| **the 151 lines both have** | | 157 626 488 → 163 187 718 | 35 490 673 → 36 137 151 | |
+
+Determinism of the three-heap walk, each run a fresh process: the record, `--order reverse` and `--order shuffle:11` over the 171 fixtures (173 of 173 tests each; 570 s, 567 s and 576 s) and a second walk of the slow corpus (18 of 18) gave the same counts: no rise and no fall in any run. Each walk still ends by walking two figures again, after the whole corpus and twice in a row, with equal counts.
+
+**Measured in a browser** (the two dev servers through `scripts/lib/browser-harness.mjs`: `main` @ `bda48f42` on port 5173, this branch on 5180; one machine, other sessions' suites running, so readings and not a benchmark).
+
+| Probe | `main` | Branch |
+|---|---|---|
+| The first line of a fresh session («משולש ABC»), Enter to the row, 8 sessions each | 119–135 ms, median 133; the worker's files are asked for AFTER Enter in 8 of 8 | 59–79 ms, median 67; asked for after Enter in 0 of 8 |
+| The second line of those sessions, median | 85 ms | 84 ms |
+| «מעגל O» · «ריבוע ABCD חסום במעגל O» · «ריבוע חוסם את מעגל O», and «הציגו תצורה אחרת» pressed 0.6 s into the third line | the page's thread is busy 3.9 s, so the press lands at 3.96 s; the row appears at 5.50 s; both buttons are back at 5.55 s and the figure is the line's own: **the press was dropped** | the same 3.9 s and 3.95 s; the row appears at 5.43 s and «הוסף» is back at 5.48 s while «הציגו תצורה אחרת» still reads «חושב…»; at 5.62 s **the figure changes to another configuration** and the button is back at 5.66 s |
+| «ABC משולש ישר זוית» · «AC=15» · «BC=10» · «חצי מעגל ABC», then «M אמצע AB», Enter to the row (two runs each) | 99 and 107 ms | 108 and 108 ms |
+| the same, after «הציגו תצורה אחרת» and its ✕ pressed 1.5 s into the search | accepted; 763 and 801 ms | accepted; 187 and 200 ms |
+| `hexagon-regular-by-angles-2797` loaded from its file, then «M אמצע AB», Enter to the row (three runs each) | accepted; 20.4, 21.0 and 20.6 s | accepted; 20.3, 20.7 and 21.2 s |
+| the same, after «הציגו תצורה אחרת» and its ✕ | accepted; 21.4, 21.5 and 21.8 s | accepted; 21.2, 21.6 and 22.2 s |
+
+What the last four rows say about the round's biggest risk, a verdict cut by a clock in a heap that has just been restarted: no line was refused or cut after a restart, on either side. On the light figure the branch is 0.6 s faster after the ✕, and that is the worker being spawned at the cancel instead of at the next line. On the hexagon the ✕ costs the next line about 0.9 s on BOTH sides: the checkpoint (the fold) did not shorten it measurably, so what a restarted worker pays there is not the fold. That line takes about 21 s with or without a restart: about 14 s in the worker first, with the page free, and then about 7.2 s with the page's thread busy, in every run on both sides. The risk is therefore unchanged by this round, neither removed nor made worse: the page's gates still run on the page, under the page's clocks, in a heap no cancel empties. It is owed its probe again when plan step 5 moves those gates into the worker.
+
+**Existing tests changed, both because of what this round is asked to change.** `shell/__tests__/work-queue-2874.test.ts` asserted the stamp taken at the ask; it now asserts the stamp of the turn, and that a figure that moves while a job works makes that job stale. `src/replay/__tests__/issue-443-macro-convexity.test.ts` drives 2-D's worker entry directly; its two harness lines speak the new protocol and its expectations of the search are unchanged.
+
+**Not done in this round.** Nothing is adopted and no page work moves: 2-D's page count is 58 260 341 units over the 1 613 recorded actions (46 623 486 on the 1 327 the walk had before) and that is where step 5 starts. Analytic's and 3-D's gates do not walk separate heaps yet, because they have no worker; they join through `isolatedExecutor` with their own op tables. The asks are not in 2-D's walk, nor are rename, swap, merge, the cycle chips and a clicked crossing. The wall time of 2-D's gate inside `npm run test:full` was not measured with three heaps (alone it is 9.5 min where it was 6.3; inside the 2-D slice 11.2 min). Safari and Firefox were not probed.
+
+**What the student will see.**
+- [ruled] «הציגו תצורה אחרת» pressed while another action runs waits its turn and then searches the figure that action left, in every tool. ADR-W-210 Am. 2, question 1 (operator, 2026-11-13: *"i go with your recommendations"*, on "an action pressed while the tool is working waits its turn"); the plan on #2890 records it. Until now 2-D dropped the press when the action finished, and in the other three the page was frozen for the whole action.
+- [asked] 2-D's first line of a session no longer waits for the worker to download (about 0.4 s on the live site, Am. 2; 133 ms → 67 ms on the dev servers). *"Speed is very important."* (operator, 2026-11-12)

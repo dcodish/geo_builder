@@ -177,6 +177,9 @@ export function sourcesOf(treeDir: string, skip: readonly string[] = ['store', '
 /** The function-valued keys of a store's state: its actions, as they are at run time. */
 export const actionsOf = (state: object): string[] => Object.entries(state).flatMap(([k, v]) => (typeof v === 'function' ? [k] : []));
 
+/** The lane every builder counts «הציגו תצורה אחרת» on (each registry's `ANOTHER`). */
+const ANOTHER_LANE = 'another';
+
 export interface RoutingProbe {
   queue: WorkQueue<unknown>;
   /** the product's basis subscription (its `onBasisChange…`) */
@@ -225,6 +228,34 @@ export function routingSuite(name: string, subject: () => RoutingSubject, probe:
       } finally {
         off();
       }
+    });
+
+    // #2890 (ADR-W-210 Am. 4, ruled): «הציגו תצורה אחרת» is counted on its own lane (its own button), and it still
+    // waits its turn. Every builder names that lane `another`; a builder whose queue does not declare it behind the
+    // student's own actions fails here.
+    it('«הציגו תצורה אחרת» pressed while another action runs waits its turn, and then reads the figure that action left', async () => {
+      const order: string[] = [];
+      let end!: () => void;
+      const action = probe.queue.run(() => new Promise<void>((r) => (end = r)).then(() => void order.push('the action ends')));
+      const press = probe.queue.run((job) => void order.push(`the search starts, stale: ${job.stale()}`), { lane: ANOTHER_LANE });
+      for (let i = 0; i < 30; i++) await Promise.resolve();
+      expect(probe.queue.working(ANOTHER_LANE), 'its own button shows it while it waits').toBe(true);
+      expect(order, 'it has not started').toEqual([]);
+      end();
+      await Promise.all([action, press]);
+      expect(order).toEqual(['the action ends', 'the search starts, stale: false']);
+    });
+
+    it('a line entered while a search runs does not wait for the search', async () => {
+      let end!: () => void;
+      const search = probe.queue.run(() => new Promise<void>((r) => (end = r)), { lane: ANOTHER_LANE });
+      for (let i = 0; i < 30; i++) await Promise.resolve();
+      const line = probe.queue.runIfIdle(() => 'taken');
+      expect(line, 'Enter is not off: the interactive lane is idle').not.toBeNull();
+      expect(await line).toBe('taken');
+      expect(probe.queue.working(ANOTHER_LANE)).toBe(true);
+      end();
+      await search;
     });
   });
 }

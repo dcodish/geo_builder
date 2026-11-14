@@ -13,7 +13,7 @@
  * an unclassified action, on a free action that writes the basis, and on a component that reaches a job
  * action through the store instead of through {@link act} or {@link jobStore}.
  */
-import { createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
+import { INTERACTIVE, createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
 import { useGeoStore, type Fact } from '@/store/geoStore';
 
 /** The store fields the fold reads: a change to either re-solves the figure. */
@@ -25,20 +25,27 @@ export interface Basis2D {
   seed: number;
 }
 
-export const work = createWorkQueue<Basis2D>({
-  basis: () => {
-    const s = useGeoStore.getState();
-    return { facts: s.facts, seed: s.seed };
-  },
-  sameBasis: (a, b) => a.facts === b.facts && a.seed === b.seed,
-});
-
 /**
  * The lane of «הציגו תצורה אחרת». 2-D's search runs in the geometry worker and shows on its OWN button
  * (measured at `main`, 2026-11-13: that button reads «חושב…» and the submit button does not change), so
  * it is counted on its own lane and the box stays open while it runs.
  */
 export const ANOTHER = 'another';
+/**
+ * #2890 ([ADR-W-210](../../docs/06w-decisions-workspace.md#adr-w-210) Am. 4, ruled): «הציגו תצורה אחרת» pressed while
+ * another action runs WAITS ITS TURN and then searches the figure that action left. It is still counted and shown on
+ * its own button, and a line entered while a search runs does not wait for the search.
+ */
+const BEHIND = { [ANOTHER]: INTERACTIVE };
+
+export const work = createWorkQueue<Basis2D>({
+  basis: () => {
+    const s = useGeoStore.getState();
+    return { facts: s.facts, seed: s.seed };
+  },
+  sameBasis: (a, b) => a.facts === b.facts && a.seed === b.seed,
+  behind: BEHIND,
+});
 
 /** The store actions that write the figure's basis: each is reached from a component only as a job. */
 export const JOB_ACTIONS = [
