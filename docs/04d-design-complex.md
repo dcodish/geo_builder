@@ -385,7 +385,9 @@ least recently used entry out first.
   empties them all, so a memo added later cannot be left out. No result depends on it; only the executed work does.
 - **The work meter.** One unit is one EXECUTED line read or one exact solve; a hit is charged nothing. The gate's
   walk starts each figure from empty memos and stays warm, as one session does, and its load is cold again
-  (`__tests__/work-meter/walkCx.ts`); the timing harness does the same per corpus item.
+  (`__tests__/work-meter/walkCx.ts`). Its `edit` comes last, in a session of its own: the rows before the last are
+  solved, the edited row is not (`editLastRowCx` in the driver builds that state), so it sizes a real edit. The
+  timing harness does the same per corpus item.
 - **Locks.** `value/__tests__/content-memo-2888.test.ts` (the table: the key, the bound, the freeze, the clear) and
   `__tests__/compute-once-2888.test.ts`: one read and one fold per content; a line under other declared letters, and
   a figure asked with another seed, question, chip or line order, is never served the other's result; and over the
