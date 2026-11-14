@@ -93,6 +93,30 @@ export interface CentreActions {
  * what the lock calls. A taken letter is answered IN the popover (holder + swap), so it does not also
  * light the error line; every other refusal shows this tree's own sentence there, which says WHY.
  */
+/** What a centre-swap decided: the commit, or the refusal. */
+export type CentreSwapVerdict = ReturnType<typeof decideCentreSwap>;
+
+/** Apply a centre's name decided elsewhere (the worker, #2890), in the popover's vocabulary. */
+export function applyCentreName(v: CentreNameVerdict, actions: CentreActions): LetterRenameResult {
+  if (v.kind === 'record') {
+    actions.record(v.verdict);
+    return { ok: true };
+  }
+  if (v.error.key === 'rename-taken' && v.holder) return { ok: false, reason: 'taken', holder: { text: v.holder.text } };
+  actions.setError(v.error);
+  return { ok: false, reason: v.error.key };
+}
+
+/** Apply a centre swap decided elsewhere (the worker, #2890). */
+export function applyCentreSwap(v: CentreSwapVerdict, actions: CentreActions): LetterSwapResult {
+  if (v.kind === 'refused') {
+    actions.setError(v.error);
+    return { ok: false };
+  }
+  actions.applySwap(v.commit);
+  return { ok: true };
+}
+
 export function centrePopoverOps(
   offerId: string,
   state: RenameState,
@@ -100,24 +124,7 @@ export function centrePopoverOps(
   current: Derivation = currentOf(state),
 ): { onRename: (from: string, to: string) => LetterRenameResult; onSwap: (a: string, b: string) => LetterSwapResult } {
   return {
-    onRename: (_from, to) => {
-      const v = decideCentreName(offerId, to, state, current);
-      if (v.kind === 'record') {
-        actions.record(v.verdict);
-        return { ok: true };
-      }
-      if (v.error.key === 'rename-taken' && v.holder) return { ok: false, reason: 'taken', holder: { text: v.holder.text } };
-      actions.setError(v.error);
-      return { ok: false, reason: v.error.key };
-    },
-    onSwap: (_a, b) => {
-      const v = decideCentreSwap(offerId, b, state, current);
-      if (v.kind === 'refused') {
-        actions.setError(v.error);
-        return { ok: false };
-      }
-      actions.applySwap(v.commit);
-      return { ok: true };
-    },
+    onRename: (_from, to) => applyCentreName(decideCentreName(offerId, to, state, current), actions),
+    onSwap: (_a, b) => applyCentreSwap(decideCentreSwap(offerId, b, state, current), actions),
   };
 }

@@ -13,7 +13,7 @@ import { clearSession, readSession, writeSession } from '../../shell/session/per
 import type { CrashSession } from '../../shell/session/crash';
 import { crashSessionOf, sliceChanged } from '../../shell/session/crash';
 import { readEnvelope } from '../../shell/save';
-import { loadAnalyticSession } from './loadSession';
+import { loadAnalyticSession, type LoadAuditor } from './loadSession';
 import { ANALYTIC_ENVELOPE, useAnalyticStore } from '../store/useAnalyticStore';
 
 /** The store's state, as the slice lists below name its fields. */
@@ -74,7 +74,7 @@ export function forgetSessionAn(): void {
  * «המשך» — the stored payload through the envelope check and the normal load path. False when it
  * is not a session this build can read; the store is left as it was.
  */
-export function restoreSessionAn(payload: string): boolean {
+export function restoreSessionAn(payload: string, audit?: LoadAuditor): boolean {
   let parsed: unknown;
   try {
     parsed = JSON.parse(payload);
@@ -83,7 +83,7 @@ export function restoreSessionAn(payload: string): boolean {
   }
   const env = readEnvelope(parsed, ANALYTIC_ENVELOPE);
   if (!env.ok) return false;
-  loadAnalyticSession(env.data, '');
+  loadAnalyticSession(env.data, '', audit);
   return true;
 }
 

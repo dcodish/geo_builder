@@ -26,11 +26,11 @@
  *     `undo` (back to the row ticked off), `redo`, and `rename` (the first point takes a free letter).
  * A sequence's counts depend on nothing run before it.
  *
- * THE HOOKS ({@link WalkHooks}) let a test run the same walk across two heaps: `setup` wraps what the walk prepares
- * unmeasured, and `each` wraps every action and is handed what the PAGE renders after it. By default both do nothing.
+ * SINCE #2890 (ADR-AG-478) every solve of an action runs in the driver's EXECUTOR (`useDriverExecutor`): the gate hands a
+ * second module instance, so the page's part of each action is measured as a browser's page.
  */
 import type { Seed } from '../../engine/evaluate';
-import { beforeLastRowEdit, doAnother, doAsk, doDelete, doEdit, doLoad, doRename, doShow, doSubmit, doToggle, newSession, sessionOf, settledState, shownSession, shownState, type Phases, type Session, type State } from './driverAnalytic';
+import { beforeLastRowEdit, doAnother, doAsk, doDelete, doEdit, doLoad, doRename, doShow, doSubmit, doToggle, newSession, settledState, shownSession, stateOf, type Phases, type State } from './driverAnalytic';
 import type { WorkCounts } from '../../../shell/workMeter';
 
 export interface WalkedActionA {
@@ -50,81 +50,68 @@ export interface WalkPlanA {
 }
 
 /** What one action returned: its phases, its counts and the figure it left (null: the figure did not change). */
-interface Ran<N> {
+interface Ran {
   ph: Phases;
   work: WorkCounts;
-  next: N | null;
+  next: State | null;
 }
 
-/**
- * How a caller runs the walk's steps. The gate uses neither. A two-heap walk (`settle-walk.test.ts`) runs `setup` and
- * every action in the worker's lane and, after each action, renders `page()` in the page's lane.
- */
-export interface WalkHooks {
-  /** Wraps what the walk prepares unmeasured (the empty figure, the edit's session, the last session's figure). */
-  setup?<T>(fn: () => T): T;
-  /** Wraps one measured action. `page` renders what the page shows after it (nothing when the figure did not change). */
-  each?<R extends Ran<unknown>>(action: string, run: () => R, page: (r: R) => void): R;
-}
-
-export function walkSequence(lines: readonly string[], saveSeed: Seed | undefined, plan: WalkPlanA, onAction?: (action: string) => void, hooks: WalkHooks = {}): WalkedActionA[] {
+export async function walkSequence(lines: readonly string[], saveSeed: Seed | undefined, plan: WalkPlanA, onAction?: (action: string) => void): Promise<WalkedActionA[]> {
   const out: WalkedActionA[] = [];
-  const setup = <T,>(fn: () => T): T => (hooks.setup ? hooks.setup(fn) : fn());
-  const ran = <R extends Ran<unknown>>(action: string, fn: () => R, page: (r: R) => void, utterance?: string): R => {
+  const run = async (action: string, fn: () => Promise<Ran>, utterance?: string): Promise<State | null> => {
     onAction?.(action);
-    const r = hooks.each ? hooks.each(action, fn, page) : fn();
+    const r = await fn();
     out.push({ action, ...(utterance ? { utterance } : {}), ph: r.ph, work: r.work });
-    return r;
+    return r.next;
   };
-  const pageOfState = (r: Ran<State>): void => {
-    if (r.next) shownState(r.next.lines, r.next.seed, r.next.hosts);
-  };
-  const pageOfSession = (r: Ran<Session>): void => {
-    if (r.next) shownSession(r.next);
-  };
-  const run = (action: string, fn: () => Ran<State>, utterance?: string): State | null => ran(action, fn, pageOfState, utterance).next;
-  const act = (action: string, fn: () => Ran<Session>): Session | null => ran(action, fn, pageOfSession).next;
 
-  setup(() => newSession());
-  let st = setup(() => settledState([], 0, {}));
+  newSession();
+  let st = await settledState([], 0, {});
   if (plan.submits === 'all') {
-    lines.forEach((line, k) => {
-      st = run(`submit#${k + 1}`, () => doSubmit(st, line), line) ?? st;
-    });
+    for (const [k, line] of lines.entries()) {
+      const at = st;
+      st = (await run(`submit#${k + 1}`, () => doSubmit(at, line), line)) ?? st;
+    }
   } else {
     const typed = plan.submits === 'last' ? 1 : 0;
-    st = setup(() => settledState(lines.slice(0, lines.length - typed), 0, {}));
-    if (typed) st = run(`submit#${lines.length}`, () => doSubmit(st, lines[lines.length - 1]), lines[lines.length - 1]) ?? st;
+    st = await settledState(lines.slice(0, lines.length - typed), 0, {});
+    const at = st;
+    if (typed) st = (await run(`submit#${lines.length}`, () => doSubmit(at, lines[lines.length - 1]), lines[lines.length - 1])) ?? st;
   }
   if (!st.lines.length) return out;
+  const built = st;
   // show another
-  let s2 = st;
+  let s2 = built;
   for (let p = 1; p <= plan.presses; p++) {
-    const n = run(`another#${p}`, () => doAnother(s2));
+    const from = s2;
+    const n = await run(`another#${p}`, () => doAnother(from));
     if (!n) break;
     s2 = n;
   }
   // the saved file, loaded cold (its own saved seed when it has one, else the configuration on screen)
-  const seed = saveSeed ?? st.seed;
-  run('load', () => doLoad(st.lines, seed, st.hosts));
-  if (st.lines.length > 1) run('delete', () => doDelete(st, 0));
+  const seed = saveSeed ?? built.seed;
+  await run('load', () => doLoad(built.lines, seed, built.hosts));
+  if (built.lines.length > 1) await run('delete', () => doDelete(built, 0));
   // the last row edited, in a session that has solved the rows before it and not this one
-  const editing = setup(() => beforeLastRowEdit(st));
-  const edited = run('edit', () => doEdit(editing, editing.lines.length - 1, editing.lines[editing.lines.length - 1])) ?? st;
+  const editing = await beforeLastRowEdit(built);
+  const edited = (await run('edit', () => doEdit(editing, editing.lines.length - 1, editing.lines[editing.lines.length - 1]))) ?? built;
   // what the walk left out (#2890): the questions, a row ticked off and on, undo, redo, a letter renamed
-  let sess = sessionOf(edited.lines, edited.seed, edited.hosts);
-  setup(() => shownSession(sess)); // the figure the edit left on screen; solved here only when the edit was refused
-  sess = act('ask', () => doAsk(sess)) ?? sess;
-  const off = act('toggle#1', () => doToggle(sess, 0));
+  let sess = stateOf(edited.lines, edited.seed, edited.hosts);
+  await shownSession(sess); // the figure the edit left on screen; solved here only when the edit was refused
+  const asking = sess;
+  sess = (await run('ask', () => doAsk(asking))) ?? sess;
+  const ticking = sess;
+  const off = await run('toggle#1', () => doToggle(ticking, 0));
   if (off) {
-    const on = act('toggle#2', () => doToggle(off, 0));
+    const on = await run('toggle#2', () => doToggle(off, 0));
     if (on) {
-      act('undo', () => doShow(off));
-      act('redo', () => doShow(on));
+      await run('undo', () => doShow(off));
+      await run('redo', () => doShow(on));
       sess = on;
     }
   }
-  act('rename', () => doRename(sess));
+  const renaming = sess;
+  await run('rename', () => doRename(renaming));
   return out;
 }
 
