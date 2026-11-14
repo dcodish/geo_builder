@@ -16678,3 +16678,30 @@ The two "re-typed" rows are what the walk's `edit` was when these times were tak
 
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)
+
+## ADR-AG-477 — Off the page, the parts that need no worker: the locus chips and a traced locus kept by content, a settled result as data, and the walk's missing actions (#2890)
+
+**Status:** built, 2026-11-14 · **Issue:** [#2890](https://github.com/dcodish/geo_builder/issues/2890) (feature, `P2`; phase 3 of the program [#2867](https://github.com/dcodish/geo_builder/issues/2867)) · branch `debt/2890-analytic-settle`
+**Requirements:** none (internal): no line, verdict, drawing, label or message changes · **Design:** [04c](04c-design-analytic.md) § "Solved content is keyed by content" (the two memos) and § "A settled result, and its adoption" · **LADDER stage:** none (memos around the solve, and data about it; no stage of the ladder changes)
+**Implements** the first round of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) invariant 1 ("the page never solves") for this builder: the three parts that need nothing from the shared worker client. It extends [ADR-AG-476](#adr-ag-476) (two more memos by content; the line-list store per lane). No page handler moves in this ADR: that is the next round.
+
+**Measured before building** (the design pass on #2890; `main` @ `cbada4e1`, all 208 saved sequences, 1 963 actions). With a whole action run on one heap, its result passed through `structuredClone` and adopted on a second heap, the page's own readers count 89 924 units of the 126 274 259 they count today, and 0 once one reader is kept by content. So the route ADR-W-210 chose ("settle, then hand over") reaches zero here, and three things stand between `main` and it that need no worker. They are this ADR's three parts.
+
+### Part 1 — two readers solved again what the session had solved
+
+**Root cause.** ADR-AG-476 keyed every solver memo by content, and two readers of the page are not behind one:
+- **`locusChips(d)`** (`app/locusChip.ts`) takes a rank or two per point (`hasLocus`, `onFixedCarrier`) on every render of a figure. Measured: 89 924 units in 1 212 of the 1 963 recorded actions, and the only page work left after a hand-over.
+- **`locusOf`** (`engine/locus.ts`), the walk behind a locus answer. `App.tsx` answers every stored question inside the render (`answers`, one memo over the whole list), so a traced locus was walked again whenever a row was ticked, an undo pressed or another question asked. Measured on the settled figure of every saved sequence: 25 offer a locus chip (34 chips); answering each once costs 3 386 703 units, and answering it a second time costs the same 3 386 703. No fixture carries a question, so the baseline counted none of it.
+
+**Decision.**
+1. **The chips of a figure are kept** in a `ContentCache` under the construction and `configurationKey(d.configuration)`, bounded at `LOCUS_CHIPS_KEPT` (= `CONFIGURATIONS_MAX`, 96) configurations per figure, oldest dropped first. The two figures the answer was read from (the one drawn, and `drawableAt` at the drawn configuration) are kept beside it and compared by identity, so a derivation built by hand around another figure is never answered by this one's. A caller gets its own copy.
+2. **A locus is traced once per figure**: `locusOf` keeps its result in a `ContentCache` under the point, the configuration shown, the configuration compared against and the frame, bounded at `LOCI_KEPT` (64) per figure. A point with no locus is remembered as having none. The result is shared, so it is frozen.
+3. **A remembered answer leaves a reader's pool as a computed one does.** Both readers ask the figure for configurations through the caller's construction, and a deferred pool decides what to show from what was asked (ADR-AG-476 point 5). The chips ask before they look in the memo; the trace is kept WITH what it asked (`recordAsks`) and replays it on a hit (`adoptAsks`), as `distinctConfigSeeds` does. So what a page shows as «בודק…» does not depend on what is kept.
+4. Both are `ContentCache`s: weak on the construction (a dropped line list's chips and traces go with it), emptied by `clearAnalyticCaches`, and carried by a settled result (part 2).
+
+**Why the locus memo is in the engine and not around the answer.** The answer (`ask`) is worded with two functions the page injects for the locale (`fmt`, `kindWord`) and reads the knowledge gates, which may be pending. A memo of the answer would have to key on the locale and could remember a pending row. The trace is the solver work, is pure, and is the same in every locale.
+
+**Tests.** `src-analytic/__tests__/locus-memo.test.ts` (17): the same figure is answered once, whichever derivation asked; another configuration, other lines, another point and another frame are each asked again; a hand-built derivation is not answered by a kept one; a caller's copy is its own; a remembered answer leaves the pool as a computed one does; the two bounds; the clear.
+
+**What the student will see.**
+- [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)

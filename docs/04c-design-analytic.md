@@ -1515,6 +1515,14 @@ where a session starts (`newSession`: each sequence, each load, and the session 
 `beforeLastRowEdit`, which has solved the rows before the edited one and not that row), and a test that measures a cold
 derivation calls it first.
 
+**Two readers of the page are memos too** ([ADR-AG-477](06c-decisions-analytic.md#adr-ag-477), #2890). `app/locusChip.ts`
+`locusChips` keeps a figure's chips under the construction and the configuration drawn (at most `LOCUS_CHIPS_KEPT` = 96
+per figure), with the two figures they were read from, compared by identity. `engine/locus.ts` `locusOf` keeps a traced
+locus under the point, the two configurations and the frame (at most `LOCI_KEPT` = 64 per figure), together with what
+the trace asked of the figure, which it replays on a hit. The chips ask the figure before they look in their memo. So
+the page's pool has read the same configurations whether an answer was computed or remembered. The ask lane's ANSWER is
+not kept: it is worded for a locale and may be pending; the trace under it is the solver work.
+
 **Adding a memo.** A pure function of a construction is memoised in a `ContentCache`, never a bare `WeakMap`, or it is
 cold on every `derive`. Anything that says how one reader treats a figure (a mode, a "shown" flag) is keyed by the
 object, like the pool. A memo that outlives an action and is NOT reached through a construction is a `BoundedStore`, so
