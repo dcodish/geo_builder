@@ -279,13 +279,14 @@ export function withWorkBudget<T>(units: number, fn: () => T): T {
  */
 export function withSearchLimit<T>(units: number, fn: () => T, kind = 'search'): { value: T; reached: boolean; spent: number } {
   const r = withWorkBudget(units, () => withWorkLimit(units, fn, () => work.done));
-  const st = (searchLimitStats[kind] ??= { runs: 0, reached: 0 });
+  const st = (searchLimitStats[kind] ??= { runs: 0, reached: 0, maxSpent: 0 });
   st.runs++;
   if (r.reached) st.reached++;
+  st.maxSpent = Math.max(st.maxSpent, r.spent);
   return r;
 }
 /** #2893 (ADR-831): per search kind, how many searches ran under a limit and how many reached it (the measurement's counter). */
-export const searchLimitStats: Record<string, { runs: number; reached: number }> = {};
+export const searchLimitStats: Record<string, { runs: number; reached: number; maxSpent: number }> = {};
 
 /**
  * #2894 (ADR-W-210 phase 5) — AN EXACT REPEAT IS SERVED, AND CHARGED AS IF IT WERE COMPUTED.

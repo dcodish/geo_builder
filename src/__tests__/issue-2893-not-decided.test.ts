@@ -3,7 +3,8 @@
  * "not decided", never «אין תצורה אחרת» or "no valid configuration"; «המשיכו לחפש» goes on from where it stopped.
  *
  * The regression lines are the corpus figures whose search reaches the limit (measured over the fixtures and the slow
- * corpus, the ADR's table): the configuration search after the #1768 kite's eighth line. (Under the first, 4 M limit
+ * corpus, the ADR's table): the configuration search after the #1768 kite's first row is muted, which charges ~14.4 M,
+ * past the 12 M limit the operator ruled (2026-11-15, "2 b"); every other corpus search decides in one round. (Under the first, 4 M limit
  * the #1771 press and the #566 two-circle search reached it too; at the browser-calibrated 7.7 M they finish.) The locks are the ADR's: the same input gives the same outcome cold or warm; a
  * "not decided" is never served from a memo as a verdict; the next round does not repeat what the first one solved; and
  * a repeat the solver serves (ADR-832) counts against the limit as a computed one does.
@@ -13,29 +14,37 @@
  * or measures what the second press solves.
  */
 import { describe, expect, it } from 'vitest';
-import { clearReplayCaches, findValidConfigRound, meetsRequirements, SEARCH_WORK_LIMIT, type Fact } from '@/replay/core';
+import { clearReplayCaches, findValidConfigRound, groupKey, meetsRequirements, SEARCH_WORK_LIMIT, type Fact } from '@/replay/core';
 import { repeatConfig, work } from '@/engine/solveBudget';
 import { readWork } from '../../shell/workMeter';
 import { isNotDecided } from '../../shell/notDecided';
 import { factsOf } from './scenarios-corpus';
 
 const KITE = ['ABCD דלתון חסום במעגל', 'AB=AD', 'CB=CD', 'E על DC', 'BE⊥DC', 'AC', 'N = חיתוך BE ו-AC', 'שטח משולש NCE = שטח משולש ACD'];
-const kite = (): Fact[] => structuredClone(factsOf(KITE)) as Fact[];
+/** The kite with its first row muted, as a student's tick does it (the walk's `toggle`): the configuration search that
+ *  follows charges ~14.4 M, past the 12 M limit. */
+const kite = (): Fact[] => {
+  const f = structuredClone(factsOf(KITE)) as Fact[];
+  const first = groupKey(f[0]);
+  return f.map((x) => (groupKey(x) === first ? { ...x, enabled: false } : x));
+};
+/** The configuration search on it, round `round` (the seed resets to 0 on a tick, as the store does). */
+const press = (facts: Fact[], round: number) => findValidConfigRound(facts, 0, round);
 const executedBy = <T>(fn: () => T): { value: T; executed: number } => {
   const e0 = work.executed;
   const value = fn();
   return { value, executed: work.executed - e0 };
 };
 
-describe('#2893 — the configuration search after the #1768 kite line «שטח משולש NCE = שטח משולש ACD»', () => {
+describe('#2893 — the configuration search after muting the first row of the #1768 kite', () => {
   it('the first round reaches its limit and says so; «המשיכו לחפש» finishes the search', () => {
     clearReplayCaches();
     const facts = kite();
-    const first = findValidConfigRound(facts, 0, 0);
+    const first = press(facts, 0);
     expect(isNotDecided(first), 'not decided: never "no valid configuration" for a search that did not finish').toBe(true);
     if (!isNotDecided(first)) return;
     expect(first.spent).toBeGreaterThanOrEqual(SEARCH_WORK_LIMIT);
-    const second = findValidConfigRound(facts, 0, (first.resume as { round: number }).round);
+    const second = press(facts, (first.resume as { round: number }).round);
     expect(isNotDecided(second), 'the second round decides').toBe(false);
     // it finished: a view that meets every requirement, or none (today's «לא נמצאה תצורה…», now said of a search that ended)
     if (second !== null) expect(meetsRequirements((second as { facts: Fact[]; seed: number }).facts, (second as { facts: Fact[]; seed: number }).seed)).toBe(true);
@@ -43,8 +52,8 @@ describe('#2893 — the configuration search after the #1768 kite line «שטח 
 
   it('the same outcome cold and warm, and a "not decided" is never served from a memo as a verdict', () => {
     clearReplayCaches();
-    const cold = findValidConfigRound(kite(), 0, 0);
-    const warm = findValidConfigRound(kite(), 0, 0); // the same content again, its folds held
+    const cold = press(kite(), 0);
+    const warm = press(kite(), 0); // the same content again, its folds held
     expect(isNotDecided(cold) && isNotDecided(warm)).toBe(true);
     expect((warm as { resume: unknown }).resume).toEqual((cold as { resume: unknown }).resume);
   }, 900_000);
@@ -52,10 +61,10 @@ describe('#2893 — the configuration search after the #1768 kite line «שטח 
   it('«המשיכו לחפש» does not repeat what the first round solved', () => {
     clearReplayCaches();
     const facts = kite();
-    const r0 = executedBy(() => findValidConfigRound(facts, 0, 0));
-    const r1 = executedBy(() => findValidConfigRound(facts, 0, 1));
+    const r0 = executedBy(() => press(facts, 0));
+    const r1 = executedBy(() => press(facts, 1));
     clearReplayCaches();
-    const alone = executedBy(() => findValidConfigRound(kite(), 0, 1)); // the second round, from nothing
+    const alone = executedBy(() => press(kite(), 1)); // the second round, from nothing
     expect(r1.value).toEqual(alone.value);
     expect(r1.executed, 'the second round solves only what the first did not').toBeLessThan(alone.executed);
     // measured: the two rounds together execute 1.54× one long search on the kite (1.25× on the #1771 press): the candidate
@@ -71,7 +80,7 @@ describe('#2893 with #2894 — a repeat the solver serves counts against the lim
       try {
         clearReplayCaches();
         const m0 = readWork().total;
-        const r = findValidConfigRound(kite(), 0, 0);
+        const r = press(kite(), 0);
         return { outcome: r, metered: readWork().total - m0 };
       } finally {
         repeatConfig.serve = true;
