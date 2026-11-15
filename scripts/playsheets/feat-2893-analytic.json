@@ -22,7 +22,7 @@
         "P(1,1)"
       ],
       "expect": ["עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.", "המשיכו לחפש"],
-      "lookFor": "On a cleared canvas, type the nine lines, then «P(1,1)». After about 6–10 s of «חושב…», under the box: «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with a button «המשיכו לחפש»; «P(1,1)» is still in the box and no row was added. Press the button: «חושב…» again, and after about 5–10 s the same question. Press it again: after a few seconds the refusal «לא נמצאה תצורה שבה מתקיים: «P(1,1)»» — today's refusal, word for word. (Pre-played in a browser on the merged tree: 6.6 s, 5.1 s, then the refusal at 4.1 s.)",
+      "lookFor": "On a cleared canvas, type the nine lines, then «P(1,1)». After about 10 s of «חושב…», under the box: «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with a button «המשיכו לחפש»; «P(1,1)» is still in the box and no row was added. Press the button: «חושב…» again, and after about 7 s the refusal «לא נמצאה תצורה שבה מתקיים: «P(1,1)»» — today's refusal, word for word. (Pre-played in a browser on the merged tree: 10.1 s, then the refusal at 6.7 s; again 10.0 s and 6.9 s.)",
       "before": "Prod shows «חושב…» for about 18 s with no other sign, then the refusal."
     },
     {

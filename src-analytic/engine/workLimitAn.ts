@@ -20,13 +20,14 @@ import { limitReached, withWorkLimit } from '../../shell/workLimit';
 import { notDecided, type NotDecided } from '../../shell/notDecided';
 
 /**
- * THE LIMIT of one analytic search, in work units (one residual evaluation). Calibrated on the dev PC (2026-11-14,
- * #2893): over the 294 operations of the fixtures and the slow corpus that spend more than 100 000 units, the solver
- * runs about 268 000 units a second (240 000 on the dearest, exam 2379's configuration pool: 3 473 334 units in
- * 14.4 s), so ten seconds is about 2.5 M units. The dearest DECISION in the corpus spends 763 370 (corpus471 #7,
- * line 4, a refusal, 1.9 s): no recorded decision reaches this limit.
+ * THE LIMIT of one analytic search, in CHARGED units (every residual evaluation the solver asks for, a repeat
+ * ADR-AG-480 serves included: {@link chargeUnit}). Calibrated in the BROWSER on the dev PC (2026-11-15, #2893), where the
+ * student waits: exam 2379's nine lines + «P(1,1)» on the analytic worker stop at 10.1 s and 10.0 s (two runs) under
+ * 3.8 M. Before ADR-AG-480 a charged unit cost more (2.5 M stopped that line at 8.4 s; with served repeats at 6.6 s).
+ * The dearest DECISION recorded in the fixtures and the slow corpus spends 763 370 metered units (corpus471 #7, line 4,
+ * a refusal): no recorded decision reaches this limit.
  */
-export const SEARCH_LIMIT_AN = 2_500_000;
+export const SEARCH_LIMIT_AN = 3_800_000;
 
 /** The signal a reached limit throws through the solver. Not an `Error`: nothing may report it as one. */
 export const WORK_LIMIT_REACHED: unique symbol = Symbol('analytic work limit reached');

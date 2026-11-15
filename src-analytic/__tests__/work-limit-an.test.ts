@@ -62,7 +62,7 @@ describe('#2893 the limit itself', () => {
     // any other throw is the caller's
     expect(() => decideWithin(() => { throw new Error('x'); })).toThrow('x');
     expect(typeof WORK_LIMIT_REACHED).toBe('symbol');
-    expect(SEARCH_LIMIT_AN).toBe(2_500_000);
+    expect(SEARCH_LIMIT_AN).toBe(3_800_000);
   });
 });
 
@@ -105,7 +105,7 @@ describe.each(CASES)('#2893 cut and resumed: $name', ({ run, prepare }) => {
     /*
      * A round goes on from what the last FINISHED: the memos are written per whole piece (a configuration solved, a walk,
      * a derivation), so a cut must leave room for the dearest piece. Measured on #3/5 line 4 (167 k units): a cut at 1/5 or
-     * 1/7 never progresses (one piece is 34–56 k units), a cut at 1/3 does. The real limit is 2.5 M units, above every
+     * 1/7 never progresses (one piece is 34–56 k units), a cut at 1/3 does. The real limit is 3.8 M charged units, above every
      * recorded DECISION (763 k at most), and exam 2379's rounds lose 0.16 M of 6.5 M to the cuts (ADR-AG-479).
      */
     for (const share of [3, 2]) {
@@ -159,22 +159,21 @@ describe.each(CASES)('#2893 cut and resumed: $name', ({ run, prepare }) => {
  * THE THIRD OUTCOME ON A REAL FIGURE (CLAUDE.md rule 4; found by this phase's measurement, ADR-AG-479). Exam 2379,
  * question 3, typed to section ג (`fixtures/exam-2379-q3-route-2392.analytic.json`, nine lines): any further line costs
  * more than ten seconds of work today. «P(1,1)» (P is the tangent point on N1) cannot hold, and the search that shows it
- * spends 6.5 M units (25.6 s on the dev PC, 2026-11-14). Under the limit: «עדיין לא נמצא פתרון» twice, and the third
- * round ends in today's refusal, word for word. When phase 5 (#2894) makes this line cheaper, this count changes.
+ * spends 6.5 M units (25.6 s on the dev PC, 2026-11-14). Under the limit: «עדיין לא נמצא פתרון» once (10 s in the
+ * browser), and the second round ends in today's refusal, word for word. When phase 5 (#2894) makes this line cheaper, this count changes.
  */
-describe('#2893 exam 2379: a tenth line reaches the limit, twice, then is refused', () => {
-  it('not decided, not decided, then today\'s refusal', () => {
+describe('#2893 exam 2379: a tenth line reaches the limit, then is refused', () => {
+  it('not decided, then today\'s refusal', () => {
     const exam = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'exam-2379-q3-route-2392.analytic.json'), 'utf8')) as { lines: string[] };
     clearAnalyticCaches();
     const figure = figureBefore(exam.lines, exam.lines.length);
     expect(figure).toEqual(exam.lines);
-    const outcomes: unknown[] = [];
-    for (let round = 1; round <= 3; round += 1) outcomes.push(opsAn.submit({ raw: 'P(1,1)', basis: basisOf(figure), round }));
-    const [first, second, third] = outcomes as Array<{ value: unknown; settled: unknown }>;
+    const outcomes: Array<{ value: unknown; settled: unknown }> = [];
+    for (let round = 1; round <= 2; round += 1) outcomes.push(opsAn.submit({ raw: 'P(1,1)', basis: basisOf(figure), round }));
+    const [first, second] = outcomes;
     expect(first.value).toEqual({ kind: 'not-decided', resume: { round: 1 }, spent: SEARCH_LIMIT_AN });
-    expect(second.value).toEqual({ kind: 'not-decided', resume: { round: 2 }, spent: SEARCH_LIMIT_AN });
     // a stop hands the page nothing to adopt
     expect(first.settled).toEqual(settledOf([]));
-    expect(third.value).toMatchObject({ kind: 'refused', error: { key: 'unsatisfiable' } });
+    expect(second.value).toMatchObject({ kind: 'refused', error: { key: 'unsatisfiable' } });
   }, 600_000);
 });

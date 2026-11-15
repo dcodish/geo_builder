@@ -1565,8 +1565,8 @@ executor over a second module instance (`__tests__/heapsAn.ts`), so its `page` c
 
 ### The work limit, and "not decided" ([ADR-AG-479](06c-decisions-analytic.md#adr-ag-479), #2893; ADR-W-210 phase 4)
 
-Every decision operation of `app/opsAn.ts` runs under `SEARCH_LIMIT_AN` (`engine/workLimitAn.ts`: 2.5 M units, about
-ten seconds on the dev PC), opened with `shell/workLimit`'s `withWorkLimit` by `decideWithin`. The check is
+Every decision operation of `app/opsAn.ts` runs under `SEARCH_LIMIT_AN` (`engine/workLimitAn.ts`: 3.8 M charged units,
+about ten seconds in the browser on the dev PC), opened with `shell/workLimit`'s `withWorkLimit` by `decideWithin`. The check is
 `solverUnit()`, which replaced `meterWork()` at the four places a unit is counted (`solveLM`, `freeRank`,
 `jacobianRank`, `scanRoots`): past an open limit it throws a symbol that unwinds the search, and `decideWithin` answers
 `NotDecided { resume: { round }, spent }` (`shell/notDecided`). A `catch` on a solve's path must rethrow it
@@ -1574,7 +1574,7 @@ ten seconds on the dev PC), opened with `shell/workLimit`'s `withWorkLimit` by `
 `solveLM` serves (ADR-AG-480) included, so a served repeat skips the meter but never moves the stop. Every memo is written once its value is whole, so a stop leaves nothing half-written and hands the
 page nothing to adopt. The next round («המשיכו לחפש», `round` + 1) finds what the last one finished in the worker's
 content memos (a hit counts no unit) and spends its limit on the rest. A round progresses only if one piece fits in it
-(measured: under 0.16 M units, against 2.5 M). The page keeps the stop in React state (`stopped` in `App.tsx`,
+(measured: under 0.16 M units, against 3.8 M). The page keeps the stop in React state (`stopped` in `App.tsx`,
 `NotDecidedNote` in the input zone; the letter popover's own note through `letterOffer`'s `not-decided` answer):
 never a fact, never an undo step. `show` and `figure` (the figure and its values) run with no limit.
 
