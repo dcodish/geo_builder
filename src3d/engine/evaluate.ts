@@ -1271,7 +1271,7 @@ function ringReachValue3(c: Construction3, seed: number): number | null {
   }
   per.set(seed, out);
   costs.set(seed, cost);
-  if (engineJournal3 && !journalPaused3) engineJournal3.reaches.push({ figure: c, seed, out });
+  if (engineJournal3) engineJournal3.reaches.push({ figure: c, seed, out });
   return out;
 }
 /** #2893: what each kept reach cost (a hit is charged it), and how many seeds a construction keeps. */
@@ -2366,8 +2366,7 @@ function journalResolve3(figure: Construction3, key: string, home: ResolvedHome3
   // a construction that is not settled (a probe with a temporary pin) has no content: its answers serve no other heap
   if (!pinsSettled3(figure)) return;
   const entry = { figure, key, home: { key: home.key, seed: home.seed, opts: home.opts, parts: home.parts }, out, cost: resolveCost3.get(out) };
-  if (journalPaused3) pausedResolves3.push(entry);
-  else engineJournal3!.resolves.push(entry);
+  engineJournal3!.resolves.push(entry);
 }
 /** Start, or stop, recording what this file's memos are given. One recording at a time. */
 export function recordEngineJournal3(on: boolean): void {
@@ -2463,7 +2462,7 @@ function seedVerdict3(c: Construction3, key: string, judge: () => boolean): bool
   const { value: out, cost } = costed3(judge);
   per.set(key, { v: out, cost });
   if (per.size > SEED_VERDICTS_PER_FIGURE) per.delete(per.keys().next().value as string);
-  if (engineJournal3 && !journalPaused3) engineJournal3.verdicts.push({ figure: of, key, out, cost });
+  if (engineJournal3) engineJournal3.verdicts.push({ figure: of, key, out, cost });
   return out;
 }
 
@@ -5642,24 +5641,23 @@ export function meetsShapePreferences3(c: Construction3, seed: Seed3, prefs: rea
 
 /**
  * #2893 ([ADR-3D-494](../../docs/06b-decisions-3d.md#adr-3d-494); ADR-W-210 invariant 3) — THE CONFIGURATION SEARCH IS
- * BOUNDED IN WORK, AND A SEARCH THAT RAN OUT SAYS SO.
+ * BOUNDED IN WORK, AND A SEARCH THE LIMIT CUT SHORT SAYS SO.
  *
  * The first seed from `from` whose configuration meets every requirement. Deterministic: the same figure always lands on
- * the same drawing (ADR-3D-053). It used to walk 200 seeds and answer `null` when none met the requirements, which the
- * store turned into a refusal («אין תצורה של הציור…») or, for «הציגו תצורה אחרת», a drawing that did not meet them. 200
- * seeds are a sample, not a proof, so that was a search that ran out reported as one that finished. Now:
+ * the same drawing (ADR-3D-053). The search is DEFINED by its count, {@link SEARCH_SEEDS3} seeds from the start: a walk that
+ * judges them all and finds none is a FINISHED search (operator 2026-11-15, #2893: *"1a"*, *"a fixed try-count is a
+ * FINISHED search, like analytic"*), and the store refuses the line with today's `bound-unsatisfiable`. Now also:
  *  - the walk is bounded by {@link SEED_SEARCH_LIMIT3} units of work (`shell/workLimit`), counted by
- *    `chargedWork3` (a memo hit is charged what it saved: the same outcome in a warm session as in a cold one), and
- *    checked before each seed is judged;
- *  - reaching it with no seed that meets the requirements is "not decided" (`shell/notDecided`): never a refusal, and
- *    it carries where the walk stopped ({@link SeedResume3}: the part, the next seed, what was found so far), so a next
- *    round goes on from there and judges no seed twice.
+ *    {@link searchWork3} (a memo hit is charged what it saved, and a judged seed at least {@link SEED_FLOOR3}: the same
+ *    outcome in a warm session as in a cold one), and checked before each seed is judged;
+ *  - reaching it before the count is spent, with no seed that meets the requirements, is "not decided"
+ *    (`shell/notDecided`): never a refusal, and it carries where the walk stopped ({@link SeedResume3}), so the next
+ *    round («המשיכו לחפש») goes on through the same window and judges no seed twice.
  *
  * #615: TWO TIERS in ONE sweep (the ADR-267 lesson — never a second full pass): a seed that also draws every stated
  * shape visibly as itself wins outright; otherwise the first merely-valid seed is remembered (the fallback) and returned
- * when the PREFERENCE window ends ({@link PREFERENCE_SEEDS3} seeds from the start, as before) — or when the limit is
- * reached first: a valid seed exists, so that is an answer, not a run-out. So a figure whose givens FORCE a special case
- * still draws, at exactly the seed it would have drawn at before.
+ * when the window ends — or when the limit is reached first: a valid seed exists, so that is an answer, not a run-out.
+ * So a figure whose givens FORCE a special case still draws, at exactly the seed it would have drawn at before.
  *
  * #2749 (ADR-3D-451): at the first valid seed a preference vetoes, the preferences the givens made impossible are
  * dropped ({@link possibleShapePreferences3}) and that seed is judged again — so a forced special case costs four
@@ -5682,38 +5680,31 @@ export interface SeedResume3 {
   /** the #2749 guard has run */
   guarded: boolean;
 }
-/** A search's outcome: a seed, or "not decided" with where it stopped. */
-export type SeedSearch3 = { kind: 'found'; seed: Seed3 } | NotDecided<SeedResume3>;
+/** A search's outcome: a seed; `none` (the window was walked and no seed meets the requirements: finished); or "not
+ *  decided" (the work limit came first), with where it stopped. */
+export type SeedSearch3 = { kind: 'found'; seed: Seed3 } | { kind: 'none' } | NotDecided<SeedResume3>;
 
 /**
- * #2893 — THE LIMIT, in charged units (one residual evaluation of `leastSquares`, a memo hit charged what it saved):
- * about 10 s of the configuration search on the dev PC (operator 2026-11-13, *"10s is an ok number"*). Calibrated in
- * ADR-3D-494 over the figures whose search walks furthest. One limit for every caller of the search (a typed line, an
- * edit, «הציגו תצורה אחרת», a load), and the same on every machine: it counts work, not seconds.
+ * #2893 — THE LIMIT, in the search's units (one residual evaluation of `leastSquares`, a memo hit charged what it saved,
+ * a judged seed at least {@link SEED_FLOOR3}): about 10 s of the configuration search on the dev PC (operator 2026-11-13,
+ * *"10s is an ok number"*). Calibrated in ADR-3D-494. One limit for every caller of the search (a typed line, an edit,
+ * «הציגו תצורה אחרת», a load), and the same on every machine: it counts work, not seconds.
  */
 export const SEED_SEARCH_LIMIT3 = 2_500_000;
-/** #615's preference window: once a valid seed is met, the seeds asked for a preferred one, counted from the start. */
-export const PREFERENCE_SEEDS3 = 200;
+/** The seeds that define the search, counted from its start (ADR-3D-053, #615): a walk that spends them is finished. */
+export const SEARCH_SEEDS3 = 200;
+/** #615's preference window is the same count. */
+export const PREFERENCE_SEEDS3 = SEARCH_SEEDS3;
 /**
  * #2893 — THE LEAST A JUDGED SEED COSTS, in the same units. A figure placed in closed form (a cube, a pyramid over a
- * square) is resolved with no `leastSquares` call at all, so its seeds cost nothing on the meter, and a search over it
- * would never reach a limit counted in solver units. Each seed judged is charged at least this: the units the solver
- * does in the time a closed-form seed takes (measured in ADR-3D-494).
+ * square) is resolved with no `leastSquares` call at all, so its seeds cost nothing on the meter. Each seed judged is
+ * charged at least this (measured in ADR-3D-494), so the count is never blind to a walk.
  */
 export const SEED_FLOOR3 = 2;
 /** The search's count: the charged work, plus each judged seed's floor where its own cost was below it. Monotone. */
 let seedFloors3 = 0;
 const searchWork3 = (): number => chargedWork3() + seedFloors3;
 
-/** While a search walks past the preference window, its per-seed answers stay in its own heap (the journal would carry
- *  thousands); the page takes the search's OUTCOME instead ({@link searchSeed3}). */
-let journalPaused3 = false;
-/** The answers of the seed being judged while paused: if it is the seed the search lands on, they cross after all. */
-const pausedResolves3: EngineJournal3['resolves'] = [];
-const flushPaused3 = (): void => {
-  if (engineJournal3) engineJournal3.resolves.push(...pausedResolves3);
-  pausedResolves3.length = 0;
-};
 /**
  * #2893 — THE OUTCOMES A JOB HANDED OVER: the worker's search outcomes, for the page's run of the same action. Each is
  * taken once, and the next job's outcomes replace any left; never written by a search of this heap, never asked by one
@@ -5732,77 +5723,63 @@ export function searchSeed3(c: Construction3, from: Seed3, resume?: SeedResume3,
     return handed;
   }
   const { value, spent } = withWorkLimit(limit, () => walkParts3(c, from, resume), searchWork3);
-  const out: SeedSearch3 = value.kind === 'found' ? value : notDecided(value.resume, spent);
+  const out: SeedSearch3 = value.kind === 'stopped' ? notDecided(value.resume, spent) : value;
   if (engineJournal3 && pinsSettled3(of)) engineJournal3.searches!.push({ figure: of, key, out });
   return out;
 }
 
-/** {@link searchSeed3} as it was asked before #2893: the seed, or null when the round ended undecided. */
+/** {@link searchSeed3} as it was asked before #2893: the seed, or null when the round found none (finished or cut short). */
 export function firstSatisfyingSeed3(c: Construction3, from: Seed3 = 0): Seed3 | null {
   const r = searchSeed3(c, from);
   return r.kind === 'found' ? r.seed : null;
 }
 
-type PartWalk3 = { kind: 'found'; seed: number } | { kind: 'stopped'; at: Omit<SeedResume3, 'entries' | 'part'> };
+type PartWalk3 = { kind: 'found'; seed: number } | { kind: 'none' } | { kind: 'stopped'; at: Omit<SeedResume3, 'entries' | 'part'> };
 
-function walkParts3(c: Construction3, from: Seed3, resume?: SeedResume3): { kind: 'found'; seed: Seed3 } | { kind: 'stopped'; resume: SeedResume3 } {
+function walkParts3(c: Construction3, from: Seed3, resume?: SeedResume3): { kind: 'found'; seed: Seed3 } | { kind: 'none' } | { kind: 'stopped'; resume: SeedResume3 } {
   const parts = partsOf3(c);
   const entries: Record<string, number> = { ...(resume?.entries ?? {}) };
   for (let k = resume?.part ?? 0; k < parts.length; k++) {
     const p = parts[k];
     const r = walkPart3(parts.length === 1 ? c : p.construction, seedOfPart3(from, p.key), resume && k === resume.part ? resume : null);
     if (r.kind === 'stopped') return { kind: 'stopped', resume: { entries, part: k, ...r.at } };
+    if (r.kind === 'none') return r;
     entries[p.key] = r.seed;
   }
   if (parts.length === 1) return { kind: 'found', seed: entries[parts[0].key] };
   return { kind: 'found', seed: canonicalSeed3(seedNumber3(from), entries) };
 }
 
-/** One part's walk over its plain seeds, from its start or from where a round stopped. */
+/** One part's walk over its window of plain seeds, from its start or from where a round stopped. */
 function walkPart3(c: Construction3, from: number, at: Omit<SeedResume3, 'entries' | 'part'> | null): PartWalk3 {
   const own = quadPreferences3(c);
   let fallback = at?.fallback ?? null;
   let prefs = at?.prefs ? at.prefs.map((i) => own[i]) : own;
   let guarded = at?.guarded ?? false;
-  const stopped = (next: number): PartWalk3 => ({
-    kind: 'stopped',
-    at: { next, fallback, prefs: prefs === own ? null : prefs.map((r) => own.indexOf(r)), guarded },
-  });
-  for (let i = at?.next ?? 0; fallback === null || i < PREFERENCE_SEEDS3; i++) {
+  for (let i = at?.next ?? 0; i < SEARCH_SEEDS3; i++) {
     if (limitReached()) {
-      if (fallback === null) return stopped(i);
-      if (fallback >= from + PREFERENCE_SEEDS3) flushPaused3();
-      return { kind: 'found', seed: fallback };
+      if (fallback !== null) return { kind: 'found', seed: fallback };
+      return { kind: 'stopped', at: { next: i, fallback, prefs: prefs === own ? null : prefs.map((r) => own.indexOf(r)), guarded } };
     }
     const seed = from + i;
-    if (fallback === null) pausedResolves3.length = 0; // a fallback's own answers are kept until the walk ends
-    journalPaused3 = i >= PREFERENCE_SEEDS3;
     const judged = chargedWork3();
     try {
       if (!meetsRequirements3(c, seed)) continue;
-      if (meetsShapePreferences3(c, seed, prefs)) {
-        if (journalPaused3) flushPaused3();
-        return { kind: 'found', seed };
-      }
+      if (meetsShapePreferences3(c, seed, prefs)) return { kind: 'found', seed };
       if (fallback === null) fallback = seed;
       if (!guarded) {
         guarded = true;
         const kept = possibleShapePreferences3(c, from, prefs);
         if (kept.length < prefs.length) {
           prefs = kept;
-          if (meetsShapePreferences3(c, seed, prefs)) {
-            if (journalPaused3) flushPaused3();
-            return { kind: 'found', seed };
-          }
+          if (meetsShapePreferences3(c, seed, prefs)) return { kind: 'found', seed };
         }
       }
     } finally {
-      journalPaused3 = false;
       seedFloors3 += Math.max(0, SEED_FLOOR3 - (chargedWork3() - judged));
     }
   }
-  if ((fallback as number) >= from + PREFERENCE_SEEDS3) flushPaused3();
-  return { kind: 'found', seed: fallback as number };
+  return fallback === null ? { kind: 'none' } : { kind: 'found', seed: fallback };
 }
 
 /**

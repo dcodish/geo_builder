@@ -3265,9 +3265,11 @@ export function decideCommands3(
   if (!opts.seedSearch) return { kind: 'record', fact, facts: candidate, seed };
   // ADR-3D-053 (#273): a stated inequality determines nothing, so it can only be honoured by
   // CHOOSING a configuration that satisfies it. Land on one before drawing.
-  // #2893 (ADR-3D-494): a search that reaches its work limit first has not shown that none exists: the line is
+  // #2893 (ADR-3D-494): the search's window walked with no configuration in the range is a FINISHED search, refused as
+  // ever (operator 2026-11-15, "1a"); a search its work limit cut short has not shown that none exists: the line is
   // neither added nor refused, and the student is offered another round from where it stopped.
   const found = seedForRequirements(candidate, seed, opts.resume);
+  if (found.kind === 'none') return { kind: 'refused', error: { code: 'bound-unsatisfiable', id: '' } };
   if (found.kind === 'not-decided') return { kind: 'not-decided', utterance: utterance.trim(), resume: found.resume };
   return { kind: 'record', fact, facts: candidate, seed: found.seed };
 }
@@ -3566,6 +3568,10 @@ export const useGeo3 = create<Geo3State>()(
           return false;
         }
         const found = seedForRequirements(candidate, seed, resume);
+        if (found.kind === 'none') {
+          set({ lastError: { code: 'bound-unsatisfiable', id: '' } }); // the window walked: finished, refused as ever
+          return false;
+        }
         if (found.kind === 'not-decided') {
           // #2893 (ADR-3D-494): the old statement stands, the editor stays open, and another round is offered
           set({ lastError: null, lastNotDecided: { action: 'edit', factId, utterance: utterance.trim(), resume: found.resume, facts, seed } });
@@ -3668,10 +3674,10 @@ export const useGeo3 = create<Geo3State>()(
         // #2764 (ADR-3D-454): a plain-number press — every part walks to its own first good seed from the next base
         const base = more?.from ?? seedNumber3(seed) + 1;
         const next = seedForRequirements(facts, base, more?.resume);
-        // #2893 (ADR-3D-494): a search that ran out used to draw the next seed anyway (`next ?? base`), a drawing the
-        // requirements had not been checked to hold in; now the figure stays, and another round is offered
+        // #2893 (ADR-3D-494): a search its work limit cut short keeps the figure, and another round is offered; the window
+        // walked with none found is a finished search and draws the next seed, as it always has (operator 2026-11-15, "1a")
         if (next.kind === 'not-decided') set({ lastNotDecided: { action: 'press', from: base, resume: next.resume, facts, seed } });
-        else set({ seed: next.seed, lastNotDecided: null });
+        else set({ seed: next.kind === 'found' ? next.seed : base, lastNotDecided: null });
       },
 
       continueSearch: (ask, newId) => {
