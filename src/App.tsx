@@ -102,6 +102,8 @@ import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
 import { figureExplainer } from '@/app/studentVocabulary';
 import { ANOTHER, act, armBasisGuard, jobStore, work } from '@/app/work';
 import { WorkingFace, useShownWorking, useWorking, workingDim } from '../shell/frame/WorkingMark';
+import { NotDecidedNote } from '../shell/frame/NotDecidedNote';
+import { isNotDecided } from '../shell/notDecided';
 
 // #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
 // without the work queue shows up the first time anyone presses it.
@@ -115,6 +117,14 @@ if (import.meta.env.DEV) armBasisGuard((message) => console.error(message));
 // Re-enabling is an operator decision: flip this AND delete the lock in
 // src/__tests__/theorems-disabled.test.ts, which exists to keep the surface from returning by accident.
 const THEOREMS_SURFACE: boolean = false;
+
+/** #2893 (ADR-831): which search stopped at its work limit, the round (or, for the audit, the step) to go on from, and the figure it was searched on. */
+interface NotDecidedAt {
+  where: 'another' | 'resolve' | 'audit';
+  round: number;
+  facts: Fact[];
+  seed: number;
+}
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -210,6 +220,10 @@ export default function App() {
   // #1467 (ADR-769, ADR-W-162): the points the last committed line created by reference, and the row its ✕ removes
   const [createdNotice, setCreatedNotice] = useState<CreatedNotice2D | null>(null);
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
+  // #2893 (ADR-831, ADR-W-210 phase 4): a search that reached its work limit before it decided. The operator's sentence
+  // with «המשיכו לחפש» shows where that search's own answer shows (the press's note, the input's note, the load's audit
+  // note), and only while the figure it was searched on is the one on screen. Never a fact, never in the undo history.
+  const [notDecidedAt, setNotDecidedAt] = useState<NotDecidedAt | null>(null);
   const [fileNote, setFileNote] = useState(''); // transient: why a figure file couldn't be loaded (FR-HS-10)
   // Persistent ADR-242 load-audit findings (issue #24). Unlike `fileNote` (a one-shot string), the audit note
   // must live exactly as long as the rows it flags: it is DERIVED from these findings against the current
@@ -240,6 +254,8 @@ export default function App() {
   // The ADR-242 load-audit note, DERIVED from the persistent findings against the current facts (issue #24):
   // a finding drops the moment its row is deleted / toggled off / ✎ re-lowered, so the note self-clears — no
   // timer, no orphaned banner. Empty ⇒ nothing shown.
+  const notDecidedFor = (where: NotDecidedAt['where']): NotDecidedAt | null =>
+    notDecidedAt && notDecidedAt.where === where && notDecidedAt.facts === facts && (where === 'audit' || notDecidedAt.seed === seed) ? notDecidedAt : null;
   const auditNote = useMemo(() => {
     const live = liveAuditFindings(facts, fileAudit);
     if (live.length === 0) return '';
@@ -557,6 +573,8 @@ export default function App() {
     // resolve's applyView merges into the load's own history entry (temporal paused there).
     void job.join(resolveAfterCommit());
     const audit = await geoJobs.audit(loaded.facts); // #2890 (ADR-830): in the geometry worker
+    // #2893 (ADR-831): an audit that reached its work limit is not a clean one: «המשיכו לחפש» audits the rest
+    setNotDecidedAt(audit.complete ? null : { where: 'audit', round: audit.resumeAt, facts: loaded.facts, seed: loaded.seed });
     if (audit.findings.length > 0) {
       setFileAudit(audit.findings); // note is DERIVED from these against live facts (issue #24) — self-clears
     } else if (refreshed.length > 0) {
@@ -745,12 +763,12 @@ export default function App() {
   const [resolvePending, setResolvePending] = useState(false);
   // #2874: it is always called from inside a job (a submit, an edit, a toggle, a load), which joins it — so
   // the working state stays up until the search settles, and it has no busy flag of its own to leave set.
-  const resolveAfterCommit = async () => {
+  const resolveAfterCommit = async (round = 0) => {
     await runViewResolve({
       getState: () => useGeoStore.getState(),
       meetsRequirements,
       // #41 (ADR-290): the config search runs in the geometry WORKER — the main thread stays free.
-      autoResolve: (facts, seed) => geoWork.autoResolve(facts, seed),
+      autoResolve: (facts, seed, r) => geoWork.autoResolve(facts, seed, r),
       applyView: (found) => {
         if (found.fold) primeFoldFor(found.facts, found.fold); // transplant — main replays at tail speed
         // the rewrite belongs to the SAME user action as the commit/load it follows — pause history
@@ -767,9 +785,24 @@ export default function App() {
       // #566 (ADR-445): an EXHAUSTED search is never silent — the figure stays (keep-prior forever
       // would hide a committed given); the note says the drawing could not honour everything at once.
       onExhausted: () => setInputNote(t('figure.noValidConfig')),
+      // #2893 (ADR-831): reached its work limit — not exhausted. The sentence and «המשיכו לחפש», where that note shows.
+      onNotDecided: (next, basis) => setNotDecidedAt({ where: 'resolve', round: next, facts: basis.facts, seed: basis.seed }),
       isCancelled,
+    }, round);
+  };
+  /** #2893 (ADR-831): «המשיכו לחפש» — one more round of the search that stopped, from where it stopped. */
+  const continueSearch = (nd: NotDecidedAt) => {
+    setNotDecidedAt(null);
+    if (nd.where === 'another') return void runResample(nd.round);
+    if (nd.where === 'resolve') return void work.run(() => resolveAfterCommit(nd.round));
+    void work.run(async () => {
+      const more = await geoJobs.audit(nd.facts, nd.round);
+      if (more.findings.length > 0) setFileAudit((had) => [...had, ...more.findings]);
+      if (!more.complete) setNotDecidedAt({ ...nd, round: more.resumeAt });
     });
   };
+  const notDecidedNote = (nd: NotDecidedAt | null, busy: boolean) =>
+    nd && <NotDecidedNote message={t('suite.notDecided.message')} continueLabel={t('suite.notDecided.continue')} onContinue={() => continueSearch(nd)} busy={busy} />;
 
   // The submit orchestration lives in src/app/submitPipeline.ts (S0.4 of docs/24) — extracted so the
   // routing (store-ops / grammar / clarifications / honesty gates / dry-run / LLM second attempt) is
@@ -1100,11 +1133,18 @@ export default function App() {
   // returns the whole COMPOSITE view, applied as ONE undo-tracked transition.
   // #2874: one job on the `ANOTHER` lane — `resampling` is that lane's derived state, and a second press
   // while the search runs is not taken.
-  const runResample = () => work.runIfIdle(resampleJob, { lane: ANOTHER }) ?? Promise.resolve();
-  const resampleJob = async () => {
+  const runResample = (round = 0) => work.runIfIdle(() => resampleJob(round), { lane: ANOTHER }) ?? Promise.resolve();
+  const resampleJob = async (round: number) => {
     try {
       const st = useGeoStore.getState();
-      const found = await geoWork.resample(st.facts, st.seed, (k, n) => setAltProgress(`${k}/${n}`));
+      const found = await geoWork.resample(st.facts, st.seed, (k, n) => setAltProgress(`${k}/${n}`), round);
+      // #2893 (ADR-831): the search reached its work limit before it decided — never «אין תצורה אחרת»
+      if (isNotDecided(found)) {
+        setAltNote('');
+        setNotDecidedAt({ where: 'another', round: found.resume.round, facts: st.facts, seed: st.seed });
+        logDebug({ kind: 'action', action: 'show-another', detail: `seed=${st.seed} round=${round}`, result: 'not-decided' });
+        return;
+      }
       const changed = found !== null;
       if (changed) jobStore().applyView(found!);
       logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found!.seed : st.seed}`, result: changed ? 'changed' : 'only-config' }); // #84
@@ -1365,13 +1405,12 @@ export default function App() {
               file" button. `fileNote` is a transient problem/refreshed message; `auditNote` is the ADR-242
               honesty audit DERIVED from live facts (issue #24), so it self-clears when its rows are fixed
               and carries a × to dismiss this load's note outright. */}
+          {/* #2893 (ADR-831): an audit that reached its work limit says so under that note, with «המשיכו לחפש» */}
+          {(fileNote || auditNote || notDecidedFor('audit')) && (
+            <div style={{ position: 'absolute', top: 48, insetInlineEnd: 8, maxWidth: 260, zIndex: 5, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(fileNote || auditNote) && (
             <div
               style={{
-                position: 'absolute',
-                top: 48,
-                insetInlineEnd: 8,
-                maxWidth: 260,
                 padding: '6px 10px',
                 background: '#fef2f2',
                 border: '1px solid #fca5a5',
@@ -1406,6 +1445,9 @@ export default function App() {
               )}
             </div>
           )}
+          {!fileNote && notDecidedNote(notDecidedFor('audit'), thinking)}
+            </div>
+          )}
         </div>
 
         {/* LEVEL 3 — figure actions UNDER the canvas (D7, B6-2d): things done TO the figure, the
@@ -1427,7 +1469,7 @@ export default function App() {
                   style={!canCycle || resampling ? rowAccentOffStyle : alt}
                   disabled={!canCycle || resampling}
                   title={t('actions.anotherHint')}
-                  onClick={() => void runResample()}
+                  onClick={() => { setNotDecidedAt(null); void runResample(); }}
                 >
                   <WorkingFace working={resampling} idle={t('actions.another')} busy={t('input.loading')} />
                 </button>
@@ -1448,6 +1490,7 @@ export default function App() {
               </span>
             )}
             {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
+            {notDecidedNote(notDecidedFor('another'), resampling)}
             {/* #973: the same choices, as one quiet line beside the button that cycles them — the row notes carry the detail. */}
             {unstated.length > 0 && !resamplingShown && (
               <span data-testid="unstated-choice-cue" style={{ fontSize: 12, color: '#b45309' }} title={unstated.map((c) => unstatedChoiceText(c, t)).join('\n')}>
@@ -1513,6 +1556,7 @@ export default function App() {
             {/* role="status" / aria-live (F6): a screen-reader student must HEAR that a step failed or
                 was partial — these appear after the submit completes, outside their focus. */}
             {inputNote && <span role="status" aria-live="polite" data-refusal="gate" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(inputNote)}>{inputNote}</span>}
+            {notDecidedNote(notDecidedFor('resolve'), thinking)}
             {renameNote && <span role="status" aria-live="polite" data-refusal="gate" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(renameNote)}>{renameNote}</span>}
             {llmDropped.length > 0 && (
               <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(llmDropped[0])}>

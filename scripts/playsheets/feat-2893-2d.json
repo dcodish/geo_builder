@@ -1,0 +1,96 @@
+{
+  "name": "feat-2893-2d",
+  "title": "#2893 phase 4 — a search that stops says so, and «המשיכו לחפש» goes on (2-D and complex, port 5180)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: «הציגו תצורה אחרת» on a heavy figure stops and says so; «המשיכו לחפש» searches on to the end",
+      "lines": [
+        "ABC משולש ישר זוית",
+        "AC=15",
+        "BC=10",
+        "חצי מעגל שקוטרו AB העובר דרך C"
+      ],
+      "after": [
+        {
+          "click": "הציגו תצורה אחרת"
+        },
+        {
+          "click": "המשיכו לחפש"
+        }
+      ],
+      "lookFor": "Type the four lines and press «הציגו תצורה אחרת». After a few seconds of «חושב…» (about 5 s on the dev PC) the row under the canvas reads «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with a button «המשיכו לחפש»; the figure has not moved. Press «המשיכו לחפש»: «חושב…» again for a few seconds, then the search FINISHES and says «אין תצורה אחרת — הצורה נקבעה (רק הגודל/המיקום משתנים)», and the sentence is gone.",
+      "before": "On prod the press thinks for about 10 seconds and then says «אין תצורה אחרת — הצורה נקבעה» (measured 10.3 s on the dev PC, inside its 12 s clock). Here it asks after ~5.6 s and finishes after one «המשיכו לחפש» (~5.8 s more)."
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: a search that finishes and finds nothing keeps today's answer",
+      "lines": [
+        "מעגל O",
+        "A על המעגל"
+      ],
+      "after": [
+        {
+          "click": "הציגו תצורה אחרת"
+        }
+      ],
+      "expect": [
+        "אין תצורה אחרת"
+      ],
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "Press «הציגו תצורה אחרת»: «אין תצורה אחרת — הצורה נקבעה (רק הגודל/המיקום משתנים)» beside the button, as today; no «המשיכו לחפש».",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "title": "2-D: the defining interaction builds exactly as before",
+      "lines": [
+        "ריבוע ABCD",
+        "נקודה G על AD",
+        "זווית GBA = 37"
+      ],
+      "expectRows": [
+        "ריבוע ABCD",
+        "נקודה G על AD",
+        "∠GBA = 37"
+      ],
+      "expectFigure": [
+        "G"
+      ],
+      "lookFor": "The square, G on AD, the 37° angle at B; three green rows.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "complex",
+      "base": "http://localhost:5180",
+      "path": "/complex.html",
+      "title": "complex: a conflicting line is refused naming the earlier line, as today",
+      "lines": [
+        "z1 = 1 + i",
+        "z1 = 2"
+      ],
+      "expectRefusal": "z1",
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "The second line is refused with today's sentence naming «z1 = 1 + i»; no «המשיכו לחפש».",
+      "before": "unchanged (a regression guard)."
+    }
+  ]
+}

@@ -10,7 +10,8 @@
  *  E6  rename/swap accept subscripted points (O1) and seg-style keys track them.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { replay, replayStats, firstSatisfyingSeed, findValidConfig, useGeoStore } from '../geoStore';
+import { replay, replayStats, firstSatisfyingSeed, useGeoStore } from '../geoStore';
+import { findValidConfigRound } from '@/replay/core';
 import type { Fact } from '../geoStore';
 import type { AnyCommand } from '@/engine';
 
@@ -91,7 +92,7 @@ describe('E2 — the config search honours its wall-clock budget', () => {
   it('findValidConfig with a zero budget exits early (null) instead of the full search', () => {
     const t0 = Date.now();
     // meetsRequirements at the entry seed may pass or fail; with budget 0 every sweep loop exits at once.
-    findValidConfig([...EXT_FACTS], 0, 0);
+    findValidConfigRound([...EXT_FACTS], 0, 0, 0); // #2893: the three-outcome form (a cut is "not decided", never null)
     expect(Date.now() - t0).toBeLessThan(4000);
   });
 });

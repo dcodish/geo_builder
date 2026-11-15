@@ -202,6 +202,8 @@ async function driveCase(browser, spec, outDir, prefix) {
         if (st.click !== undefined) {
           const btn = page.getByRole('button', { name: st.click, exact: true }).first();
           const label = page.locator('label', { hasText: st.click }).first();
+          // #2893: a control a search puts up when it ends («המשיכו לחפש») appears only then: wait for it, up to a minute
+          await btn.or(label).first().waitFor({ state: 'visible', timeout: 60000 }).catch(() => {});
           const target = (await btn.count()) ? btn : (await label.count()) ? label : null;
           if (!target) {
             steps.push({ line: `(press «${st.click}»)`, refusals: [`no control reading «${st.click}»`] });

@@ -14,7 +14,8 @@ import { applyStep } from '../step';
 import { lower } from '../lower';
 import type { Command, Construction, Constraint, GeoObject } from '../types';
 import { ctxOf, factsOf } from '../../__tests__/scenario-pipeline';
-import { dryRunOutcome, replay, seatRescue } from '@/replay/core';
+import { dryRunOutcome, replay, seatRescue, SEARCH_WORK_LIMIT } from '@/replay/core';
+import { withSearchLimit } from '../solveBudget';
 import { trialFacts } from '@/store/geoStore';
 import { parse } from '@/parser';
 
@@ -162,7 +163,7 @@ describe('#1441 arm 3 — the seat yields at the gate (ADR-551 Am. 1)', () => {
   it('the shared sweep finds the reseat the autoResolve applies, stated lengths exact', () => {
     const facts = factsOf(['משולש ישר זווית ABC', 'AB=3'] as never);
     const all = trialFacts(facts, cmdsOf(facts, 'BC=4'));
-    const found = seatRescue(all, Date.now() + 10_000);
+    const found = withSearchLimit(SEARCH_WORK_LIMIT, () => seatRescue(all)).value; // #2893: under a search's work limit (it was a 10 s clock)
     expect(found, 'a flipped seat admits the whole figure').not.toBeNull();
     const fig = replay(found!.facts, found!.seed);
     expect(fig.lastError).toBeNull();

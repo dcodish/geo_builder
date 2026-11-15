@@ -12,8 +12,7 @@
  * Cancellation is by TERMINATION (the client kills and respawns the worker): a JS worker cannot be interrupted
  * mid-computation any other way.
  */
-import { WORKER_SEARCH_BUDGET_MS } from '@/replay/core';
 import { serveWorker } from '../../shell/workerHost';
 import { geoOps, takeCheckpoint } from './geoOps';
 
-serveWorker(geoOps({ searchBudgetMs: WORKER_SEARCH_BUDGET_MS, crossing: true }), { seed: takeCheckpoint });
+serveWorker(geoOps({ crossing: true }), { seed: takeCheckpoint }); // #2893 (ADR-831): the searches' limit is work, the same in every heap
