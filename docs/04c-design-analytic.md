@@ -1349,6 +1349,15 @@ trace, repairs) pass no anchor.
 
 *Identifiers:* `ANCHOR_LAMBDA` · `ANCHOR_WINDOW` · `NEWTON_RATIO` · `ANCHOR_MIN_PULL` · `ANCHOR_RAISES` · `POLISH_ITER`
 
+**One solve never evaluates one point twice ([ADR-AG-480](06c-decisions-analytic.md#adr-ag-480), #2894).** `solveLM`'s
+residual function is wrapped in `servingRepeatedPoints`: within the one solve, residuals already computed at a point bit
+for bit equal to the one asked are returned again. That serves the residuals at the iterate (the cost takes them, then
+the top of the next iteration asked again), the whole central-difference Jacobian after a rejected step (the iterate has
+not moved: 3-D's `leastSquares` caches its Jacobian for the same reason, ADR-3D-210) and the finish's re-reads. Measured,
+31.9 % of every evaluation was such a repeat. The residual functions are pure in the point and no caller writes into a
+returned vector, so the iterates and the result are unchanged; the table is the solve's own. `freeRank` and the finish's
+own `solveLM` are separate solves with their own tables.
+
 ### The legibility bound (sr-25) ([ADR-AG-359](06c-decisions-analytic.md#adr-ag-359), ADR-W-175)
 
 One predicate, `legibleAt(c, at, extent)` (`engine/evaluate.ts`, over `rings.ts` `legibilityFaults`): every FREE corner of a

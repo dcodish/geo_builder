@@ -1615,6 +1615,33 @@ export interface SolveResult {
 }
 
 /**
+ * #2894 ([ADR-AG-480](../../docs/06c-decisions-analytic.md#adr-ag-480), ADR-W-210 phase 5) — AN EXACT REPEAT IS SERVED.
+ *
+ * Within ONE solve, a residual vector already computed at a point bit-for-bit equal to `x` is returned again instead of
+ * being computed again. A residual function is a pure function of its point for the life of a solve, so the iterates,
+ * the result and every verdict built on it are unchanged; only the work meter sees the evaluation that did not happen.
+ * Nothing outlives the solve (the map is the call's). The returned array is shared with the first caller, and no caller
+ * writes into a residual vector. A point with a NaN coordinate is never served (NaN has more than one bit pattern).
+ * 3-D's `leastSquares` reaches the same end by caching its Jacobian (ADR-3D-210); this serves every repeat the
+ * analytic loop makes, wherever it makes it.
+ */
+function servingRepeatedPoints(f: (x: number[]) => number[]): (x: number[]) => number[] {
+  const seen = new Map<string, number[]>();
+  return (x) => {
+    let key = '';
+    for (const v of x) {
+      if (Number.isNaN(v)) return f(x);
+      key += (Object.is(v, -0) ? '-0' : String(v)) + ',';
+    }
+    const hit = seen.get(key);
+    if (hit) return hit;
+    const r = f(x);
+    seen.set(key, r);
+    return r;
+  };
+}
+
+/**
  * Levenberg–Marquardt over the free carriers.
  *
  * Gauss–Newton alone diverges on the corpus's own figures — an area constraint is quadratic in the
@@ -1640,10 +1667,13 @@ export function solveLM(
 ): SolveResult {
   // #2873 (ADR-W-210): one residual evaluation is analytic's unit of work. The rank and the finishing solve below are
   // handed the bare function, because each meters its own evaluations.
-  const residuals = (v: number[]): number[] => {
+  // #2894 (ADR-W-210 phase 5): a point this solve has already evaluated is served, not evaluated again — the residuals at
+  // the iterate (taken by the cost, then again at the top of the next iteration), the whole Jacobian after a rejected
+  // step (x has not moved), the finish's re-reads. Measured: 31.9 % of every evaluation was such a repeat.
+  const residuals = servingRepeatedPoints((v: number[]): number[] => {
     meterWork();
     return residuals0(v);
-  };
+  });
   const n = x0.length;
   /*
    * A DETERMINED START IS NOT ANCHORED (round #2627, ruling 2026-10-30 "5 A"): with no free direction at the start

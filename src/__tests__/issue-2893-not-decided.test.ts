@@ -15,7 +15,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { clearReplayCaches, findValidConfigRound, meetsRequirements, searchAnotherViewRound, SEARCH_WORK_LIMIT, type Fact } from '@/replay/core';
-import { work } from '@/engine/solveBudget';
+import { repeatConfig, work } from '@/engine/solveBudget';
+import { readWork } from '../../shell/workMeter';
 import { deserializeFigure } from '@/store/figureFile';
 import { isNotDecided } from '../../shell/notDecided';
 import { factsOf } from './scenarios-corpus';
@@ -70,6 +71,28 @@ describe('#2893 — «הציגו תצורה אחרת» on «ABC משולש יש�
     // so their seeded tails are solved again; the folds are not)
     expect(r0.executed + r1.executed, 'both rounds together cost little more than one long search').toBeLessThan(alone.executed * 1.35);
   }, 900_000);
+});
+
+describe('#2893 with #2894 — a repeat the solver serves counts against the limit as a computed one does', () => {
+  it('the press stops at the same charged unit, with the same resume, with and without the repeat table', () => {
+    const run = (serve: boolean) => {
+      repeatConfig.serve = serve;
+      try {
+        clearReplayCaches();
+        const { facts, seed } = semicircle();
+        const m0 = readWork().total;
+        const r = searchAnotherViewRound(facts, seed, 0);
+        return { outcome: r, metered: readWork().total - m0 };
+      } finally {
+        repeatConfig.serve = true;
+      }
+    };
+    const off = run(false);
+    const on = run(true);
+    expect(isNotDecided(off.outcome), 'the limit cut the press').toBe(true);
+    expect(on.outcome, 'the same stop: the same charged units spent, the same round to resume').toEqual(off.outcome);
+    expect(on.metered, 'and repeats were served inside it (the meter fell)').toBeLessThan(off.metered);
+  }, 600_000);
 });
 
 describe('#2893 — the configuration search after the #1768 kite line «שטח משולש NCE = שטח משולש ACD»', () => {
