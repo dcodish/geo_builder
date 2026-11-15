@@ -22,6 +22,7 @@ import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { componentOf, minimalComponentOf } from './components';
 import { reachImpossibility } from './reachFeasibility';
+import { metricClosureImpossibility } from './metricClosure';
 import {
   angleSumImpossibility,
   angleSumImpossibilityError,
@@ -817,6 +818,21 @@ function brokenEarlierGivens(prev: Construction, next: Construction, primary: Ev
   return out;
 }
 
+/**
+ * #2894 (ADR-833): no rung of the failure ladder can find a figure for `next` — the metric closure proves its lengths
+ * hold in no configuration, the prior figure's do (a proof already true of `prev` is never this step's), and no
+ * rung's evaluate can stop at a tangent crossing (a line or circle crossing a circle, or an on-circle point a
+ * collinearity could drive): that refusal would outrank the over-constraint's.
+ */
+/** #2894 (ADR-833): off only in the lock that the proven refusal reads exactly as the climbed one. */
+export const ladderProofConfig = { exit: true };
+function provenUnreachable(prev: Construction, next: Construction): boolean {
+  if (!ladderProofConfig.exit) return false;
+  if (next.objects.some((o) => o.kind === 'line-circle' || o.kind === 'circle-circle')) return false;
+  if (next.objects.some((o) => o.kind === 'on-circle') && [...next.constraints, ...drivenConstraintsOf(next)].some((k) => k.type === 'collinear')) return false;
+  return metricClosureImpossibility(next) !== null && metricClosureImpossibility(prev) === null;
+}
+
 function runFailureLadder(
   prev: Construction,
   next: Construction,
@@ -826,6 +842,15 @@ function runFailureLadder(
   trace: string[],
   prefix: 'main' | 'm1' | 'coupled',
 ): StepResult {
+  // #2894 ([ADR-833](../../docs/06-decisions.md#adr-833)): the ladder's own refusal, at once, when no rung can succeed.
+  // The metric closure proves that NO figure holds `next`'s lengths (its obligations and its objects' parameter-free
+  // structure, with margins wider than the solver's acceptance), so every rung's evaluate fails and none sees a
+  // solution to refuse as not a figure: the climb would end at the refusal below with nothing found, which is this
+  // one, word for word. A figure in which a rung's evaluate could meet a tangent crossing is left to the climb (that
+  // rung's tangent refusal would be the reason instead).
+  if (!primary.ok && provenUnreachable(prev, next)) {
+    return { ok: false, error: blameNewStatement(primary.error, addedConstraints(prev, next), primary.violated), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:proven`, `${prefix}:refuse`] };
+  }
   // THE PRESERVATION GATE (issue #258, [ADR-402](../../docs/06-decisions.md#adr-402)) — a rescue stage
   // may not LOSE an obligation `next` carried. The rescue stages bake, replace, and re-point carriers,
   // and an obligation whose ONLY copy lives inside a carrier (driveOrCheck case (1) embeds without
