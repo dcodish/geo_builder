@@ -1877,6 +1877,14 @@ pure function of the point for the life of the call, so the descent is unchanged
 `work.done`, `work.executed` and the open ledger frame's `own` by exactly what the first evaluation advanced them, so
 every work budget, the re-attempt cap and every memo entry's ledger read what they read before; only the work meter's
 executed count falls. Nothing is kept between calls.
+
+**A view that fails at every seed is tried at one ([ADR-834](06-decisions.md#adr-834), #2894).** A seed enters a replay
+only in its tail (the sample and one evaluate); the fold is the fact list's alone. So a view whose fold failed (its build
+error, a row it filed as failed) or whose construction has nothing to sample fails at every seed, and the configuration
+searches (`firstSatisfyingSeed`, `findValidConfig`, the choice and seat sweeps under a search's limit, «הציגו תצורה
+אחרת») stop retrying it: `failsAtEverySeed` (`replay/core.ts`) reads the fold a Derived was drawn from, recorded only
+when that fold ran whole. The seeds skipped are seeds that fail, so which view a search returns is unchanged; under its
+work limit it gets further.
 ### The knowledge pool of a DETERMINED figure is its admissible set (#434, [ADR-509](06-decisions.md#adr-509))
 
 The relations layer's definite values, the values panel and the forced crossing dots read one shared pool
