@@ -4938,6 +4938,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const missing = missingPoint(c, [vertex, p, q]);
       if (missing) return { ok: false, error: missing };
       if (cmd.min !== undefined && cmd.max !== undefined && cmd.min >= cmd.max) return { ok: false, error: { code: 'bound-unsatisfiable', id: vertex } };
+      // #2893 (ADR-3D-494): an angle lies in [0°, 180°], so a range outside it is decided without a search, as above: refused
+      if ((cmd.min !== undefined && cmd.min >= 180) || (cmd.max !== undefined && cmd.max <= 0)) return { ok: false, error: { code: 'bound-unsatisfiable', id: vertex } };
       const next = clone(c);
       for (const arm of [p, q]) if (!hasSegment(next, vertex, arm)) next.segments.push([vertex, arm]);
       next.requirements.push({ kind: 'angle-bound', vertex, p, q, min: cmd.min, max: cmd.max });

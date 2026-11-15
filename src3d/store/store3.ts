@@ -48,7 +48,7 @@ import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engi
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../lexicon/marks3';
-import { checkInSpan, clearEngineCaches3, componentValue, crossingOnInk3, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, clearEngineCaches3, componentValue, crossingOnInk3, declaredRingCrossed3, evaluate3, searchSeed3, type SeedResume3, type SeedSearch3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
@@ -316,10 +316,10 @@ export type StoreError3 =
  * `status` — and `submit` refuses it (keep-prior), so a wrong answer or an
  * unsatisfiable condition can never silently sit on the figure.
  */
-/** The first seed at/after `from` whose figure meets every stated requirement, or null when none does
- *  within budget (ADR-3D-053). Requirement-free figures return `from` immediately — the search costs
- *  nothing for the figures that state no inequality. */
-function seedForRequirements(facts: Fact3[], from: Seed3): Seed3 | null {
+/** The first seed at/after `from` whose figure meets every stated requirement (ADR-3D-053), or "not decided" when the
+ *  search reached its work limit first (#2893, ADR-3D-494: one round; `resume` goes on from where the last stopped).
+ *  Requirement-free figures return `from` immediately — the search costs nothing for the figures that state no inequality. */
+function seedForRequirements(facts: Fact3[], from: Seed3, resume?: SeedResume3): SeedSearch3 {
   const d = derive3(facts, from);
   const construction = d.construction;
   // #817 (ADR-3D-176): the short-circuit used to be «no stated requirements ⇒ any seed will do», which
@@ -329,8 +329,8 @@ function seedForRequirements(facts: Fact3[], from: Seed3): Seed3 | null {
   // Judged first on the resolution we ALREADY have, so the common (non-degenerate) case still returns
   // `from` without a single extra solve.
   // #1986 (ADR-3D-418): ...and a declared ring drawn crossed asks the sweep too (its preference tier), judged the same way.
-  if (construction.requirements.length === 0 && !solidFaceCollapsed(construction, d.positions) && !declaredRingCrossed3(construction, d.positions)) return from;
-  return firstSatisfyingSeed3(construction, from);
+  if (!resume && construction.requirements.length === 0 && !solidFaceCollapsed(construction, d.positions) && !declaredRingCrossed3(construction, d.positions)) return { kind: 'found', seed: from };
+  return searchSeed3(construction, from, resume);
 }
 
 /**
@@ -341,7 +341,9 @@ function seedForRequirements(facts: Fact3[], from: Seed3): Seed3 | null {
  */
 function loadedSeed3(facts: Fact3[], seed: Seed3): Seed3 {
   if (facts.length === 0 || partsOf3(derive3(facts, seed).construction).length < 2) return seed;
-  return seedForRequirements(facts, seed) ?? seed;
+  // #2893: a search that ran out opens the figure at its saved configuration, as a search that found nothing did
+  const r = seedForRequirements(facts, seed);
+  return r.kind === 'found' ? r.seed : seed;
 }
 
 /**
@@ -2646,6 +2648,11 @@ export interface Geo3State {
    * silently, so that case sets no notice.
    */
   lastNotice: { code: 'already-held' } | { code: 'vertex-angle-read-as'; angles: string } | null;
+  /** #2893 (ADR-3D-494): the last action's configuration search reached its work limit: what to go on with. Transient
+   *  (never in the history, never saved); the page shows it while the store holds the figure it was made on. */
+  lastNotDecided: NotDecided3 | null;
+  /** #2893: one more round of that search, from where it stopped («המשיכו לחפש»). */
+  continueSearch: (ask: SearchAsk3, newId?: () => string) => void;
   /** #1467 (ADR-3D-382): the points the last recorded line created by reference, and that line's fact id — what the
    *  «נוצרה נקודה חדשה …» notice names; its ✕ removes the fact. Null after any other verdict. */
   lastCreated: { factId: string; ids: readonly string[]; circle?: string } | null;
@@ -2666,7 +2673,7 @@ export interface Geo3State {
    *  changes; `lastError` names why — the shared FactList keeps its editor open on false).
    *  An edit that orphans a DEPENDENT commits and the dependent flags on its own row — the same
    *  reversible auto-drop contract as `toggle`, this product's honesty surface. */
-  replaceFact: (factId: string, utterance: string) => boolean;
+  replaceFact: (factId: string, utterance: string, resume?: SeedResume3) => boolean;
   /** #578 (ADR-3D-211): re-letter a point across the whole fact list — history is rewritten, so the
    *  figure is exactly what it would have been had the student typed the new letter from the start.
    *  One undoable step. Also reached from the text command, intercepted in `submit`. */
@@ -2707,7 +2714,7 @@ export interface Geo3State {
    *  reset by `clear`. */
   figureName: string;
   setFigureName: (name: string) => void;
-  resample: () => void;
+  resample: (resume?: { from: Seed3; resume: SeedResume3 }) => void;
   dismissError: () => void;
   /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
   loadFigure: (facts: Fact3[], seed: Seed3, queries?: string[], planeDisplay?: PlaneDisplayMode3Map, displayMode?: DisplayModeMap, dihedralShown?: DihedralShownMap) => void;
@@ -3128,12 +3135,28 @@ export type Verdict3 =
   | { readonly kind: 'retick'; readonly twin: Fact3; readonly facts: Fact3[] }
   /** `readAs` (#1942): the polygon angle a lone vertex was read as — said aloud on the committed step, 2-D's note.
    *  `held` (#2790, ADR-3D-484, ADR-W-200): the figure already holds the line — it is its own row, with the notice. */
-  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: Seed3; readonly readAs?: readonly string[]; readonly held?: true };
+  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: Seed3; readonly readAs?: readonly string[]; readonly held?: true }
+  /** #2893 (ADR-3D-494): the configuration search reached its work limit before a configuration met the line's
+   *  requirements — neither accepted nor refused; nothing is added. `resume` goes on from where it stopped. */
+  | { readonly kind: 'not-decided'; readonly utterance: string; readonly resume: SeedResume3 };
+
+/**
+ * #2893 ([ADR-3D-494](../../docs/06b-decisions-3d.md#adr-3d-494)) — A SEARCH THAT REACHED ITS LIMIT, as the page offers to
+ * go on with it: which action, its input, and where the search stopped. Plain data (it crosses to the worker as the
+ * argument of `continueSearch`). Never a fact, never in the undo history.
+ */
+export type SearchAsk3 =
+  | { readonly action: 'submit'; readonly utterance: string; readonly resume: SeedResume3 }
+  | { readonly action: 'edit'; readonly factId: string; readonly utterance: string; readonly resume: SeedResume3 }
+  | { readonly action: 'press'; readonly from: Seed3; readonly resume: SeedResume3 };
+/** The ask, with the figure it was made on: shown only while the store still holds that figure. */
+export type NotDecided3 = SearchAsk3 & { readonly facts: Fact3[]; readonly seed: Seed3 };
 
 export function decideSubmit3(
   st: { facts: Fact3[]; seed: Seed3 },
   raw: string,
   newId: () => string = rowId3,
+  resume?: SeedResume3,
 ): Verdict3 {
   const utterance = ingestTypedText(raw); // #751 (ADR-W-029) — the store-side ingest invariant
   // #578 (ADR-3D-211): «שנה שם E ל-O» is a rewrite of HISTORY, not a statement about the figure,
@@ -3148,7 +3171,7 @@ export function decideSubmit3(
   if (rw?.kind === 'rename') return { kind: 'rename', from: rw.from, to: rw.to };
   const read = readStatement3(st, utterance);
   if (!read.ok) return read.error.code === 'not-understood' ? { kind: 'not-understood' } : { kind: 'refused', error: read.error };
-  const v = decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true, unread: read.unread, readExtent: true }, newId);
+  const v = decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true, unread: read.unread, readExtent: true, resume }, newId);
   return v.kind === 'record' && read.readAs ? { ...v, readAs: read.readAs } : v;
 }
 
@@ -3161,7 +3184,7 @@ export function decideCommands3(
   st: { facts: Fact3[]; seed: Seed3 },
   utterance: string,
   commands: readonly Command3[],
-  opts: { twins: boolean; seedSearch: boolean; unread?: readonly string[]; readExtent?: boolean; lane?: 'grammar' | 'model' },
+  opts: { twins: boolean; seedSearch: boolean; unread?: readonly string[]; readExtent?: boolean; lane?: 'grammar' | 'model'; resume?: SeedResume3 },
   newId: () => string = rowId3,
 ): Verdict3 {
   const { facts, seed } = st;
@@ -3241,11 +3264,12 @@ export function decideCommands3(
   }
   if (!opts.seedSearch) return { kind: 'record', fact, facts: candidate, seed };
   // ADR-3D-053 (#273): a stated inequality determines nothing, so it can only be honoured by
-  // CHOOSING a configuration that satisfies it. Land on one before drawing; if none exists within
-  // budget, refuse and keep the prior figure rather than draw a figure that contradicts the given.
-  const found = seedForRequirements(candidate, seed);
-  if (found === null) return { kind: 'refused', error: { code: 'bound-unsatisfiable', id: '' } };
-  return { kind: 'record', fact, facts: candidate, seed: found };
+  // CHOOSING a configuration that satisfies it. Land on one before drawing.
+  // #2893 (ADR-3D-494): a search that reaches its work limit first has not shown that none exists: the line is
+  // neither added nor refused, and the student is offered another round from where it stopped.
+  const found = seedForRequirements(candidate, seed, opts.resume);
+  if (found.kind === 'not-decided') return { kind: 'not-decided', utterance: utterance.trim(), resume: found.resume };
+  return { kind: 'record', fact, facts: candidate, seed: found.seed };
 }
 
 /**
@@ -3433,6 +3457,7 @@ export const useGeo3 = create<Geo3State>()(
       figureName: '',
       lastError: null,
       lastNotice: null,
+      lastNotDecided: null,
       lastCreated: null,
 
       submit: (utterance, newId) => {
@@ -3442,7 +3467,14 @@ export const useGeo3 = create<Geo3State>()(
 
       dispatchVerdict: (v) => {
         if (v.kind !== 'record') set({ lastCreated: null }); // #1467: the notice speaks for the last line only
+        set({ lastNotDecided: null });
         switch (v.kind) {
+          case 'not-decided': {
+            // #2893: nothing is added and nothing is refused; the line waits for another round
+            const { facts, seed } = get();
+            set({ lastError: null, lastNotice: null, lastNotDecided: { action: 'submit', utterance: v.utterance, resume: v.resume, facts, seed } });
+            return;
+          }
           case 'rename':
             get().rename(v.from, v.to);
             return;
@@ -3500,9 +3532,10 @@ export const useGeo3 = create<Geo3State>()(
         set({ facts: next, lastError: dependentsBroken(facts, next, seed, target) });
       },
 
-      replaceFact: (factId, utterance) => {
+      replaceFact: (factId, utterance, resume) => {
         utterance = ingestTypedText(utterance); // #751 (ADR-W-029)
         const { facts, seed } = get();
+        set({ lastNotDecided: null });
         const old = facts.find((f) => f.id === factId);
         if (!old) return false;
         // #1394: the same reader as `submit` — the #866 one-angle repair and the #516 typed refusals
@@ -3532,15 +3565,16 @@ export const useGeo3 = create<Geo3State>()(
           set({ lastError: st }); // keep-prior: the old statement stands
           return false;
         }
-        const found = seedForRequirements(candidate, seed);
-        if (found === null) {
-          set({ lastError: { code: 'bound-unsatisfiable', id: '' } });
+        const found = seedForRequirements(candidate, seed, resume);
+        if (found.kind === 'not-decided') {
+          // #2893 (ADR-3D-494): the old statement stands, the editor stays open, and another round is offered
+          set({ lastError: null, lastNotDecided: { action: 'edit', factId, utterance: utterance.trim(), resume: found.resume, facts, seed } });
           return false;
         }
         // #926: the edit is committed (it passed its own gate), but an edit that took OTHER rows from
         // green to red — «∠SAB = α» → «∠SAB = 40» leaves «α = 70» with no letter to bind — is not a bare
         // success: `lastError` names them. `true` still means "committed" (the editor closes on it).
-        set({ facts: candidate, seed: found, lastError: dependentsBroken(facts, candidate, found, old) });
+        set({ facts: candidate, seed: found.seed, lastError: dependentsBroken(facts, candidate, found.seed, old) });
         return true;
       },
 
@@ -3629,12 +3663,21 @@ export const useGeo3 = create<Geo3State>()(
       // requirement (ADR-3D-053). Was a blind `seed + 1`, which could show a drawing contradicting a
       // stated bound; with no requirements the search accepts the very next seed, so behaviour is
       // unchanged for every figure that states none.
-      resample: () => {
+      resample: (more) => {
         const { facts, seed } = get();
         // #2764 (ADR-3D-454): a plain-number press — every part walks to its own first good seed from the next base
-        const base = seedNumber3(seed) + 1;
-        const next = seedForRequirements(facts, base);
-        set({ seed: next ?? base });
+        const base = more?.from ?? seedNumber3(seed) + 1;
+        const next = seedForRequirements(facts, base, more?.resume);
+        // #2893 (ADR-3D-494): a search that ran out used to draw the next seed anyway (`next ?? base`), a drawing the
+        // requirements had not been checked to hold in; now the figure stays, and another round is offered
+        if (next.kind === 'not-decided') set({ lastNotDecided: { action: 'press', from: base, resume: next.resume, facts, seed } });
+        else set({ seed: next.seed, lastNotDecided: null });
+      },
+
+      continueSearch: (ask, newId) => {
+        if (ask.action === 'submit') get().dispatchVerdict(decideSubmit3(get(), ask.utterance, newId, ask.resume));
+        else if (ask.action === 'edit') get().replaceFact(ask.factId, ask.utterance, ask.resume);
+        else get().resample({ from: ask.from, resume: ask.resume });
       },
 
       dismissError: () => set({ lastError: null }),

@@ -30,7 +30,7 @@ import { readFigure3, readValues3 } from './readers3';
 export type StoreData3 = Pick<Geo3State, 'facts' | 'seed' | 'queries' | 'planeDisplay' | 'displayMode' | 'dihedralShown'>;
 
 /** The store actions a job may name. Each is the store's own, called with the job's arguments. */
-export type StoreAction3 = 'submit' | 'dispatchVerdict' | 'submitSteps' | 'toggle' | 'remove' | 'replaceFact' | 'rename' | 'swap' | 'clear' | 'resample' | 'loadFigure' | 'addQuery';
+export type StoreAction3 = 'submit' | 'dispatchVerdict' | 'submitSteps' | 'toggle' | 'remove' | 'replaceFact' | 'rename' | 'swap' | 'clear' | 'resample' | 'loadFigure' | 'addQuery' | 'continueSearch';
 
 /** One step of a student's action, as both heaps run it. */
 export type Step3 =
@@ -107,7 +107,7 @@ export function ops3() {
     act(args: ActArgs3, ctx: OpContext): Journal3 {
       const rec = recordJournal3();
       try {
-        useGeo3.setState({ ...args.state, lastError: null, lastNotice: null, lastCreated: null });
+        useGeo3.setState({ ...args.state, lastError: null, lastNotice: null, lastCreated: null, lastNotDecided: null });
         useGeo3.temporal.getState().clear(); // a worker's store keeps no history: every job brings its state
         useRowIds3(args.ids);
         try {

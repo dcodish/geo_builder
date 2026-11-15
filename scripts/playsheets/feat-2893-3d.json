@@ -1,0 +1,139 @@
+{
+  "name": "feat-2893-3d",
+  "title": "#2893 phase 4 — 3-D: a search that runs out says «עדיין לא נמצא פתרון» and offers to keep searching (PR, port 5188)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: a range no drawing reaches — the tool says it has not found one yet, and «המשיכו לחפש» searches again",
+      "lines": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "179 < ∠SAB < 180"
+      ],
+      "after": [
+        {
+          "click": "המשיכו לחפש"
+        }
+      ],
+      "expectRows": [
+        "פירמידה ABCDS שבסיסה ריבוע"
+      ],
+      "expect": [
+        "עדיין לא נמצא פתרון",
+        "המשיכו לחפש"
+      ],
+      "lookFor": "Type the two lines. After the second, «חושב…» for about 10 seconds, then under the box: «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with a button «המשיכו לחפש». The line stays in the box and is not added (one row). Press «המשיכו לחפש»: about 10 seconds more, and the same sentence again. Then type something else in the box: the sentence goes away.",
+      "before": "On prod the line is refused at once: «אין תצורה של הציור שבה הזווית נמצאת בתחום הזה, ולכן הנתון לא נוסף. בדקו את גבולות התחום.»"
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: a range on a figure the solver places — the sentence comes after about 10 seconds, not after minutes",
+      "lines": [
+        "ריבוע ABCD",
+        "קטע AS",
+        "|SA| = 5",
+        "179 < ∠SAB < 180"
+      ],
+      "expectRows": [
+        "ריבוע ABCD",
+        "קטע AS",
+        "|SA| = 5"
+      ],
+      "expect": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "Three rows; the fourth line stays in the box and the sentence with «המשיכו לחפש» shows about 10 seconds after Enter.",
+      "before": "On prod the page freezes for nearly two minutes (measured 114 s), then refuses the line."
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: a range a drawing does reach is added at once, with no question",
+      "lines": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "30 < ∠SAB < 85"
+      ],
+      "expectRows": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "30 < ∠SAB < 85"
+      ],
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "Two rows, the pyramid drawn; no sentence.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: a wrong claim is still refused, word for word",
+      "lines": [
+        "קובייה ABCD",
+        "∠BAC = 60"
+      ],
+      "expectRefusal": "הטענה לא מתקיימת בציור",
+      "lookFor": "«הטענה לא מתקיימת בציור — בדקו את החישוב»; one row; no «המשיכו לחפש».",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T5",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: «הציגו תצורה אחרת» on a figure with a range still redraws, with no question",
+      "lines": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "30 < ∠SAB < 85"
+      ],
+      "cycles": 2,
+      "expectRows": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "30 < ∠SAB < 85"
+      ],
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "Each press draws another pyramid; no sentence.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T6",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: an ordinary figure and «הציגו תצורה אחרת» are untouched",
+      "lines": [
+        "קובייה ABCD",
+        "M אמצע BB'"
+      ],
+      "cycles": 1,
+      "expectRows": [
+        "קובייה ABCD",
+        "M אמצע BB'"
+      ],
+      "expectFigure": [
+        "M"
+      ],
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "The cube and M on BB′; the press redraws.",
+      "before": "unchanged (a regression guard)."
+    }
+  ]
+}

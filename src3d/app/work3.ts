@@ -56,7 +56,7 @@ export const work3 = createWorkQueue<Basis3>({
 export const MODEL = 'model';
 
 /** The store actions that write the figure's basis: each is reached from a component only as a job. */
-export const JOB_ACTIONS_3 = ['submit', 'dispatchVerdict', 'submitSteps', 'toggle', 'remove', 'replaceFact', 'rename', 'swap', 'clear', 'resample', 'loadFigure'] as const;
+export const JOB_ACTIONS_3 = ['submit', 'dispatchVerdict', 'submitSteps', 'toggle', 'remove', 'replaceFact', 'rename', 'swap', 'clear', 'resample', 'loadFigure', 'continueSearch'] as const;
 
 const DISPLAY = 'a display preference: `derive3` does not read it';
 

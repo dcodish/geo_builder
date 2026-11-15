@@ -338,6 +338,20 @@
         "z1 = 2"
       ],
       "lookFor": "The second line is refused with today's sentence naming «z1 = 1 + i»; no «המשיכו לחפש»."
+    },
+    {
+      "sheet": "feat-2893-3d",
+      "id": "T4",
+      "kind": "3d:assertion",
+      "queued": "2026-11-14",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCD",
+        "∠BAC = 60"
+      ],
+      "lookFor": "«הטענה לא מתקיימת בציור — בדקו את החישוב»; one row; no «המשיכו לחפש»."
     }
   ],
   "results": [

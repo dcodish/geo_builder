@@ -1040,6 +1040,18 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   values. A question asked in the panel reads «<השאלה> = בודק…» until its answer is ready. An action whose values
   are ready within the threshold is drawn whole, figure and values together.
   - Sources: ADR-3D-493; ADR-W-210; #2890.
+- **FR-SP-34 (Must)** — **A search that runs out says so, and offers to keep searching** (#2893; operator 2026-11-13,
+  *"we should say honestly that a solution was not found and if we should continue searching"*, *"10s is an ok
+  number"*; 2026-11-14, three rulings). When the tool looks for a configuration that meets a stated range (an angle
+  bound) and reaches its limit, about 10 seconds of work, without finding one, it does not refuse the line and does not
+  draw a configuration it has not checked: where a refusal shows it says «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10
+  שניות.» with a button «המשיכו לחפש», which searches the same amount again from where it stopped and asks again if it
+  still finds nothing. For a typed line the line stays in the box and is not added; typing something else dismisses
+  the question. For an edit the old statement stands. For «הציגו תצורה אחרת» the drawing stays as it is. The limit is
+  counted in work, not seconds, so it is the same on every machine and the same input always stops at the same place.
+  A range no angle can be in (below 0° or above 180°) is decided without a search and keeps its refusal word for word
+  («אין תצורה של הציור שבה הזווית נמצאת בתחום הזה…»).
+  - Sources: ADR-3D-494; ADR-W-210 invariant 3; #2893.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.
