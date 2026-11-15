@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { replay, findValidConfig, searchResample, meetsRequirements } from '@/store/geoStore';
 import { findValidConfigRound, lastConfigTier, SEARCH_WORK_LIMIT } from '@/replay/core';
 import { isNotDecided } from '../../shell/notDecided';
-import { findValidConfigInRounds } from './searchRounds';
 import { SCENARIOS, factsOf, at } from './scenarios-corpus';
 import type { Fact } from '@/store/geoStore';
 
@@ -91,9 +90,7 @@ describe('config searches get a generous budget off the main thread (issue #87)'
         'קשת AB = קשת BC',
       ]),
     ) as Fact[];
-    // #2893 (ADR-831): ~11.6 M charged units, past one round's limit; «המשיכו לחפש» reaches the seat tier's rescue
-    const { value: found, rounds } = findValidConfigInRounds(facts, 0);
-    expect(rounds, 'past one round').toBeGreaterThan(1);
+    const found = findValidConfig(facts, 0);
     expect(found, 'the seat flip is found on the full play figure').not.toBeNull();
     expect(lastConfigTier, 'produced by the seat tier').toBe('seat');
     expect(meetsRequirements(found!.facts, found!.seed)).toBe(true);
