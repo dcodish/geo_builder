@@ -38,7 +38,10 @@ export interface FigureFile3 {
    * that predates it ignores it and draws every part at `seed` instead of refusing the file.
    */
   seedParts?: Record<string, number>;
-  facts: { utterance: string; cmds: Command3[]; enabled?: boolean }[];
+  /** #2894 part 2 B ([ADR-3D-497](../../docs/06b-decisions-3d.md#adr-3d-497)): `as`, the first names of the row's renamed
+   *  letters (`Fact3.as`), written only when a rename or swap gave one. A build that predates it ignores it and draws
+   *  the figure as typed with its current letters; a file without it is read as it always was. */
+  facts: { utterance: string; cmds: Command3[]; enabled?: boolean; as?: Record<string, string> }[];
   /** Data-panel queries (ADR-3D-057, #274) — questions about the figure, not facts; optional. */
   queries?: string[];
   /** Per-plane patch display (#318): plane name → 'face' (patch = the defining polygon only).
@@ -189,7 +192,7 @@ function figureFile3Of(
       const parts = seedPartsOf3(seed);
       return parts ? { seedParts: { ...parts } } : {};
     })(),
-    facts: facts.map((f) => ({ utterance: f.utterance, cmds: f.cmds, ...(f.enabled ? {} : { enabled: false }) })),
+    facts: facts.map((f) => ({ utterance: f.utterance, cmds: f.cmds, ...(f.enabled ? {} : { enabled: false }), ...(f.as ? { as: { ...f.as } } : {}) })),
     ...(queries.length ? { queries } : {}),
     ...(Object.keys(planeDisplay).length ? { planeDisplay } : {}),
     ...(() => {
@@ -297,7 +300,9 @@ export function deserializeFigure3(text: string): LoadResult3 {
     // #751 (ADR-W-029): clean on LOAD too — a file saved before the invariant carries the
     // app's display isolates, and those saves are already in the wild.
     // #509: and so are files carrying the pre-affine symbolic components — migrate them.
-    facts.push({ id: rowId3(), utterance: ingestTypedText(f.utterance), cmds: f.cmds.map(migrateSymExprs), enabled: f.enabled !== false });
+    // #2894 part 2 B (ADR-3D-497): the row's first names, lenient like `queries` — only label → name entries are kept
+    const as = firstNamesOfFile3((f as { as?: unknown }).as);
+    facts.push({ id: rowId3(), utterance: ingestTypedText(f.utterance), cmds: f.cmds.map(migrateSymExprs), enabled: f.enabled !== false, ...(as ? { as } : {}) });
   }
   const queries = Array.isArray(file.queries) ? file.queries.filter((q): q is string => typeof q === 'string') : [];
   // #318: lenient like `queries` — keep only well-formed entries; anything else falls back to 'full'
@@ -359,4 +364,12 @@ export function figureNameFromFileName3(fileName: string): string {
     .replace(/\.geo3$/i, '')
     .replace(new RegExp(`-${SAVE_SUFFIX_3D}$`, 'i'), '')
     .trim();
+}
+
+/** #2894 part 2 B (ADR-3D-497): a row's `as` read from a file — label → a non-empty name; anything else is dropped. */
+function firstNamesOfFile3(v: unknown): Record<string, string> | undefined {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [k, n] of Object.entries(v as Record<string, unknown>)) if (/^[A-Z]\d*'?$/.test(k) && typeof n === 'string' && n.length > 0 && n !== k) out[k] = n;
+  return Object.keys(out).length > 0 ? out : undefined;
 }

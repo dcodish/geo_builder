@@ -29,6 +29,7 @@
  * Pure over the construction, memoised per construction.
  */
 import { figureSymbolsOf, orientationStated3, type Construction3, type Id, type PointDef, type SolidObj } from './types';
+import { sampleKey3 } from './rng';
 
 /**
  * #2764 — A CONFIGURATION. A plain number is every part at that seed (every figure before this change, and every
@@ -95,13 +96,13 @@ export interface Part3 {
 export const solidKey3 = (s: SolidObj): string => `solid-${s.kind}-${s.ids.join('')}`;
 
 /** The key of a figure taken as one part: its first solid's, or '' with no solid. */
-export const partKey3 = (c: Construction3): string => (c.solids.length > 0 ? solidKey3(c.solids[0]) : '');
+export const partKey3 = (c: Construction3): string => (c.solids.length > 0 ? sampleKey3(solidKey3(c.solids[0]), c.sampleNames) : '');
 
 /**
  * The `Construction3` fields that are not an array, a map or a set — each must hold no name a statement could share,
  * or be a figure-global object that keeps the figure whole ({@link wholeFigure3}). The totality lock reads this list.
  */
-export const NAMELESS_FIELDS3: readonly string[] = ['param', 'partOf'];
+export const NAMELESS_FIELDS3: readonly string[] = ['param', 'partOf', 'sampleNames'];
 
 /** Does an object that frames every solid keep this figure whole? (see the module comment) */
 export function wholeFigure3(c: Construction3): boolean {

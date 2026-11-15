@@ -24,7 +24,7 @@ import { create } from 'zustand';
 import type { PlaneDisplayMode3Map } from './figureFile3';
 import { buildNotices3, shapeWarnings3, type BuildNotice3, type ShapeWarning3 } from '../engine/notices';
 import { narrowingNotes3 } from './narrowing3';
-import { normalizeLabel3, pointLabels3, renameFacts3, renamePlaneDisplay3, renameQueries3, swapSession3, type RenameResult3, type SwapResult3 } from './rename3';
+import { normalizeLabel3, pointLabels3, renameFacts3, renamePlaneDisplay3, renameQueries3, sampleNames3, swapSession3, type RenameResult3, type SwapResult3 } from './rename3';
 import { temporal } from 'zundo';
 import { rowId3 } from './rowIds3';
 import { ingestTypedText } from '../../shell/bidi';
@@ -72,6 +72,15 @@ export interface Fact3 {
    *  one note is the held notice; the derive's older «already known» relation notes stay quiet for its claims. Not saved:
    *  a row loaded from a file is read as typed. */
   held?: true;
+  /**
+   * #2894 part 2 B ([ADR-3D-497](../../docs/06b-decisions-3d.md#adr-3d-497); operator, 2026-11-15: *"Yes, store the first
+   * name (Recommended)"*) — THE FIRST NAMES of the letters this row names that a rename or a swap gave a new one: current
+   * letter → the name the point was first given (written by `renameFacts3` / `swapSession3`, read by the fold through
+   * `sampleNames3`). A letter is a name, not a configuration: the figure is sampled under these names, so a rename keeps
+   * the drawing. Absent on every row no rename touched, so a list that was never renamed is the content it always was.
+   * Saved and linked with the row (`figureFile3`); a file without it loads as it always did.
+   */
+  as?: Readonly<Record<string, string>>;
 }
 
 export type FactStatus3 = 'ok' | 'disabled' | EngineError3;
@@ -1118,7 +1127,10 @@ function deriveCore3(
   };
   // #1467 (ADR-3D-382): the points the mint pass decided to create, placed before the fold so every row applies in
   // LIST ORDER over them (see the mint pass) — empty on the first fold
-  let c: Construction3 = premint ? mintFree(emptyConstruction3(), Object.values(premint).flat()) : emptyConstruction3();
+  // #2894 part 2 B (ADR-3D-497): a renamed figure is sampled under its points' first names, so the rename keeps the drawing
+  const names = sampleNames3(factsIn, premint ? Object.values(premint).flat() : []);
+  const empty = (): Construction3 => (names ? { ...emptyConstruction3(), sampleNames: names } : emptyConstruction3());
+  let c: Construction3 = premint ? mintFree(empty(), Object.values(premint).flat()) : empty();
   for (const [id, plane] of Object.entries(preriders ?? {})) if (c.points.get(id)?.kind === 'free3') c.points.set(id, { kind: 'on-plane', plane });
   for (const name of Object.values(prelines ?? {}).flat()) {
     const made = applyCommand3(c, { type: 'free-line', name });

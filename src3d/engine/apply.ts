@@ -192,6 +192,8 @@ function clone(c: Construction3): Construction3 {
     coordPlanePins: [...c.coordPlanePins],
     planeLinePerps: [...c.planeLinePerps],
     lineRels: [...c.lineRels],
+    // #2894 part 2 B (ADR-3D-497): the names the figure is sampled under go with it, through every statement
+    ...(c.sampleNames ? { sampleNames: c.sampleNames } : {}),
   };
 }
 

@@ -479,6 +479,21 @@
         "AC = 10"
       ],
       "lookFor": "The third line is refused «לא נמצאה תצורה שבה מתקיים: «AC = 10»»; two rows stay."
+    },
+    {
+      "sheet": "feat-2894-b-3d",
+      "id": "T2",
+      "kind": "3d:assertion",
+      "queued": "2026-11-15",
+      "product": "3d",
+      "base": "http://localhost:5201",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "מישור ABCD",
+        "שנה שם A ל-M"
+      ],
+      "lookFor": "Start from «נקה הכל». The rows read «קובייה MBCDA'B'C'D'» and «מישור MBCD»; M is drawn where A was, A' keeps its letter."
     }
   ],
   "results": [

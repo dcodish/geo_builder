@@ -1054,6 +1054,16 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   The limit is counted in work, not seconds, so it is the same on every machine and the same input always stops at the
   same place. A range no angle can be in (below 0° or above 180°) is refused at once, with the same sentence.
   - Sources: ADR-3D-494; ADR-W-210 invariant 3; #2893.
+- **FR-SP-36 (Must)** — **A rename or a swap keeps the drawing in place and changes only the letters** (#2894;
+  operator 2026-11-15, *"Keep the drawing (Recommended)"*, *"Yes, store the first name (Recommended)"*). Renaming a
+  point («שנה שם A ל-Q», the letter popover) or swapping two («החלף בין B ל-C») re-letters every row, question and
+  plane toggle that names it, and the figure stays exactly where it was: every point at the same place, under its new
+  letter, at every configuration «הציגו תצורה אחרת» then draws. Every status, notice, value and answer reads as it did
+  under the old letters. One undo restores the old letters. A saved file and a share link keep the renamed figure's
+  drawing; a file or link made before this opens and draws as it always did. A new point given a letter a rename freed
+  is a new point, drawn on its own. The letters the tool itself chose for a shape typed without letters are chosen
+  again after a rename and are not kept.
+  - Sources: ADR-3D-497; ADR-3D-211; #2894.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

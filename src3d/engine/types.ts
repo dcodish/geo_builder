@@ -1738,6 +1738,14 @@ export interface Construction3 {
    * the whole. Holds no name.
    */
   partOf?: { readonly solidIndex: readonly number[] };
+  /**
+   * #2894 part 2 B ([ADR-3D-497](../../docs/06b-decisions-3d.md#adr-3d-497)) — THE NAMES THE FIGURE IS SAMPLED UNDER: each
+   * point letter a rename or swap gave a new name (or that collides with such a point's first name) → the name its
+   * seeded samples are keyed by. Set by the fold from the facts' stored first names (`Fact3.as`, `firstNames3`); absent
+   * when no letter was ever renamed, so every figure that was never renamed is the content it always was. Read by the
+   * sampler only (`rng.ts`, `withSampleNames3`): a letter is a name, not a configuration. Holds no statement.
+   */
+  sampleNames?: Readonly<Record<string, string>>;
 }
 
 /**

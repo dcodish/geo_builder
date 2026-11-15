@@ -838,6 +838,34 @@ gives each CONTENT one object, at the two chokepoints:
   always did (so an undo, or a derive the store still holds, finds its figure whatever was solved since), over the
   answers its content shares on the representative (`sharedResolves3`). Each tier holds at most 64 entries per object.
 
+**The source of truth is `(facts, seed)`, and a row carries the first names of its renamed letters (#2894 part 2 B,
+[ADR-3D-497](06b-decisions-3d.md#adr-3d-497); operator, 2026-11-15).** The figure is a function of the fact list and the
+configuration; positions are never stored. Every seeded sample is keyed by a string spelled with the letters of the
+points it samples (`solid-polygon3-ABC`, `t-E-A-B`, `free3-x-P`, `oncircle-th-P`, `freeline-az-ℓ`, …, about forty sites
+through `rng.sample`). A rename or a swap rewrites every letter of the facts (ADR-3D-211), so it used to key every
+sample anew and the drawing jumped. Now:
+- `renameFacts3` / `swapSession3` write, on every row that names a moved letter, `Fact3.as[newLetter] = firstName` (the
+  name the point was first given; dropped when the point is back on it, so a rename undone by renaming back leaves the
+  row as typed). The first names are part of the facts, so undo/redo (zundo), the derive memo's content key, the
+  worker's journal (ADR-3D-493), the save file and the share link (`figureFile3`, the row's optional `as`) carry them
+  with no other change. A file without `as` (every file saved before) is read as it always was.
+- The fold reads them once (`sampleNames3`, store/rename3.ts) into `Construction3.sampleNames`: current letter → sampling
+  name, one-to-one. A letter no rename touched whose own name is a renamed point's first name (A renamed to D, then a
+  new point A) is sampled as `A~`, so two points never share a sample. Absent when no letter was ever renamed: such a
+  construction is the content it always was, and keys, solves and draws exactly as before.
+- `resolve3` solves a construction inside `withSampleNames3(c.sampleNames, …)` (`rng.ts`), and a lazy value computed
+  later runs under the names of the solve that made it (`lazy3`). Inside, `sample()` reads each label token of its key
+  (the rename's own grammar and boundaries) as its sampling name: the rename rewrote exactly those tokens, so the key,
+  and the sample, are the ones the figure had before. A part's seed key (`partKey3`) and the order the pivot ranks a
+  figure's configurations in (`intrinsicShape3`, `bySampleName3`) read the same names, so a split figure's saved part
+  seeds still match and the same configuration is picked.
+- Not covered: the letters the TOOL chooses for an unlettered solid noun or an indefinite shape are chosen again by
+  every fold from the letters free at that row, so a rename that frees a letter re-letters them, and their drawing
+  moves, as on `main`.
+- The solve is not reused across a rename: the renamed construction is another content, and the memos hanging off a
+  representative hold answers in its letters. Keeping the drawing costs nothing; reusing the solve needs a
+  relettering-invariant content key and a relabelling of every memo's answer (ADR-3D-497, *Not built*).
+
 "The same content" is exact, never a digest: a hash picks the candidates and `sameContent3` compares the two graphs node
 by node. Order is content (array items, map and set entries, object keys); primitives are compared as `Object.is` does;
 a key holding `undefined` is not a missing key; SHARING is content (a claim listed in `claims` and in `scaleGivens` is
