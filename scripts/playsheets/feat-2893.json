@@ -1,0 +1,318 @@
+{
+  "name": "feat-2893",
+  "title": "Phase 4 of ADR-W-210 (#2893): a search that reaches its limit says so — 2-D, 3-D and analytic combined",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5190",
+      "path": "/",
+      "title": "2-D: a line whose configuration search stops says so; «המשיכו לחפש» finds the drawing",
+      "lines": [
+        "משולש ישר זווית ABC",
+        "משולש ABC חסום במעגל",
+        "מעגל חסום במשולש ABC",
+        "משיק למעגל בנקודה B",
+        "קשת AB = קשת BC"
+      ],
+      "after": [
+        {
+          "click": "המשיכו לחפש"
+        }
+      ],
+      "lookFor": "Type the five lines. The last one thinks for about 12 seconds (its own fold ~10 s, then ~2 s of search); the row is added and under the box reads «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with «המשיכו לחפש», the figure drawn as it fell. Press «המשיכו לחפש»: in under a second the drawing moves to one where every row holds (the right angle at B, AB = BC), and the sentence is gone.",
+      "before": "On prod the line thinks for about 10 seconds and draws the rescued figure by itself (measured: 9.9 s, then 0.3 s). Here the search stops after ~2 s and asks; one «המשיכו לחפש» (0.35 s) gives the same drawing."
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5190",
+      "path": "/",
+      "title": "2-D: a search that finishes and finds nothing keeps today's answer",
+      "lines": [
+        "מעגל O",
+        "A על המעגל"
+      ],
+      "after": [
+        {
+          "click": "הציגו תצורה אחרת"
+        }
+      ],
+      "expect": [
+        "אין תצורה אחרת"
+      ],
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "Press «הציגו תצורה אחרת»: «אין תצורה אחרת — הצורה נקבעה (רק הגודל/המיקום משתנים)» beside the button, as today; no «המשיכו לחפש».",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5190",
+      "path": "/",
+      "title": "2-D: the defining interaction builds exactly as before",
+      "lines": [
+        "ריבוע ABCD",
+        "נקודה G על AD",
+        "זווית GBA = 37"
+      ],
+      "expectRows": [
+        "ריבוע ABCD",
+        "נקודה G על AD",
+        "∠GBA = 37"
+      ],
+      "expectFigure": [
+        "G"
+      ],
+      "lookFor": "The square, G on AD, the 37° angle at B; three green rows.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "complex",
+      "base": "http://localhost:5190",
+      "path": "/complex.html",
+      "title": "complex: a conflicting line is refused naming the earlier line, as today",
+      "lines": [
+        "z1 = 1 + i",
+        "z1 = 2"
+      ],
+      "expectRefusal": "z1",
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "The second line is refused with today's sentence naming «z1 = 1 + i»; no «המשיכו לחפש».",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T5",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5190",
+      "path": "/3d.html",
+      "title": "3-D: a range no drawing reaches — the tool says it has not found one yet, and «המשיכו לחפש» searches again",
+      "lines": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "179 < ∠SAB < 180"
+      ],
+      "after": [
+        {
+          "click": "המשיכו לחפש"
+        }
+      ],
+      "expectRows": [
+        "פירמידה ABCDS שבסיסה ריבוע"
+      ],
+      "expect": [
+        "עדיין לא נמצא פתרון",
+        "המשיכו לחפש"
+      ],
+      "lookFor": "Type the two lines. After the second, «חושב…» for about 10 seconds, then under the box: «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with a button «המשיכו לחפש». The line stays in the box and is not added (one row). Press «המשיכו לחפש»: about 10 seconds more, and the same sentence again. Then type something else in the box: the sentence goes away.",
+      "before": "On prod the line is refused at once: «אין תצורה של הציור שבה הזווית נמצאת בתחום הזה, ולכן הנתון לא נוסף. בדקו את גבולות התחום.»"
+    },
+    {
+      "id": "T6",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5190",
+      "path": "/3d.html",
+      "title": "3-D: a range on a figure the solver places — the sentence comes after about 10 seconds, not after minutes",
+      "lines": [
+        "ריבוע ABCD",
+        "קטע AS",
+        "|SA| = 5",
+        "179 < ∠SAB < 180"
+      ],
+      "expectRows": [
+        "ריבוע ABCD",
+        "קטע AS",
+        "|SA| = 5"
+      ],
+      "expect": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "Three rows; the fourth line stays in the box and the sentence with «המשיכו לחפש» shows about 10 seconds after Enter.",
+      "before": "On prod the page freezes for nearly two minutes (measured 114 s), then refuses the line."
+    },
+    {
+      "id": "T7",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5190",
+      "path": "/3d.html",
+      "title": "3-D: a range a drawing does reach is added at once, with no question",
+      "lines": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "30 < ∠SAB < 85"
+      ],
+      "expectRows": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "30 < ∠SAB < 85"
+      ],
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "Two rows, the pyramid drawn; no sentence.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T8",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5190",
+      "path": "/3d.html",
+      "title": "3-D: a wrong claim is still refused, word for word",
+      "lines": [
+        "קובייה ABCD",
+        "∠BAC = 60"
+      ],
+      "expectRefusal": "הטענה לא מתקיימת בציור",
+      "lookFor": "«הטענה לא מתקיימת בציור — בדקו את החישוב»; one row; no «המשיכו לחפש».",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T9",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5190",
+      "path": "/3d.html",
+      "title": "3-D: «הציגו תצורה אחרת» on a figure with a range still redraws, with no question",
+      "lines": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "30 < ∠SAB < 85"
+      ],
+      "cycles": 2,
+      "expectRows": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "30 < ∠SAB < 85"
+      ],
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "Each press draws another pyramid; no sentence.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T10",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5190",
+      "path": "/3d.html",
+      "title": "3-D: an ordinary figure and «הציגו תצורה אחרת» are untouched",
+      "lines": [
+        "קובייה ABCD",
+        "M אמצע BB'"
+      ],
+      "cycles": 1,
+      "expectRows": [
+        "קובייה ABCD",
+        "M אמצע BB'"
+      ],
+      "expectFigure": [
+        "M"
+      ],
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "The cube and M on BB′; the press redraws.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T11",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5190",
+      "path": "/analytic.html",
+      "title": "Exam 2379: a tenth line searches about 10 s, says so, and goes on when asked",
+      "lines": [
+        "נתון מעגל שמרכזו M(8,-3)",
+        "המעגל משיק לישר 4x+3y+2=0 בנקודה A",
+        "נתון מעגל שמרכזו N1 ורדיוסו 10",
+        "מעגל N1 משיק למעגל M בנקודה A",
+        "נתון מעגל שמרכזו N2 ורדיוסו 10",
+        "מעגל N2 משיק למעגל M בנקודה A",
+        "N1 משמאל ל-N2",
+        "הישר l משיק לשני מעגלים N1 ו- N2 בנקודות P ו- Q בהתאמה",
+        "הישר l חותך את ציר ה- y בנקודה הנמצאת מעל ציר ה- x",
+        "P(1,1)"
+      ],
+      "expect": [
+        "עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.",
+        "המשיכו לחפש"
+      ],
+      "lookFor": "On a cleared canvas, type the nine lines, then «P(1,1)». After about 10 s of «חושב…», under the box: «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with a button «המשיכו לחפש»; «P(1,1)» is still in the box and no row was added. Press the button: «חושב…» again, and after about 7 s the refusal «לא נמצאה תצורה שבה מתקיים: «P(1,1)»» — today's refusal, word for word. (Pre-played in a browser on the merged tree: 10.1 s, then the refusal at 6.7 s; again 10.0 s and 6.9 s.)",
+      "before": "Prod shows «חושב…» for about 18 s with no other sign, then the refusal."
+    },
+    {
+      "id": "T12",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5190",
+      "path": "/analytic.html",
+      "title": "A search that finishes and finds nothing keeps today's refusal",
+      "lines": [
+        "A(1,2)",
+        "B(4,6)",
+        "קטע AB",
+        "AB = 7"
+      ],
+      "expectRefusal": "לא נמצאה תצורה שבה מתקיים",
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "«לא נמצאה תצורה שבה מתקיים: «AB = 7»» at once; no «עדיין לא נמצא פתרון»; three rows.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T13",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5190",
+      "path": "/analytic.html",
+      "title": "An ordinary figure is drawn as before",
+      "lines": [
+        "A(1,2)",
+        "B(4,6)",
+        "קטע AB"
+      ],
+      "expectRows": [
+        "A(1,2)",
+        "B(4,6)",
+        "קטע AB"
+      ],
+      "expectFigure": [
+        "A",
+        "B"
+      ],
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "Three rows, the segment AB drawn, no question.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T14",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5190",
+      "path": "/analytic.html",
+      "title": "«הציגו תצורה אחרת» changes the figure",
+      "lines": [
+        "משולש ABC",
+        "A(0,0)",
+        "B(6,0)",
+        "שטח המשולש ABC הוא 12"
+      ],
+      "cycles": 1,
+      "expectConfigsDiffer": true,
+      "lookFor": "The press moves C to another place.",
+      "before": "unchanged (a regression guard)."
+    }
+  ]
+}
