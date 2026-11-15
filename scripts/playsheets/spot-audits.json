@@ -414,6 +414,22 @@
         "שטח המשולש ABC הוא 12"
       ],
       "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2894-c-2d",
+      "id": "T2",
+      "kind": "2d:assertion",
+      "queued": "2026-11-15",
+      "product": "2d",
+      "base": "http://localhost:5194",
+      "path": "/",
+      "lines": [
+        "מלבן ABCD",
+        "AB = 3",
+        "BC = 4",
+        "AC = 7"
+      ],
+      "lookFor": "«AC = 7» is refused, naming «BC = 4»."
     }
   ],
   "results": [

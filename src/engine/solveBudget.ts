@@ -328,8 +328,64 @@ export function servingRepeats<T>(f: (x: number[]) => T): (x: number[]) => T {
   };
 }
 
+/**
+ * #2894 ([ADR-833](../../docs/06-decisions.md#adr-833)) — A WHOLE COMPUTATION THAT WOULD BE RUN AGAIN TO THE SAME
+ * RESULT IS SERVED, AND CHARGED AS IF IT WERE RUN. The {@link servingRepeats} discipline, one level up: a driven solve's
+ * relaxed pass repeats its convex pass's Nelder–Mead descents call for call (same cost function, same start, same
+ * steps), and an anti-collapse retry whose barrier was zero at every point the plain search evaluated is the plain
+ * search again. What the run advanced (`work.done`, `work.executed`, the open ledger frame's `own`) is advanced again,
+ * so every budget, cap and ledger reads what it read when the computation ran twice.
+ *
+ * A run is never served past a limit: a run during which an armed limit was crossed (or the ladder was spent) is not
+ * {@link ChargedRun.whole}, and a hit whose charge would cross an armed limit is refused ({@link serveRun} returns
+ * false), so the caller computes it again and is cut exactly where a computation would be.
+ */
+export interface ChargedRun<T> {
+  value: T;
+  done: number;
+  executed: number;
+  own: number;
+  /** no limit was crossed while it ran, so running it again (under the same limits) runs it whole */
+  whole: boolean;
+}
+const overLimit = (): boolean =>
+  solveBudget.ladderSpent || (work.limitAt !== null && work.done > work.limitAt) || (executedCap.limitAt !== null && work.executed > executedCap.limitAt);
+/** Run `fn` and record what it charged. */
+export function measuredRun<T>(fn: () => T): ChargedRun<T> {
+  const at = frame;
+  const d0 = work.done;
+  const e0 = work.executed;
+  const o0 = at ? at.own : 0;
+  const whole0 = !overLimit();
+  const value = fn();
+  return { value, done: work.done - d0, executed: work.executed - e0, own: at && frame === at ? at.own - o0 : 0, whole: whole0 && !overLimit() };
+}
+/** Charge a recorded run as if it ran again; false (nothing charged) when it was cut, serving is off, or the charge
+ *  would cross an armed limit — the caller then runs it. */
+export function serveRun<T>(run: ChargedRun<T>): boolean {
+  if (!repeatConfig.serve || !run.whole || solveBudget.ladderSpent) return false;
+  if (work.limitAt !== null && work.done + run.done > work.limitAt) return false;
+  if (executedCap.limitAt !== null && work.executed + run.executed > executedCap.limitAt) return false;
+  work.done += run.done;
+  work.executed += run.executed;
+  if (frame) frame.own += run.own;
+  return true;
+}
+/** A memo of whole runs by key, scoped to its caller: a hit is served by {@link serveRun}, a miss (or a refused hit)
+ *  runs and is kept when it ran whole. */
+export function servedRuns<T>(): (key: string, compute: () => T) => T {
+  const seen = new Map<string, ChargedRun<T>>();
+  return (key, compute) => {
+    const hit = seen.get(key);
+    if (hit && serveRun(hit)) return hit.value;
+    const run = measuredRun(compute);
+    if (run.whole) seen.set(key, run);
+    return run.value;
+  };
+}
+
 /** The exact identity of a point: every coordinate by its shortest round-trip text, −0 kept apart; null with a NaN. */
-function exactKey(x: readonly number[]): string | null {
+export function exactKey(x: readonly number[]): string | null {
   let key = '';
   for (const v of x) {
     if (Number.isNaN(v)) return null;
