@@ -414,6 +414,21 @@
         "שטח המשולש ABC הוא 12"
       ],
       "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2894-f-analytic",
+      "id": "T2",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "lines": [
+        "A(1,2)",
+        "נקודה B",
+        "קטע AB"
+      ],
+      "lookFor": "The panel reads A = (1, 2); B and AB open."
     }
   ],
   "results": [

@@ -16851,3 +16851,21 @@ Wall time of the same actions through `scripts/perf/analytic/driver.mjs`, before
 
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"Speed-only ships, rest waits (Recommended)"* (operator, 2026-11-14)
+
+## ADR-AG-484 — The values pool stops when every reader has decided: a figure whose every value is already open is not filled to 24 (#2894)
+
+**Status:** built, 2026-11-15 · **Issue:** [#2894](https://github.com/dcodish/geo_builder/issues/2894) (phase 5 part 2 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210), item F, the provable part) · branch `feat/2894-f-pool-early-stop`
+**Requirements:** none (internal): every value, «או» list, gate and note the page shows is the full pool's (transcript below) · **Design:** [04c](04c-design-analytic.md) § *The page never solves*
+
+**Root cause (class).** After the figure, the worker's `show` fills the 24-configuration pool and only then answers the values, whatever the readers need. A knowledge gate on a PARTIAL pool already knows a value is open once two configurations differ (a superset can only widen the spread, ADR-AG-180), and answers PENDING for anything a further configuration could change (an invariant value, a possible «או» pair, a starved pool, a note that reads the whole pool). For a figure whose every reader is already open, the rest of the pool changes nothing the student sees. Measured on the transcript before the change: 711 of 3 060 figure states have every panel gate open, carrying 7.3 M of the 104.1 M after-paint units (7.0 %) — the ceiling.
+
+**The mechanism.** `opsAn.show` holds the values view's pool while it fills; at 3, 6 and 12 configurations it runs the page's readers (`readFigure` with the questions, `readAfterPaint`) on it, and when none answers pending it answers the values from those configurations, `partial: { seeds }`. The page (`workerAn.valuesFromPartialPool`, `App.tsx`; the meter's driver the same) reads those seeds — handed over, so lookups — and holds its pool: its verdicts are the worker's and it evaluates nothing (the page lane stays 0). A later reader that needs more (a question asked later, a submit's entailment gate) fills the pool where it runs, as it always could.
+
+**Measured.** The work-meter gate (re-recorded with `--accept-rise`, both rises listed): 39 lines fell, 2 rose; total 114 195 382 → 113 857 960 (−0.3 %); before the paint unchanged (10 126 611); page 0. The falls total 365 207 units. The rises are the pool's remainder paid later, after the paint, where a reader needs it: corpus 471 #6/4 «אלכסוני המרובע ABCO נפגשים בנקודה K» 3 781 → 10 331 (the submit's entailment gate fills the previous figure's pool; before the paint unchanged, 265); `issue-2502-copula-diameter` «ask» 0 → 21 235 (a question asked after the values fills the rest). The slow corpus: 0 of 55 moved. Of the 3 205 actions walked, 197 states stop early. The fall is far below the 7 % ceiling because most all-open figures carry a polygon, whose narrowing note reads the whole pool and stays pending until it is complete.
+
+**Proof that nothing a student sees changed.** The two-level transcript read the PAGE's way (the worker's `show`, then the page's held reading of the seeds it handed over), `origin/main` @ `63ccbc5a` against this branch: 3 205 + 55 + 67 actions, 197 early stops, **0 differences** in values, «או» lists, gates, answers, notes and drawings.
+
+**Locks.** `issue-2894-pool-early-stop.test.ts`: an all-open figure stops early and its panel reads exactly what the full pool reads; a figure with a stated point fills all 24. `issue-1473-mid-pool-render.test.tsx`: the page holds its pool at the figure stage and on partial values.
+
+**What the student will see.**
+- [ruled] Nothing: every value, «או» list and note is the full pool's (proved by the transcript). Ruling 1 (operator, 2026-11-15), and his ruling on #2894 of the same day: build F's provable part, stopping the pool early only where the transcript proves nothing a student sees changes.

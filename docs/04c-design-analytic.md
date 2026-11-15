@@ -1552,6 +1552,12 @@ reader fills the pool). Then it completes the pool, one configuration per `ctx.t
 questions asked and the two notes of the paint, and answers the VALUES. The readers are one list,
 `app/figureReaders.ts`, read by the operations and by the work meter's driver; `App.tsx` calls each from its own memos.
 
+**The pool stops when every reader has decided** ([ADR-AG-484](06c-decisions-analytic.md#adr-ag-484), #2894). The values view's
+pool is held while it fills; at 3, 6 and 12 configurations `show` runs the readers on it, and when none answers pending
+(every value already open for good: a superset of configurations can only widen a spread) it answers the values from
+those configurations, `partial: { seeds }`. The page (`workerAn.valuesFromPartialPool`) reads the same seeds — handed
+over, so lookups — and holds its pool, so its verdicts are the worker's and it evaluates nothing.
+
 **The page renders what it holds** (`app/useShownFigure.ts`): the last store state whose figure is adopted, so rows,
 canvas and panel change together; at stage `figure` the derivation's pool is held and every value is pending, at stage
 `values` the pool is complete. A question is a value: its row is pending until the worker answered it on that figure.

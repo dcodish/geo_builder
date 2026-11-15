@@ -29,7 +29,7 @@
  * redo and a letter renamed.
  */
 import { clearAnalyticCaches, derive, type Derivation } from '../../engine/derive';
-import { canonicalSeed, configurationPool, type Seed } from '../../engine/evaluate';
+import { canonicalSeed, configurationPool, drawableAt, type Seed } from '../../engine/evaluate';
 import { adoptSettled, type Settled } from '../../engine/settle';
 import { isHeld } from '../../app/submit';
 import { activeOf, activePins } from '../../app/active';
@@ -111,9 +111,13 @@ function pageFigure(s: State): Derivation {
   readFigure(d, activeLines(s), { ...inputsOf(s), asks: [] });
   return d;
 }
-/** The page at stage `values`: a new view, the pool complete, the readers, the answers and the two notes. */
-function pageValues(s: State): Derivation {
+/** The page at stage `values`: a new view, the pool complete (or, ADR-AG-484, decided and held), the readers, the answers and the two notes. */
+function pageValues(s: State, partial?: { seeds: number[] }): Derivation {
   const d = pageDerivation(s);
+  if (partial) {
+    for (const seed of partial.seeds) drawableAt(d.construction, seed);
+    configurationPool(d.construction).hold();
+  }
   readFigure(d, activeLines(s), inputsOf(s));
   readAfterPaint(d, activeLines(s), s.seed, s.seedNames);
   return d;
@@ -156,7 +160,7 @@ async function show(s: State, ph: Phases, onPhase: (p: string) => void): Promise
   onPhase('settle');
   t = now();
   adoptSettled(shown.settled);
-  pageValues(s);
+  pageValues(s, shown.partial);
   ph.settle = now() - t;
   ph.total = ph.figure + ph.pool + ph.settle;
 }

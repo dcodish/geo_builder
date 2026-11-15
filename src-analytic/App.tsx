@@ -46,7 +46,7 @@ import { isolateRtlName } from '../shell/bidi';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
-import { configurationPool, knownCurve, settled, type Seed } from './engine/evaluate';
+import { configurationPool, drawableAt, knownCurve, settled, type Seed } from './engine/evaluate';
 import { pointText as pointTextOf } from './app/pointText';
 import { drawnBox as composeDrawnBox } from './app/drawnBox';
 import { SYMBOLS } from './ui/symbols';
@@ -82,7 +82,7 @@ import { segKey } from './render/scene';
 import { segmentName } from './app/lines';
 import { curveMenuOf, type CurveMenuTarget } from './app/curveDisplay';
 import type { LetterRenameResult, LetterSwapResult } from '../shell/frame/letterOffer';
-import { decideAn, isAnswered, showFigure } from './app/workerAn';
+import { decideAn, isAnswered, showFigure, valuesFromPartialPool } from './app/workerAn';
 import { basisOfState, useShownFigure } from './app/useShownFigure';
 import { PendingText } from './app/PendingText';
 import type { ReaderInputs } from './app/figureReaders';
@@ -689,7 +689,10 @@ export function App() {
     // #2890 (ADR-AG-478): a lookup of what the worker settled. At stage `figure` the pool is HELD: every gate is
     // pending and nothing is evaluated here; at stage `values` the pool is complete and every gate reads it.
     const out = derive(active, seed, seedNames, pins);
-    if (!valuesShown) configurationPool(out.construction).hold();
+    // #2894 F (ADR-AG-484): values decided on a partial pool are read on its configurations (handed over: lookups), held
+    const partial = valuesShown ? valuesFromPartialPool(basisOfState(shownFigure.state)) : null;
+    if (partial) for (const s of partial) drawableAt(out.construction, s);
+    if (!valuesShown || partial) configurationPool(out.construction).hold();
     return out;
     // `version`: what was adopted since; a new view reads it
     // eslint-disable-next-line react-hooks/exhaustive-deps

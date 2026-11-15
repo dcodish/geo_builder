@@ -19,7 +19,7 @@
  * No store, no React (`__tests__/off-page-graph.test.ts`).
  */
 import { derive, type Derivation } from '../engine/derive';
-import { configurationPool, type Seed } from '../engine/evaluate';
+import { configurationPool, settled, type Seed } from '../engine/evaluate';
 import { adoptSettled, settledOf, settling, type Settled } from '../engine/settle';
 import type { OpContext } from '../../shell/workerProtocol';
 import { isNotDecided, type NotDecided } from '../../shell/notDecided';
@@ -76,6 +76,13 @@ export interface Shown {
   settled: Settled;
   /** The pool is complete and every reader has run on it: the page may show the values. */
   complete: boolean;
+  /**
+   * #2894 F (ADR-AG-484): the values were decided before the pool was complete — every reader of the page already gave
+   * its final verdict on the configurations evaluated (each one open for good), so the rest was not evaluated. The page
+   * reads them on the same configurations (`seeds`, every one already handed over) with the pool HELD, exactly as the
+   * worker did, and never completes it itself.
+   */
+  partial?: { seeds: number[] };
 }
 
 /** The figure: the derivation and what its paint reads, with the pool held. */
@@ -100,26 +107,58 @@ function valueStage(args: ShowArgs, d: Derivation, keys: Set<string>): Shown {
   return { settled: settledOf([...keys]), complete: true };
 }
 
+/**
+ * #2894 F ([ADR-AG-484](../../docs/06c-decisions-analytic.md#adr-ag-484)) — THE POOL STOPS WHEN EVERY READER HAS DECIDED.
+ *
+ * Every knowledge gate already answers from a PARTIAL pool on the page (ADR-AG-180): a value the configurations evaluated
+ * so far show to differ is OPEN for good (a superset of them can only widen the spread), and anything a further
+ * configuration could still change — an invariant value, a possible «או» pair, a starved pool, a note that reads the
+ * whole pool — answers PENDING. So when the page's every reader (`readFigure` with the questions, `readAfterPaint`),
+ * run on the held pool, answers nothing pending, its verdicts are the full pool's, and the rest of the pool is not
+ * evaluated. Asked at a few counts only (`EARLY_CHECKS`), so the readers are not re-run after every configuration.
+ */
+const EARLY_CHECKS = new Set([3, 6, 12]);
+function decidedEarly(args: ShowArgs, d: Derivation): boolean {
+  const pool = configurationPool(d.construction);
+  if (pool.complete() || !EARLY_CHECKS.has(pool.ready().length)) return false;
+  return !settled(() => {
+    readFigure(d, activeLinesOf(args.basis), args.inputs);
+    readAfterPaint(d, activeLinesOf(args.basis), args.basis.seed, args.basis.seedNames);
+  }).pending;
+}
+/** The view the values are read on: its pool held, so a reader evaluates nothing the pool has not (ADR-AG-484). */
+function valuesView(args: ShowArgs): Derivation {
+  const view = derivationOf(args.basis);
+  configurationPool(view.construction).hold();
+  return view;
+}
+
 function showNow(args: ShowArgs, ctx: OpContext): Shown {
   const keys = new Set<string>();
   ctx.part('figure', figureStage(args, keys));
-  const { value: d, keys: touched } = settling(() => {
-    const view = derivationOf(args.basis);
-    configurationPool(view.construction).fill();
-    return view;
+  const { value, keys: touched } = settling(() => {
+    const view = valuesView(args);
+    const pool = configurationPool(view.construction);
+    while (!pool.complete()) {
+      pool.step();
+      if (decidedEarly(args, view)) return { view, partial: true };
+    }
+    return { view, partial: false };
   });
   for (const k of touched) keys.add(k);
-  return valueStage(args, d, keys);
+  const shown = valueStage(args, value.view, keys);
+  return value.partial ? { ...shown, partial: { seeds: configurationPool(value.view.construction).ready() } } : shown;
 }
 
 async function showYielding(args: ShowArgs, ctx: OpContext): Promise<Shown> {
   const keys = new Set<string>();
   ctx.part('figure', figureStage(args, keys));
-  const { value: d, keys: touched } = settling(() => derivationOf(args.basis));
+  const { value: d, keys: touched } = settling(() => valuesView(args));
   for (const k of touched) keys.add(k);
   const pool = configurationPool(d.construction);
   while (!pool.complete()) {
     pool.step();
+    if (decidedEarly(args, d)) return { ...valueStage(args, d, keys), partial: { seeds: pool.ready() } };
     if (!pool.complete() && (await ctx.tick())) return { settled: settledOf([...keys]), complete: false };
   }
   return valueStage(args, d, keys);

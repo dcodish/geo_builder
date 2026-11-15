@@ -121,7 +121,8 @@ describe('#1473 — mid-pool, the page shows «בודק…» and never a number'
   // worker's values are adopted, and completes no pool itself.
   it('App holds the pool until the worker’s values are adopted, and completes no pool itself', () => {
     const src = readFileSync(path.resolve(__dirname, '../App.tsx'), 'utf8');
-    expect(src).toContain('if (!valuesShown) configurationPool(out.construction).hold()');
+    // #2894 F (ADR-AG-484): and values decided on a partial pool are read held, on the worker's configurations
+    expect(src).toContain('if (!valuesShown || partial) configurationPool(out.construction).hold()');
     expect(src).not.toMatch(/completePoolAfterRender|poolScheduler/);
   });
 });

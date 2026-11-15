@@ -101,6 +101,8 @@ type Question = ReaderInputs['asks'][number];
 /** The figures whose figure stage the page holds, whose values it holds, and the questions answered on a figure. */
 const figures = new Set<string>();
 const values = new Set<string>();
+/** #2894 F (ADR-AG-484): figures whose values were decided on a partial pool — the page reads them with the pool held. */
+const partials = new Map<string, number[]>();
 const answered = new Set<string>();
 const inFlight = new Map<string, { figure: Promise<void>; values: Promise<void> }>();
 
@@ -113,6 +115,14 @@ export function figureStage(basis: BasisAn): Stage | null {
   if (!lineListOf(listKeyOf(basis))) return null;
   if (values.has(figureKeyOf(basis))) return 'values';
   return figures.has(figureKeyOf(basis)) ? 'figure' : null;
+}
+
+/**
+ * #2894 F (ADR-AG-484): the configurations this figure's values were decided on, when that was before its pool was
+ * complete (null otherwise). The page reads them — all handed over, so lookups — and holds the pool, as the worker did.
+ */
+export function valuesFromPartialPool(basis: BasisAn): readonly number[] | null {
+  return partials.get(figureKeyOf(basis)) ?? null;
 }
 
 /** Is this question's answer on this figure held? A question is a value: until then its row is pending. */
@@ -150,6 +160,8 @@ export function showFigure(r: FigureRequest): { figure: Promise<void>; values: P
       figures.add(figureKeyOf(r.basis));
       if (shown.complete) {
         values.add(figureKeyOf(r.basis));
+        if (shown.partial) partials.set(figureKeyOf(r.basis), shown.partial.seeds);
+        else partials.delete(figureKeyOf(r.basis));
         for (const q of r.inputs.asks) answered.add(questionKeyOf(r.basis, q));
       }
       adopt(shown.settled);
@@ -182,6 +194,7 @@ export function figureNow(r: FigureRequest): void {
 export function forgetFiguresAn(): void {
   figures.clear();
   values.clear();
+  partials.clear();
   answered.clear();
   inFlight.clear();
 }

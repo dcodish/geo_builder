@@ -1,0 +1,45 @@
+{
+  "name": "feat-2894-f-analytic",
+  "title": "#2894 F (analytic): the values pool stops once every value is decided — the same panel for less work",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "title": "Two free points and their segment: the values panel settles as before",
+      "lines": ["נקודה A", "נקודה B", "קטע AB"],
+      "expectRows": ["קטע AB"],
+      "expectAbsent": ["בודק"],
+      "lookFor": "On a cleared canvas, type the three lines. Three rows; the panel's coordinates, slope and length of AB read «—» (free, not known), never stuck on «בודק…».",
+      "before": "unchanged panel; the worker now stops after a few configurations instead of 24"
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "title": "A stated point is still known in the panel",
+      "lines": ["A(1,2)", "נקודה B", "קטע AB"],
+      "expect": ["(1, 2)"],
+      "expectAbsent": ["בודק"],
+      "lookFor": "The panel reads A = (1, 2); B and AB open.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "title": "«הציגו תצורה אחרת» still moves a free figure",
+      "lines": ["נקודה A", "נקודה B", "קטע AB"],
+      "cycles": 1,
+      "expectConfigsDiffer": true,
+      "lookFor": "The press moves A and B.",
+      "before": "unchanged"
+    }
+  ]
+}
