@@ -14,7 +14,7 @@
  * does when no polygon of that size exists.
  */
 import { parse, type ParseContext, type ParseResult } from '@/parser';
-import { withSolveBudget } from '@/engine';
+import { withLadderSpent } from '@/engine';
 import { dryRunOutcome, getFoldFor, replay, trialFacts, type Fact } from './geoStore';
 
 /**
@@ -37,7 +37,7 @@ export function restatesExistingShape(facts: Fact[], commands: readonly unknown[
     if (o.produced || (o.reason !== 'empty' && o.reason !== 'implied')) return false;
     return replay(trialFacts(facts, cmds), seed).violations.length <= before.violations.length;
   };
-  return node && !node.retriedCreating ? withSolveBudget(0, probe) : probe();
+  return node && !node.retriedCreating ? withLadderSpent(probe) : probe();
 }
 
 /** The reading of `utterance` an indefinite shape noun calls for: `r` itself, or the new-shape re-read. */

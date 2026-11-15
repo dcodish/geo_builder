@@ -22,6 +22,8 @@ import { derive, type Derivation } from '../engine/derive';
 import { configurationPool, type Seed } from '../engine/evaluate';
 import { adoptSettled, settledOf, settling, type Settled } from '../engine/settle';
 import type { OpContext } from '../../shell/workerProtocol';
+import { isNotDecided, type NotDecided } from '../../shell/notDecided';
+import { decideWithin, type ResumeAn } from '../engine/workLimitAn';
 import { activeOf, activePins } from './active';
 import { decideEditHost, decideSubmit, decideToggle } from './submit';
 import { anotherConfiguration } from './another';
@@ -51,9 +53,17 @@ export interface Decided<V> {
   value: V;
   settled: Settled;
 }
-function decided<V>(fn: () => V): Decided<V> {
-  const { value, keys } = settling(fn);
-  return { value, settled: settledOf(keys) };
+/**
+ * #2893 (ADR-AG-479): every decision is one search under the work limit (`engine/workLimitAn`). A round that reaches it
+ * answers "not decided" and hands nothing over: what it finished stays in this heap's memos for the next round.
+ */
+function decided<V>(fn: () => V, round = 1): Decided<V | NotDecided<ResumeAn>> {
+  const { value, keys } = settling(() => decideWithin(fn, round));
+  return { value, settled: settledOf(isNotDecided(value) ? [] : keys) };
+}
+/** Which round of a search this is: 1, or 2, 3, … for each «המשיכו לחפש». */
+export interface Round {
+  round?: number;
 }
 
 export interface ShowArgs {
@@ -130,13 +140,13 @@ export const opsAn = {
   show: (args: ShowArgs, ctx: OpContext): Shown | Promise<Shown> => (args.ticks ? showYielding(args, ctx) : showNow(args, ctx)),
   /** The figure stage alone (a page with no worker draws its first figure from it, in the same task). */
   figure: (args: ShowArgs): Settled => figureStage(args, new Set()),
-  submit: ({ raw, basis }: { raw: string; basis: BasisAn }) => decided(() => decideSubmit(raw, activeLinesOf(basis), basis.seed, derivationOf(basis))),
-  edit: ({ index, text, basis }: { index: number; text: string; basis: BasisAn }) =>
-    decided(() => decideEditHost(index, text, basis.lines, basis.disabled, basis.seed, basis.seedNames, basis.hosts)),
-  toggle: ({ index, basis }: { index: number; basis: BasisAn }) =>
-    decided(() => decideToggle(index, basis.lines, basis.disabled, basis.seed, derivationOf(basis), basis.hosts)),
-  another: ({ basis }: { basis: BasisAn }) => decided(() => anotherConfiguration(activeLinesOf(basis), basis.seed, undefined, basis.seedNames, pinsOf(basis))),
-  letter: ({ request, state }: { request: LetterRequest; state: RenameState }) =>
+  submit: ({ raw, basis, round }: { raw: string; basis: BasisAn } & Round) => decided(() => decideSubmit(raw, activeLinesOf(basis), basis.seed, derivationOf(basis)), round),
+  edit: ({ index, text, basis, round }: { index: number; text: string; basis: BasisAn } & Round) =>
+    decided(() => decideEditHost(index, text, basis.lines, basis.disabled, basis.seed, basis.seedNames, basis.hosts), round),
+  toggle: ({ index, basis, round }: { index: number; basis: BasisAn } & Round) =>
+    decided(() => decideToggle(index, basis.lines, basis.disabled, basis.seed, derivationOf(basis), basis.hosts), round),
+  another: ({ basis, round }: { basis: BasisAn } & Round) => decided(() => anotherConfiguration(activeLinesOf(basis), basis.seed, undefined, basis.seedNames, pinsOf(basis)), round),
+  letter: ({ request, state, round }: { request: LetterRequest; state: RenameState } & Round) =>
     decided(() => {
       const current = stateDerivation(state);
       switch (request.kind) {
@@ -149,12 +159,12 @@ export const opsAn = {
         case 'centreSwap':
           return { kind: 'centreSwap' as const, verdict: decideCentreSwap(request.offerId, request.taken, state, current) };
       }
-    }),
-  audit: ({ lines, disabled, hosts }: { lines: readonly string[]; disabled: readonly number[]; hosts: Readonly<Record<number, readonly string[]>> }) =>
-    decided(() => auditLoadedLines(lines, disabled, hosts)),
-  fallbackExisting: ({ lines, seed }: { lines: readonly string[]; seed: Seed }) => decided(() => existingNamesOf(lines, seed)),
-  fallbackJudge: ({ utterance, lines, seed, answer, existing }: { utterance: string; lines: readonly string[]; seed: Seed; answer: LlmStepsOutcome | null; existing: ReadonlySet<string> }) =>
-    decided(() => judgeAnswer(utterance, lines, seed, answer, existing)),
+    }, round),
+  audit: ({ lines, disabled, hosts, round }: { lines: readonly string[]; disabled: readonly number[]; hosts: Readonly<Record<number, readonly string[]>> } & Round) =>
+    decided(() => auditLoadedLines(lines, disabled, hosts), round),
+  fallbackExisting: ({ lines, seed, round }: { lines: readonly string[]; seed: Seed } & Round) => decided(() => existingNamesOf(lines, seed), round),
+  fallbackJudge: ({ utterance, lines, seed, answer, existing, round }: { utterance: string; lines: readonly string[]; seed: Seed; answer: LlmStepsOutcome | null; existing: ReadonlySet<string> } & Round) =>
+    decided(() => judgeAnswer(utterance, lines, seed, answer, existing), round),
 };
 export type OpsAn = typeof opsAn;
 

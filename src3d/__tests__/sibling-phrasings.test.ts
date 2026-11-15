@@ -24,6 +24,8 @@ function outcomeOf(v: Verdict3): Outcome {
       return { verdict: 'builds', code: 'retick' };
     case 'not-understood':
       return { verdict: 'not-handled' };
+    case 'not-decided': // #2893 (ADR-3D-494): the search reached its limit; the student is asked whether to go on
+      return { verdict: 'asks', code: 'not-decided' };
     case 'refused':
       return { verdict: /^ambiguous/.test(v.error.code) ? 'asks' : 'refused', code: v.error.code };
     case 'rename':

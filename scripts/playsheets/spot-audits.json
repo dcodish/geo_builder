@@ -324,6 +324,96 @@
         "AD = 3"
       ],
       "lookFor": "Three rows at the end, D on AB."
+    },
+    {
+      "sheet": "feat-2893-2d",
+      "id": "T4",
+      "kind": "complex:assertion",
+      "queued": "2026-11-15",
+      "product": "complex",
+      "base": "http://localhost:5180",
+      "path": "/complex.html",
+      "lines": [
+        "z1 = 1 + i",
+        "z1 = 2"
+      ],
+      "lookFor": "The second line is refused with today's sentence naming «z1 = 1 + i»; no «המשיכו לחפש»."
+    },
+    {
+      "sheet": "feat-2893-3d",
+      "id": "T4",
+      "kind": "3d:assertion",
+      "queued": "2026-11-14",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCD",
+        "∠BAC = 60"
+      ],
+      "lookFor": "«הטענה לא מתקיימת בציור — בדקו את החישוב»; one row; no «המשיכו לחפש»."
+    },
+    {
+      "sheet": "feat-2893-analytic",
+      "id": "T4",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-14",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "A(0,0)",
+        "B(6,0)",
+        "שטח המשולש ABC הוא 12"
+      ],
+      "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2893",
+      "id": "T14",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5190",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "A(0,0)",
+        "B(6,0)",
+        "שטח המשולש ABC הוא 12"
+      ],
+      "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2893-2d",
+      "id": "T5",
+      "kind": "complex:assertion",
+      "queued": "2026-11-15",
+      "product": "complex",
+      "base": "http://localhost:5180",
+      "path": "/complex.html",
+      "lines": [
+        "z1 = 1 + i",
+        "z1 = 2"
+      ],
+      "lookFor": "The second line is refused with today's sentence naming «z1 = 1 + i»; no «המשיכו לחפש»."
+    },
+    {
+      "sheet": "feat-2893",
+      "id": "T15",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5190",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "A(0,0)",
+        "B(6,0)",
+        "שטח המשולש ABC הוא 12"
+      ],
+      "lookFor": "The press moves C to another place."
     }
   ],
   "results": [

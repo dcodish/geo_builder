@@ -30,6 +30,12 @@ import type { ReservedConstant } from '../model/naming';
 import { ingestTypedText } from '../../shell/bidi';
 import { type DisplayMode, type DisplayModeMap, toggleDisplayMode } from '../../shell/displayMode';
 
+/** #2893 (ADR-CX-092): which action's gate reached its work limit, and where its blame goes on from. */
+export type NotDecidedCx =
+  | { kind: 'line'; line: string; from: number }
+  | { kind: 'toggle'; index: number; from: number }
+  | { kind: 'edit'; index: number; line: string; from: number };
+
 export type InputError =
   | { key: 'not-handled' | 'parse-error'; detail: string }
   /**
@@ -178,6 +184,12 @@ interface ComplexState {
   seed: number;
   view: 'cart' | 'polar';
   lastError: InputError | null;
+  /**
+   * #2893 (ADR-CX-092): the last action's gate reached its work limit before it decided. The page shows the operator's
+   * sentence with «המשיכו לחפש», which runs the action again from `from`. Like `lastError`, never in the history.
+   */
+  notDecided: NotDecidedCx | null;
+  setNotDecided: (nd: NotDecidedCx | null) => void;
   /** #2268 / #2790 — the last line restated what the figure already held; shown as a notice, cleared by the next step */
   lastNote: InputNote | null;
   /** The load audit (ADR-242, via shell/save): what the last load could NOT restore — the report
@@ -252,6 +264,8 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
   seed: 0,
   view: 'cart',
   lastError: null,
+  notDecided: null,
+  setNotDecided: (notDecided) => set({ notDecided }),
   lastNote: null,
   loadAudit: null,
 

@@ -152,6 +152,10 @@ export function replay3dSession(events: readonly LoggedEvent3[], budgetMs = 60_0
           res = 'not-handled';
           detail = 'not-understood';
           break;
+        case 'not-decided': // #2893 (ADR-3D-494): the search reached its limit; the replay cannot say what it finds
+          res = 'unverified';
+          detail = 'not-decided';
+          break;
       }
     } catch (err) {
       res = 'error';

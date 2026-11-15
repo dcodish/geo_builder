@@ -24,7 +24,9 @@ import { buildParseCtx, droppedNewLabels, parse } from '@/parser';
 import { indefiniteShapeReading } from './indefiniteShape';
 import type { AnyCommand } from '@/engine';
 import { variantCountOf, withVariant } from '@/engine';
-import { BRANCH_CYCLE_KINDS } from '@/replay/core';
+import { BRANCH_CYCLE_KINDS, TEN_SECONDS_OF_WORK } from '@/replay/core';
+import { withSearchLimit } from '@/engine';
+import { limitReached } from '../../shell/workLimit';
 
 export interface LoadAuditFinding {
   /** 1-based index of the step group (the fact-list row). */
@@ -167,19 +169,19 @@ function carryConfiguration(fresh: AnyCommand[], saved: AnyCommand[]): AnyComman
 }
 
 /**
- * The two load budgets, in milliseconds (#2873, ADR-W-210 Am. 1). As the search budgets of `replay/core.ts`: tests run
- * with NO deadline (vitest sets MODE 'test'), so what a load refreshes and audits is a function of the file alone, on
- * any machine under any load. Measured on the dev PC with the suite running, the hexagon fixture's refresh takes 2.5 s
- * and its audit 2.4 s: inside the budgets here, and past them on a machine half as fast, where the steps left unread
- * would change what the load did. The browser's budgets are unchanged.
+ * The load's limit, in work units (#2893, [ADR-831](../../docs/06-decisions.md#adr-831), ADR-W-210 phase 4). The
+ * refresh and the audit had wall clocks of 4 s and 3 s, and none under vitest (#2873, ADR-W-210 Am. 1): so what a load
+ * refreshed and audited depended on the machine, and an audit the clock cut reported no finding, as a clean one does.
+ * Now each is bounded by `TEN_SECONDS_OF_WORK` (calibrated in `replay/core.ts`), the same in the suite and the browser.
+ * Measured on the dev PC: the hexagon fixture's refresh is 396 586 units (1.3 s) and its audit a handful.
  */
-const REFRESH_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 4000;
-const AUDIT_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 3000;
+export const LOAD_WORK_LIMIT = TEN_SECONDS_OF_WORK;
 
 /**
- * Audit a loaded fact list against the CURRENT parser. Budgeted (each step costs a prefix `replay`;
- * a pathological figure must not freeze the load) — `complete: false` means the budget ran out and
- * later steps went unchecked. A step with no utterance (a direct command) is skipped; a step whose
+ * Audit a loaded fact list against the CURRENT parser. Bounded by `limit` units of work (each step costs a prefix
+ * `replay`; a pathological figure must not freeze the load). `complete: false` means the limit was reached and the
+ * steps from `resumeAt` (0-based) went unchecked: the page says "not decided" (#2893, ADR-831), never "no finding",
+ * and «המשיכו לחפש» audits again from `resumeAt` (`from`) with a limit of the same size. A step with no utterance (a direct command) is skipped; a step whose
  * utterance no longer parses is an LLM-escalated step stored as canonical commands — only the
  * `dropped` differential applies to it.
  */
@@ -201,8 +203,10 @@ const AUDIT_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITI
  * {@link auditLoadedFigure}; on budget exhaustion the remaining steps are kept as saved (never partially
  * corrupt). Returns the (possibly rebuilt) fact list + the 1-based indices of the steps that changed.
  */
-export function refreshLoadedFigure(facts: Fact[], budgetMs = REFRESH_BUDGET_MS): { facts: Fact[]; refreshed: number[] } {
-  const t0 = Date.now();
+export function refreshLoadedFigure(facts: Fact[], limit = LOAD_WORK_LIMIT): { facts: Fact[]; refreshed: number[] } {
+  return withSearchLimit(limit, () => refreshUnder(facts), 'loadRefresh').value;
+}
+function refreshUnder(facts: Fact[]): { facts: Fact[]; refreshed: number[] } {
   const steps = stepsOf(facts);
   const out: Fact[] = [];
   const refreshed: number[] = [];
@@ -210,7 +214,7 @@ export function refreshLoadedFigure(facts: Fact[], budgetMs = REFRESH_BUDGET_MS)
     const step = steps[i];
     const end = steps[i + 1]?.start ?? facts.length;
     const groupFacts = facts.slice(step.start, end);
-    if (!step.utterance || Date.now() - t0 > budgetMs) {
+    if (!step.utterance || limitReached()) {
       out.push(...groupFacts);
       continue;
     }
@@ -251,12 +255,16 @@ export function refreshLoadedFigure(facts: Fact[], budgetMs = REFRESH_BUDGET_MS)
   return { facts: out, refreshed };
 }
 
-export function auditLoadedFigure(facts: Fact[], budgetMs = AUDIT_BUDGET_MS): { findings: LoadAuditFinding[]; complete: boolean } {
-  const t0 = Date.now();
+export function auditLoadedFigure(facts: Fact[], limit = LOAD_WORK_LIMIT, from = 0): LoadAudit {
+  return withSearchLimit(limit, () => auditUnder(facts, from), 'loadAudit').value;
+}
+/** What an audit returns: its findings, and whether it read every step (else where to go on from). */
+export type LoadAudit = { findings: LoadAuditFinding[]; complete: true } | { findings: LoadAuditFinding[]; complete: false; resumeAt: number };
+function auditUnder(facts: Fact[], from: number): LoadAudit {
   const findings: LoadAuditFinding[] = [];
   const steps = stepsOf(facts);
-  for (let i = 0; i < steps.length; i++) {
-    if (Date.now() - t0 > budgetMs) return { findings, complete: false };
+  for (let i = from; i < steps.length; i++) {
+    if (limitReached()) return { findings, complete: false, resumeAt: i };
     const step = steps[i];
     if (!step.utterance) continue;
     const end = steps[i + 1]?.start ?? facts.length;

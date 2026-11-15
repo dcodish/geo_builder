@@ -39,7 +39,7 @@
  *
  * THE WORKER'S OPERATIONS go through the App's own client (`geoWork`, `geoJobs`). What serves them is the caller's:
  * the gate injects one isolated executor per lane (`useGeoWorkExecutor`), the timing harness the worker's table with
- * its 12-second budget in the page's instance.
+ * its search limit (in work units since #2893) in the page's instance.
  *
  * THE WORKER'S HEAPS (#2890, ADR-829). The gate hands this driver a client whose two lanes are served from their own
  * module instances, every message cloned (`shell/workerExecutor`'s isolated executor): the page, the interactive
@@ -68,6 +68,7 @@ import { freeDofs, freeDofCount, unstatedChoices, type AnyCommand } from '@/engi
 import { loadFigureText } from '@/store/figureLoad';
 import { serializeFigure } from '@/store/figureFile';
 import { meterAction, type WorkCounts } from '../../../shell/workMeter';
+import { isNotDecided } from '../../../shell/notDecided';
 
 export type Snap = { facts: Fact[]; seed: number };
 
@@ -122,9 +123,8 @@ export interface Driver2d {
   saved(): string;
 }
 
-export function createDriver2d(ops: WorkerOps = {}, opts: { searchBudgetMs?: number } = {}): Driver2d {
+export function createDriver2d(ops: WorkerOps = {}): Driver2d {
   let figure: Snap = { facts: [], seed: 0 };
-  const budget = opts.searchBudgetMs ?? Number.POSITIVE_INFINITY;
   const setStore = (s: Snap): void => useGeoStore.setState({ facts: s.facts, seed: s.seed });
   const adopt = (): void => {
     const n = useGeoStore.getState();
@@ -155,9 +155,10 @@ export function createDriver2d(ops: WorkerOps = {}, opts: { searchBudgetMs?: num
     const found = await geoWork.autoResolve(figure.facts, figure.seed); // its view arrives settled and is adopted
     const w = now() - t;
     rec[prefix + 'autoResolve_worker'] = r1(w);
-    rec[prefix + 'autoResolve'] = found === 'ok' ? 'ok' : found ? 'found' : 'exhausted';
-    if (w >= budget - 50) rec.clipped = true;
-    if (found && found !== 'ok') {
+    // #2893 (ADR-831): a search that reached its work limit is "not decided", the same on every machine (it was `clipped`
+    // by a clock, which only this harness's browser budget could see)
+    rec[prefix + 'autoResolve'] = found === 'ok' ? 'ok' : isNotDecided(found) ? 'not-decided' : found ? 'found' : 'exhausted';
+    if (found && found !== 'ok' && !isNotDecided(found)) {
       figure = { facts: found.facts, seed: found.seed };
       setStore(figure);
       t = now();
@@ -304,9 +305,8 @@ export function createDriver2d(ops: WorkerOps = {}, opts: { searchBudgetMs?: num
         const found = await geoWork.resample(figure.facts, figure.seed); // its view arrives settled and is adopted
         const w = now() - t;
         rec.resample_worker = r1(w);
-        if (w >= budget - 50) rec.clipped = true;
-        rec.outcome = found ? 'changed' : 'only-config';
-        if (found) {
+        rec.outcome = isNotDecided(found) ? 'not-decided' : found ? 'changed' : 'only-config'; // #2893 (ADR-831)
+        if (found && !isNotDecided(found)) {
           figure = { facts: found.facts, seed: found.seed };
           setStore(figure);
           const t2 = now();

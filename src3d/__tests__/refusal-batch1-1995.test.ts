@@ -140,6 +140,8 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
     const s = submit('179 < ∠SAB < 180');
     expect(s).toBe('אין תצורה של הציור שבה הזווית נמצאת בתחום הזה, ולכן הנתון לא נוסף. בדקו את גבולות התחום.');
     expect(s).not.toMatch(/ב- /);
+    // #2893 (ADR-3D-494): a range no angle can be in is refused with the same sentence, without a search
+    expect(submit('∠SAB > 200')).toBe(s);
     expect(submit('60 < ∠SAB < 90')).toBeNull();
   });
 

@@ -6181,7 +6181,7 @@ export const SCENARIOS_4: Scenario[] = [
           expect(c.center.y).toBeCloseTo(before.center.y, 9);
           expect(c.r).toBeCloseTo(before.r, 9);
         }
-        const next = searchAnotherView(cur.facts, cur.seed, undefined, 60_000);
+        const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY); // #2893: was a generous 60 s clock
         if (!next) break;
         cur = next;
       }

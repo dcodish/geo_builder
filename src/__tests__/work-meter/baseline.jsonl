@@ -560,7 +560,7 @@
 {"k":"issue-1694-eew5ezi5-exact.geo.json|submit#2","total":2152,"page":0,"prePaint":2152}
 {"k":"issue-1694-eew5ezi5-exact.geo.json|submit#3","total":3686,"page":0,"prePaint":3686}
 {"k":"issue-1694-eew5ezi5-exact.geo.json|submit#4","total":23068,"page":0,"prePaint":23068}
-{"k":"issue-1694-eew5ezi5-exact.geo.json|submit#5","total":4222,"page":0,"prePaint":4222}
+{"k":"issue-1694-eew5ezi5-exact.geo.json|submit#5","total":3175,"page":0,"prePaint":3175}
 {"k":"issue-1694-eew5ezi5-exact.geo.json|toggle","total":6,"page":0,"prePaint":6}
 {"k":"issue-1694-eew5ezi5-exact.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-1697-naming-by-use-is-a-fact.geo.json|another#1","total":1,"page":0,"prePaint":1}
@@ -583,9 +583,9 @@
 {"k":"issue-172-sector-area-and-arc-length.geo.json|submit#3","total":11365,"page":0,"prePaint":11365}
 {"k":"issue-172-sector-area-and-arc-length.geo.json|toggle","total":5,"page":0,"prePaint":5}
 {"k":"issue-172-sector-area-and-arc-length.geo.json|undo","total":0,"page":0,"prePaint":0}
-{"k":"issue-1771-semicircle-three-vertices.geo.json|another#1","total":4501790,"page":0,"prePaint":4501790}
+{"k":"issue-1771-semicircle-three-vertices.geo.json|another#1","total":3801510,"page":0,"prePaint":3801510}
 {"k":"issue-1771-semicircle-three-vertices.geo.json|delete","total":63880,"page":0,"prePaint":63880}
-{"k":"issue-1771-semicircle-three-vertices.geo.json|detect","total":2929181,"page":0,"prePaint":0}
+{"k":"issue-1771-semicircle-three-vertices.geo.json|detect","total":2703749,"page":0,"prePaint":0}
 {"k":"issue-1771-semicircle-three-vertices.geo.json|edit","total":131282,"page":0,"prePaint":131282}
 {"k":"issue-1771-semicircle-three-vertices.geo.json|load","total":145538,"page":0,"prePaint":145538}
 {"k":"issue-1771-semicircle-three-vertices.geo.json|submit#1","total":3,"page":0,"prePaint":3}
@@ -1089,7 +1089,7 @@
 {"k":"issue-2405-all-common-tangents-apart.geo.json|load","total":458885,"page":0,"prePaint":458885}
 {"k":"issue-2405-all-common-tangents-apart.geo.json|submit#1","total":6,"page":0,"prePaint":6}
 {"k":"issue-2405-all-common-tangents-apart.geo.json|submit#2","total":755427,"page":0,"prePaint":755427}
-{"k":"issue-2405-all-common-tangents-apart.geo.json|toggle","total":527,"page":0,"prePaint":527}
+{"k":"issue-2405-all-common-tangents-apart.geo.json|toggle","total":272,"page":0,"prePaint":272}
 {"k":"issue-2405-all-common-tangents-apart.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2405-all-common-tangents-ext-touch.geo.json|another#1","total":246526,"page":0,"prePaint":246526}
 {"k":"issue-2405-all-common-tangents-ext-touch.geo.json|delete","total":28,"page":0,"prePaint":28}
@@ -1160,7 +1160,7 @@
 {"k":"issue-2430-reverse-order-tangent-at-t.geo.json|submit#3","total":509,"page":0,"prePaint":509}
 {"k":"issue-2430-reverse-order-tangent-at-t.geo.json|submit#4","total":12817,"page":0,"prePaint":12817}
 {"k":"issue-2430-reverse-order-tangent-at-t.geo.json|submit#5","total":5588,"page":0,"prePaint":5588}
-{"k":"issue-2430-reverse-order-tangent-at-t.geo.json|toggle","total":93,"page":0,"prePaint":93}
+{"k":"issue-2430-reverse-order-tangent-at-t.geo.json|toggle","total":90,"page":0,"prePaint":90}
 {"k":"issue-2430-reverse-order-tangent-at-t.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2477-diameter-of-the-circle.geo.json|another#1","total":24,"page":0,"prePaint":24}
 {"k":"issue-2477-diameter-of-the-circle.geo.json|delete","total":1,"page":0,"prePaint":1}
@@ -1277,9 +1277,9 @@
 {"k":"issue-556-two-tangents-free-apex.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-572-load-collapse.geo.json|another#1","total":129659,"page":0,"prePaint":129659}
 {"k":"issue-572-load-collapse.geo.json|delete","total":4719,"page":0,"prePaint":4719}
-{"k":"issue-572-load-collapse.geo.json|detect","total":1545074,"page":0,"prePaint":0}
+{"k":"issue-572-load-collapse.geo.json|detect","total":1488478,"page":0,"prePaint":0}
 {"k":"issue-572-load-collapse.geo.json|edit","total":557337,"page":0,"prePaint":557337}
-{"k":"issue-572-load-collapse.geo.json|load","total":3825956,"page":0,"prePaint":3825956}
+{"k":"issue-572-load-collapse.geo.json|load","total":3006047,"page":0,"prePaint":3006047}
 {"k":"issue-572-load-collapse.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-572-load-collapse.geo.json|submit#2","total":1,"page":0,"prePaint":1}
 {"k":"issue-572-load-collapse.geo.json|submit#3","total":20,"page":0,"prePaint":20}

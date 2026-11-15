@@ -13,6 +13,9 @@
  */
 
 import { sample } from './rng';
+import { chargeHit3, chargedWork3, costed3 } from './workLedger3';
+import { limitReached, withWorkLimit } from '../../shell/workLimit';
+import { notDecided, type NotDecided } from '../../shell/notDecided';
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { defaultViewFrame } from './defaultView';
 import {
@@ -284,6 +287,8 @@ export function solidDimsAt(c: Construction3, i: number, seed: number): number[]
  * `perSolidDims` and the DOF count all read the same draws. #1855's per-solid similarity added seven keys to every
  * further solid, and sampling them again in each one-shot placement took two-solid figures past the #863 ceiling.
  */
+/** #2893: the draws kept per solid list (a configuration search walks thousands of seeds; the oldest are dropped). */
+const SOLID_DIMS_PER_FIGURE3 = 1024;
 const solidDimsMemo3 = new WeakMap<readonly unknown[], Map<number | string, readonly (readonly number[])[]>>();
 export function solidDimsAll3(c: Construction3, seed: number): readonly (readonly number[])[] {
   let bySeed = solidDimsMemo3.get(c.solids);
@@ -293,6 +298,7 @@ export function solidDimsAll3(c: Construction3, seed: number): readonly (readonl
   const concave = c.solids.map((solid) => (CONCAVE_SEAT_KINDS3.has(solid.kind) && !solid.bound ? concaveSeatVertices3(c, baseRingOf(solid)!) : null));
   const memoKey = concave.some(Boolean) ? `${seed}|${concave.map((v) => (v ? v.join('') : '-')).join('|')}` : seed;
   let all = bySeed.get(memoKey);
+  if (!all && bySeed.size >= SOLID_DIMS_PER_FIGURE3) bySeed.delete(bySeed.keys().next().value as number | string); // #2893: a search walks thousands of seeds
   if (!all) {
     all = c.solids.map((solid, i) => {
       // #2490 (ADR-3D-434): a bound solid's dims are its apex's alone — no layout, no similarity of its own
@@ -1251,7 +1257,28 @@ function ringReachValue3(c: Construction3, seed: number): number | null {
   let per = ringReachMemo3.get(c);
   if (!per) ringReachMemo3.set(c, (per = new Map()));
   const known = per.get(seed);
-  if (known !== undefined) return known;
+  if (known !== undefined) {
+    chargeHit3(ringReachCost3.get(per)?.get(seed)); // #2893: what finding it cost
+    return known;
+  }
+  const { value: out, cost } = costed3(() => ringReachSearch3(c, rings, seed));
+  let costs = ringReachCost3.get(per);
+  if (!costs) ringReachCost3.set(per, (costs = new Map()));
+  if (per.size >= RING_REACH_SEEDS3) {
+    const old = per.keys().next().value as number; // #2893: a configuration search walks thousands of seeds
+    per.delete(old);
+    costs.delete(old);
+  }
+  per.set(seed, out);
+  costs.set(seed, cost);
+  if (engineJournal3) engineJournal3.reaches.push({ figure: c, seed, out });
+  return out;
+}
+/** #2893: what each kept reach cost (a hit is charged it), and how many seeds a construction keeps. */
+const ringReachCost3 = new WeakMap<Map<number, number | null>, Map<number, number>>();
+const RING_REACH_SEEDS3 = 1024;
+/** {@link ringReachValue3}'s search for one seed. */
+function ringReachSearch3(c: Construction3, rings: Id[][], seed: number): number | null {
   const crossed = (r: Resolved3): boolean =>
     rings.some((ring) => {
       const pts = ring.map((id) => r.positions.get(id));
@@ -1272,8 +1299,6 @@ function ringReachValue3(c: Construction3, seed: number): number | null {
       }
     }
   }
-  per.set(seed, out);
-  if (engineJournal3) engineJournal3.reaches.push({ figure: c, seed, out });
   return out;
 }
 
@@ -2141,6 +2166,22 @@ function ownResolves3(figure: Construction3): Map<string, Resolved3> {
   if (!own) resolveMemo3.set(figure, (own = new Map()));
   return own;
 }
+/**
+ * #2893 ([ADR-3D-494](../../docs/06b-decisions-3d.md#adr-3d-494)) — WHAT EACH ANSWER COST (`engine/workLedger3.ts`): a hit is
+ * charged it, so a work limit counts the same in a warm session as in a cold one. Carried with the answer in a journal.
+ */
+const resolveCost3 = new WeakMap<Resolved3, number>();
+/** A hit in the resolve memo: charged what computing it cost. */
+function chargedResolve3(hit: Resolved3 | undefined): Resolved3 | undefined {
+  if (hit) chargeHit3(resolveCost3.get(hit));
+  return hit;
+}
+/** A computed answer, with its cost recorded. */
+function costedResolve3(compute: () => Resolved3): Resolved3 {
+  const { value, cost } = costed3(compute);
+  if (!resolveCost3.has(value)) resolveCost3.set(value, cost);
+  return value;
+}
 /** An answer the content already has, taken into the object's own. `home`: where the figure's solve lives (the journal's). */
 function sharedResolve3(figure: Construction3, own: Map<string, Resolved3>, c: Construction3, key: string, home: () => ResolvedHome3): Resolved3 | undefined {
   const hit = sharedResolves3.get(c)?.get(key);
@@ -2196,11 +2237,11 @@ const resolveHomes3 = new WeakMap<Resolved3, ResolvedHome3>();
  * key it is held under and the home of the solve it came from. Reads only: nothing is solved. The page hands these
  * to a fresh worker (the checkpoint), so the worker does not solve again the figure the student is looking at.
  */
-export function heldResolves3(figure: Construction3): { key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3 }[] {
-  const out: { key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3 }[] = [];
+export function heldResolves3(figure: Construction3): { key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3; cost?: number }[] {
+  const out: { key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3; cost?: number }[] = [];
   for (const [key, r] of resolveMemo3.get(figure) ?? []) {
     const home = resolveHomes3.get(r);
-    if (home) out.push({ key, home: { key: home.key, seed: home.seed, opts: home.opts, parts: home.parts }, out: r });
+    if (home) out.push({ key, home: { key: home.key, seed: home.seed, opts: home.opts, parts: home.parts }, out: r, cost: resolveCost3.get(r) });
   }
   return out;
 }
@@ -2274,8 +2315,9 @@ export const placementFreedom3 = (resolved: Resolved3): PlacementFreedom3 | unde
  * that a value asked for later is found or solved (`lazyValue3`). The caller has written the construction's pin
  * origins (`scalarPinOrigin3`) first: they are part of its content.
  */
-export function keepResolved3(figure: Construction3, key: string, home: Omit<ResolvedHome3, 'c'>, out: Resolved3): void {
+export function keepResolved3(figure: Construction3, key: string, home: Omit<ResolvedHome3, 'c'>, out: Resolved3, cost?: number): void {
   const c = figureContent3.of(figure);
+  if (cost !== undefined && !resolveCost3.has(out)) resolveCost3.set(out, cost);
   homeLazies3(out, { ...home, c });
   if (!resolveHomes3.has(out)) resolveHomes3.set(out, { ...home, c });
   const own = ownResolves3(figure);
@@ -2309,9 +2351,11 @@ export function releaseAdopted3(): void {
  */
 export interface EngineJournal3 {
   /** an answer of `resolve3`: the memo key it is held under, and the home of the solve it came from */
-  resolves: { figure: Construction3; key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3 }[];
-  /** a seed's verdict (`seedVerdict3`) */
-  verdicts: { figure: Construction3; key: string; out: boolean }[];
+  resolves: { figure: Construction3; key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3; cost?: number }[];
+  /** a seed's verdict (`seedVerdict3`), with what judging it cost (#2893) */
+  verdicts: { figure: Construction3; key: string; out: boolean; cost?: number }[];
+  /** #2893: a configuration search's outcome, for the page's run of the same action ({@link searchSeed3}) */
+  searches?: { figure: Construction3; key: string; out: SeedSearch3 }[];
   /** a ring-reach value (`ringReachValue3`) */
   reaches: { figure: Construction3; seed: number; out: number | null }[];
   /** a lazy value in hand, addressed like its figure: of a figure in this journal, or of one an earlier journal carried (it follows) */
@@ -2321,18 +2365,19 @@ let engineJournal3: (Omit<EngineJournal3, 'lazies'> & { late: { cell: Lazy3<unkn
 function journalResolve3(figure: Construction3, key: string, home: ResolvedHome3, out: Resolved3): void {
   // a construction that is not settled (a probe with a temporary pin) has no content: its answers serve no other heap
   if (!pinsSettled3(figure)) return;
-  engineJournal3!.resolves.push({ figure, key, home: { key: home.key, seed: home.seed, opts: home.opts, parts: home.parts }, out });
+  const entry = { figure, key, home: { key: home.key, seed: home.seed, opts: home.opts, parts: home.parts }, out, cost: resolveCost3.get(out) };
+  engineJournal3!.resolves.push(entry);
 }
 /** Start, or stop, recording what this file's memos are given. One recording at a time. */
 export function recordEngineJournal3(on: boolean): void {
   if (on && engineJournal3) throw new Error('a journal is already being recorded');
-  engineJournal3 = on ? { resolves: [], verdicts: [], reaches: [], late: [] } : null;
+  engineJournal3 = on ? { resolves: [], verdicts: [], reaches: [], late: [], searches: [] } : null;
 }
 /** What was written since the last take (the recording goes on). */
 export function takeEngineJournal3(): EngineJournal3 {
   if (!engineJournal3) throw new Error('no journal is being recorded');
-  const { resolves, verdicts, reaches, late } = engineJournal3;
-  engineJournal3 = { resolves: [], verdicts: [], reaches: [], late: [] };
+  const { resolves, verdicts, reaches, late, searches } = engineJournal3;
+  engineJournal3 = { resolves: [], verdicts: [], reaches: [], late: [], searches: [] };
   // A figure's cell holds no value, so every value in hand crosses here, addressed like its figure: those of the
   // figures in this take, and those computed since on a figure an earlier take carried. Each once.
   const sent = new Set<Lazy3<unknown>>();
@@ -2345,19 +2390,26 @@ export function takeEngineJournal3(): EngineJournal3 {
   };
   for (const r of resolves) for (const name of LAZY_NAMES3) if (r.out.pivot?.[name]) send(r.out.pivot[name] as Lazy3<unknown>, r.figure, r.home.key, name);
   for (const l of late) send(l.cell, l.figure, l.key, l.name);
-  return { resolves, verdicts, reaches, lazies };
+  return { resolves, verdicts, reaches, lazies, searches };
 }
 /** Take a journal's entries into this heap's memos, under the same content keys. The pin origins are written first (the caller's). */
 export function adoptEngineJournal3(j: EngineJournal3): void {
   releaseAdopted3();
   for (const l of j.lazies) keepLazyValue3(l.figure, l.key, l.name, l.value);
-  for (const r of j.resolves) keepResolved3(r.figure, r.key, r.home, r.out);
+  for (const r of j.resolves) keepResolved3(r.figure, r.key, r.home, r.out, r.cost);
+  if (j.searches?.length) handedSearches3 = new WeakMap(); // a job's outcomes replace the last job's
+  for (const h of j.searches ?? []) {
+    const of = figureContent3.of(h.figure);
+    let per = handedSearches3.get(of);
+    if (!per) handedSearches3.set(of, (per = new Map()));
+    per.set(h.key, h.out);
+  }
   for (const v of j.verdicts) {
     const of = figureContent3.of(v.figure);
     let per = seedVerdicts3.get(of);
     if (!per) seedVerdicts3.set(of, (per = new Map()));
     if (per.has(v.key)) continue;
-    per.set(v.key, v.out);
+    per.set(v.key, { v: v.out, cost: v.cost ?? 0 });
     if (per.size > SEED_VERDICTS_PER_FIGURE) per.delete(per.keys().next().value as string);
   }
   for (const r of j.reaches) {
@@ -2391,7 +2443,7 @@ export function writePinOrigins3(c: Construction3, origins: PinOrigins3): void {
  * judged again.
  */
 export const SEED_VERDICTS_PER_FIGURE = 1024;
-let seedVerdicts3 = new WeakMap<Construction3, Map<string, boolean>>();
+let seedVerdicts3 = new WeakMap<Construction3, Map<string, { v: boolean; cost: number }>>();
 /** #2888: seed verdicts by count: `asked` every question that reached the memo, `hits` those it answered. */
 export const seedVerdictStats3 = { asked: 0, hits: 0 };
 /** #2888: how many verdicts are kept for this construction's content (the bound's lock reads it). */
@@ -2404,12 +2456,13 @@ function seedVerdict3(c: Construction3, key: string, judge: () => boolean): bool
   const hit = per.get(key);
   if (hit !== undefined) {
     seedVerdictStats3.hits++;
-    return hit;
+    chargeHit3(hit.cost); // #2893: what judging it cost
+    return hit.v;
   }
-  const out = judge();
-  per.set(key, out);
+  const { value: out, cost } = costed3(judge);
+  per.set(key, { v: out, cost });
   if (per.size > SEED_VERDICTS_PER_FIGURE) per.delete(per.keys().next().value as string);
-  if (engineJournal3) engineJournal3.verdicts.push({ figure: of, key, out });
+  if (engineJournal3) engineJournal3.verdicts.push({ figure: of, key, out, cost });
   return out;
 }
 
@@ -2423,6 +2476,7 @@ export function clearEngineCaches3(): void {
   figureContent3.stats.shared = figureContent3.stats.fresh = figureContent3.stats.opaque = figureContent3.stats.dropped = 0;
   seedVerdicts3 = new WeakMap();
   seedVerdictStats3.asked = seedVerdictStats3.hits = 0;
+  handedSearches3 = new WeakMap();
   lazyValues3 = new WeakMap();
   lazyStats3.solvedAgain = 0;
   adoptedOver3.clear();
@@ -2461,11 +2515,12 @@ export function resolve3(figure: Construction3, seedIn: Seed3, opts: Resolve3Opt
   const solvedKey = `${base}|raw`;
   // #2890: the figure's home is its SOLVE's: the drawn frame is that solution turned, and shares its lazy cells
   const home = (): ResolvedHome3 => ({ c, key: solvedKey, seed, opts, parts: false });
-  let solved = own.get(solvedKey) ?? sharedResolve3(figure, own, c, solvedKey, home);
+  let solved = chargedResolve3(own.get(solvedKey) ?? sharedResolve3(figure, own, c, solvedKey, home));
   if (solved) resolveStats3.hits++;
-  else solved = rememberResolve3(figure, own, c, solvedKey, home, resolveHeld3(c, seed, opts));
+  else solved = rememberResolve3(figure, own, c, solvedKey, home, costedResolve3(() => resolveHeld3(c, seed, opts)));
   if (opts.solvedFrame) return solved;
-  return own.get(base) ?? sharedResolve3(figure, own, c, base, home) ?? rememberResolve3(figure, own, c, base, home, drawnFrame3(c, solved));
+  const drawn = solved;
+  return chargedResolve3(own.get(base) ?? sharedResolve3(figure, own, c, base, home)) ?? rememberResolve3(figure, own, c, base, home, costedResolve3(() => drawnFrame3(c, drawn)));
 }
 
 /**
@@ -2479,11 +2534,12 @@ function resolveParts3(figure: Construction3, c: Construction3, parts: readonly 
   const own = ownResolves3(figure);
   const solvedKey = `${base}|raw`;
   const home = (): ResolvedHome3 => ({ c, key: solvedKey, seed, opts, parts: true });
-  let solved = own.get(solvedKey) ?? sharedResolve3(figure, own, c, solvedKey, home);
+  let solved = chargedResolve3(own.get(solvedKey) ?? sharedResolve3(figure, own, c, solvedKey, home));
   if (solved) resolveStats3.hits++;
-  else solved = rememberResolve3(figure, own, c, solvedKey, home, solveParts3(c, parts, seed, opts));
+  else solved = rememberResolve3(figure, own, c, solvedKey, home, costedResolve3(() => solveParts3(c, parts, seed, opts)));
   if (opts.solvedFrame) return solved;
-  return own.get(base) ?? sharedResolve3(figure, own, c, base, home) ?? rememberResolve3(figure, own, c, base, home, drawnFrame3(c, solved));
+  const drawn = solved;
+  return chargedResolve3(own.get(base) ?? sharedResolve3(figure, own, c, base, home)) ?? rememberResolve3(figure, own, c, base, home, costedResolve3(() => drawnFrame3(c, drawn)));
 }
 
 /** {@link resolveParts3}'s solve: each part in the solved frame (its own resolve is memoised on the part), joined. */
@@ -5584,53 +5640,146 @@ export function meetsShapePreferences3(c: Construction3, seed: Seed3, prefs: rea
 }
 
 /**
- * The first seed from `from` whose configuration meets every requirement, or null within `budget`
- * tries. Deterministic — the same figure always lands on the same drawing (ADR-3D-053).
+ * #2893 ([ADR-3D-494](../../docs/06b-decisions-3d.md#adr-3d-494); ADR-W-210 invariant 3) — THE CONFIGURATION SEARCH IS
+ * BOUNDED IN WORK, AND A SEARCH THE LIMIT CUT SHORT SAYS SO.
  *
- * #615: TWO TIERS in ONE sweep (the ADR-267 lesson — never a second full pass): a seed that also draws
- * every stated shape visibly as itself wins outright; otherwise the first merely-valid seed is
- * remembered and returned when the sweep ends. So a figure whose givens FORCE a special case still
- * draws, at exactly the seed it would have drawn at before.
+ * The first seed from `from` whose configuration meets every requirement. Deterministic: the same figure always lands on
+ * the same drawing (ADR-3D-053). The search is DEFINED by its count, {@link SEARCH_SEEDS3} seeds from the start: a walk that
+ * judges them all and finds none is a FINISHED search (operator 2026-11-15, #2893: *"1a"*, *"a fixed try-count is a
+ * FINISHED search, like analytic"*), and the store refuses the line with today's `bound-unsatisfiable`. Now also:
+ *  - the walk is bounded by {@link SEED_SEARCH_LIMIT3} units of work (`shell/workLimit`), counted by
+ *    {@link searchWork3} (a memo hit is charged what it saved, and a judged seed at least {@link SEED_FLOOR3}: the same
+ *    outcome in a warm session as in a cold one), and checked before each seed is judged;
+ *  - reaching it before the count is spent, with no seed that meets the requirements, is "not decided"
+ *    (`shell/notDecided`): never a refusal, and it carries where the walk stopped ({@link SeedResume3}), so the next
+ *    round («המשיכו לחפש») goes on through the same window and judges no seed twice.
+ *
+ * #615: TWO TIERS in ONE sweep (the ADR-267 lesson — never a second full pass): a seed that also draws every stated
+ * shape visibly as itself wins outright; otherwise the first merely-valid seed is remembered (the fallback) and returned
+ * when the window ends — or when the limit is reached first: a valid seed exists, so that is an answer, not a run-out.
+ * So a figure whose givens FORCE a special case still draws, at exactly the seed it would have drawn at before.
  *
  * #2749 (ADR-3D-451): at the first valid seed a preference vetoes, the preferences the givens made impossible are
  * dropped ({@link possibleShapePreferences3}) and that seed is judged again — so a forced special case costs four
- * samples, not the budget, and lands on the seed the full sweep fell back to. Asked only on the failure path: a
- * figure whose first valid seed is preferred pays nothing new.
+ * samples, not the window, and lands on the seed the full sweep fell back to.
+ *
+ * #2764 (ADR-3D-454): a figure of several parts walks each part on its own, from its own entry; a part already drawn as
+ * it should be is answered by the first seed it is asked at.
  */
-export function firstSatisfyingSeed3(c: Construction3, from: Seed3 = 0, budget = 200): Seed3 | null {
-  const parts = partsOf3(c);
-  if (parts.length === 1) return firstSatisfyingSeedOf3(c, seedOfPart3(from, parts[0].key), budget);
-  // #2764 (ADR-3D-454): each part is judged and walked on its own, from its own entry. A part already drawn as it should
-  // be is answered by the first seed it is asked at, so nothing earlier moves when a line touches another part.
-  const entries: Record<string, number> = {};
-  for (const p of parts) {
-    const found = firstSatisfyingSeedOf3(p.construction, seedOfPart3(from, p.key), budget);
-    if (found === null) return null;
-    entries[p.key] = found;
+export interface SeedResume3 {
+  /** the parts already settled, by part key: the seed each landed on */
+  entries: Record<string, number>;
+  /** the part being walked (its index among the figure's parts) */
+  part: number;
+  /** the next seed to judge, as an offset from that part's own start */
+  next: number;
+  /** the first seed met that meets the requirements (null: none yet) */
+  fallback: number | null;
+  /** the preferences still asked, by place among the part's own, once the #2749 guard dropped some (null: all) */
+  prefs: number[] | null;
+  /** the #2749 guard has run */
+  guarded: boolean;
+}
+/** A search's outcome: a seed; `none` (the window was walked and no seed meets the requirements: finished); or "not
+ *  decided" (the work limit came first), with where it stopped. */
+export type SeedSearch3 = { kind: 'found'; seed: Seed3 } | { kind: 'none' } | NotDecided<SeedResume3>;
+
+/**
+ * #2893 — THE LIMIT, in the search's units (one residual evaluation of `leastSquares`, a memo hit charged what it saved,
+ * a judged seed at least {@link SEED_FLOOR3}): about 10 s of the configuration search on the dev PC (operator 2026-11-13,
+ * *"10s is an ok number"*). Calibrated in ADR-3D-494. One limit for every caller of the search (a typed line, an edit,
+ * «הציגו תצורה אחרת», a load), and the same on every machine: it counts work, not seconds.
+ */
+export const SEED_SEARCH_LIMIT3 = 2_500_000;
+/** The seeds that define the search, counted from its start (ADR-3D-053, #615): a walk that spends them is finished. */
+export const SEARCH_SEEDS3 = 200;
+/** #615's preference window is the same count. */
+export const PREFERENCE_SEEDS3 = SEARCH_SEEDS3;
+/**
+ * #2893 — THE LEAST A JUDGED SEED COSTS, in the same units. A figure placed in closed form (a cube, a pyramid over a
+ * square) is resolved with no `leastSquares` call at all, so its seeds cost nothing on the meter. Each seed judged is
+ * charged at least this (measured in ADR-3D-494), so the count is never blind to a walk.
+ */
+export const SEED_FLOOR3 = 2;
+/** The search's count: the charged work, plus each judged seed's floor where its own cost was below it. Monotone. */
+let seedFloors3 = 0;
+const searchWork3 = (): number => chargedWork3() + seedFloors3;
+
+/**
+ * #2893 — THE OUTCOMES A JOB HANDED OVER: the worker's search outcomes, for the page's run of the same action. Each is
+ * taken once, and the next job's outcomes replace any left; never written by a search of this heap, never asked by one
+ * that is not the same round (the key is the figure's content, the start, where the round resumes, and the limit). It is
+ * what that round found, not a memo of verdicts.
+ */
+let handedSearches3 = new WeakMap<Construction3, Map<string, SeedSearch3>>();
+
+/** One round of the configuration search, from `from` or from where an earlier round stopped. */
+export function searchSeed3(c: Construction3, from: Seed3, resume?: SeedResume3, limit: number = SEED_SEARCH_LIMIT3): SeedSearch3 {
+  const of = figureContent3.of(c);
+  const key = `${seedKey3(from)}|${resume ? JSON.stringify(resume) : ''}|${limit}`;
+  const handed = handedSearches3.get(of)?.get(key);
+  if (handed) {
+    handedSearches3.get(of)!.delete(key); // taken once: the page's run of the round it was handed for
+    return handed;
   }
-  return canonicalSeed3(seedNumber3(from), entries);
+  const { value, spent } = withWorkLimit(limit, () => walkParts3(c, from, resume), searchWork3);
+  const out: SeedSearch3 = value.kind === 'stopped' ? notDecided(value.resume, spent) : value;
+  if (engineJournal3 && pinsSettled3(of)) engineJournal3.searches!.push({ figure: of, key, out });
+  return out;
 }
 
-/** {@link firstSatisfyingSeed3} for one part: the walk over its plain seeds. */
-function firstSatisfyingSeedOf3(c: Construction3, from: number, budget: number): number | null {
-  let fallback: number | null = null;
-  let prefs = quadPreferences3(c);
-  let guarded = false;
-  for (let i = 0; i < budget; i++) {
+/** {@link searchSeed3} as it was asked before #2893: the seed, or null when the round found none (finished or cut short). */
+export function firstSatisfyingSeed3(c: Construction3, from: Seed3 = 0): Seed3 | null {
+  const r = searchSeed3(c, from);
+  return r.kind === 'found' ? r.seed : null;
+}
+
+type PartWalk3 = { kind: 'found'; seed: number } | { kind: 'none' } | { kind: 'stopped'; at: Omit<SeedResume3, 'entries' | 'part'> };
+
+function walkParts3(c: Construction3, from: Seed3, resume?: SeedResume3): { kind: 'found'; seed: Seed3 } | { kind: 'none' } | { kind: 'stopped'; resume: SeedResume3 } {
+  const parts = partsOf3(c);
+  const entries: Record<string, number> = { ...(resume?.entries ?? {}) };
+  for (let k = resume?.part ?? 0; k < parts.length; k++) {
+    const p = parts[k];
+    const r = walkPart3(parts.length === 1 ? c : p.construction, seedOfPart3(from, p.key), resume && k === resume.part ? resume : null);
+    if (r.kind === 'stopped') return { kind: 'stopped', resume: { entries, part: k, ...r.at } };
+    if (r.kind === 'none') return r;
+    entries[p.key] = r.seed;
+  }
+  if (parts.length === 1) return { kind: 'found', seed: entries[parts[0].key] };
+  return { kind: 'found', seed: canonicalSeed3(seedNumber3(from), entries) };
+}
+
+/** One part's walk over its window of plain seeds, from its start or from where a round stopped. */
+function walkPart3(c: Construction3, from: number, at: Omit<SeedResume3, 'entries' | 'part'> | null): PartWalk3 {
+  const own = quadPreferences3(c);
+  let fallback = at?.fallback ?? null;
+  let prefs = at?.prefs ? at.prefs.map((i) => own[i]) : own;
+  let guarded = at?.guarded ?? false;
+  for (let i = at?.next ?? 0; i < SEARCH_SEEDS3; i++) {
+    if (limitReached()) {
+      if (fallback !== null) return { kind: 'found', seed: fallback };
+      return { kind: 'stopped', at: { next: i, fallback, prefs: prefs === own ? null : prefs.map((r) => own.indexOf(r)), guarded } };
+    }
     const seed = from + i;
-    if (!meetsRequirements3(c, seed)) continue;
-    if (meetsShapePreferences3(c, seed, prefs)) return seed;
-    if (fallback === null) fallback = seed;
-    if (!guarded) {
-      guarded = true;
-      const kept = possibleShapePreferences3(c, from, prefs);
-      if (kept.length < prefs.length) {
-        prefs = kept;
-        if (meetsShapePreferences3(c, seed, prefs)) return seed;
+    const judged = chargedWork3();
+    try {
+      if (!meetsRequirements3(c, seed)) continue;
+      if (meetsShapePreferences3(c, seed, prefs)) return { kind: 'found', seed };
+      if (fallback === null) fallback = seed;
+      if (!guarded) {
+        guarded = true;
+        const kept = possibleShapePreferences3(c, from, prefs);
+        if (kept.length < prefs.length) {
+          prefs = kept;
+          if (meetsShapePreferences3(c, seed, prefs)) return { kind: 'found', seed };
+        }
       }
+    } finally {
+      seedFloors3 += Math.max(0, SEED_FLOOR3 - (chargedWork3() - judged));
     }
   }
-  return fallback;
+  return fallback === null ? { kind: 'none' } : { kind: 'found', seed: fallback };
 }
 
 /**

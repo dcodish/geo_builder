@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /** Functions whose cost is "many replays/evaluates" — never acceptable on the UI thread. */
-const HEAVY = ['sharedSamples', 'detectAll', 'firstSatisfyingSeed', 'findValidConfig', 'searchAnotherView', 'searchResample'];
+const HEAVY = ['sharedSamples', 'detectAll', 'firstSatisfyingSeed', 'findValidConfig', 'searchAnotherView', 'searchResample', 'findValidConfigRound', 'searchAnotherViewRound']; // #2893: the three-outcome forms are the same sweeps
 
 /**
  * Modules that execute on the MAIN thread. Deliberately excluded: `geoWorker.ts` (the worker itself),
@@ -37,7 +37,7 @@ const MAIN_THREAD = ['src/App.tsx', 'src/store/geoStore.ts', 'src/app/submitPipe
  */
 const BASELINE: Record<string, Record<string, number>> = {
   'src/App.tsx': {},
-  'src/store/geoStore.ts': { findValidConfig: 1, searchAnotherView: 1 },
+  'src/store/geoStore.ts': { findValidConfigRound: 1, searchAnotherViewRound: 1 }, // #2893 (ADR-831): the store's sync actions call the three-outcome forms
   'src/app/submitPipeline.ts': {},
   'src/render/scene.ts': {},
   'src/render/Figure.tsx': {},

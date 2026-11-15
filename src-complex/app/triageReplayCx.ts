@@ -46,7 +46,7 @@ export interface LoggedEventCx {
  * nothing), `refused` (a reasoned refusal, listed for review), `skip`, `unverified`, `error`.
  */
 export interface ReplayOutcomeCx {
-  readonly now: 'built' | 'not-handled' | 'built-nothing' | 'refused' | 'skip' | 'unverified' | 'error';
+  readonly now: 'built' | 'not-handled' | 'built-nothing' | 'refused' | 'not-decided' | 'skip' | 'unverified' | 'error';
   readonly detail: string;
   readonly degraded: boolean;
 }
@@ -143,6 +143,9 @@ export function replayComplexSession(events: readonly LoggedEventCx[], opts: Rep
             v.error.key === 'not-handled'
               ? { now: 'not-handled', detail: v.error.key, degraded }
               : { now: 'refused', detail: v.error.key, degraded };
+          break;
+        case 'not-decided': // #2893 (ADR-CX-092): the gate reached its work limit before it decided
+          res = { now: 'not-decided', detail: 'not-decided', degraded };
           break;
       }
     } catch (err) {

@@ -28,7 +28,7 @@
  * still runs as before for anything the scan does not cover.
  */
 import type { Constraint } from './solve';
-import { meterWork } from '../../shell/workMeter';
+import { solverUnit } from './workLimitAn';
 import { inDomain, type Domain } from './types';
 import type { Env } from './expr';
 
@@ -43,7 +43,7 @@ const SAME_ROOT = 1e-6;
 export function scanRoots(f0: (v: number) => number[] | null, domain: Domain, L: number): number[] | 'identity' {
   // #2873 (ADR-W-210): a scan's residual evaluations are solver work in the same unit as `solveLM`'s.
   const f = (v: number): number[] | null => {
-    meterWork();
+    solverUnit();
     return f0(v);
   };
   const lo = Math.max(domain.min ?? -L, -L);

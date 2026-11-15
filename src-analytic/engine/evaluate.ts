@@ -34,6 +34,7 @@ import { segmentIdOf } from './cevian';
 import { followObjects } from './roles';
 import { ContentCache, contentOf } from './content';
 import { offInkExtensions } from '../../shell/offInk';
+import { isLimitSignal } from './workLimitAn';
 import { curveByName, inDomain, isFree, isPositional, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
 export interface FigurePoint {
@@ -2139,7 +2140,9 @@ function constraintReads(raw: Construction): ReadonlyMap<Constraint, ReadonlySet
           },
           scale,
         );
-      } catch {
+      } catch (e) {
+        // #2893: a reached work limit is never "cannot be read": it ends the search (`workLimitAn`)
+        if (isLimitSignal(e)) throw e;
         /* a residual that cannot be read here links by its text alone */
       }
     }

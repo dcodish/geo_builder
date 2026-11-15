@@ -16,7 +16,7 @@
 //   submit  = decidePreParse/decideFromParse (main, minus the prefold hook = worker 'prefold')
 //             → commitVerdict (main) → render (main) → meetsRequirements (main, runViewResolve's gate)
 //             → [worker autoResolve = meetsRequirements + findValidConfig(…, 12 s) + replay(found)] → render (main)
-//   another = searchAnotherView(facts, seed, _, WORKER_SEARCH_BUDGET_MS) (worker) → render (main)
+//   another = searchAnotherView(facts, seed) under SEARCH_WORK_LIMIT (worker) → render (main)
 //   load    = clearReplayCaches → loadFigureText (refresh + smoke replay main; prefold worker) → render → resolve
 //             → auditLoadedFigure (main, App.tsx runLoad)
 //   edit    = runEditCommit(last row, its own text) (main) → render → resolve
@@ -34,10 +34,9 @@
 //
 // COMPARABILITY: every `*_ms` here is a wall-clock timing — comparable only on a quiet machine, same machine, before
 // vs after. `work` { total, page, prePaint } is the work meter's three counts (#2873, ADR-W-210): evaluateCore calls in
-// all, on the page's UI thread, and before the figure can paint. It is clock-free and comparable anywhere, EXCEPT on
-// an action marked `clipped`: this harness runs the browser's clock budgets (--mode production), and where a 12 s
-// search is cut depends on the machine. The suite's gate runs the same driver with NO clock, so its counts are the
-// whole search's and are exact; the two are different measurements of one action. `outcome` is deterministic too.
+// all, on the page's UI thread, and before the figure can paint. It is clock-free and comparable anywhere: since #2893
+// (ADR-831) every search is bounded in work units, the same here, in the suite and in the browser, and a search that
+// reaches its limit records the outcome `not-decided`. `outcome` is deterministic too.
 import { useGeoWorkExecutor } from '../../../src/store/geoWork';
 import { geoOps } from '../../../src/store/geoOps';
 import { sameInstanceExecutor } from '../../../shell/workerExecutor';
@@ -51,7 +50,7 @@ import { Session } from 'node:inspector';
   throw new Error('perf harness: network disabled (no LLM)');
 };
 
-import { replay, meetsRequirements, findValidConfig, searchAnotherView, getFoldFor, detectAll, groupKey, WORKER_SEARCH_BUDGET_MS, type Fact } from '@/store/geoStore';
+import { replay, meetsRequirements, findValidConfig, searchAnotherView, getFoldFor, detectAll, groupKey, type Fact } from '@/store/geoStore';
 import { rowNouns } from '@/store/rowNouns';
 import { serializeFigure } from '@/store/figureFile';
 import { createDriver2d, type Snap, type WorkerOps } from '@/__tests__/work-meter/driver2d';
@@ -277,8 +276,8 @@ function buildJobs(): Item[] {
 /** geoWorker.ts's own bodies, with its 12 s budget, charged to the worker lane: what a browser's worker runs. */
 // #2890 (ADR-830): every decision goes through the App's client; here it is served by the worker's own table, with its
 // 12 s budget, in this instance, charged to the worker lane (shell/workerExecutor's same-instance executor).
-useGeoWorkExecutor(sameInstanceExecutor(geoOps({ searchBudgetMs: WORKER_SEARCH_BUDGET_MS, crossing: false })));
-const driver = createDriver2d({}, { searchBudgetMs: WORKER_SEARCH_BUDGET_MS });
+useGeoWorkExecutor(sameInstanceExecutor(geoOps({ crossing: false })));
+const driver = createDriver2d({});
 let history: Snap[] = [];
 let future: Snap[] = [];
 const loadedFinals = new Set<string>();

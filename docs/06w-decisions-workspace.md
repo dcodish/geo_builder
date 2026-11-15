@@ -8010,3 +8010,38 @@ Slow corpora: page 0 in all three (2-D 37.7 M → 0, 3-D 71.7 M → 0, analytic 
 - [ruled] Once a figure is on screen, the next action does not wait for that figure's values; the old figure's values are dropped. Operator, 2026-11-14, after playing analytic's T1 with that question beside it: *"T1 works great"*.
 - [ruled] An action pressed while the tool works on a figure waits its turn (Am. 2, question 1).
 - [2-D] Save, share, the exports, the language and the guide stay usable while a job runs and act on the figure on screen: measured in 2-D on `main` during its worker search (save 43 ms, language 47 ms, guide 53 ms) and in 3-D on the branch (save 36 ms).
+
+### ADR-W-210 Amendment 6 (2026-11-15) — phase 4 as built: every search is bounded in work, and one that reaches its limit says so (#2893)
+
+**Status:** built · 2026-11-15 · feature (workspace: 2-D, 3-D, analytic, shell) · branch `feat/2893-phase4`, three builder branches merged into it · on the operator's word (*"go ahead with next phases"*) and his four rulings on #2893 (2026-11-13 and 2026-11-14) · awaiting his play
+**Requirements:** [02](02-requirements.md) FR-ALT-8 (new); [02b](02b-requirements-3d.md) FR-SP-34 (new); [02c](02c-requirements-analytic.md) R16 (a new promise) · **Design:** [04w](04w-design-shell.md) § "The work limit and "not decided""; [04](04-design.md), [04b](04b-design-3d.md), [04c](04c-design-analytic.md) (each builder's limit)
+
+**The shared part** (`shell/`): `workLimit.ts` (`withWorkLimit(units, fn)`, `limitReached()`, `unitsLeft()`), `notDecided.ts` (the third outcome, `{kind:'not-decided', resume, spent}`: never a verdict, never a refusal, never a memo entry, never a fact, never an undo step), `frame/NotDecidedNote.tsx` with the suite keys `suite.notDecided.message` / `.continue`, and the letter popover's not-decided answer (`frame/letterOffer.ts`).
+
+**The three ADRs.** [ADR-831](06-decisions.md#adr-831) (2-D), [ADR-3D-494](06b-decisions-3d.md#adr-3d-494), [ADR-AG-479](06c-decisions-analytic.md#adr-ag-479). Every wall clock on a path that decides a verdict, a stored fact or what is drawn is gone; the check sits inside each solver's loop, where the meter counts. Complex has no search that can run out and is unchanged.
+
+| Builder | Limit, a named constant | Measured in the browser (dev PC, through the harness) | Counted how |
+|---|---|---|---|
+| 2-D | `TEN_SECONDS_OF_WORK` = 12 M (ruled *"2 b"*) | 770 k units a second on a search that solves what it touches, so about 15 s; every fixture and slow-corpus search but the kite's (14.4 M, on unticking its first row) decides in one round; the #566 two-circle line draws at once, as on `main` | charged units: a served repeat and a memo hit count as computed |
+| 3-D | `SEED_SEARCH_LIMIT3` = 2.5 M over the 200-seed window | the square + |SA| = 5 + «179 < ∠SAB < 180»: 10.8 s, then 8.9 s (113.6 s frozen on `main`); the pyramid with the same range: all 200 seeds tried, refused in 0.42 s as on `main` | `chargedWork3`: executed units plus what each memo hit saved |
+| Analytic | `SEARCH_LIMIT_AN` = 3.8 M | exam 2379 + «P(1,1)»: 10.1 s and 10.0 s, then today's refusal at 6.7 s | `chargeUnit`: every evaluation the solver asks for, served or computed |
+
+Each limit is counted so that the same input stops at the same unit cold or warm, in any order, in any heap and on any machine. Each builder's gate asserts that, plus that a "not decided" is never served from a memo as a verdict and that «המשיכו לחפש» does not repeat what the first round tried.
+
+**Recalibrated after phase 5.** Phase 5's served repeats ([ADR-832](06-decisions.md#adr-832), [ADR-AG-480](06c-decisions-analytic.md#adr-ag-480)) made each charged unit cheaper in time. The first limits then stopped at 5.6 s (2-D) and 6.6 s (analytic) against a sentence that says «כ-10 שניות», so both were raised to about 10 s as ruled. A served repeat stays charged to the limit, so phase 5 changes when a round ends in seconds, never which unit it ends at.
+
+**The meter.** Analytic and 3-D: no recorded action reaches its limit; analytic's baselines are byte-identical to `main`'s and 3-D's did not move. 2-D, against `main` @ `9e96c6f0`: fixtures 92 005 252 → 90 201 730, slow corpus 92 675 197 → 87 106 692, and no line above `main`'s (at 7.7 M five lines rose, among them `issue-572-load-collapse`'s edit 0.56 M → 3.01 M, signed off by the operator on 2026-11-15, *"i sign off on the items you mentioned about 2x work. its ok for now"*; at 12 M all five are back at or under `main`).
+
+**Found on the way.** In 3-D a range no angle can be in is now refused at once without a search, keeping 2-D's verdict on «זווית ABC גדולה מ-200». A square-with-|SA| case that froze 3-D for 113.6 s on `main` now asks at 10.8 s. As first built, 3-D treated its 200-seed window as a run-out; ruling *"1a"* made a spent count a finished search in every builder, so its refusals are `main`'s again.
+
+**Sibling audit.** 2-D, 3-D and analytic change together on one shell part. Complex: no search, unchanged. The sentence, the button and the key are shared, so every builder says the same words.
+
+**What the student will see.**
+- [ruled] When a search reaches its limit without a solution, the tool says «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with a button «המשיכו לחפש», where it shows a refusal (or «אין תצורה אחרת — הצורה נקבעה») today. A search that finishes and finds nothing keeps today's words. Operator: *"we should say honestly that a solution was not found and if we should continue searching"* (2026-11-13); wording: *"«עדיין לא נמצא פתרון…» (Recommended)"* (2026-11-14).
+- [ruled] «המשיכו לחפש» searches the same amount again from where it stopped. *"Another ~10 s round (Recommended)"* (2026-11-14).
+- [ruled] In 3-D and analytic, a typed line whose search stopped stays in the box and is not added. *"Stays in the box, not added (Recommended)"* (2026-11-14). 2-D: the line stays added, *"3 a"* (2026-11-15).
+- [ruled] The limit is counted in work, about 10 s on the dev PC (2-D about 15 s, by *"2 b"*), the same everywhere. *"10s is an ok number"* (2026-11-13).
+- [ruled] A spent try-count is a FINISHED search in every builder (today's refusal); only a search the work limit cuts short asks. 3-D's 200-seed window is its count. Operator, 2026-11-15, after playing T1, T5 and T11 of PR #2895 (*"all tests pass"*): *"1a"*.
+- [ruled] 2-D's limit is raised so every corpus search but the kite's decides in one round. *"2 b"* (2026-11-15). ADR-831.
+- [ruled] 2-D: the typed line stays added when its search stops, as built. *"3 a"* (2026-11-15). The submit gates, the variant settle and the load's refresh ask at their limit, built when a figure first reaches one ([#2896](https://github.com/dcodish/geo_builder/issues/2896)). *"4 yes"* (2026-11-15).
+- [ruled] Analytic: a figure's values have no limit. *"5 yes"* (2026-11-15). ADR-AG-479.

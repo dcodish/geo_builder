@@ -948,6 +948,27 @@ every saved question), and answer with their journal. The page (`app/offPage3.ts
 - `derive3` hands the fold the fact list's REPRESENTATIVE (`factLists3`), so a memo below it keyed by the array (the
   narrowing notes) is keyed by content: a worker is handed every list as a clone.
 
+**The configuration search is bounded in work (#2893, [ADR-3D-494](06b-decisions-3d.md#adr-3d-494); ADR-W-210 invariant 3).**
+`searchSeed3` (`engine/evaluate.ts`) walks the search's window, `SEARCH_SEEDS3` = 200 seeds from its start, until one
+meets the requirements, under `withWorkLimit` (`shell/workLimit`) of `SEED_SEARCH_LIMIT3` units, checked before each
+seed. Three outcomes: `found`; `none`, the window walked with no seed (a FINISHED search, operator ruling "1a",
+2026-11-15: the callers answer it as they always have); `not-decided` (`shell/notDecided`), the limit reached first,
+carrying `SeedResume3` (the part, the next seed, the fallback, the preferences kept): the next round goes on through the
+window from there. A valid seed met before the limit is an answer. The count (`searchWork3`) is `chargedWork3`
+(`engine/workLedger3.ts`: the meter's executed units, plus what each memo hit on the per-seed path saved: the seed
+verdicts, the resolve memo, the ring reach), plus a floor of `SEED_FLOOR3` per judged seed.
+- The store's callers on `none`: a typed line and an edit refuse with `bound-unsatisfiable`; `resample` draws the next
+  seed; `loadedSeed3` opens at the saved one. On `not-decided`: `decideCommands3` answers the verdict `not-decided`
+  (nothing added, no refusal); `replaceFact` keeps the old statement; `resample` keeps the seed. Each sets
+  `lastNotDecided` (transient, never in the history), which App3 shows with the shell's `NotDecidedNote` where
+  `lastError` shows, while the store holds the figure it was made on. «המשיכו לחפש» is the store action
+  `continueSearch(ask)`, a job like any other (the press's on its lane).
+- The round runs in the worker; the journal carries its OUTCOME (`searches`), which the page's run of the same round
+  takes once (`handedSearches3`).
+- A range no angle can be in (low end ≥ 180°, high end ≤ 0°) is refused by `apply.ts` without a search.
+- The per-seed memos are bounded: the solid draws (1 024 per solid list), the ring reach (1 024 per construction), as
+  the seed verdicts (1 024) and the resolves (64) already were.
+
 **A pin symbol's admissible roots are one set (#1769, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395)).** One
 root predicate decides whether a candidate joins the pool: `collect` admits it only when it is exact on the primary
 residuals, not collapsed, and every member pin holds by the verifier's own bar (`membersHold`, which reads
