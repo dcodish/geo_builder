@@ -27,13 +27,24 @@ export interface LetterHolderView {
  *
  * `taken` is the one refusal the popover treats specially: it names the holder and offers the swap.
  * Every other refusal (`bad`, or a product's own reason string) shows the "invalid letter" note.
+ *
+ * #2893 (ADR-W-210 phase 4): `not-decided` is NOT a refusal. The product's decision reached its work limit before it
+ * decided (`shell/notDecided`); the popover shows the operator's sentence with «המשיכו לחפש» where it shows the invalid
+ * note, and the button calls the same callback again with `round` (the round to run, as the product handed it back).
  */
-export type LetterRenameResult = { ok: true } | { ok: false; reason: 'taken' | 'bad' | (string & {}); holder?: LetterHolderView | null };
+export type LetterRenameResult =
+  | { ok: true }
+  /** `round` (#2893): with `not-decided`, the round «המשיכו לחפש» passes back */
+  | { ok: false; reason: 'taken' | 'bad' | 'not-decided' | (string & {}); holder?: LetterHolderView | null; round?: number };
 
-/** What a product's swap callback answers. */
+/** What a product's swap callback answers. #2893: `notDecided` = its decision reached the work limit (see above). */
 export interface LetterSwapResult {
   ok: boolean;
+  notDecided?: { round: number };
 }
+
+/** #2893: the attempt «המשיכו לחפש» repeats, and the round it runs. */
+export type LetterRetry = { kind: 'rename'; to: string; round: number } | { kind: 'swap'; to: string; round: number };
 
 /**
  * THE TAKEN-LETTER OFFER'S SCOPE — a swap is offered wherever the letter has a holder (#1199, ADR-532).
@@ -52,9 +63,11 @@ export const typedLetter = (raw: string): string => raw.trim().toUpperCase();
 /** The popover's state after an attempt. `close` ends it; otherwise `note` and `takenBy` are shown. */
 export interface LetterPopoverOutcome {
   close: boolean;
-  note: 'taken' | 'bad' | null;
+  note: 'taken' | 'bad' | 'not-decided' | null;
   /** the holder to quote and the letter the student asked for — the swap offer's two halves */
   takenBy: { holder: LetterHolderView; to: string } | null;
+  /** #2893: what «המשיכו לחפש» runs, when `note` is `not-decided` */
+  retry?: LetterRetry;
 }
 
 /**
@@ -66,14 +79,18 @@ export interface LetterPopoverOutcome {
  */
 export function afterRename(res: LetterRenameResult, to: string): LetterPopoverOutcome {
   if (res.ok) return { close: true, note: null, takenBy: null };
+  if (res.reason === 'not-decided') return { close: false, note: 'not-decided', takenBy: null, retry: { kind: 'rename', to, round: res.round ?? 1 } };
   if (res.reason !== 'taken') return { close: false, note: 'bad', takenBy: null };
   return { close: false, note: 'taken', takenBy: res.holder ? { holder: res.holder, to } : null };
 }
 
 /** The reducer from a swap answer (2-D's `swapLetters`, #1013): a swap that went through closes the
  *  popover; one the product refused leaves it open with the "invalid" note, the offer still showing. */
-export function afterSwap(res: LetterSwapResult): { close: boolean; note: 'bad' | null } {
-  return res.ok ? { close: true, note: null } : { close: false, note: 'bad' };
+export function afterSwap(res: LetterSwapResult, to = ''): { close: boolean; note: 'bad' | 'not-decided' | null; retry?: LetterRetry } {
+  if (res.ok) return { close: true, note: null };
+  // #2893: a swap whose decision reached the work limit is not refused: the sentence and «המשיכו לחפש»
+  if (res.notDecided) return { close: false, note: 'not-decided', retry: { kind: 'swap', to, round: res.notDecided.round } };
+  return { close: false, note: 'bad' };
 }
 
 /** Fill `{{a}}`/`{{b}}` (the swap button) or `{{what}}` (the holder line) in a caller-supplied string. */

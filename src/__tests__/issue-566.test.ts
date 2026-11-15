@@ -14,6 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import { factsOf } from './scenarios-harness';
 import { cyclableSeat, findValidConfig, meetsRequirements, replay, searchAnotherView } from '@/replay/core';
+import { findValidConfigInRounds } from './searchRounds';
 
 const STEPS = ['משולש ישר זווית ABC', 'משולש ABC חסום במעגל', 'קשת AB = קשת BC'];
 
@@ -75,7 +76,10 @@ describe('#566 — the unstated right-angle seat yields to a later constraint (A
       'משיק למעגל בנקודה B',
       'קשת AB = קשת BC',
     ]);
-    const found = findValidConfig(facts, 0);
+    // #2893 (ADR-831): this search charges ~11.6 M units, past one round's limit: the first round says "not decided",
+    // and «המשיכו לחפש» reaches the same rescue (each round goes on from where the last one stopped)
+    const { value: found, rounds } = findValidConfigInRounds(facts, 0);
+    expect(rounds, 'past one round: the student presses «המשיכו לחפש»').toBeGreaterThan(1);
     expect(found, 'a real configuration exists at the seat B — must be found').not.toBeNull();
     const fig = replay(found!.facts, found!.seed);
     const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));

@@ -18,7 +18,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearReplayCaches, foldStats, getFoldFor, replay, replayMemoConfig, replayMemoSizes, sharedSamples, type Derived, type Fact } from '@/replay/core';
-import { computeWithCell, countWork, servingRepeats, solveBudget, withSolveBudget, withWorkBudget, withWorkEpoch, work } from '@/engine/solveBudget';
+import { computeWithCell, countWork, servingRepeats, solveBudget, withLadderSpent, withWorkBudget, withWorkEpoch, work } from '@/engine/solveBudget';
 import { nelderMead } from '@/engine/evaluate';
 import { applyCommand, emptyConstruction, reflectableFreePoints, withReflectMask, type AnyCommand, type Command } from '@/engine';
 import { inWorkerLane } from '../../../shell/workMeter';
@@ -160,7 +160,10 @@ describe('the sampled construction of a fold is built once, so its solve is too 
     const onPage = executedBy(() => replay(arrayOf(), SEED));
     expect(onPage.executed, 'the page solves its own sample').toBeGreaterThan(0);
     expect(executedBy(() => replay(arrayOf(), SEED)).executed, 'and then holds it').toBe(0);
-    expect(inWorkerLane(() => executedBy(() => replay(arrayOf(), SEED)).executed), 'as the worker lane holds its own').toBe(0);
+    // #2893 (ADR-831): the page now folds the content itself (ADR-827's shared 8-entry list is gone), and in this ONE node heap
+    // the content's fold is replaced by the page's, so the worker lane's sample, keyed by the fold it was drawn from, is
+    // solved once more. In a browser each heap keeps its own fold and this never happens.
+    expect(inWorkerLane(() => executedBy(() => replay(arrayOf(), SEED)).executed), 'the worker lane solves at most its one sample again').toBeLessThanOrEqual(1);
   });
 
   it('the sample pool: a second pool of one figure runs none of its samples again, and holds the same samples', () => {
@@ -168,8 +171,8 @@ describe('the sampled construction of a fold is built once, so its solve is too 
       const facts = arrayOf(LOOSE);
       replay(facts, 0); // the figure on screen
       const e0 = work.executed;
-      // the gate's pool: narrow, on the clock (none under test), never kept as the knowledge memo
-      const pool = sharedSamples(facts, { deadlineMs: Number.POSITIVE_INFINITY });
+      // the gate's pool: narrow, under its work limit (#2893; it was a clock, none under test), never kept as the knowledge memo
+      const pool = sharedSamples(facts, { gate: true });
       return { executed: work.executed - e0, complete: pool.complete, at: pool.samples.map((m) => [...m].map(([id, p]) => `${id}:${p.x.toFixed(9)},${p.y.toFixed(9)}`).join(' ')) };
     };
     const cold = poolOf();
@@ -216,13 +219,14 @@ describe('under a budget nothing is different: memo on = memo off, cold = warm (
     expect(on.warm.figures).toEqual(off.cold.figures);
   });
 
-  it('two arrays in ONE epoch are counted as two solves, as they always were', () => {
+  it('two arrays in ONE epoch: the second is served from the table, the same cold and warm (#2893, ADR-831)', () => {
     const one = fourWays(() => epochOf(1));
     const two = fourWays(() => epochOf(2));
-    expect(two.on.cold.done).toBe(two.off.cold.done);
-    expect(two.on.warm.done).toBe(two.off.warm.done);
+    // ADR-827 built a fresh object for the second array so an epoch counted two solves, as before the table existed;
+    // #2893 removes that emulation: the second hand-out is free, as a cold run serves it from the table it just filled
     expect(two.on.warm.done, 'cold = warm').toBe(two.on.cold.done);
-    expect(two.on.cold.done, 'the second array of an epoch is not served free').toBeGreaterThan(one.on.cold.done);
+    expect(two.on.cold.done, 'the table counts no more than two separate solves').toBeLessThanOrEqual(two.off.cold.done);
+    expect(two.on.cold.done, 'and the second array costs nothing more').toBe(one.on.cold.done);
     expect(new Set([...two.on.cold.figures, ...two.on.warm.figures, ...two.off.cold.figures]).size, 'one figure throughout').toBe(1);
   });
 
@@ -242,8 +246,9 @@ describe('under a budget nothing is different: memo on = memo off, cold = warm (
       expect(one.on.warm.done, 'mask ' + mask + ', one array, warm').toBe(one.off.warm.done);
       expect(one.on.warm.figures).toEqual(one.off.warm.figures);
       const two = fourWays(() => epochOf(2, seed, apex));
-      expect(two.on.cold.done, 'mask ' + mask + ', two arrays, cold').toBe(two.off.cold.done);
-      expect(two.on.warm.done, 'mask ' + mask + ', two arrays, warm').toBe(two.off.warm.done);
+      // #2893 (ADR-831): the second array is served from the table (ADR-827's fresh object is gone): cold = warm
+      expect(two.on.warm.done, 'mask ' + mask + ', two arrays, cold = warm').toBe(two.on.cold.done);
+      expect(two.on.cold.done, 'mask ' + mask + ', two arrays, no more than two solves').toBeLessThanOrEqual(two.off.cold.done);
       expect(two.on.warm.figures).toEqual(two.off.cold.figures);
     }
   });
@@ -276,7 +281,7 @@ describe('under a budget nothing is different: memo on = memo off, cold = warm (
       const facts = arrayOf(LOOSE);
       replay(facts, 0);
       const w0 = work.done;
-      const p = sharedSamples(facts, { deadlineMs: Number.POSITIVE_INFINITY });
+      const p = sharedSamples(facts, { gate: true });
       return { done: work.done - w0, complete: p.complete, at: p.samples.map((m) => [...m].map(([id, q]) => `${id}:${q.x.toFixed(9)},${q.y.toFixed(9)}`).join(' ')) };
     };
     const { off, on } = fourWays(pool);
@@ -291,15 +296,16 @@ describe('under a budget nothing is different: memo on = memo off, cold = warm (
       replay(arrayOf(), SEED); // the full solve, with no budget: the memo holds it
       const facts = arrayOf();
       const a0 = solveBudget.aborts;
-      const r = executedBy(() => withSolveBudget(0, () => replay(facts, SEED)));
+      const r = executedBy(() => withLadderSpent(() => replay(facts, SEED)));
       return { executed: r.executed, cut: solveBudget.aborts - a0, figure: seen(r.value, facts) };
     };
     const { off, on } = fourWays(spent);
     expect(on.cold).toEqual(off.cold);
     expect(on.warm).toEqual(off.warm);
-    // a budget with no time LEFT (its deadline is this millisecond) is spent too: a zero budget buys no memo hit
+    // a budget with nothing LEFT is spent too (#2893: a work budget of zero units; it was a clock at this millisecond):
+    // a zero budget buys no memo hit
     replay(arrayOf(), SEED);
-    const none = executedBy(() => withSolveBudget(Date.now(), () => replay(arrayOf(), SEED)));
+    const none = executedBy(() => withWorkBudget(0, () => replay(arrayOf(), SEED)));
     expect(none.executed, 'solved, as a search on a zero budget always solved its candidates').toBeGreaterThan(0);
     // and with no budget the next replay is the held, whole solve
     const after = arrayOf();
@@ -370,13 +376,13 @@ describe('the fold memo is least-recently-used, with a bound (ADR-827)', () => {
     expect(foldStats.computes - before, 'the old 8-entry first-in-first-out memo folded it again here').toBe(0);
   });
 
-  it('beyond the old eight each lane holds its own folds, as each heap does in a browser', () => {
-    // within the old eight the two lanes of one node process share a fold, as they always did (the page count's
-    // known lower bound, ADR-W-210 Am. 1); the larger memo must not add to that
+  it('each lane holds its own folds, as each heap does in a browser (#2893: the shared old eight are gone too)', () => {
+    // ADR-827 let the two lanes of one node process share the old memo's eight folds; #2893 (ADR-831) removes that
+    // emulation with the clocks, so a fold the worker lane folded is folded again by the page lane, as in a browser
     inWorkerLane(() => replay(arrayOf(), 0));
     const shared = foldStats.computes;
     replay(arrayOf(), 0);
-    expect(foldStats.computes - shared, 'inside the old eight: shared, as before').toBe(0);
+    expect(foldStats.computes - shared, 'the page lane folds its own').toBe(1);
     clearReplayCaches();
     inWorkerLane(() => {
       replay(arrayOf(), 0);
@@ -392,7 +398,7 @@ describe('the fold memo is least-recently-used, with a bound (ADR-827)', () => {
     expect(foldStats.computes - before - 12, 'and the worker lane still holds its own').toBe(1);
   });
 
-  it('under a budget the memo holds what the old one held: the same fold is folded again inside a work epoch', () => {
+  it('under a budget the larger memo is read and charged what it saved: it counts and shows what folding it again did (#2893)', () => {
     const inEpoch = (folds: number) => {
       replayMemoConfig.folds = folds;
       clearReplayCaches();
@@ -410,15 +416,17 @@ describe('the fold memo is least-recently-used, with a bound (ADR-827)', () => {
     const old = inEpoch(8);
     const now = inEpoch(saved.folds);
     expect(old.folded, 'eight entries: the figure was pushed out, and is folded inside the epoch').toBe(1);
-    expect(now, 'the larger memo counts, folds and shows exactly the same there').toEqual(old);
+    // #2893 (ADR-831): ADR-827 made the larger memo fold it again there too; now the held fold is read, charged its ledger
+    expect(now.folded, 'the larger memo holds it: not folded again').toBe(0);
+    expect({ done: now.done, figure: now.figure }, 'and it counts and shows exactly what folding it did').toEqual({ done: old.done, figure: old.figure });
   });
 
-  it('getFoldFor answers as the old memo did (its callers act on it under a budget)', () => {
+  it('getFoldFor answers what the memo holds for this lane (#2893: no longer as the 8-entry memo did)', () => {
     const figure = arrayOf();
     replay(figure, 0);
     expect(getFoldFor(figure)).not.toBeNull();
     for (let i = 0; i < 12; i++) replay(junk(i), 0);
-    expect(getFoldFor(figure), 'twelve folds later the 8-entry memo no longer had it').toBeNull();
+    expect(getFoldFor(figure), 'twelve folds later the larger memo still has it').not.toBeNull();
     replay(arrayOf(), 0); // read again: held, and the old memo would have folded and held it from here
     expect(getFoldFor(figure)).not.toBeNull();
   });

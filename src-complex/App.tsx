@@ -6,6 +6,7 @@ import { privacyDeclaration } from './ui/privacy';
 import { aboutContent } from './ui/about';
 import { inputPreviewNodeCx } from './ui/inputPreviewNodeCx';
 import { Banner, InfoNote } from '../shell/frame/Banner';
+import { NotDecidedNote } from '../shell/frame/NotDecidedNote';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
@@ -83,6 +84,8 @@ export function App() {
     view,
     lastError,
     lastNote,
+    notDecided,
+    setNotDecided,
     loadAudit,
     display,
     toggleDisplay,
@@ -385,6 +388,23 @@ export function App() {
   };
 
   const [input, setInput] = useState('');
+  // #2893 (ADR-CX-092): the question «המשיכו לחפש» answers belongs to the figure it was asked on, and to the line in the
+  // box: another step, or typing something else, dismisses it (operator, 2026-11-14, #2893 q3)
+  useEffect(() => setNotDecided(null), [lines, disabled, seed, setNotDecided]);
+  useEffect(() => {
+    if (notDecided?.kind === 'line' && input.trim() !== notDecided.line) setNotDecided(null);
+  }, [input, notDecided, setNotDecided]);
+  /** #2893 (ADR-CX-092): «המשיכו לחפש» — the same action again, its blame going on from where it stopped. */
+  const continueSearch = () => {
+    const nd = notDecided;
+    if (!nd) return;
+    void workCx.runIfIdle(() => {
+      if (nd.kind === 'line') {
+        if (submitLine(nd.line, false, nd.from)) setInput('');
+      } else if (nd.kind === 'toggle') toggleLine(nd.index, nd.from);
+      else editLine(nd.index, nd.line, nd.from);
+    });
+  };
 
   // the language toggle and the document-direction flip are the FRAME's now (suite-level chrome,
   // implemented once — the operator caught the per-product copies)
@@ -852,6 +872,9 @@ export function App() {
                   space") — the curated commands live on the CLEAN CANVAS (QuickChips below). */}
               {lastError && (
                 <Banner kind="error">{errorText(lastError, t)}</Banner>
+              )}
+              {notDecided && (
+                <NotDecidedNote message={t('suite.notDecided.message')} continueLabel={t('suite.notDecided.continue')} onContinue={continueSearch} busy={working} />
               )}
               {/* #2268 (ADR-CX-084) → #2790 (ADR-CX-089, ADR-W-204): a held line is its own row — a notice, not a refusal */}
               {lastNote && <Banner kind="notice">{t('suite.notice.alreadyHeld')}</Banner>}

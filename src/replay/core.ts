@@ -33,12 +33,14 @@ import { circlePairVariantCase } from '@/engine/variants';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, statedSizeCircles } from '@/engine';
 import { crossingPastSecond } from '@/engine/extensionSide';
-import { chargeHit, chargedInOpenEpoch, clockSpent, computeWithCell, flatLedger, inWorkEpoch, ledgerTotal, registerLedger, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
+import { budgetSpent, chargeHit, computeWithCell, flatLedger, ledgerTotal, registerLedger, work, withExecutedCap, withSearchLimit, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
+import { limitReached } from '../../shell/workLimit';
+import { isNotDecided, notDecided, type NotDecided } from '../../shell/notDecided';
 import { workLane } from '../../shell/workMeter';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
 import { DOUBLE_ROOT_SPLIT } from '@/engine/geometry';
-import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, isSatisfied, declaredRingsHold, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
+import { solveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, isSatisfied, declaredRingsHold, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
 import { resolveBinds } from './naming';
 import { clearNarrowingMemo, narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
@@ -520,8 +522,8 @@ const foldCache = new Map<string, FoldNode>();
  * - `samples` — the sampled-construction table ({@link sampledOnce}). The largest session asks for 790 distinct
  *   samples between two clears; at 512 that session solves 1.55 M units again, at 1024 none. About 1.6 KB a sample.
  * Together a long session's memos hold 2.3–4.2 MB (it was 2.1–3.8 MB). `samples: 0` turns the table off; a test may
- * lower either bound to exercise the eviction. Under a budget the fold memo answers as the old 8 entries did, whatever
- * `folds` is (see `budgetVisibleFolds`), which needs `folds` ≥ 15 to be exact.
+ * lower either bound to exercise the eviction. #2893 (ADR-831): a budget reads the whole memo, charged by ledger
+ * (ADR-582); ADR-827's emulation of the old 8 entries inside a budget is gone with the clocks.
  */
 export const replayMemoConfig = { folds: 64, samples: 1024 };
 export const foldStats = { computes: 0, resumes: 0 };
@@ -552,34 +554,18 @@ function noteFoldHeld(node: FoldNode, lane: string = workLane()): void {
   else foldLanes.set(node, new Set([lane]));
 }
 /**
- * #2888 (ADR-827) — WHAT A BUDGET SEES OF THE FOLD MEMO: EXACTLY WHAT IT SAW.
+ * #2888 (ADR-827), #2893 ([ADR-831](docs/06-decisions.md#adr-831)) — WHO MAY READ A HELD FOLD: the lane that folded or
+ * read it ({@link foldLanes}). In a browser a heap is one lane and this rule is idle; under node the page and the two
+ * workers are one module instance, and a fold one lane computed is not a hit for another, as it is not in a browser.
  *
- * A work budget ([ADR-558](docs/06-decisions.md#adr-558)) counts a fold it has to compute and charges a held one once
- * per epoch, so which folds are held decides where a budget cuts. The memo used to hold 8 folds, first in first out.
- * `budgetVisibleFolds` is that old memo's key list, kept in step with every fold stored, primed or read (a read of a
- * fold the old memo had dropped is where it would have folded, and stored, it again). Inside a work epoch, and under a
- * clock that has already run out (the indefinite-shape probe folds with its ladder spent on purpose,
- * [ADR-757](docs/06-decisions.md#adr-757)), a fold is readable only if it is on that list. So a budgeted computation
- * folds, charges and cuts exactly as before, whatever the larger memo holds. Everywhere else the larger memo answers.
- *
- * Beyond that list the two lanes of one node process do not share: a fold is readable by the lane that folded or read
- * it ({@link foldLanes}). On the list they share as they always did, which is the known lower bound of the 2-D page
- * count (ADR-W-210 Am. 1); the larger memo must not add to it. In a browser a heap is one lane, and this rule is idle.
+ * ADR-827 kept, beside this, the old memo's 8-entry key list and let a work budget, or a spent ladder, read only that
+ * list, so that no budgeted verdict moved while the memo grew. Phase 4 of ADR-W-210 re-bases every budget in work units
+ * (ADR-831): a budget charges a held fold the work it saved, once per epoch (ADR-582), so a warm memo and a cold one
+ * stop it at the same unit, and the emulation is removed.
  */
-const BUDGET_VISIBLE_FOLDS = 8;
-const budgetVisibleFolds: string[] = [];
-/** `primed`: a transplanted fold dropped the oldest entry of a full memo even when its own key was already held. */
-function noteFoldStored(key: string, primed = false): void {
-  const held = budgetVisibleFolds.includes(key);
-  if ((primed || !held) && budgetVisibleFolds.length >= BUDGET_VISIBLE_FOLDS) budgetVisibleFolds.shift();
-  if (!budgetVisibleFolds.includes(key)) budgetVisibleFolds.push(key);
-}
-/** May the code running now read the memo's entry for `key`? Always, unless a budget could tell the difference. */
 function foldVisible(key: string): boolean {
-  if (budgetVisibleFolds.includes(key)) return true; // what the 8-entry memo held, read as it always was
-  if (inWorkEpoch() || clockSpent()) return false; // under a budget, nothing more
   const node = foldCache.get(key);
-  return node !== undefined && (foldLanes.get(node)?.has(workLane()) ?? false); // and beyond it, each lane its own
+  return node !== undefined && (foldLanes.get(node)?.has(workLane()) ?? false);
 }
 function foldKey(facts: Fact[]): string {
   const groupIdx = new Map<string, number>();
@@ -638,13 +624,14 @@ export type { FoldNode };
  *   lane: a sample the worker lane solved is never a hit for the page lane, as it is not in a browser.
  * - **A work budget counts what it counted** ([ADR-558](docs/06-decisions.md#adr-558), ADR-582). `evaluate` charges a
  *   hit the work it saved, once per work epoch, and a hit of this table is charged what BUILDING the object cost (a
- *   mirrored seed reads a solve). Two requests inside ONE epoch used to build and solve two objects, and both were
- *   counted: so inside an epoch that has already charged a solve or the build of the stored object, the table hands
- *   out a freshly built one ({@link chargedInOpenEpoch}). A hit a work budget cannot afford is built, and cut, as it
- *   always was. `work.done` is therefore unchanged for every input, cold or warm; only EXECUTED work falls (what the
- *   work meter counts).
- * - **Under a clock that has already run out it is not read** (`clockSpent`): a solve there is cut on purpose (the
- *   indefinite-shape probe, ADR-757), and it must be cut exactly as it was.
+ *   mirrored seed reads a solve), once per epoch: a second request inside the epoch is served free, as a cold run serves
+ *   it from the table it just filled, so the count is the same cold or warm. (ADR-827 handed out a freshly built object
+ *   there instead, so that an epoch counted exactly what it counted before the table existed; #2893, ADR-831, re-bases
+ *   every budget in work units and removes that emulation, which made every search under a limit solve its samples
+ *   again: +30 % to +55 % executed work measured on the #566 searches.) A hit a work budget cannot afford is built, and
+ *   cut, as it always was.
+ * - **Under a budget with nothing left it is not read** (`budgetSpent`: the indefinite-shape probe's spent ladder,
+ *   ADR-757, or a work budget at its limit): a solve there is cut on purpose, and it must be cut exactly as it was.
  * - **A cut solve is never kept.** The table holds constructions, not results: `evaluate` refuses to memoize a solve
  *   a clock or a work budget cut short, as before, and an object whose BUILD a budget cut is not stored.
  * - **Never inside a fold.** The fold's re-attempt cap counts executed work (ADR-583); nothing in `computeFold` reads
@@ -661,16 +648,16 @@ let nextSampledSource = 1;
 const sampledBuildCells = new WeakMap<Construction, WorkCell>();
 registerLedger((c) => sampledBuildCells.get(c as Construction));
 function sampledOnce(from: Construction, slot: string, build: () => Construction): Construction {
-  // off, or under a clock that has already run out (a solve there is cut, and must be cut as it always was)
-  if (replayMemoConfig.samples <= 0 || clockSpent()) return build();
+  // off, or under a budget with nothing left (a solve there is cut, and must be cut as it always was)
+  if (replayMemoConfig.samples <= 0 || budgetSpent()) return build();
   let source = sampledSourceIds.get(from);
   if (source === undefined) sampledSourceIds.set(from, (source = nextSampledSource++));
   const key = `${source}:${workLane()}:${slot}`;
   const hit = sampledMemo.get(key);
   if (hit) {
-    // This epoch already counted its solve, or its build: a second object, as before. Otherwise the hit is charged
-    // what building it cost, and one a work budget cannot afford is built, and cut, as it always was.
-    if (chargedInOpenEpoch(hit) || !chargeHit(sampledBuildCells.get(hit))) return build();
+    // The hit is charged what building it cost, once per epoch (#2893, ADR-831), and one a work budget cannot afford is
+    // built, and cut, as it always was.
+    if (!chargeHit(sampledBuildCells.get(hit))) return build();
     sampledMemo.delete(key);
     sampledMemo.set(key, hit);
     return hit;
@@ -694,7 +681,6 @@ export function replayMemoSizes(): { folds: number; searchFolds: number; samples
  *  cleared here: the work meter's counts (#2873, ADR-W-210) are reproducible only because nothing survives it. */
 export function clearReplayCaches(): void {
   foldCache.clear();
-  budgetVisibleFolds.length = 0;
   searchFoldCache.clear();
   sampledMemo.clear();
   sampledSourceIds = new WeakMap();
@@ -780,11 +766,9 @@ export function peekReplay(facts: Fact[], seed: number): Derived | undefined {
   return hasReplay(facts, seed) ? replayCache.get(facts)!.bySeed.get(`${seed}`) : undefined;
 }
 export function getFoldFor(facts: Fact[]): FoldNode | null {
-  // #2888 (ADR-827): it answers as the 8-entry memo did. Its callers act on the answer under a budget (the
-  // indefinite-shape probe runs with the ladder spent only when this fold is one that probe can resume from), and
-  // a fold handed across the worker boundary is one the worker has just replayed, which is always in that set.
+  // #2893 (ADR-831): the fold this lane holds (a fold handed across the worker boundary is one the worker has just replayed)
   const key = foldKey(resolveBinds(facts));
-  const node = (budgetVisibleFolds.includes(key) ? foldCacheGet(key) : undefined) ?? null;
+  const node = (foldVisible(key) ? foldCacheGet(key) : undefined) ?? null;
   const cell = node ? cellOf.get(node) : undefined;
   if (node && cell) node.work = ledgerTotal(cell);
   return node;
@@ -793,7 +777,6 @@ export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
   if (fold.work !== undefined) cellOf.set(fold, flatLedger(fold.work)); // #1671: charged like a fold computed here
   const key = foldKey(resolveBinds(facts));
   foldCachePut(key, fold);
-  noteFoldStored(key, true);
 }
 
 /**
@@ -941,12 +924,9 @@ function computeReplay(raw: Fact[], seed = 0): Derived {
   // #1697 (ADR-588): a naming by use is a FACT of the line that made it — applied here, to the facts before it
   const facts = resolveBinds(raw);
   const key = foldKey(facts);
-  let fold = foldVisible(key) ? foldCacheGet(key) : undefined; // #2888 (ADR-827): under a budget, only what it always saw
+  let fold = foldVisible(key) ? foldCacheGet(key) : undefined;
   if (fold && !chargeHit(cellOf.get(fold))) fold = undefined; // #1605: unaffordable under the budget → recompute
-  if (fold) {
-    noteFoldStored(key); // the 8-entry memo would have folded it here, and held it from here on
-    noteFoldHeld(fold);
-  }
+  if (fold) noteFoldHeld(fold);
   if (!fold) {
     const abortsBefore = solveBudget.aborts;
     const { value, cell } = computeWithCell(() => computeFold(facts));
@@ -957,7 +937,6 @@ function computeReplay(raw: Fact[], seed = 0): Derived {
     if (solveBudget.aborts === abortsBefore) {
       cellOf.set(fold, cell);
       foldCachePut(key, fold);
-      noteFoldStored(key);
     }
   }
   const out = tailChoice(fold, facts, seed);
@@ -1223,7 +1202,10 @@ function attemptFact(cur: Construction, cmds: Command[], seat?: () => Constructi
       return { ok: false, error: hit.error, degenerate: hit.degenerate };
     }
   }
-  const unarmed = solveBudget.deadlineAt === null && work.limitAt === null;
+  // #2893 (ADR-831): a re-attempt that no budget cut is complete whatever budget is armed, so it is memoized under a work
+  // limit too (every search now runs under one; requiring NO budget here made each search's folds repeat their
+  // re-attempts). A cut one never is (`aborts`), nor one with the ladder spent.
+  const unarmed = !solveBudget.ladderSpent;
   const aborts0 = solveBudget.aborts;
   let exhausted = false;
   const e0 = work.executed;
@@ -3240,27 +3222,50 @@ function reflectMaskForFailing(fig: Derived, facts: Fact[] = []): number {
 }
 
 /**
- * Wall-clock budget for the synchronous config searches (E2 / STO-2). The search loops run replay after
- * replay on the UI thread behind a spinner; on a pathologically slow figure (~1.5 s/replay was measured,
- * ADR-123) an unbounded sweep froze the tab for tens of seconds. Past the deadline the search returns
- * what it has — the caller keeps the current figure, honestly amber, instead of freezing. Tests run with
- * NO deadline (vitest sets MODE 'test') so seed choices stay machine-independent and deterministic; the
- * deadline path itself is unit-tested by passing an explicit budget.
+ * #2893 ([ADR-831](docs/06-decisions.md#adr-831), ADR-W-210 phase 4) — EVERY SEARCH IS BOUNDED IN WORK, NEVER IN SECONDS.
+ *
+ * The searches used to stop on a wall clock: 2.5 s on the page, 12 s in the worker ([ADR-296](docs/06-decisions.md#adr-296)),
+ * 5 s for the submit gates' sample pool, 4 s and 3 s for a load's refresh and audit, and NO clock under vitest. So the
+ * suite ran every search to its end, a browser cut it where its machine happened to be, and a search that was cut said
+ * what a search that finished says («אין תצורה אחרת — הצורה נקבעה», "no valid configuration", no audit finding).
+ *
+ * Now each is bounded by a number of WORK UNITS (`evaluateCore` calls, charged as ADR-582 charges them: a memo hit costs
+ * the work it saved, so a warm cache and a cold one stop at the same unit), the same in the suite and the browser, and a
+ * search that reaches its limit without an answer says so ("not decided", `shell/notDecided`; the operator's wording,
+ * 2026-11-14, #2893). The operator set the size: about 10 s on the dev PC (*"10s is an ok number"*, 2026-11-13).
+ *
+ * MEASURED on the dev PC (2026-11-14, vitest under node, one process, cold caches; `src/__tests__/tmp-calib`, deleted):
+ * «הציגו תצורה אחרת» on `issue-1771-semicircle-three-vertices` 6 778 367 units in 18.2 s (372 k/s); the same press on
+ * `hexagon-regular-by-angles-2797` 2 584 301 in 9.4 s (274 k/s); the configuration search on that hexagon, from seed 7,
+ * 28 625 671 in 105 s (272 k/s); its fold 3 358 924 in 11.9 s (282 k/s); the 1771 fold 376 546 in 0.88 s (426 k/s); the
+ * hexagon's load refresh 396 586 in 1.27 s (312 k/s). In a browser (phase 3's probes): 360–450 k/s executed. A limit counts
+ * CHARGED units (a memo hit costs what it saved), which run ahead of executed ones: the #566 seat rescue on one circle
+ * charges 3 839 924 units in 6.6 s cold (580 k/s), on two circles 11 629 517 in 28.7 s (405 k/s). So ten seconds is
+ * 2.7 M to 5.8 M charged units on this PC. The limit is 4 M, the size of the submit door's work caps already
+ * (`POOL_WORK_CAP`, `SEAT_SWEEP_WORK_CAP`, `CHOICE_RESCUE_WORK_CAP`): about 7 to 15 s, the same count everywhere. A
+ * figure whose units are slow (heavy joint solves: #207's ladder runs ~50 k units/s) takes longer to reach it; a unit
+ * is one `evaluateCore`, and nothing inside one is counted.
+ *
+ * One constant per search kind, all the same size by the ruling (one limit "the same in every tool"); each is named so
+ * a later calibration can move one kind without touching the others.
  */
-const SEARCH_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 2500;
-
+export const TEN_SECONDS_OF_WORK = 4_000_000;
+/** The configuration searches: «הציגו תצורה אחרת» (`searchAnotherView`) and the post-commit search (`findValidConfig`). */
+export const SEARCH_WORK_LIMIT = TEN_SECONDS_OF_WORK;
 /**
- * The budget for a config search that runs OFF the main thread in the geometry worker (issue #87 /
- * [ADR-296](docs/06-decisions.md#adr-296)). `SEARCH_BUDGET_MS` (2500) was sized to protect the MAIN
- * THREAD from the page-unresponsive dialog (E2); since ADR-290 the searches (`resample` / `autoResolve` →
- * `findValidConfig`) run in the worker, where the tab never blocks and the UI already shows a "thinking"
- * state (resample also has progress + a ✕ cancel). So the worker gets a generous budget — a findable
- * configuration on a heavy figure (the CEFO figure's `findValidConfig` returned null cold at ~2743 ms,
- * one bad seed past 2500) is now found on the FIRST submit instead of only after an idempotent re-submit
- * warmed the worker's caches. Finite (not ∞) so the same value is meaningful when a test passes it
- * explicitly; the worker is never instantiated under vitest (no `Worker`/`document`), so the main-thread
- * sync fallback keeps `SEARCH_BUDGET_MS`. */
-export const WORKER_SEARCH_BUDGET_MS = 12_000;
+ * The submit door's searches: the gates' sample pool («כבר קיים», a forced crossing, a forced side) with ADR-605's walk
+ * over the unvaried choices, and the commit's variant settle (#2294). They kept their clock until #2893.
+ */
+export const GATE_WORK_LIMIT = TEN_SECONDS_OF_WORK;
+
+/** Round `round` (0 first) of a search that «המשיכו לחפש» continues: the limit is the rounds' sum, so the round goes on
+ *  from where the last one stopped (what that round solved is read back from the memos, charged as it was). */
+export const roundLimit = (limit: number, round = 0): number => limit * (round + 1);
+/** What a configuration search hands back with "not decided": the rounds run so far. */
+export interface SearchResume {
+  round: number;
+}
+
 
 /**
  * The first seed whose replay BUILDS and satisfies the configuration requirements — every "המשך" extension
@@ -3269,9 +3274,9 @@ export const WORKER_SEARCH_BUDGET_MS = 12_000;
  * REFLECTION (high seed bits, {@link withReflectMask}). A point on a circle whose secant must extend onto
  * another circle, and an apex whose side decides whether two segments cross, are both placements only a
  * subset of configurations satisfies — we SAMPLE one rather than drive across a degeneracy. Used to auto-pick
- * the default configuration after a step and to gate "show another configuration". Bounded by `budgetMs`
- * of wall-clock (E2): past the deadline it returns the best seed seen so far, else `from` — keep the
- * current view, amber if short.
+ * the default configuration after a step and to gate "show another configuration". Bounded by `limit`
+ * units of work (#2893, ADR-831; it was a wall clock): at the limit it returns the best seed seen so far, else `from` —
+ * keep the current view, amber if short. Inside `findValidConfig` the caller's limit governs it.
  */
 /**
  * #194 (ADR-474) — the DISPLAY-QUALITY preference, as a predicate over an already-computed figure.
@@ -3301,8 +3306,10 @@ const spreadScore = (fig: Derived): number => (fig.lastError === null ? tightest
  *  configuration — it never searches longer than this beyond the seed it would have returned. */
 const SPREAD_EXTRA_TRIES = 24;
 
-export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budgetMs = SEARCH_BUDGET_MS): number {
-  const deadline = Date.now() + budgetMs;
+export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, limit = SEARCH_WORK_LIMIT): number {
+  return withSearchLimit(limit, () => firstSatisfyingSeedUnder(facts, from, budget), 'firstSatisfyingSeed').value;
+}
+function firstSatisfyingSeedUnder(facts: Fact[], from: number, budget: number): number {
   const hasExt = extensionTriples(facts).length > 0;
   const base0 = replay(facts, from);
   const reflectable = reflectableFreePoints(base0.construction);
@@ -3350,12 +3357,11 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // #942: acceptable but stacked — used only if no separated candidate is found at all.
   let coincidentOnly = ok(base0) && !separatedView(base0) ? from : -1;
   let sinceStrict = 0; // candidates examined since the first acceptable answer (SPREAD_EXTRA_TRIES)
-  // The same deadline is ARMED inside the solve ladder (engine/solveBudget.ts): the between-replay check
-  // below caps the sweep, and the in-ladder consult caps a single pathological candidate (issue #59 —
-  // one replay used to blow through 32 budgets before this line ever ran again).
-  return withSolveBudget(deadline, () => {
+  // The limit is ARMED inside the solve ladder too (`withSearchLimit` arms the work budget): the between-replay check
+  // below caps the sweep, and the in-ladder consult caps a single pathological candidate (issue #59).
+  {
     for (const s of seeds) {
-      if (Date.now() > deadline) break; // out of budget — settle for the best seen so far
+      if (limitReached()) break; // at the limit — settle for the best seen so far
       if (strictOnly >= 0 && ++sinceStrict > SPREAD_EXTRA_TRIES) break; // bounded improvement, then settle
       const fig = replay(facts, s);
       if (ok(fig) && !separatedView(fig)) {
@@ -3371,11 +3377,11 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
         }
       }
     }
-    // Past the sweep or the deadline: settle for the best tier seen, exactly as before the preference
+    // Past the sweep or the limit: settle for the best tier seen, exactly as before the preference
     // existed. A figure with no well-spread configuration lands on the same seed it used to.
     // #942 (ADR-486): a stacked-but-satisfying seed comes last — worse than any separated view.
     return strictOnly >= 0 ? strictOnly : coincidentOnly >= 0 ? coincidentOnly : from;
-  });
+  }
 }
 
 /** Branchable derived-point command types — the discrete "alternatives" a figure can have (which of two
@@ -3528,26 +3534,51 @@ export const separatedView = (fig: Derived): boolean => fig.coincidences.length 
  * Before drawing, VERIFY the figure meets every requirement and, if not, LOOP over alternative
  * configurations — continuous (seeds) AND discrete (branch choices: which intersection / arc side / root) —
  * for one that does ([ADR-106](docs/06-decisions.md#adr-106)). Returns the chosen facts (branches set) +
- * seed, or null if none is found within budget (the caller keeps the current figure, flagged amber). The
+ * seed; null when the search FINISHED and found none (the caller keeps the current figure, flagged amber); or
+ * #2893 (ADR-831) "not decided" when it reached its work limit first, never reported as "none found". The
  * CURRENT branch assignment is tried first and most widely; the combinatorics of alternative branches are
- * bounded. Deterministic.
+ * bounded. Deterministic: the limit is counted in work, the same on every machine.
  */
 /** #566 (ADR-445 Am. 1) — dev instrumentation, the S0.2 `lastLadderStage` pattern: WHICH tier of
  *  `findValidConfig` produced the last returned config. Lets a test assert the tier ORDERING
  *  deterministically — a wall-clock assertion on the real worker budget flaked at 28 s under the
- *  suite's CPU contention (5 s solo), which is exactly why `SEARCH_BUDGET_MS` is Infinity in tests. */
+ *  suite's CPU contention (5 s solo); since #2893 the limit is work, the same in the suite. */
 export let lastConfigTier: 'current' | 'sweep' | 'seat' | 'variant' | 'reflect' | 'branch' | null = null;
 
-export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_BUDGET_MS): { facts: Fact[]; seed: number } | null {
+export function findValidConfig(facts: Fact[], fromSeed = 0, limit = SEARCH_WORK_LIMIT): { facts: Fact[]; seed: number } | null {
+  return decidedOrThrow(findValidConfigRound(facts, fromSeed, 0, limit));
+}
+/**
+ * #2893 (ADR-831): the configuration search as the worker runs it — its THREE outcomes: a view, null (it finished and
+ * found none), or "not decided" (it reached its limit first). «המשיכו לחפש» runs round `round` from the resume it got,
+ * whose limit is the rounds' sum (`roundLimit`).
+ */
+export function findValidConfigRound(facts: Fact[], fromSeed: number, round = 0, limit = SEARCH_WORK_LIMIT): { facts: Fact[]; seed: number } | null | NotDecided<SearchResume> {
   lastConfigTier = null;
+  const r = withSearchLimit(roundLimit(limit, round), () => findValidConfigUnder(facts, fromSeed), 'findValidConfig');
+  return r.value === null && r.reached ? notDecided({ round: round + 1 }, r.spent) : r.value;
+}
+
+/**
+ * #2893 (ADR-831): what a caller that knows only two outcomes is handed. A search cut by its limit is NOT "none found",
+ * so it is never answered as null: this throws instead. The page's paths call the `…Round` forms, which return it.
+ */
+export class SearchNotDecidedError extends Error {
+  constructor(readonly outcome: NotDecided<SearchResume>) {
+    super('the search reached its work limit before it decided (#2893): not decided, which is not "none found"');
+  }
+}
+function decidedOrThrow<T>(r: T | NotDecided<SearchResume>): T {
+  if (isNotDecided(r)) throw new SearchNotDecidedError(r as NotDecided<SearchResume>);
+  return r as T;
+}
+function findValidConfigUnder(facts: Fact[], fromSeed: number): { facts: Fact[]; seed: number } | null {
   // #2813 (ADR-823 Am. 1): a stored reflex seat a later stated angle rules out is moved structurally, before any sample
   facts = reflexSeatsYieldToStatedCorners(facts);
-  const deadline = Date.now() + budgetMs;
-  const timeLeft = () => Math.max(0, deadline - Date.now());
   // First the targeted extension/reflection search (ADR-098/ADR-166): it explores the discrete apex
   // REFLECTION DOF (high seed bits) that the plain seed sweep below can't reach, so a segment-meet whose
   // apex points the wrong way is brought onto the segments in a handful of tries instead of by luck.
-  const s0 = firstSatisfyingSeed(facts, fromSeed, 120, timeLeft());
+  const s0 = firstSatisfyingSeedUnder(facts, fromSeed, 120); // under this search's limit
   // #194 (ADR-474): a requirement-meeting config that draws a squashed wedge is REMEMBERED rather than
   // returned — the sweep below gets a chance to find one that is also legible, and this seed is what it
   // settles for when none exists. Behaviour is therefore identical on every figure that has no
@@ -3569,18 +3600,18 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     lastConfigTier = 'current';
     return { facts, seed: s0 };
   }
-  // The deadline is also ARMED inside the solve ladder (engine/solveBudget.ts, issue #59): the branch
+  // The limit is also ARMED inside the solve ladder (`withSearchLimit`, issue #59): the branch
   // tier below builds NEW fact content (branch rewrites), whose folds can hit the expensive recruit
   // ladder — the between-replay checks alone couldn't stop a single 30 s candidate.
-  return withSolveBudget(deadline, () => {
+  {
     for (let s = fromSeed; s < fromSeed + 40; s++) {
-      if (Date.now() > deadline) {
-        // #194: out of budget — a remembered meeting-but-squashed config still beats amber.
+      if (limitReached()) {
+        // #194: at the limit — a remembered meeting-but-squashed config still beats amber.
         if (meetingOnly !== null) {
           lastConfigTier = 'current';
           return { facts, seed: meetingOnly };
         }
-        return null; // caller keeps the current figure, amber
+        return null; // at the limit: "not decided" (the caller, above)
       }
       if (meetsRequirements(facts, s)) {
         const fig = replay(facts, s);
@@ -3619,24 +3650,24 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     // ~5 s ordered here; the suite's Infinity budget masked exactly this, which is why the
     // production-budget lock in scenarios-props-budget.test.ts carries the figure). Cost when no
     // unpinned right-triangle exists: zero (the list is empty).
-    const seatFound = seatRescue(facts, deadline);
+    const seatFound = seatRescue(facts);
     if (seatFound) {
       lastConfigTier = 'seat';
       return seatFound;
     }
-    if (Date.now() > deadline) return null;
+    if (limitReached()) return null;
     // #1711 (ADR-573): the VARIANT dimension — every unstated configuration choice a fact carries (a
     // sine's acute/obtuse root, an isosceles apex, a kite axis, an inscribed seating, a circle pair's
     // position, a common tangent's basin). Before this tier the search never left the variants the facts
     // already held, so a figure whose CURRENT variant a later given made impossible was refused although
     // another variant draws it — «sin∢ACB = 3/4» then «זווית ACB קהה». Seed-invariant like the seat
     // (a wrong root fails at every seed), so it runs here, before the mask × seed product.
-    const variantFound = choiceRescue(facts, { deadline });
+    const variantFound = choiceRescue(facts, 'under-limit');
     if (variantFound) {
       lastConfigTier = 'variant';
       return variantFound;
     }
-    if (Date.now() > deadline) return null;
+    if (limitReached()) return null;
     // Discrete REFLECTION alternatives (#441). The sweep above varies only the CONTINUOUS jitter — the
     // base seed — while the reflection mask lives in the seed's HIGH bits (`REFLECT_STRIDE`). So a
     // requirement that needs a MIRROR configuration is unreachable by that sweep however many seeds it
@@ -3648,7 +3679,7 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     const reflectable = reflectableFreePoints(replay(facts).construction).length;
     for (let m = 1; m < 1 << Math.min(reflectable, REFLECT_MAX); m++) {
       for (let s = fromSeed; s < fromSeed + 6; s++) {
-        if (Date.now() > deadline) return null;
+        if (limitReached()) return null;
         const sm = withReflectMask(m, s);
         if (meetsRequirements(facts, sm)) {
           lastConfigTier = 'reflect';
@@ -3668,7 +3699,7 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     let combos: number[][] = [[]];
     for (const { count } of branchy) combos = combos.flatMap((c) => Array.from({ length: count }, (_, b) => [...c, b]));
     for (const combo of combos.slice(0, 16)) {
-      if (Date.now() > deadline) return null;
+      if (limitReached()) return null;
       // skip the current assignment (already swept above)
       const fc = facts.map((f, idx) => {
         const k = branchy.findIndex((x) => x.i === idx);
@@ -3681,32 +3712,34 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
         }
     }
     return null;
-  });
+  }
 }
 
 /** Outcome of dry-running a parsed step on top of the current facts (see {@link dryRunOutcome}). */
 /**
  * The "show another configuration" SEARCH, extracted PURE (#41 / [ADR-290](docs/06-decisions.md#adr-290))
  * so a geometry worker can run it off the main thread; the store's `resample` action applies its result.
- * Semantics unchanged: a wall-clock budget (2026-07-06 review hotspot #3 — past the deadline, return what
- * we have; tests run deadline-free), the shared `meetsRequirements` acceptance bar, and the
- * similarity-invariant fingerprint (a same-shape-resized view is not "another configuration"). The
- * deadline is also armed inside the solve ladder (engine/solveBudget.ts, issue #59) so a single
+ * Semantics unchanged: a bounded search (2026-07-06 review hotspot #3; a work limit since #2893, ADR-831: at the
+ * limit it returns what it has, and a caller under a limit asks `limitReached()` whether a null was a cut), the
+ * shared `meetsRequirements` acceptance bar, and the similarity-invariant fingerprint (a same-shape-resized view is
+ * not "another configuration"). The limit is also armed inside the solve ladder (issue #59) so a single
  * pathological candidate can't blow through the between-candidate checks. `onProgress` reports the
  * candidate index (the worker forwards it to the UI's "still searching…" cue).
  */
-export function searchResample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void, budgetMs = SEARCH_BUDGET_MS): number | null {
+export function searchResample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void, limit = SEARCH_WORK_LIMIT): number | null {
+  return withSearchLimit(limit, () => searchResampleUnder(facts, seed, onProgress), 'searchResample').value;
+}
+function searchResampleUnder(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): number | null {
   const cur = replay(facts, seed);
   if (freeDofs(cur.construction).length === 0) return null; // fully determined — nothing to vary
   const curFp = shapeFingerprint(cur.construction, cur.positions, cur.circles);
   let s = seed;
-  const deadline = Date.now() + budgetMs;
   /** #194: the first requirement-meeting but squashed candidate — the answer when nothing better shows. */
   let squashed = -1;
-  for (let k = 0; k < CONFIG_SEEDS && Date.now() <= deadline; k++) {
+  for (let k = 0; k < CONFIG_SEEDS && !limitReached(); k++) {
     onProgress?.(k + 1, CONFIG_SEEDS);
     s += 1;
-    const r = withSolveBudget(deadline, () => replay(facts, s));
+    const r = replay(facts, s);
     // Accept only a view that MEETS EVERY REQUIREMENT — the SAME bar the initial display uses — AND is a
     // genuinely DIFFERENT drawing (see the class notes above; the Q8 two-right-triangles lock).
     if (!shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions, r.circles))) continue;
@@ -3909,16 +3942,32 @@ function withAssignment(facts: Fact[], axes: ChoiceAxis[], assignment: number[])
   });
 }
 
-/** How many odometer steps one press of «הציגו תצורה אחרת» may try (the deadline bounds it too). */
+/** How many odometer steps one press of «הציגו תצורה אחרת» may try (the work limit bounds it too). */
 const SEARCH_AXIS_STEPS_MAX = 63;
 
 export function searchAnotherView(
   facts: Fact[],
   seed: number,
   onProgress?: (k: number, n: number) => void,
-  budgetMs = SEARCH_BUDGET_MS,
+  limit = SEARCH_WORK_LIMIT,
 ): { facts: Fact[]; seed: number } | null {
-  const deadline = Date.now() + budgetMs;
+  return decidedOrThrow(searchAnotherViewRound(facts, seed, 0, onProgress, limit));
+}
+/**
+ * #2893 (ADR-831): the press as the worker runs it. A press that reached the limit with nothing found is "not decided",
+ * never «אין תצורה אחרת»; its «המשיכו לחפש» runs round `round`, whose limit is the rounds' sum (`roundLimit`).
+ */
+export function searchAnotherViewRound(
+  facts: Fact[],
+  seed: number,
+  round = 0,
+  onProgress?: (k: number, n: number) => void,
+  limit = SEARCH_WORK_LIMIT,
+): { facts: Fact[]; seed: number } | null | NotDecided<SearchResume> {
+  const r = withSearchLimit(roundLimit(limit, round), () => searchAnotherViewUnder(facts, seed, onProgress), 'searchAnotherView');
+  return r.value === null && r.reached ? notDecided({ round: round + 1 }, r.spent) : r.value;
+}
+function searchAnotherViewUnder(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): { facts: Fact[]; seed: number } | null {
   const cur = replay(facts, seed);
   // #1600 (ADR-593): the discrete space is the PRODUCT of every registered axis — every cyclable branch, the
   // composition side, every variant (#1711, ADR-573) and the seat — walked as ONE odometer from the current
@@ -3941,22 +3990,22 @@ export function searchAnotherView(
   let k = 0;
   const totalWork = candidates.length * (hasDofs ? 4 : 1) + (hasDofs ? CONFIG_SEEDS : 0);
   for (const fc of candidates) {
-    if (Date.now() > deadline) break;
+    if (limitReached()) break;
     // Fresh seeds first (the legacy press resampled AND flipped), the current seed as the in-combo fallback.
     const seeds = hasDofs ? [seed + 1, seed + 2, seed + 3, seed] : [seed];
     for (const s of seeds) {
-      if (Date.now() > deadline) break;
+      if (limitReached()) break;
       onProgress?.(++k, totalWork);
-      if (withSolveBudget(deadline, () => meetsRequirements(fc, s))) {
+      if (meetsRequirements(fc, s)) {
         // #942: separated wins outright; coincident is remembered and only used if nothing else turns up.
-        if (withSolveBudget(deadline, () => separatedView(replay(fc, s)))) return { facts: fc, seed: s };
+        if (separatedView(replay(fc, s))) return { facts: fc, seed: s };
         if (!coincident) coincident = { facts: fc, seed: s };
       }
     }
   }
   // The plain seed resample (no discrete step) — shape-diff gated, existing semantics.
-  if (hasDofs && Date.now() <= deadline) {
-    const s = searchResample(facts, seed, (kk, n) => onProgress?.(Math.min(k + kk, totalWork), Math.max(totalWork, k + n)), Math.max(0, deadline - Date.now()));
+  if (hasDofs && !limitReached()) {
+    const s = searchResampleUnder(facts, seed, (kk, n) => onProgress?.(Math.min(k + kk, totalWork), Math.max(totalWork, k + n)));
     if (s !== null) return { facts, seed: s };
   }
   // #942 (ADR-486): the coincident view is offered only now, with every separated option exhausted —
@@ -4040,10 +4089,11 @@ function advanceAssignment(axes: readonly { n: number; cur: number }[], steps: n
  * reflection tier), so tier ORDER — and with it every default drawing — is unchanged. Zero cost when no fact
  * carries a cyclable variant and no composition recorded a side choice.
  */
-export function choiceRescue(facts: Fact[], limit: { deadline: number } | { workCap: number }): { facts: Fact[]; seed: number } | null {
+export function choiceRescue(facts: Fact[], limit: 'under-limit' | { workCap: number }): { facts: Fact[]; seed: number } | null {
   const mayHaveSide = facts.some((f) => f.enabled && 'ids' in f.cmd);
   if (!mayHaveSide && variantAxes(facts).length === 0) return null;
-  if ('deadline' in limit) return choiceSweep(facts, () => Date.now() > limit.deadline);
+  // #2893 (ADR-831): the configuration search's tier runs under that search's work limit (it was its clock)
+  if (limit === 'under-limit') return choiceSweep(facts, limitReached);
   // #1857 (ADR-709): the submit gate's rescue is bounded by WORK, in charged units (every memo hit charged the
   // work it saved, ADR-582) — the seat sweep's ADR-584 shape — so whether the cure for an unstated choice
   // counts is the same on every device and cold or warm. The axes' own fold is read inside the epoch, so it is
@@ -4107,8 +4157,8 @@ export const choiceRescueConfig = { cap: CHOICE_RESCUE_WORK_CAP };
  * submit gate's seat-curable test (`dryRunOutcome`), so the two can never disagree about which
  * failures belong to the unstated seat. Zero cost when no unpinned right-triangle exists.
  */
-export function seatRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
-  return seatSweep(facts, { deadline }).cured;
+export function seatRescue(facts: Fact[]): { facts: Fact[]; seed: number } | null {
+  return seatSweep(facts, 'under-limit').cured; // #2893 (ADR-831): under the configuration search's work limit
 }
 
 /** #1671 ([ADR-584](docs/06-decisions.md#adr-584)): the rewritten fact lists the seat sweep tries — every
@@ -4140,11 +4190,11 @@ export const seatSweepStats = { sweeps: 0, complete: 0, cured: 0, cut: 0, execut
  * failure — the submit gate may then refuse it ({@link deferralWorthwhile}); a sweep its budget cut proved
  * nothing, and the line keeps the ADR-104 route as before. The submit gate bounds it by a fixed amount of WORK
  * in charged units ({@link SEAT_SWEEP_WORK_CAP}, operator ruling 2026-10-04), so the verdict is the same on
- * every device and cold or warm; the configuration search's seat tier keeps its wall-clock deadline (an
- * interactive view search, ADR-558). The submit path also warms the rotated folds off the main thread first
+ * every device and cold or warm; the configuration search's seat tier runs under that search's work limit
+ * (#2893, ADR-831; it was its wall clock). The submit path also warms the rotated folds off the main thread first
  * ({@link seatSweepWarmup}), so the wait sits in the worker.
  */
-export function seatSweep(facts: Fact[], limit: { deadline: number } | { workCap: number }): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
+export function seatSweep(facts: Fact[], limit: 'under-limit' | { workCap: number }): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
   const rotations = seatRotations(facts);
   if (rotations.length === 0) return { cured: null, complete: true };
   seatSweepStats.sweeps++;
@@ -4152,7 +4202,7 @@ export function seatSweep(facts: Fact[], limit: { deadline: number } | { workCap
   const d0 = work.done;
   try {
     const { value: r, cutKeys } = observeReattemptCuts(() => {
-      if ('deadline' in limit) return withWorkEpoch(() => sweepRotations(rotations, () => Date.now() > limit.deadline));
+      if (limit === 'under-limit') return withWorkEpoch(() => sweepRotations(rotations, limitReached));
       // #1671 (ADR-584): the submit gate's sweep is bounded by WORK, in charged units (every memo hit charged
       // the work it saved, ADR-582) — the same verdict on every device and cold or warm. A ladder the cap cut
       // mid-fold ends the sweep as incomplete: a cut fold is not THE fold, so it can neither cure nor refute.
@@ -4299,7 +4349,7 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
       const named = new Set(added.flatMap((con) => constraintRefs(con)));
       if (newObjects.some((o) => objectParents(o).some((id) => !named.has(id)))) return false;
     }
-    const pool = sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS }); // the UI-thread gate: on the clock (ADR-558)
+    const pool = sharedSamples(facts, { gate: true }); // the submit gate's pool, under GATE_WORK_LIMIT (#2893, ADR-831)
     if (!pool.determined && pool.samples.length < IMPLIED_MIN_SAMPLES) return false;
     if (pool.samples.length === 0) return false;
 
@@ -4329,13 +4379,15 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
     // passed the pool pays for it — exactly the lines that answered «כבר קיים» before.
     const alternatives = choiceAlternatives(facts, before.construction, pool);
     if (alternatives === null) return false; // over the cap: the choice space cannot be walked — fail open
-    const deadline = Date.now() + SAMPLE_BUDGET_MS;
-    for (const alt of alternatives) {
-      if (Date.now() > deadline) return false; // not established in time — fail open
-      if (!meetsRequirements(alt, seed)) continue; // not a configuration of the figure (the pool's own bar, ADR-558)
-      if (!holdsAt(replay(alt, seed).positions)) return false;
-    }
-    return true;
+    // #2893 (ADR-831): bounded in work, as the pool is (it was a 5 s clock, #2294); at the limit it fails open, as before
+    return withSearchLimit(GATE_WORK_LIMIT, () => {
+      for (const alt of alternatives) {
+        if (limitReached()) return false; // not established within the limit — fail open
+        if (!meetsRequirements(alt, seed)) continue; // not a configuration of the figure (the pool's own bar, ADR-558)
+        if (!holdsAt(replay(alt, seed).positions)) return false;
+      }
+      return true;
+    }, 'impliedAlternatives').value;
   } catch {
     return false; // fails open, always
   }
@@ -4411,7 +4463,7 @@ export function forcedCrossedRing(facts: Fact[], commands: AnyCommand[], seed = 
         ringProperlyCrossed(ids.map((id) => placed.get(id) as Vec)), // the prefilter: simple on screen ⇒ simple somewhere
     );
     if (rings.length === 0) return null;
-    const pool = sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS }); // the UI-thread gate, as `impliedByPrior`
+    const pool = sharedSamples(facts, { gate: true }); // the submit gate's pool, as `impliedByPrior`
     if (pool.samples.length === 0) return null;
     if (!pool.determined && pool.samples.length < FORCED_RING_MIN_SAMPLES) return null;
     let trial: Fact[] | null = null;
@@ -4522,7 +4574,7 @@ export function impossibleExtensionSide(facts: Fact[], commands: AnyCommand[], s
     };
     for (const c of stated) {
       const seat = seatOf(c);
-      if (seat && beyond(fig.positions, c, seat) === false && offEverywhere(sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS, atSeed: seed }), c, seat)) return { a: c.a, b: c.b, id: c.id };
+      if (seat && beyond(fig.positions, c, seat) === false && offEverywhere(sharedSamples(facts, { gate: true, atSeed: seed }), c, seat)) return { a: c.a, b: c.b, id: c.id };
     }
     const before = replay(facts, seed).positions;
     for (const { c, utterance } of standing) {
@@ -4958,7 +5010,10 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean; atSeed?: num
   const configs = variantConfigs(facts);
   // #2518 (ADR-784): `atSeed` skips the display-seed search. A gate asking about a figure with an unmet requirement
   // pays the whole futile sweep there (3 s on a five-line figure), for a base construction it does not need.
-  const settled = (vf: Fact[]) => opts.atSeed ?? firstSatisfyingSeed(vf);
+  // #2893 (ADR-831): the pool's display seed is found to the end of its sweep, as the suite always found it (it was the
+  // worker's 12 s clock in a browser). Under a search limit it was cut on the #572 figure, which moved the pool's seed and
+  // with it the knowledge verdicts; the pool itself is bounded by POOL_WORK_CAP (ADR-558).
+  const settled = (vf: Fact[]) => opts.atSeed ?? firstSatisfyingSeedUnder(vf, 0, 120);
   const seed0 = configs.length === 1 ? settled(facts) : 0;
   const constructions = configs.map((vf) => replay(vf, configs.length === 1 ? seed0 : settled(vf)).construction);
   // #434 (ADR-509): a DETERMINED figure's pool is its ADMISSIBLE SET, not one sample. `freeDofCount === 0`
@@ -5164,10 +5219,10 @@ export function figureDeterminacy(shared: Pick<SharedSamples, 'samples' | 'deter
 
 // Sample collection is budgeted like every other search loop (E2): a failing seed's solve costs ~10× a
 // converging one (all restarts run to exhaustion) and is then DROPPED by convergedSamples anyway — on the
-// ADR-123 heavy figure the unbudgeted loop was ~50 s of mostly-discarded work. Past the deadline, detection
+// ADR-123 heavy figure the unbudgeted loop was ~50 s of mostly-discarded work. At the limit, detection
 // proceeds on the samples in hand (a smaller ground-truth pool — `samplesUsed` reports it); the FIRST job
-// always runs so there is never an empty pool for a buildable figure. Tests run deadline-free (E2).
-const SAMPLE_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 5000;
+// always runs so there is never an empty pool for a buildable figure. The submit gate's pool had a 5 s clock
+// (none under vitest); since #2893 (ADR-831) it is bounded by GATE_WORK_LIMIT, the same in the suite.
 /**
  * #1601/#1599 (ADR-558): the KNOWLEDGE pool's budget, in work units (`evaluateCore` calls), never seconds.
  * The wall clock above made the same figure print «AC = 2x» on one run and nothing on the next; a work
@@ -5180,9 +5235,9 @@ export const POOL_WORK_CAP = 4_000_000;
 /**
  * The shared sample pool (M3 — one sampler). The knowledge consumers (the detect sweep, the values panel)
  * call it bare and get the work-bounded pool, `complete` when every job finished inside the cap. The typed
- * submit gate's «כבר קיים» test runs on the UI thread and keeps a WALL-CLOCK bound (`deadlineMs`) — an
- * interactive check, which the ruling leaves on the clock; it fails open, so a cut pool only skips the
- * courtesy note. A pool cut short is never served from the memo as if it were complete.
+ * submit gate's tests («כבר קיים», a forced crossing, a forced side) ask for the narrow pool (`gate`), bounded by
+ * GATE_WORK_LIMIT (#2893, ADR-831; it was a wall clock, #2294); they fail open, as before. A pool cut short is never
+ * served from the memo as if it were complete.
  */
 /**
  * #1599 (ADR-558): a sample is EVIDENCE only if it satisfies the figure's givens more tightly than the
@@ -5243,7 +5298,7 @@ export function sampleSubset(facts: Fact[], counterexample?: (pos: Map<Id, Vec>)
 /** #1996: how many sampling jobs the counterexample probe of {@link sampleSubset} runs before the full pool. */
 const SUBSET_PROBE_JOBS = 4;
 
-export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number; atSeed?: number } = {}): SharedSamples {
+export function sharedSamples(facts: Fact[], opts: { gate?: boolean; atSeed?: number } = {}): SharedSamples {
   // #1605 (ADR-582): the work-bounded pool is now a function of the input alone (every memo hit inside it is
   // charged — engine/solveBudget.ts), so a pool the cap cut is served from the memo like a complete one: the
   // values op after the detect sweep reuses it instead of recomputing the whole pool, and the status line and
@@ -5252,12 +5307,12 @@ export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number; atSeed
   if (hit) return hit;
   return withWorkEpoch(() => samplePool(facts, opts));
 }
-function samplePool(facts: Fact[], opts: { deadlineMs?: number; atSeed?: number }): SharedSamples {
+function samplePool(facts: Fact[], opts: { gate?: boolean; atSeed?: number }): SharedSamples {
   sampleStats.sweeps++;
   // The UI-thread gate samples the NARROW set (ADR-509's three seeds, no extra button seeds): measured while
   // building ADR-558, the widened set doubled its main-thread cost on a determined figure (0.67 s → 1.32 s
   // on a 3-4-5 restatement). Its narrow pool never replaces the knowledge memo.
-  const narrow = opts.deadlineMs !== undefined;
+  const narrow = opts.gate === true;
   // The budget bounds the JOBS, so the same input stops at the same job on every run. The setup (the
   // display-seed search and the base replays) runs in the same work EPOCH but before the cap is armed: what
   // it touches is charged once there, so a job re-reading the figure's own fold pays nothing — as on a cold
@@ -5286,11 +5341,10 @@ function samplePool(facts: Fact[], opts: { deadlineMs?: number; atSeed?: number 
     const cut = [...observed.cutKeys, ...cutKeys].some((k) => k !== base);
     return finish(ran === jobs.length && solveBudget.aborts === aborts0 && !cut);
   };
-  if (opts.deadlineMs !== undefined) {
-    const deadline = Date.now() + opts.deadlineMs;
-    // Armed inside the solve ladder too (engine/solveBudget.ts, issue #59): a variant job builds NEW fact
+  if (narrow) {
+    // Armed inside the solve ladder too (`withSearchLimit`, issue #59): a variant job builds NEW fact
     // content whose fold can hit the recruit ladder — the between-job check alone couldn't stop it.
-    const pool = withSolveBudget(deadline, () => runJobs(() => Date.now() > deadline));
+    const pool = withSearchLimit(GATE_WORK_LIMIT, () => runJobs(limitReached), 'gatePool').value;
     sampleMemo = memoBefore; // the narrow pool is this gate's alone
     return pool;
   }
@@ -6107,10 +6161,13 @@ function shapeDiffers(a: number[], b: number[]): boolean {
  * Settling happens ONCE, at commit — the parser is the only producer of the default, a student can only
  * CYCLE afterwards — so the persisted variant is authoritative from then on, "show another configuration"
  * cycles verbatim from it, and the corner square stays REACHABLE (with its notice), never the default.
- * Returns the SAME array when nothing changed (undo/memo hygiene). Budgeted like the seed search.
+ * Returns the SAME array when nothing changed (undo/memo hygiene). Bounded by GATE_WORK_LIMIT units of work (#2294,
+ * #2893, ADR-831: it was the seed search's wall clock); at the limit it keeps the best variant seen so far, as before.
  */
-export function settleVariantDefaults(facts: Fact[], isNew: (f: Fact) => boolean, seed: number, budgetMs = SEARCH_BUDGET_MS): Fact[] {
-  const deadline = Date.now() + budgetMs;
+export function settleVariantDefaults(facts: Fact[], isNew: (f: Fact) => boolean, seed: number, limit = GATE_WORK_LIMIT): Fact[] {
+  return withSearchLimit(limit, () => settleVariantDefaultsUnder(facts, isNew, seed), 'settleVariantDefaults').value;
+}
+function settleVariantDefaultsUnder(facts: Fact[], isNew: (f: Fact) => boolean, seed: number): Fact[] {
   let out = facts;
   for (let idx = 0; idx < out.length; idx++) {
     const f = out[idx];
@@ -6130,7 +6187,7 @@ export function settleVariantDefaults(facts: Fact[], isNew: (f: Fact) => boolean
     const candidate = (v: number) => out.map((x, i) => (i === idx ? { ...x, cmd: withVariant(x.cmd, v) } : x));
     let best = { v: v0, s: score(replay(out, seed)) };
     if (best.s[0] === 0 && best.s[1] === 0 && best.s[2] === 0) continue; // the parsed default is already clean
-    for (let dv = 1; dv < n && Date.now() < deadline; dv++) {
+    for (let dv = 1; dv < n && !limitReached(); dv++) {
       const v = (v0 + dv) % n;
       const s = score(replay(candidate(v), seed));
       // Strictly better lexicographically wins; ties keep the earlier (most-canonical) variant.

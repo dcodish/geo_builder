@@ -20,16 +20,22 @@
  * the page's store, already at that state: the operation acts on it directly, exactly as the seam always did, and
  * answers `applied: true` with nothing to adopt. So every existing test drives the same code it always drove.
  *
- * Two things differ between the heaps, and both are this table's options, never a second copy of a body:
- *   - `searchBudgetMs`: off the page's thread a search gets the generous budget (ADR-296); on it, the default.
+ * One thing differs between the heaps, and it is this table's option, never a second copy of a body:
  *   - `crossing`: the results cross a heap (a worker): the found view's fold travels, views arrive settled, the shadow
  *     store is set from the arguments, logs are captured for the page to send.
+ * (A second option, `searchBudgetMs`, gave a worker's search ADR-296's 12 s clock and the page's its 2.5 s one. #2893,
+ * ADR-831: every search is bounded in work units, the same in every heap, so there is nothing left to choose.)
+ *
+ * #2893 (ADR-831): a search that reaches its work limit answers "not decided" (`shell/notDecided`), carrying the round
+ * to run next; the page shows the operator's sentence with «המשיכו לחפש», which sends the same operation with that
+ * `round`. "Not decided" is never written to the store: it is answered before anything is applied.
  */
 import type { QueryInput, ValuesPanelResult } from '@/engine/valuesPanel';
 import type { AnyCommand } from '@/engine';
 import {
-  searchAnotherView,
-  findValidConfig,
+  searchAnotherViewRound,
+  findValidConfigRound,
+  type SearchResume,
   meetsRequirements,
   replay,
   getFoldFor,
@@ -47,7 +53,8 @@ import type { RowNouns } from '@/replay/narrowing';
 import type { OpContext } from '../../shell/workerProtocol';
 import { useGeoStore } from './geoStore';
 import { deserializeFigure, type FigureFile, type FigureLoadFailure } from './figureFile';
-import { auditLoadedFigure, refreshLoadedFigure, type LoadAuditFinding } from './loadAudit';
+import { auditLoadedFigure, refreshLoadedFigure, LOAD_WORK_LIMIT, type LoadAudit } from './loadAudit';
+import { isNotDecided, type NotDecided } from '../../shell/notDecided';
 import { captureLogs, captureLogsAsync } from '@/debug/sessionLog';
 import { decideFromParse, type DecideView, type Verdict2D } from '@/app/decideDeterministic';
 import { commitVerdict, type CreatedNotice2D } from '@/app/commitLine';
@@ -55,8 +62,6 @@ import { judgeModelAnswer, type JudgeInput, type JudgeOutcome } from '@/app/llmJ
 import { runEditCommit } from '@/app/editPipeline';
 
 export interface GeoOpsOptions {
-  /** The clock a search runs under. Absent: the page's own default (and no clock under vitest). */
-  searchBudgetMs?: number;
   /** The results cross a heap (a worker). See the header. */
   crossing: boolean;
 }
@@ -133,16 +138,17 @@ export function geoOps(options: GeoOpsOptions) {
 
   return {
     // ── the searches ────────────────────────────────────────────────────────────────────────────────────────────
-    resample: ({ facts, seed }: Figure, ctx: OpContext): (Figure & { settled?: SettledView | null }) | null => {
-      const found = searchAnotherView(facts, seed, (k, n) => ctx.progress(k, n), options.searchBudgetMs);
+    resample: ({ facts, seed, round = 0 }: Figure & { round?: number }, ctx: OpContext): (Figure & { settled?: SettledView | null }) | null | NotDecided<SearchResume> => {
+      const found = searchAnotherViewRound(facts, seed, round, (k, n) => ctx.progress(k, n));
+      if (found === null || isNotDecided(found)) return found;
       // #2890 (ADR-830): the found view arrives settled, so the page draws it without folding it again
-      return found && crossing ? { ...found, settled: settleView(found.facts, found.seed) } : found;
+      return crossing ? { ...found, settled: settleView(found.facts, found.seed) } : found;
     },
-    autoResolve: ({ facts, seed }: Figure): 'ok' | FoundView | null => {
+    autoResolve: ({ facts, seed, round = 0 }: Figure & { round?: number }): 'ok' | FoundView | null | NotDecided<SearchResume> => {
       if (meetsRequirements(facts, seed)) return 'ok';
       // #364 (ADR-510): the sweep starts from the student's CURRENT seed (M2: the view in hand is preferred)
-      const found = findValidConfig(facts, seed, options.searchBudgetMs);
-      if (!found) return null;
+      const found = findValidConfigRound(facts, seed, round);
+      if (found === null || isNotDecided(found)) return found;
       if (!crossing) return { ...found, fold: null };
       const settled = settleView(found.facts, found.seed);
       return { ...found, fold: settled.fold, settled };
@@ -220,7 +226,8 @@ export function geoOps(options: GeoOpsOptions) {
       return { ok: true, file, refreshed, settled: crossing ? settleView(file.facts, file.seed) : null };
     },
     /** The honesty audit of loaded rows (ADR-242). */
-    audit: ({ facts }: { facts: Fact[] }): { findings: LoadAuditFinding[]; complete: boolean } => auditLoadedFigure(facts),
+    /** #2893 (ADR-831): from step `from` on, when «המשיכו לחפש» continues an audit that reached its limit. */
+    audit: ({ facts, from = 0 }: { facts: Fact[]; from?: number }): LoadAudit => auditLoadedFigure(facts, LOAD_WORK_LIMIT, from),
     dryRun: ({ facts, seed, cmds }: { facts: Fact[]; seed: number; cmds: AnyCommand[] }): { produced: boolean } => ({ produced: dryRunOutcome(facts, cmds, seed).produced }),
   };
 }

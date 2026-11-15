@@ -471,7 +471,7 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
  * a needle the tolerance's slack bought — two right angles in one triangle satisfied to 0.5° by a 0.35°
  * apex — can only satisfy a tighter tolerance by collapsing past the coincidence floor, where the solvers'
  * own accept refuses it. Set only through {@link withToleranceFactor}, which always restores it (the
- * `withSolveBudget` shape); nothing else may write it.
+ * `withLadderSpent` shape); nothing else may write it.
  */
 export const toleranceScale = { factor: 1, length: 1 };
 

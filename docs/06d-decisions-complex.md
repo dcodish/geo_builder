@@ -4715,3 +4715,24 @@ Each memo was also switched off alone, in the same minutes. Without the fold mem
 
 **What the student will see.**
 - [ruled] «הציגו תצורה אחרת» pressed while another action runs waits its turn and then searches the figure that action left. ADR-W-210 Am. 2, question 1 (operator, 2026-11-13: an action pressed while the tool works waits its turn); the plan on #2890 records it. It is built for all four builders in ADR-W-210 Am. 4; in complex an action is over in milliseconds, so the case can hardly be produced by hand.
+
+## ADR-CX-092 — The gate's blame loop has a work limit, and a gate that reaches it says so: complex's part of phase 4 (#2893)
+
+**Status:** built · 2026-11-14 · feature (P2, workspace; this entry is complex's part) · branch `feat/2893-limits-2d` · phase 4 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (invariant 3: bounded and honest) · **LADDER stage:** none is added or moved ([LADDER-CX](LADDER-CX.md)): the gate decides what it decided, under a bound
+**Operator:** 2026-11-13, in chat: *"we should say honestly that a solution was not found and if we should continue searching"*, *"10s is an ok number"* · 2026-11-14, the four questions of #2893 (below)
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-LN-6 (new) · **Design:** [04d](04d-design-complex.md) § "The work ceiling" ("What happens over it"); [04w](04w-design-shell.md) § "The work limit and "not decided""
+
+**What was unbounded.** The gate (`acceptLine` for a typed line, `gateChange` for a toggle and an edit, `app/submit.ts`) tries eight configurations, then asks which earlier line, removed, lets the new one in: two folds per earlier line, so its cost grows with the figure and nothing bounded it. It is exact and it always finished. Complex has no clock to replace.
+
+**Measured** (the dev PC, 2026-11-14, `acceptLine` on a figure of n lines whose new line conflicts with the first, so the blame runs to its end): a blame over 10, 40 and 120 earlier lines charges 22, 41 and 91 units in 38, 23 and 82 ms: 570 to 1 760 units a second, because a line read once per content (ADR-CX-090) is cheap to ask again. The gate's walk records 26 units for the dearest action, and the page's ceiling is 256 (ADR-CX-091).
+
+**Decision.**
+- **The limit.** `GATE_WORK_LIMIT_CX` units of the work meter (complex's unit, ADR-CX-090), counted by the shared `withWorkLimit` (`shell/workLimit`); the blame's loop asks `limitReached()` before each earlier line. It is 10 000: ten seconds at the measured rates is 6 000 to 17 000 units, and the dearest gate recorded is two orders of magnitude below it.
+- **Reached, the gate is "not decided"**, never a refusal: `Verdict` gains `{ ok: false, notDecided }` with the next line to ask about (`resume.from`). A typed line is not added and stays in the box; a toggle leaves the row muted; an edit leaves the row's text. The store holds the question (`notDecided`, outside the undo history like `lastError`) and the page shows the operator's sentence with «המשיכו לחפש» where the refusal banner shows; the button runs the same action again from `resume.from`. Another step, or typing something else, dismisses it. A load restores the student's saved lines rather than answer a search the student waits on, so its gate goes on round after round until it decides (the blame is exact and finite); a saved line is never left undecided.
+- **No switch.** The suites run the same limit.
+
+**Not changed.** Every verdict, refusal, drawing and message of the complex builder: no recorded figure comes near the limit.
+
+**What the student will see.**
+- Nothing today: no figure reaches the limit (measured above). [ruled] If one ever does: «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with «המשיכו לחפש» (operator, 2026-11-14, #2893 question 1: *"«עדיין לא נמצא פתרון…» (Recommended)"*), the button searching the same amount again from where it stopped (question 2: *"Another ~10 s round (Recommended)"*), and the typed line staying in the box, not added (question 3: *"Stays in the box, not added (Recommended)"*). The limit counted in work (*"10s is an ok number"*, 2026-11-13).

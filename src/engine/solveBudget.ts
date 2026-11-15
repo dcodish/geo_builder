@@ -1,6 +1,12 @@
 import { meterWork } from '../../shell/workMeter';
+import { withWorkLimit } from '../../shell/workLimit';
 
 /**
+ * #2893 ([ADR-831](../../docs/06-decisions.md#adr-831), ADR-W-210 phase 4): THERE IS NO CLOCK HERE ANY MORE. Every
+ * search is bounded in WORK (the work budget below, in charged units), so the same input stops at the same point on
+ * every machine, in the suite as in the browser. What follows is the history of the budget this file began as; the
+ * one non-work state it keeps is the indefinite-shape probe's "ladder spent" ({@link withLadderSpent}).
+ *
  * Cooperative wall-clock budget for the failure-path recruit ladder (docs/17 §7 — "no unbudgeted
  * sweeps"; issues #59/#41). The old search budgets (`SEARCH_BUDGET_MS`, `SAMPLE_BUDGET_MS`) are checked
  * BETWEEN replays, so one replay whose ladder ran tens of seconds blew straight through them. This
@@ -19,24 +25,29 @@ import { meterWork } from '../../shell/workMeter';
  * ladder was cut short (a budget-aborted fold is not THE fold for that content — caching it would pin a
  * degraded figure for every later, unbudgeted replay).
  */
-export const solveBudget: { deadlineAt: number | null; aborts: number } = { deadlineAt: null, aborts: 0 };
+export const solveBudget: { ladderSpent: boolean; aborts: number } = { ladderSpent: false, aborts: 0 };
 
-/** Has the armed budget run out? (Never true when unarmed — the default, and always under tests.) */
+/** Has the armed budget run out? (Never true when unarmed — the default, and the primary submit fold.) */
 export function budgetExceeded(): boolean {
   if (workExceeded()) return true;
-  if (solveBudget.deadlineAt === null || Date.now() <= solveBudget.deadlineAt) return false;
+  if (!solveBudget.ladderSpent) return false;
   solveBudget.aborts++;
   return true;
 }
 
-/** Arm the ladder budget for `fn` (nested arms keep the tighter deadline; always restored). */
-export function withSolveBudget<T>(deadlineAt: number, fn: () => T): T {
-  const prev = solveBudget.deadlineAt;
-  solveBudget.deadlineAt = prev === null ? deadlineAt : Math.min(prev, deadlineAt);
+/**
+ * #2480 ([ADR-757](../../docs/06-decisions.md#adr-757)) — run `fn` with the recruit ladder SPENT: every ladder consult
+ * answers "over" at once. The indefinite-shape probe asks a question that is true of the drawn figure without the
+ * failure path, so it never needs the ladder. It used to be spelled as a clock budget whose deadline was the epoch
+ * (`withSolveBudget(0, …)`), which was already deterministic; #2893 (ADR-831) names it, and the clock is gone.
+ */
+export function withLadderSpent<T>(fn: () => T): T {
+  const prev = solveBudget.ladderSpent;
+  solveBudget.ladderSpent = true;
   try {
     return fn();
   } finally {
-    solveBudget.deadlineAt = prev;
+    solveBudget.ladderSpent = prev;
   }
 }
 
@@ -44,8 +55,8 @@ export function withSolveBudget<T>(deadlineAt: number, fn: () => T): T {
  * #1601/#1599 (ADR-558): the WORK budget — the deterministic sibling of the wall clock above. Every
  * `evaluateCore` is one work unit (`work.done`), so a budget of N units stops at the same point on every
  * device and every run: the knowledge pool's verdicts can then never depend on how fast the machine was
- * (the operator's ruling on #1601 — "same input, same answer"). The interactive searches keep the wall
- * clock; only the knowledge pool is bounded this way.
+ * (the operator's ruling on #1601 — "same input, same answer"). Since #2893 (ADR-831) every search is: the
+ * interactive ones, the submit gates and the load's refresh and audit too ({@link withSearchLimit}).
  */
 export const work: { done: number; limitAt: number | null; executed: number } = { done: 0, limitAt: null, executed: 0 };
 
@@ -150,23 +161,13 @@ export function chargeHit(cell: WorkCell | undefined): boolean {
 }
 
 /**
- * #2888 ([ADR-827](docs/06-decisions.md#adr-827)) — HAS THE OPEN WORK EPOCH ALREADY CHARGED A SOLVE OF THIS OBJECT?
- *
- * Every memo keyed by an object's identity that carries a ledger registers how to find its entry's cell
- * ({@link registerLedger}: `evaluate`, `resolveDriven`, the DOF count). A cache that hands the SAME object to a second
- * caller — where each caller used to build its own — asks this first: inside an epoch that has already charged a solve
- * of that object, a second hand-out would be served free, while two separately built objects were each solved and
- * counted. So the cache builds a fresh object there, and the epoch counts exactly what it counted before the cache
- * existed. Outside an epoch nothing is charged and no budget reads the counter, so this is always false.
+ * #2888 (ADR-827) registered here how to find the ledger cell of every identity memo (`evaluate`, `resolveDriven`, the
+ * DOF count), so that a cache could build a fresh object inside an epoch that had already charged one. #2893 (ADR-831)
+ * removed that emulation; the registry stays, read by nothing, so the three memos keep one place that names their cells.
  */
 const ledgerLookups: ((key: object) => WorkCell | undefined)[] = [];
 export function registerLedger(lookup: (key: object) => WorkCell | undefined): void {
   ledgerLookups.push(lookup);
-}
-export function chargedInOpenEpoch(key: object): boolean {
-  if (!epochOpen) return false;
-  for (const lookup of ledgerLookups) if (lookup(key)?.charged === epochId) return true;
-  return false;
 }
 
 /** #1671 (ADR-584): a ledger's total — every `own` in its closure once — the work a transplanted entry
@@ -207,13 +208,12 @@ export function inWorkEpoch(): boolean {
   return epochOpen;
 }
 /**
- * #2888 (ADR-827): is a clock budget armed that has NO TIME LEFT (its deadline is now, or past)? It only asks: no abort
- * is counted. `>=`, not `>`: a search handed a budget of zero computes its deadline as this very millisecond, and its
- * loop gives up only once the clock has ticked. It always did tick, because each candidate was solved; a memo that
- * answers in microseconds would let that search examine candidates on a budget it was told it does not have.
+ * #2893 (ADR-831; it was ADR-827's `clockSpent`): is the code running now under a budget that has NOTHING LEFT — the
+ * ladder spent, or an armed work budget with no unit left? It only asks: no abort is counted. `>=`: a search handed a
+ * budget of zero examines no candidate, even one a memo would answer in microseconds.
  */
-export function clockSpent(): boolean {
-  return solveBudget.deadlineAt !== null && Date.now() >= solveBudget.deadlineAt;
+export function budgetSpent(): boolean {
+  return solveBudget.ladderSpent || (work.limitAt !== null && work.done >= work.limitAt);
 }
 
 /** Has the armed WORK budget run out? Never true when unarmed. Counted as a ladder abort, like the clock. */
@@ -249,7 +249,7 @@ export function withExecutedCap<T>(units: number, fn: () => T): { value: T; exha
   }
   const exhausted = solveBudget.aborts !== aborts0 && work.executed > at;
   const outerRanOut =
-    (solveBudget.deadlineAt !== null && Date.now() > solveBudget.deadlineAt) ||
+    solveBudget.ladderSpent ||
     (work.limitAt !== null && work.done > work.limitAt) ||
     (prev !== null && work.executed > prev);
   if (exhausted && !outerRanOut) solveBudget.aborts = aborts0;
@@ -271,6 +271,23 @@ export function withWorkBudget<T>(units: number, fn: () => T): T {
 }
 
 /**
+ * #2893 ([ADR-831](../../docs/06-decisions.md#adr-831), ADR-W-210 phase 4) — A SEARCH UNDER ITS LIMIT. Arms a work
+ * budget of `units` (so the solve ladder inside a candidate stops at the same unit too) and opens the shared work limit
+ * (`shell/workLimit`) on the same warmth-independent count, `work.done`: the search's loop asks `limitReached()` where
+ * it read a clock, and the caller learns whether the limit was reached. A search that reached it without an answer
+ * returns "not decided" (`shell/notDecided`), never a verdict.
+ */
+export function withSearchLimit<T>(units: number, fn: () => T, kind = 'search'): { value: T; reached: boolean; spent: number } {
+  const r = withWorkBudget(units, () => withWorkLimit(units, fn, () => work.done));
+  const st = (searchLimitStats[kind] ??= { runs: 0, reached: 0 });
+  st.runs++;
+  if (r.reached) st.reached++;
+  return r;
+}
+/** #2893 (ADR-831): per search kind, how many searches ran under a limit and how many reached it (the measurement's counter). */
+export const searchLimitStats: Record<string, { runs: number; reached: number }> = {};
+
+/**
  * #2894 (ADR-W-210 phase 5) — AN EXACT REPEAT IS SERVED, AND CHARGED AS IF IT WERE COMPUTED.
  *
  * Measured over every 2-D fixture and the slow corpus: 44–47 % of the cost evaluations a `nelderMead` call makes are
@@ -285,7 +302,10 @@ export function withWorkBudget<T>(units: number, fn: () => T): T {
  * caller's, so nothing is kept between calls or depends on what ran before. A point with a NaN coordinate is never
  * served (NaN has more than one bit pattern).
  */
+/** #2893 (ADR-831): off only in the lock that a served repeat counts against a search limit exactly as a computed one. */
+export const repeatConfig = { serve: true };
 export function servingRepeats<T>(f: (x: number[]) => T): (x: number[]) => T {
+  if (!repeatConfig.serve) return f;
   const seen = new Map<string, { value: T; done: number; executed: number; own: number }>();
   return (x) => {
     const key = exactKey(x);

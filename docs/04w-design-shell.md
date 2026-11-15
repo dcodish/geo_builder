@@ -560,6 +560,16 @@ A submit asks with `runIfIdle`: while the lane works it is not taken, and the li
 
 Locks: `shell/__tests__/worker-client.test.ts` (the host; the client against a fake `Worker` that clones every message and answers later; the three executors; the ceiling) and `shell/__tests__/work-queue-2874.test.ts` (the stamp, `behind`, `span`, `around`).
 
+### The work limit and "not decided" ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) phase 4, #2893)
+
+**A search is bounded in work, never in seconds**, so the suite and the browser run the same control flow and the same input gives the same outcome on every machine (invariant 3).
+
+- `shell/workLimit.ts`: `withWorkLimit(units, fn, read?)` opens a limit counted by default in the work meter's own unit (it reads `readWork().total` at the start; no second counter), or on a counter the builder passes when its solver already keeps a warmth-independent one (2-D's ADR-558 count charges a memo hit as the work it saved, so a warm cache and a cold one stop at the same place); it returns `{ value, reached, spent }`. A search's loop asks `limitReached()` where it read a clock. Limits nest: each is its own, and an outer one is reached by everything spent inside it. `unitsLeft()` reads the tightest. Each builder names its limits as constants, calibrated to about 10 s on the dev PC and documented with the measurement (operator, 2026-11-13: *"10s is an ok number"*).
+- `shell/notDecided.ts`: `NotDecided<R> = { kind: 'not-decided', resume: R, spent }`, the third outcome of a search beside a verdict and a refusal. `resume` is opaque to everything but the search that made it (what it already tried, so the next round does not repeat it). It is never a verdict, never a refusal naming a statement, never cached as a verdict, never stored as a fact or committed to the undo history, and it crosses the worker client as plain data.
+- `shell/frame/NotDecidedNote.tsx`: the page's face, placed where the builder shows a refusal. String-free: the caller passes `t('suite.notDecided.message')` («עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.») and `t('suite.notDecided.continue')` («המשיכו לחפש»); `onContinue` runs one more round of the same size from `resume` (operator, 2026-11-14, #2893 questions 1 and 2). A `status`, not an `alert`: nothing was refused.
+
+- **The letter popover** (`frame/letterOffer.ts`, `LetterPopover`): a rename answers `{ ok: false, reason: 'not-decided', round }` and a swap `{ ok: false, notDecided: { round } }` when the product's decision reached its work limit. That is not a refusal: the popover shows `NotDecidedNote` where it shows the invalid note (the caller passes `strings.notDecided` / `strings.keepSearching`, its `suite.notDecided` keys), and «המשיכו לחפש» calls the same callback again with `round`.
+
 ### The created-points notice ([ADR-W-162](06w-decisions-workspace.md#adr-w-162), #1467)
 
 `shell/frame/CreatedNotice.tsx` is a string-free `Banner kind="notice"` whose dismiss is the undo: ✕ (accessible

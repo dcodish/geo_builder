@@ -17,7 +17,8 @@
  * one that serves each lane from its own module instance, as a browser's two worker heaps are.
  */
 import type { QueryInput, ValuesPanelResult } from '@/engine/valuesPanel';
-import { adoptSettled, peekFoldFor, type DetectAllResult, type Fact, type FoldNode, type SettledView } from '@/replay/core';
+import { adoptSettled, peekFoldFor, type DetectAllResult, type Fact, type FoldNode, type SearchResume, type SettledView } from '@/replay/core';
+import { isNotDecided, type NotDecided } from '../../shell/notDecided';
 import { createWorkerClient } from '../../shell/workerClient';
 import { sameInstanceExecutor, type Executor } from '../../shell/workerExecutor';
 import { geoOps, type GeoCheckpoint, type GeoOps } from './geoOps';
@@ -173,27 +174,32 @@ export function supersedeStaleSearches(now: { facts: Fact[]; seed: number }): bo
 export const geoWork = {
   /** The "show another configuration" search, off-thread. Resolves the validated COMPOSITE view —
    *  facts (possibly carrying a branch/variant step) + seed — or null (ADR-340, #175). The view
-   *  carries the `basis` it was searched on (#2757). */
+   *  carries the `basis` it was searched on (#2757). #2893 (ADR-831): or "not decided" (the search reached its work
+   *  limit first), whose `resume.round` is what «המשיכו לחפש» passes as `round`. */
   async resample(
     facts: Fact[],
     seed: number,
     onProgress?: (k: number, n: number) => void,
-  ): Promise<{ facts: Fact[]; seed: number; basis: ViewBasis } | null> {
+    round = 0,
+  ): Promise<{ facts: Fact[]; seed: number; basis: ViewBasis } | null | NotDecided<SearchResume>> {
     const basis = { facts, seed };
-    const found = await searchOn(basis, () => client.run(LANE_OF.resample, 'resample', { facts, seed }, { onProgress }));
-    if (found?.settled) adoptSettled(found.settled); // #2890 (ADR-830): drawn without folding it again
-    return found ? { facts: found.facts, seed: found.seed, basis } : null;
+    const found = await searchOn(basis, () => client.run(LANE_OF.resample, 'resample', { facts, seed, round }, { onProgress }));
+    if (found === null || isNotDecided(found)) return found;
+    if (found.settled) adoptSettled(found.settled); // #2890 (ADR-830): drawn without folding it again
+    return { facts: found.facts, seed: found.seed, basis };
   },
-  /** The post-commit config search. `'ok'` = already valid; `null` = nothing found in budget. */
+  /** The post-commit config search. `'ok'` = already valid; `null` = it finished and found nothing; #2893 (ADR-831):
+   *  "not decided" = it reached its work limit first (`resume.round` continues it). */
   async autoResolve(
     facts: Fact[],
     seed: number,
-  ): Promise<'ok' | { facts: Fact[]; seed: number; fold: FoldNode | null; basis: ViewBasis } | null> {
+    round = 0,
+  ): Promise<'ok' | { facts: Fact[]; seed: number; fold: FoldNode | null; basis: ViewBasis } | null | NotDecided<SearchResume>> {
     const basis = { facts, seed };
-    const found = await searchOn(basis, () => client.run(LANE_OF.autoResolve, 'autoResolve', { facts, seed }));
-    if (found === 'ok') return 'ok';
-    if (found?.settled) adoptSettled(found.settled); // #2890 (ADR-830)
-    return found ? { facts: found.facts, seed: found.seed, fold: found.fold, basis } : null;
+    const found = await searchOn(basis, () => client.run(LANE_OF.autoResolve, 'autoResolve', { facts, seed, round }));
+    if (found === 'ok' || found === null || isNotDecided(found)) return found;
+    if (found.settled) adoptSettled(found.settled); // #2890 (ADR-830)
+    return { facts: found.facts, seed: found.seed, fold: found.fold, basis };
   },
   /** Warm the fold for a fact-list's content off-thread; returns the node for `primeFoldFor`. */
   async prefold(facts: Fact[], seed: number): Promise<FoldNode | null> {
@@ -238,7 +244,8 @@ export const geoJobs = {
   judge: (args: Parameters<GeoOps['judge']>[0]) => client.run('interactive', 'judge', args),
   edit: (args: Parameters<GeoOps['edit']>[0]) => client.run('interactive', 'edit', args),
   load: (text: string, prefold: boolean) => client.run('interactive', 'load', { text, prefold }),
-  audit: (facts: Fact[]) => client.run('interactive', 'audit', { facts }),
+  /** #2893 (ADR-831): `from` continues an audit that reached its work limit (its `resumeAt`). */
+  audit: (facts: Fact[], from = 0) => client.run('interactive', 'audit', { facts, from }),
   dryRun: (facts: Fact[], seed: number, cmds: import('@/engine').AnyCommand[]) => client.run('interactive', 'dryRun', { facts, seed, cmds }),
 };
 
