@@ -1,9 +1,9 @@
 {"_":"THE WORK-METER BASELINE (#2873, ADR-W-210). One line per figure-action, sorted by key: solver work in units, never seconds (total = all of it, page = on the UI thread, prePaint = before the figure can paint). Never edited by hand: `npm run work:record -- <builder>` rewrites it, and docs/08 says when."}
-{"k":"1768-kite-area|another#1","total":655892,"page":0,"prePaint":655892}
+{"k":"1768-kite-area|another#1","total":2730546,"page":0,"prePaint":2730546}
 {"k":"1768-kite-area|delete","total":110176,"page":0,"prePaint":110176}
 {"k":"1768-kite-area|detect","total":735245,"page":0,"prePaint":0}
-{"k":"1768-kite-area|edit","total":2792366,"page":0,"prePaint":2792366}
-{"k":"1768-kite-area|load","total":2893202,"page":0,"prePaint":2893202}
+{"k":"1768-kite-area|edit","total":9806333,"page":0,"prePaint":9806333}
+{"k":"1768-kite-area|load","total":4215865,"page":0,"prePaint":4215865}
 {"k":"1768-kite-area|submit#1","total":3342,"page":0,"prePaint":3342}
 {"k":"1768-kite-area|submit#2","total":144271,"page":0,"prePaint":144271}
 {"k":"1768-kite-area|submit#3","total":6272,"page":0,"prePaint":6272}
@@ -11,8 +11,8 @@
 {"k":"1768-kite-area|submit#5","total":73514,"page":0,"prePaint":73514}
 {"k":"1768-kite-area|submit#6","total":6098,"page":0,"prePaint":6098}
 {"k":"1768-kite-area|submit#7","total":27062,"page":0,"prePaint":27062}
-{"k":"1768-kite-area|submit#8","total":5500444,"page":0,"prePaint":5500444}
-{"k":"1768-kite-area|toggle","total":2166407,"page":0,"prePaint":2166407}
+{"k":"1768-kite-area|submit#8","total":6824449,"page":0,"prePaint":6824449}
+{"k":"1768-kite-area|toggle","total":3445513,"page":0,"prePaint":3445513}
 {"k":"1768-kite-area|undo","total":0,"page":0,"prePaint":0}
 {"k":"2104-list|another#1","total":1,"page":0,"prePaint":1}
 {"k":"2104-list|delete","total":2,"page":0,"prePaint":2}

@@ -3241,15 +3241,21 @@ function reflectMaskForFailing(fig: Derived, facts: Fact[] = []): number {
  * hexagon's load refresh 396 586 in 1.27 s (312 k/s). In a browser (phase 3's probes): 360–450 k/s executed. A limit counts
  * CHARGED units (a memo hit costs what it saved), which run ahead of executed ones: the #566 seat rescue on one circle
  * charges 3 839 924 units in 6.6 s cold (580 k/s), on two circles 11 629 517 in 28.7 s (405 k/s). So ten seconds is
- * 2.7 M to 5.8 M charged units on this PC. The limit is 4 M, the size of the submit door's work caps already
- * (`POOL_WORK_CAP`, `SEAT_SWEEP_WORK_CAP`, `CHOICE_RESCUE_WORK_CAP`): about 7 to 15 s, the same count everywhere. A
+ * 2.7 M to 5.8 M charged units under node.
+ *
+ * THE CALIBRATION IS THE BROWSER'S (2026-11-15, the dev PC, the page on :5180 with ADR-832's served repeats, through the
+ * browser harness): «הציגו תצורה אחרת» on «ABC משולש ישר זוית · AC=15 · BC=10 · חצי מעגל שקוטרו AB העובר דרך C», a search
+ * that solves almost everything it touches, reached a 4 M limit after 5.19 s and 5.17 s (two runs): 770 k charged units a
+ * second. Ten seconds is 7.7 M, the limit. (At 7.7 M that press finishes in one round, 8.7 s.) A search that reads
+ * most of what it needs from the memos charges faster: after the #566 two-circle line the configuration search reached
+ * 7.7 M in 2.1 s (main, with no limit, finishes it in 0.3 s: most of its 11.6 M charged units are memo hits). A
  * figure whose units are slow (heavy joint solves: #207's ladder runs ~50 k units/s) takes longer to reach it; a unit
  * is one `evaluateCore`, and nothing inside one is counted.
  *
  * One constant per search kind, all the same size by the ruling (one limit "the same in every tool"); each is named so
  * a later calibration can move one kind without touching the others.
  */
-export const TEN_SECONDS_OF_WORK = 4_000_000;
+export const TEN_SECONDS_OF_WORK = 7_700_000;
 /** The configuration searches: «הציגו תצורה אחרת» (`searchAnotherView`) and the post-commit search (`findValidConfig`). */
 export const SEARCH_WORK_LIMIT = TEN_SECONDS_OF_WORK;
 /**
