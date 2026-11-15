@@ -311,6 +311,11 @@ behind it; their history is in [06d](06d-decisions-complex.md).
 - **FR-LN-2 (Must)** — **A refusal names the student's statement**, never internal state
   ([FR-SU-5](02w-requirements-workspace.md)), and reads correctly in an RTL sentence with LTR
   mathematics inside it ([FR-WI-2](02w-requirements-workspace.md)).
+- **FR-LN-6 (Must)** — **A gate that stops says so.** The search that names the earlier statement a line conflicts
+  with is bounded by a fixed amount of work, never a time. When it reaches that amount before it decides, the line is
+  not refused and not added: it stays in the box with «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» and
+  «המשיכו לחפש», which searches on from the statement it reached ([ADR-CX-092](06d-decisions-complex.md#adr-cx-092),
+  #2893). No figure reaches it today: the dearest gate is far below the amount.
 - **FR-LN-4 (Must)** — **Radicals are input, carried exactly.** «√3 + i», «sqrt(3)», «√(x)», «³√8» /
   «ⁿ√x» and «√2cis45» parse; a root of a rational literal is an exact magnitude (the modulus exponent
   vector), so «√3 + i» IS 2·cis30° and «|z₁| = √2» pins the modulus exactly — never a decimal

@@ -409,7 +409,12 @@ solve, ADR-CX-090). The dearest recorded action charges 26.
   result. That is the whole action: the App's decision functions (`app/submit.ts`), the store action and the render's
   `deriveLines`. Measuring the store action alone would see almost none of it.
 - **What happens over it.** The action finishes. In development the page logs it (`armCeilingCx`, armed in `App.tsx`
-  beside the basis guard). Nothing is cut before phase 4 of ADR-W-210 gives every builder the "not decided" outcome.
+  beside the basis guard). Nothing is cut: the ceiling reports.
+- **The gate's limit** ([ADR-CX-092](06d-decisions-complex.md#adr-cx-092), #2893). The one loop that grows with the figure,
+  the gate's differential blame (`acceptLine`, `gateChange`), runs under `GATE_WORK_LIMIT_CX` units (`withWorkLimit`,
+  `shell/workLimit`). Reached, the gate answers "not decided" with the next earlier line to ask about; the store holds the
+  question (`notDecided`, outside the history), the page shows `NotDecidedNote` where the refusal banner shows, and
+  «המשיכו לחפש» runs the action again from there. A load's replay goes on round after round until its gate decides.
 - **The routing.** `actCx` runs the store's job actions through `pageLaneExecutor`: the routing every builder's actions
   have (a worker client's executor, [04w](04w-design-shell.md) § "The worker client"), with the executor of a builder
   that stays on the page. No clone, the same store, the same order of effects.

@@ -97,6 +97,7 @@ export const FREE_ACTIONS_CX: Readonly<Record<string, string>> = {
   clearError: NOTE,
   setError: NOTE,
   setLoadAudit: NOTE,
+  setNotDecided: 'the keep-searching question (#2893): a message, nothing is folded',
   serialize: 'reads the session for a save: nothing is written',
 };
 
