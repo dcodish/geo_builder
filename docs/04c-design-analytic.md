@@ -1323,7 +1323,11 @@ feeds the panel's «זוויות».
 `carrierSystem(c, env, { params })` builds the vector the solve moves — the free vertices (`ids`), then every register
 parameter (`syms`) — and every residual is evaluated at `envAt(x)`, so a given can pin a parameter
 (`(k+1)x+2y−12+5k=0`). **Two stages**: vertices with parameters at their sample first; parameters join only when that
-does not converge, walked in the student's order, with an `accept` predicate for declared domains. The freedom cue is
+does not converge, walked in the student's order, with an `accept` predicate for declared domains. The walks of one
+content (attempts, sign re-seeds, the discrete options tried at a seed) are one continuation: a prefix solve is keyed by
+the resolved construction, the prefix, the environment, the start to the last bit and the tolerance, solved once and
+served after (`walkSteps`, [ADR-AG-482](06c-decisions-analytic.md#adr-ag-482)); a served step is a finished piece and
+charges the work limit nothing. The freedom cue is
 rank over the joint vector (`figureDofOf`, `reportedDof`); the locus tracer asks for `params: 'fixed'`. The membership
 residual (`curves.ts`) is signed; `solveLM` stops on a stall; `evaluate` is memoised per (construction, seed);
 `figureSignature` signs used parameters (`usedSymbols`). A free direction (`Direction.free`) is a `line-at` angle; a
@@ -1741,8 +1745,11 @@ Seeding a derived point's region through its parents; exact root enumeration.
 
 `derive` raises faults in a fixed order and gives a line one message, so the ring arm (#1170) runs after the vacancy
 loop and skips lines already in `faults`. A collapse the givens force is `polygon-collapsed`
-([ADR-AG-247](06c-decisions-analytic.md#adr-ag-247): `Figure.collapsedRings`, `collapsedByGivens(c, seed)`,
+([ADR-AG-247](06c-decisions-analytic.md#adr-ag-247): `Figure.collapsedRings`, `collapsedByGivens(c, at)`,
 `errPolygonCollapsed`). A fault is also the refusal: `decideSubmit` refuses when one lands on the new line.
+`collapsedByGivens` and its pair twin `pairsMetByGivens` read **the walk's own window** (`walkWindow`: the requested
+configuration, then each later seed at reach 1 with the request's `wide`), so on the refusal path every figure they read
+is one `drawableAt` already evaluated ([ADR-AG-481](06c-decisions-analytic.md#adr-ag-481)).
 
 **The vacancy arm reads the OBJECT's freedom, and a stated collinearity is a proof** ([ADR-AG-296](06c-decisions-analytic.md#adr-ag-296), #1963).
 A `vacant` object is refused `does-not-exist` when `Figure.freedomOfRead` over its inputs (`inputsOf`, `carriers.ts`:

@@ -450,6 +450,35 @@
         "AC = 7"
       ],
       "lookFor": "«AC = 7» is refused, naming «BC = 4»."
+    },
+    {
+      "sheet": "feat-2894-d-analytic",
+      "id": "T2",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5197",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "AB = 5"
+      ],
+      "lookFor": "The press moves the triangle to another configuration."
+    },
+    {
+      "sheet": "feat-2894-c-analytic",
+      "id": "T3",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "lines": [
+        "ריבוע ABCD",
+        "AB = 3",
+        "AC = 10"
+      ],
+      "lookFor": "The third line is refused «לא נמצאה תצורה שבה מתקיים: «AC = 10»»; two rows stay."
     }
   ],
   "results": [

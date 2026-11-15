@@ -24,7 +24,7 @@ import { isHorizontal, isVerticalLine, lineByName, normalizedLine, type NamedLin
 import { commonTangentLine } from './commonTangents';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { closePairsOf, COLLAPSED_SIN_TOL, cornerKey, legibilityFaults, ringFaultsOf, thinRingsOf, THIN_SIN_TOL, type RingFault } from './rings';
-import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
+import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, toleranceFactor, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
 import { assignmentAt, joinChoiceSeeds, splitChoiceSeed } from './discreteAxes';
@@ -3973,6 +3973,93 @@ function labelsFromFigure(
   return { env: out, labelled };
 }
 
+/**
+ * THE WALK'S STEPS, SOLVED ONCE PER CONTENT (#2894 part 2, [ADR-AG-482](../../docs/06c-decisions-analytic.md#adr-ag-482)) —
+ * the memo behind `walk`'s continuation. Per raw content (cleared with every content cache), a step is keyed by the
+ * resolved construction (everything in it but its constraints), the constraint prefix (`i` constraints; `0` is the whole system the
+ * walk finishes on), the environment, the start vector to the last bit and the solver's tolerance factor: every input
+ * `solveLM` reads. The answer is the one a fresh solve would return. A served step is a FINISHED PIECE, like a served
+ * `evaluate` (ADR-AG-479: «המשיכו לחפש» goes on from what the last round finished), so it charges the work limit nothing.
+ */
+interface WalkStep {
+  r: SolveResult;
+}
+let walkStepsServed = true;
+/**
+ * AN INSTRUMENT (#2894 part 2, ADR-AG-482's lock): run `fn` with every walk step solved afresh — the walk before the
+ * continuation. Not a mode: nothing outside the locks calls it.
+ */
+export function withoutWalkContinuation<T>(fn: () => T): T {
+  const was = walkStepsServed;
+  walkStepsServed = false;
+  try {
+    return fn();
+  } finally {
+    walkStepsServed = was;
+  }
+}
+/** `systems` interns a (structure, prefix) to a short id, so a step's key does not carry the construction's text. */
+const walkMemo = new ContentCache<{ systems: Map<string, number>; steps: Map<string, WalkStep> }>();
+const numKey = (v: number): string => (Object.is(v, -0) ? '-0' : String(v));
+/**
+ * The exact text of a construction part: every number by its shortest round-trip spelling (−0, NaN and ±∞ kept apart,
+ * which JSON would fold into `0` and `null`), keys in their order, and a FUNCTION — which no text can stand for — as a
+ * fresh token, so a value carrying one is never served (its key matches nothing).
+ */
+let opaque = 0;
+function exactText(v: unknown): string {
+  if (typeof v === 'number') return numKey(v);
+  if (typeof v === 'string') return JSON.stringify(v);
+  if (v === null || v === undefined || typeof v === 'boolean') return String(v);
+  if (typeof v === 'function' || typeof v === 'symbol' || typeof v === 'bigint') return `<opaque ${(opaque += 1)}>`;
+  if (Array.isArray(v)) return `[${v.map(exactText).join(',')}]`;
+  if (v instanceof Map) return `M[${[...v].map(([k, w]) => `${exactText(k)}:${exactText(w)}`).join(',')}]`;
+  if (v instanceof Set) return `S[${[...v].map(exactText).join(',')}]`;
+  return `{${Object.keys(v)
+    .map((k) => `${JSON.stringify(k)}:${exactText((v as Record<string, unknown>)[k])}`)
+    .join(',')}}`;
+}
+const envKey = (e: Env): string =>
+  Object.keys(e)
+    .sort()
+    .map((k) => `${k}=${numKey(e[k])}`)
+    .join(',');
+function walkSteps(raw: Construction, c: Construction): { solve: (i: number, env: string, x: number[], run: () => SolveResult) => SolveResult } {
+  let memo = walkMemo.get(raw);
+  if (!memo) {
+    memo = { systems: new Map(), steps: new Map() };
+    walkMemo.set(raw, memo);
+  }
+  const { systems, steps: table } = memo;
+  const intern = (text: string): number => {
+    let id = systems.get(text);
+    if (id === undefined) {
+      id = systems.size;
+      systems.set(text, id);
+    }
+    return id;
+  };
+  const structure = exactText({ ...c, constraints: [] }); // everything but the constraints, which the prefix spells
+  // [0]: the whole system the walk finishes on; [i]: the first i constraints.
+  const prefixes: number[] = [intern(`${structure}|all|${exactText(c.constraints)}`)];
+  let acc = '';
+  for (const k of c.constraints) {
+    acc += exactText(k) + ';';
+    prefixes.push(intern(`${structure}|${acc}`));
+  }
+  return {
+    solve: (i, env, x, run) => {
+      if (!walkStepsServed || x.some((v) => Number.isNaN(v))) return run();
+      const key = `${prefixes[i]}|${env}|${toleranceFactor()}|${x.map(numKey).join(',')}`;
+      const hit = table.get(key);
+      if (hit) return { ...hit.r, values: [...hit.r.values] };
+      const r = run();
+      table.set(key, { r: { ...r, values: [...r.values] } });
+      return r;
+    },
+  };
+}
+
 function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramReach = 1, wide = seed !== 0): Figure {
   /**
    * DISCRETE freedom is resolved HERE, once, before anything measures a constraint (#1049).
@@ -4829,13 +4916,30 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         }
         return null;
       };
+      /**
+       * ONE CONTINUATION, NOT A RE-SOLVE PER WALK (#2894 part 2, [ADR-AG-482](../../docs/06c-decisions-analytic.md#adr-ag-482)).
+       *
+       * Every walk of this content — each attempt, each sign re-seed, and above all each discrete OPTION
+       * `evaluateTryingChoices` tries at the same seed — used to solve its prefixes from scratch, although two walks that
+       * start from the same point with the same parameters solve the same prefixes to the same bits until the first
+       * constraint where their systems differ (a choice's option, a re-seeded angle). Measured on exam 2379's ninth line:
+       * 14 % of the pool's walk work was such a repeat. So the walks of one content are one tree: a prefix solve is keyed
+       * by everything its answer is a function of (`walkSteps`: the resolved construction, the
+       * prefix's constraints, the walk's environment, the start to the last bit, the tolerance) and solved once; a walk
+       * continues from the deepest step already solved. A served step is a finished piece and charges the work limit
+       * nothing, as a served `evaluate` does (ADR-AG-479), so a round of «המשיכו לחפש» goes on from it; a search that
+       * repeated walks therefore reaches further before the limit (ADR-AG-482 lists where that changed an outcome).
+       */
+      const steps = walkSteps(raw, c);
       const walk = (start: Map<Id, Pt>, attempt: Env): SolveResult => {
         let x = solved.toVec(start, attempt);
+        const ek = envKey(attempt);
         for (let i = 1; i <= c.constraints.length; i += 1) {
-          const prefix = carrierSystem({ ...c, constraints: c.constraints.slice(0, i) }, attempt);
-          x = solveLM(x, prefix.residualsAt, 60).values;
+          const from = x;
+          x = steps.solve(i, ek, from, () => solveLM(from, carrierSystem({ ...c, constraints: c.constraints.slice(0, i) }, attempt).residualsAt, 60)).values;
         }
-        return solveLM(x, solved.residualsAt);
+        const last = x;
+        return steps.solve(0, envKey(env), last, () => solveLM(last, solved.residualsAt));
       };
       const consider = (r: SolveResult): boolean => {
         if (r.ok && admissible(r.values)) {
@@ -6579,29 +6683,45 @@ function firstAdmittingDrop(
 
 /**
  * WHICH DECLARED POLYGONS THE GIVENS FORCE FLAT (#1849, ADR-AG-247) — the rings the thin-ring arm found the givens
- * holding on only collapsed (`Figure.collapsedRings`), over the window `drawableAt` walks from `seed`. In order of
- * first appearance, so the ring a refusal names is a function of the input and the seed alone.
+ * holding on only collapsed (`Figure.collapsedRings`), over the window `drawableAt` walks from `at`. In order of
+ * first appearance, so the ring a refusal names is a function of the input and the configuration alone.
  *
  * Called only on the refusal path, where `drawableAt` found nothing whole and so evaluated this whole window
- * already: every lookup is a memo hit (ADR-AG-144), never a new solve.
+ * already: every lookup is a memo hit (ADR-AG-144), never a new solve. **The window is the walk's own**
+ * ({@link walkWindow}, #2894 part 2, ADR-AG-481): the requested configuration, then each later seed at reach 1 with the
+ * request's `wide`. It used to be `evaluate(c, s)` with the defaults, which at a seed-0 request (`wide` false) are
+ * other configurations (`wide` true from seed 1 on): every such refusal solved a second 24-seed window it then read.
  */
-/**
- * WHICH OPERAND PAIRS THE GIVENS FORCE TOGETHER (#2506, ADR-AG-399) — `Figure.metPairs` over the same window, the
- * pair twin of {@link collapsedByGivens}. Refusal path only, every lookup a memo hit.
- */
-export function pairsMetByGivens(c: Construction, seed: number): [Id, Id][] {
-  const out: [Id, Id][] = [];
-  for (let s = seed; s <= seed + DRAWABLE_TRIES; s += 1) {
-    for (const p of evaluate(c, s).metPairs ?? []) if (!out.some((q) => q[0] === p[0] && q[1] === p[1])) out.push(p);
+export function collapsedByGivens(c: Construction, at: Seed): Id[] {
+  const out: Id[] = [];
+  for (const f of walkWindow(c, at)) {
+    for (const id of f.collapsedRings ?? []) if (!out.includes(id)) out.push(id);
   }
   return out;
 }
 
-export function collapsedByGivens(c: Construction, seed: number): Id[] {
-  const out: Id[] = [];
-  for (let s = seed; s <= seed + DRAWABLE_TRIES; s += 1) {
-    for (const id of evaluate(c, s).collapsedRings ?? []) if (!out.includes(id)) out.push(id);
+/**
+ * WHICH OPERAND PAIRS THE GIVENS FORCE TOGETHER (#2506, ADR-AG-399) — `Figure.metPairs` over the same window, the
+ * pair twin of {@link collapsedByGivens}. Refusal path only, every lookup a memo hit.
+ */
+export function pairsMetByGivens(c: Construction, at: Seed): [Id, Id][] {
+  const out: [Id, Id][] = [];
+  for (const f of walkWindow(c, at)) {
+    for (const p of f.metPairs ?? []) if (!out.some((q) => q[0] === p[0] && q[1] === p[1])) out.push(p);
   }
+  return out;
+}
+
+/**
+ * THE WINDOW `walkDrawable` EVALUATES FROM `at` (#2894 part 2, ADR-AG-481) — the first figure at the requested
+ * configuration, then seeds `seed + 1 … seed + DRAWABLE_TRIES` at reach 1 with the request's `wide`, exactly the
+ * `evalAt` calls of its forward walk. A reader of "the window the search walked" reads these, so on the refusal path
+ * (where the walk found nothing whole and evaluated all of them) every one is a memo hit.
+ */
+function walkWindow(c: Construction, at: Seed): Figure[] {
+  const { seed, reach, wide } = configurationOf(at);
+  const out: Figure[] = [evaluate(c, seed, reach, wide)];
+  for (let s = seed + 1; s <= seed + DRAWABLE_TRIES; s += 1) out.push(evaluate(c, s, 1, wide));
   return out;
 }
 
