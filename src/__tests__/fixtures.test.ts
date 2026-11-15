@@ -27,7 +27,8 @@
 import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { deserializeFigure } from '@/store/figureFile';
 import { replay, groupKey } from '@/store/geoStore';
-import { findValidConfig, meetsRequirements } from '@/replay/core';
+import { meetsRequirements } from '@/replay/core';
+import { findValidConfigInRounds } from './searchRounds';
 import type { Fact } from '@/store/geoStore';
 import { parse, buildParseCtx } from '@/parser';
 import type { AnyCommand } from '@/engine';
@@ -101,7 +102,8 @@ describe('figure-file fixtures net', () => {
       if (!r.ok) return;
       const { facts: savedFacts, seed: savedSeed } = r.file;
       // ADR-537: the load rescue (ADR-446), for the fixtures that name themselves above — and only those.
-      const rescued = FIXTURE_LOAD_RESCUED.has(name) ? findValidConfig(savedFacts) : null;
+      // #2893 (ADR-831): the rescue as the student reaches it — the search continued with «המשיכו לחפש» until it decides
+      const rescued = FIXTURE_LOAD_RESCUED.has(name) ? findValidConfigInRounds(savedFacts).value : null;
       if (FIXTURE_LOAD_RESCUED.has(name)) {
         it('the load rescue reseats a figure whose default configuration is refused (ADR-537 on ADR-446)', () => {
           // the app's own trigger (resolveView): the saved configuration fails its requirements

@@ -12,7 +12,8 @@ import { drivenSolveStats, evaluate } from '../evaluate';
 import { applySeed } from '../sample';
 import { withExecutedCap, work } from '../solveBudget';
 import { factsOf } from '../../__tests__/scenario-pipeline';
-import { findValidConfig, replay } from '@/replay/core';
+import { replay } from '@/replay/core';
+import { findValidConfigInRounds } from '../../__tests__/searchRounds';
 import { dist, footOnLine } from '../geometry';
 import type { Command } from '../types';
 
@@ -152,7 +153,8 @@ describe('the LM rescue rung (#2797, ADR-816)', () => {
     const ring = ['A', 'B', 'C', 'D', 'E', 'F'];
     for (const facts of [factsOf(lines), factsOf([...lines, 'FA = 4'])]) {
       for (let seed = 0; seed < 8; seed++) {
-        const found = findValidConfig(facts, seed);
+        // #2893 (ADR-831): continued with «המשיכו לחפש» until it decides (this search runs past one round's limit)
+        const found = findValidConfigInRounds(facts, seed).value;
         if (!found) continue;
         const pts = ring.map((id) => replay(found.facts, found.seed).positions.get(id)!);
         let area = 0;

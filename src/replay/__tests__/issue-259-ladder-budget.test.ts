@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { replay } from '@/replay/core';
 import { factsOf } from '@/__tests__/scenario-pipeline';
 import { solveBudget, withLadderSpent } from '@/engine';
-import { withWorkBudget } from '@/engine/solveBudget';
+import { withWorkBudget, work } from '@/engine/solveBudget';
 import { nelderMead } from '@/engine/evaluate';
 
 /**
@@ -50,17 +50,17 @@ describe('#259 — the budget reaches inside the joint solve', () => {
   it('a 3s budget BINDS the #207 ladder, and the refusal is unchanged', () => {
     const facts = factsOf(FIGURE_207);
     const before = solveBudget.aborts;
-    const t0 = Date.now();
+    const w0 = work.done;
     // #2893 (ADR-831): a budget in work units (it was a 3 s clock). This figure's units are slow (heavy joint solves: about
     // 50 k a second), and a budget much under 1 M cuts the fold before the statement the refusal names: 1 M it is.
     const d = withWorkBudget(1_000_000, () => replay(facts, 0));
-    const elapsed = Date.now() - t0;
+    const spent = work.done - w0;
 
     // The mechanism: the consult fired INSIDE a solve. Machine-independent, so this is the real lock.
     expect(solveBudget.aborts, 'the budget was consulted inside the joint solve').toBeGreaterThan(before);
-    // The effect. Measured at 3.09s on the dev machine against 31.9s unbudgeted; the ceiling is loose so
-    // a slow CI box cannot flake, and is still far below the ~32s this figure costs unbudgeted.
-    expect(elapsed, `the ladder honoured the deadline (took ${elapsed}ms)`).toBeLessThan(30_000); // #2893: 1 M units took 20.5 s under the suite (the 3 s clock: 3.09 s solo)
+    // The effect, in the budget's own unit (#2893, ADR-831: a work budget is the same on every machine, so its bound is
+    // asserted in units, not seconds; the 3 s clock measured 3.09 s solo against 31.9 s unbudgeted).
+    expect(spent, `the ladder honoured the budget (spent ${spent} units)`).toBeLessThan(1_500_000);
     // Only the TIME moved. The figure still refuses, and names the same statement.
     expect(d.lastError).toBe(REFUSAL);
   }, 120_000);
