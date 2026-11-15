@@ -22,7 +22,8 @@ import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { componentOf, minimalComponentOf } from './components';
 import { reachImpossibility } from './reachFeasibility';
-import { metricClosureImpossibility } from './metricClosure';
+import { explainLengthConflict, metricClosureImpossibility, type LengthConflict } from './metricClosure';
+import { exactFormOf, formatExactText, formatMeasure } from '../format';
 import {
   angleSumImpossibility,
   angleSumImpossibilityError,
@@ -833,6 +834,17 @@ function provenUnreachable(prev: Construction, next: Construction): boolean {
   return metricClosureImpossibility(next) !== null && metricClosureImpossibility(prev) === null;
 }
 
+/** #2894 (ADR-835): a length as the student reads it — exact when it is one (3√2, 5/2), else two decimals. */
+const lengthText = (x: number): string => {
+  const ex = exactFormOf(x);
+  return ex && !ex.pi ? formatExactText(ex) : formatMeasure(x);
+};
+/** #2894 (ADR-835): the closure's reason as the error bank's variant. */
+function lengthsError(w: LengthConflict): Parameters<typeof engineErrorDebugText>[0] {
+  if (w.kind === 'value') return { code: 'lengths-value', seg: w.seg.join(''), forced: lengthText(w.forced), stated: lengthText(w.stated) };
+  return { code: 'lengths-triangle', tri: w.tri.join(''), long: w.long.join(''), longLen: lengthText(w.longLen), a: w.a.join(''), b: w.b.join(''), sum: lengthText(w.sum) };
+}
+
 function runFailureLadder(
   prev: Construction,
   next: Construction,
@@ -849,7 +861,12 @@ function runFailureLadder(
   // one, word for word. A figure in which a rung's evaluate could meet a tangent crossing is left to the climb (that
   // rung's tangent refusal would be the reason instead).
   if (!primary.ok && provenUnreachable(prev, next)) {
-    return { ok: false, error: blameNewStatement(primary.error, addedConstraints(prev, next), primary.violated), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:proven`, `${prefix}:refuse`] };
+    // #2894 (ADR-835, operator ruling 2026-11-15 «The clearer reason everywhere»): the refusal says WHICH lengths and why,
+    // in 3-D's sentence; the fold's drop-one search still names the statement it contradicts. No reading → the plain one.
+    const added = addedConstraints(prev, next);
+    const why = explainLengthConflict(next, added);
+    const error = why ? engineErrorDebugText(lengthsError(why)) : blameNewStatement(primary.error, added, primary.violated);
+    return { ok: false, error, construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:proven`, `${prefix}:refuse`] };
   }
   // THE PRESERVATION GATE (issue #258, [ADR-402](../../docs/06-decisions.md#adr-402)) — a rescue stage
   // may not LOSE an obligation `next` carried. The rescue stages bake, replace, and re-point carriers,

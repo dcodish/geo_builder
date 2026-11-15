@@ -290,6 +290,9 @@ export const WORDINGS = {
   restatedSize: { key: 'errors.restatedSize', saysSubject: true, namesOther: true, circleParams: ['circle'] },
   // evaluate.ts — `over-constrained: |AC| = 9 cannot hold`, with the fold's optional `[vs #i]` (#943 half B)
   overConstrained: { key: 'errors.overConstrained', saysSubject: true, namesOther: true, withoutReason: 'overConstrainedBare' },
+  // #2894 (ADR-835): the metric closure's reason — 3-D's `lengths-impossible` sentences (ADR-3D-495), one wording across builders
+  lengthsValue: { key: 'errors.lengthsImpossibleValue', saysSubject: true, namesOther: true, nextStep: true },
+  lengthsTriangle: { key: 'errors.lengthsImpossibleTriangle', saysSubject: true, namesOther: true, nextStep: true },
   // #2591 (ADR-778): the over-constrained frame with NO reason clause — the ruled `restatedSize_said` / `_said_vs` sentences
   // (2026-10-15), which name only the student's statements. Reached by a bare `over-constrained` (no constraint named) and
   // by an over-constrained reason the provenance check refuses to show; never without the student's sentence.
@@ -407,6 +410,10 @@ export function wordingOf(e: EngineError): Worded | null {
       return one('tangentsExhausted', { key: tangentsExhaustedKey(e.kind, e.position) });
     case 'restated-size':
       return one('restatedSize', { params: { circle: e.circle, value: e.value } });
+    case 'lengths-value':
+      return one('lengthsValue', { params: { seg: e.seg, a: e.forced, b: e.stated } });
+    case 'lengths-triangle':
+      return one('lengthsTriangle', { params: { tri: e.tri, long: e.long, longLen: e.longLen, a: e.a, b: e.b, sum: e.sum } });
     case 'over-constrained':
       return one('overConstrained', { params: { what: e.what } });
     case 'over-constrained-unnamed':

@@ -6837,6 +6837,34 @@ export const SCENARIOS_4: Scenario[] = [
       expect(warm).toEqual(cold);
     },
   },
+  {
+    id: 'lengths-clearer-reason-2894',
+    title: '#2894 (ADR-835): a length the rest of the figure already forces, stated otherwise, is refused with 3-D\'s reason — which segment, and its two lengths — naming the statement it contradicts',
+    guards:
+      'Operator ruling 2026-11-15 on #2894 («The clearer reason everywhere (Recommended)»): a length conflict the metric closure decides is refused in the sentence 3-D gives (ADR-3D-495, its lengths-impossible keys), word for word, replacing 2-D\'s «לא ניתן: … סותר את … הסיבה: |AC| = 10». The fold\'s drop-one search still names the earlier statement. Measured on the combined C+E branch through the submit gate. The closure, its explanation and the round trip are src/engine/__tests__/metric-closure.test.ts and engine-error-total.test.ts.',
+    // The refused line never becomes a fact, so each line is driven through the submit gate in `check`.
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const cases: [string[], string, string][] = [
+        [['ריבוע ABCD', 'AB = 3'], 'AC = 10', 'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מלבן ABCD', 'AB = 3', 'BC = 4'], 'AC = 7', 'הנתונים סותרים זה את זה — «AC = 7» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['משולש שווה צלעות ABC', 'AB = 3'], 'BC = 5', 'הנתונים סותרים זה את זה — «BC = 5» לא מתקיים יחד עם «AB = 3»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-5. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מעגל O ברדיוס 2', 'AB קוטר במעגל'], 'AB = 6', 'הנתונים סותרים זה את זה — «AB = 6» לא מתקיים יחד עם «AB קוטר במעגל»: יחד הם נותנים לקטע AB שני אורכים שונים, 4 ו-6. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מרובע ABCD', 'AB = 3', 'BC = 4'], 'ABCD ריבוע', 'הנתונים סותרים זה את זה — «ABCD ריבוע» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.'],
+      ];
+      for (const [prior, line, words] of cases) {
+        const facts = factsOf(prior);
+        const v = gateVerdict(facts, line);
+        expect(v.kind === 'refused' && v.reason, `«${line}» after «${prior.join(' · ')}» is refused before it becomes a fact`).toBe('error');
+        const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+        expect(humanizeError(detail, he, line, otherUtteranceForError(facts, detail)).replace(/[\u2066-\u2069]/g, ''), `«${line}»: 3-D's words, naming both statements`).toBe(words);
+      }
+      // the control: the diagonal the square forces still commits
+      expect(gateVerdict(factsOf(['ריבוע ABCD']), 'AC = 10').kind, 'a square with only its diagonal stated commits').toBe('commit');
+    },
+  },
 ];
 /** #2370 / #2444 (ADR-828): the vertex of ABC that carries a right angle ('' = none, two letters never happen in a triangle). */
 function rightAngleSeat(f: ReturnType<typeof replay>): string {

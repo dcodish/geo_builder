@@ -47,6 +47,8 @@ const SAMPLES: { [C in EngineErrorCode]: Extract<EngineError, { code: C }> } = {
   'pair-position-conflict': { code: 'pair-position-conflict', a: 'circle-O', b: 'circle-P', position: 'contained', other: 'ext-tangent' },
   'tangents-exhausted': { code: 'tangents-exhausted', pair: 'AB', kind: 'any', position: 'int-tangent' },
   'restated-size': { code: 'restated-size', circle: 'circle-O', value: '4' },
+  'lengths-value': { code: 'lengths-value', seg: 'AC', forced: '3√2', stated: '10' },
+  'lengths-triangle': { code: 'lengths-triangle', tri: 'OAB', long: 'AB', longLen: '6', a: 'OA', b: 'OB', sum: '4' },
   'over-constrained': { code: 'over-constrained', what: '|AC| = 9' },
   'over-constrained-unnamed': { code: 'over-constrained-unnamed' },
   'not-determined': { code: 'not-determined', who: ['@ctr-O', 'A'], what: '@ctr-OB ⟂ AB' },

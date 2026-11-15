@@ -1,0 +1,123 @@
+{
+  "name": "feat-2894-c2-2d",
+  "title": "#2894 item C, 2-D — a length conflict is refused with the clearer reason, as in 3-D (port 5196)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5196",
+      "path": "/",
+      "title": "A square's diagonal that cannot be: the refusal says which segment and its two lengths",
+      "lines": [
+        "ריבוע ABCD",
+        "AB = 3",
+        "AC = 10"
+      ],
+      "lookFor": "The third line is refused at once: «הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.»",
+      "before": "prod: «לא ניתן: «AC = 10» סותר את «AB = 3» — אי אפשר לקיים את שניהם יחד. הסיבה: |AC| = 10.» after about 1.4 s",
+      "expectRefusal": "לקטע AC שני אורכים שונים, 3√2 ו-10"
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5196",
+      "path": "/",
+      "title": "A rectangle's diagonal: 5 and 7, naming «BC = 4»",
+      "lines": [
+        "מלבן ABCD",
+        "AB = 3",
+        "BC = 4",
+        "AC = 7"
+      ],
+      "lookFor": "«AC = 7» is refused: «… «AC = 7» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7. …»",
+      "before": "prod: the short «לא ניתן … סותר את «BC = 4»» after about 7.5 s",
+      "expectRefusal": "«AC = 7» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7"
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5196",
+      "path": "/",
+      "title": "An equilateral triangle's second side: 3 and 5",
+      "lines": [
+        "משולש שווה צלעות ABC",
+        "AB = 3",
+        "BC = 5"
+      ],
+      "lookFor": "«BC = 5» is refused naming «AB = 3», segment BC, 3 and 5.",
+      "before": "prod: the short sentence",
+      "expectRefusal": "לקטע BC שני אורכים שונים, 3 ו-5"
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5196",
+      "path": "/",
+      "title": "A diameter past 2r: 4 and 6, naming the diameter line",
+      "lines": [
+        "מעגל O ברדיוס 2",
+        "AB קוטר במעגל",
+        "AB = 6"
+      ],
+      "lookFor": "«AB = 6» is refused naming «AB קוטר במעגל», segment AB, 4 and 6.",
+      "before": "prod: the short sentence",
+      "expectRefusal": "לא מתקיים יחד עם «AB קוטר במעגל»: יחד הם נותנים לקטע AB שני אורכים שונים, 4 ו-6"
+    },
+    {
+      "id": "T5",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5196",
+      "path": "/",
+      "title": "A square over two sides already unequal",
+      "lines": [
+        "מרובע ABCD",
+        "AB = 3",
+        "BC = 4",
+        "ABCD ריבוע"
+      ],
+      "lookFor": "«ABCD ריבוע» is refused naming «BC = 4», segment BC, 3 and 4.",
+      "before": "prod: the short sentence after about 8 s",
+      "expectRefusal": "«ABCD ריבוע» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4"
+    },
+    {
+      "id": "T6",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5196",
+      "path": "/",
+      "title": "Control: a refusal the closure does not decide keeps its own sentence",
+      "lines": [
+        "משולש ABC",
+        "AB = 3",
+        "BC = 4",
+        "AC = 10"
+      ],
+      "lookFor": "«AC = 10» is refused with the triangle-inequality sentence it had (the stage-0 prover, unchanged).",
+      "before": "unchanged",
+      "expectRefusal": "AC"
+    },
+    {
+      "id": "T7",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5196",
+      "path": "/",
+      "title": "Control: the diagonal with no side stated still builds",
+      "lines": [
+        "ריבוע ABCD",
+        "AC = 10"
+      ],
+      "lookFor": "Both lines build; no refusal.",
+      "before": "unchanged",
+      "expectAbsent": [
+        "לא ניתן",
+        "סותרים"
+      ]
+    }
+  ]
+}

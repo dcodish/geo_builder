@@ -4355,6 +4355,16 @@
       "reason": "Reverses ADR-3D-047's idempotent re-declare; no precedent.",
       "at": "2026-11-11T10:12:57.683Z",
       "status": "escalated"
+    },
+    {
+      "id": "text-2894-lengths-impossible-base",
+      "kind": "text",
+      "issue": "#2894",
+      "what": "2-D's lengths-impossible refusal when there is no student sentence to quote (a model-built command): the base keys; the _said / _said_vs texts are 3-D's (ADR-3D-495), word for word",
+      "choice": "«הנתונים סותרים זה את זה: הם נותנים לקטע {{seg}} שני אורכים שונים, {{a}} ו-{{b}}. בדקו איזה מהאורכים האלה לא נכון.» and its triangle twin / \"The givens contradict each other: they give the segment {{seg}} two different lengths, {{a}} and {{b}}. Check which of these lengths is wrong.\"",
+      "chosen": true,
+      "at": "2026-11-15T15:26:32.746Z",
+      "status": "pending"
     }
   ],
   "demoted": {

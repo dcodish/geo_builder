@@ -68,6 +68,23 @@ interface Wedge { v: number; p: number; q: number; t1: number; t2: number } // a
  * directive's) and the parameter-free structure of `c.objects`.
  */
 export function metricClosureImpossibility(c: Construction): MetricClosureProof | null {
+  return closeLengths(c).proof;
+}
+
+/** The closure's result: the proof (or null), and each pair's final interval (null for a pair it never read). */
+interface Closed {
+  proof: MetricClosureProof | null;
+  interval: (a: Id, b: Id) => [number, number] | null;
+}
+
+/** The closure itself; `skip` leaves one stated obligation out (the explanation asks what the OTHERS force). */
+function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed {
+  // `exact`: the explanation's reading — the givens' own values with no acceptance margin, so a length the rest FORCES
+  // comes out as one number (3√2, never 4.2426 ± 0.004). Never a proof: only `metricClosureImpossibility`'s margins are.
+  const lenRel = exact ? EXACT_REL : LEN_REL;
+  const lenAbs = exact ? 0 : LEN_ABS;
+  const angleMargin = exact ? 0 : ANGLE_MARGIN;
+  const perpMargin = exact ? 0 : PERP_MARGIN;
   const ptIndex = new Map<Id, number>();
   const pts: Id[] = [];
   const pt = (id: Id): number => {
@@ -103,12 +120,12 @@ export function metricClosureImpossibility(c: Construction): MetricClosureProof 
   const pinned: { i: number; lo: number; hi: number }[] = [];
   const pin = (a: Id, b: Id, value: number, rel: number): void => {
     if (a === b || !Number.isFinite(value) || value < 0) return;
-    const m = Math.max(LEN_ABS, rel * value);
+    const m = Math.max(lenAbs, rel * value);
     pinned.push({ i: pair(a, b), lo: Math.max(0, value - m), hi: value + m });
   };
   const ratio = (a: Id, b: Id, c2: Id, d: Id, k: number, rel: number): void => {
     if (a === b || c2 === d || !(k > 0) || !Number.isFinite(k)) return;
-    ratios.push({ p: pair(a, b), q: pair(c2, d), k1: k * (1 - rel), k2: k * (1 + rel), abs: rel > EXACT_REL ? LEN_ABS : 0 });
+    ratios.push({ p: pair(a, b), q: pair(c2, d), k1: k * (1 - rel), k2: k * (1 + rel), abs: rel > EXACT_REL ? lenAbs : 0 });
   };
   const wedge = (v: Id, p: Id, q: Id, deg: number, margin: number): void => {
     if (v === p || v === q || p === q || !Number.isFinite(deg) || deg <= 0 || deg >= 180) return;
@@ -120,15 +137,17 @@ export function metricClosureImpossibility(c: Construction): MetricClosureProof 
 
   // ── the obligations ──
   const obligations: Constraint[] = [...c.constraints, ...drivenConstraintsOf(c)];
+  const skipKey = skip ? JSON.stringify(skip) : null;
   for (const con of obligations) {
-    if (con.type === 'distance') pin(con.a, con.b, con.value, LEN_REL);
-    else if (con.type === 'equal') ratio(con.a, con.b, con.c, con.d, 1, LEN_REL);
-    else if (con.type === 'ratio' && !con.add) ratio(con.a, con.b, con.c, con.d, con.k, LEN_REL);
-    else if (con.type === 'length-radius' && !con.add) ratio(con.a, con.b, con.center, con.witness, con.k, LEN_REL);
+    if (skipKey !== null && JSON.stringify(con) === skipKey) continue; // every copy (listed and driven) of the one left out
+    if (con.type === 'distance') pin(con.a, con.b, con.value, lenRel);
+    else if (con.type === 'equal') ratio(con.a, con.b, con.c, con.d, 1, lenRel);
+    else if (con.type === 'ratio' && !con.add) ratio(con.a, con.b, con.c, con.d, con.k, lenRel);
+    else if (con.type === 'length-radius' && !con.add) ratio(con.a, con.b, con.center, con.witness, con.k, lenRel);
   }
   for (const con of obligations) {
     if (con.type !== 'angle' && con.type !== 'perpendicular') continue;
-    for (const w of pinnedAngleWedges([con])) wedge(w.v, w.p, w.q, w.deg, con.type === 'perpendicular' ? PERP_MARGIN : ANGLE_MARGIN);
+    for (const w of pinnedAngleWedges([con])) wedge(w.v, w.p, w.q, w.deg, con.type === 'perpendicular' ? perpMargin : angleMargin);
   }
 
   // ── the structure ──
@@ -188,7 +207,14 @@ export function metricClosureImpossibility(c: Construction): MetricClosureProof 
     if (!circ || circ.kind !== 'circle' || o.of === o.id) continue;
     ratio(o.of, o.id, circ.center, o.of, 2, EXACT_REL); // |of → antipode| = 2·|centre → of|
   }
-  if (!lo.length) return null;
+  const interval = (a: Id, b: Id): [number, number] | null => {
+    const i = ptIndex.get(a);
+    const j = ptIndex.get(b);
+    if (i === undefined || j === undefined) return null;
+    const k = pairIndex.get(i < j ? `${i}|${j}` : `${j}|${i}`);
+    return k === undefined ? null : [lo[k]!, hi[k]!];
+  };
+  if (!lo.length) return { proof: null, interval };
 
   // ── the closure ──
   for (const p of pinned) {
@@ -255,10 +281,54 @@ export function metricClosureImpossibility(c: Construction): MetricClosureProof 
         }
     }
     const proof = empty();
-    if (proof) return proof;
+    if (proof) return { proof, interval };
     if (!moved) break;
   }
-  return empty();
+  return { proof: empty(), interval };
+}
+
+/**
+ * #2894 ([ADR-835](../../docs/06-decisions.md#adr-835)) — WHY no figure holds the lengths, in the student's terms: the
+ * shapes of 3-D's `lengths-impossible` (ADR-3D-495), so the two builders say one sentence.
+ *  - `value`: one STATED length, against what the rest of the figure forces on that same segment (one value);
+ *  - `triangle`: a stated length and two lengths the rest forces, against the triangle inequality.
+ * Each stated `distance` is tried in turn (`prefer` first: the refused line's own; then newest first), the closure run without it; null
+ * when no such reading exists (the refusal then keeps its plain over-constraint). Only the student's own point letters
+ * are named: a third point the engine named (`@ctr-…`) is never offered.
+ */
+export type LengthConflict =
+  | { kind: 'value'; seg: [Id, Id]; forced: number; stated: number }
+  | { kind: 'triangle'; tri: [Id, Id, Id]; long: [Id, Id]; longLen: number; a: [Id, Id]; b: [Id, Id]; sum: number };
+const STUDENT_LETTER = /^[A-Z][0-9]*'*$/;
+export function explainLengthConflict(c: Construction, prefer: readonly Constraint[] = []): LengthConflict | null {
+  const obligations: Constraint[] = [...c.constraints, ...drivenConstraintsOf(c)];
+  const stated = obligations.filter((k): k is Extract<Constraint, { type: 'distance' }> => k.type === 'distance' && !k.derived && Number.isFinite(k.value) && k.value > 0 && k.a !== k.b && STUDENT_LETTER.test(k.a) && STUDENT_LETTER.test(k.b));
+  const key = (k: Constraint) => JSON.stringify(k);
+  const preferred = new Set(prefer.map(key));
+  // the refused line's own lengths first, then the newest: the statement the fold's drop-one search names is the latest
+  // that resolves the conflict, so the sentence speaks of ITS segment
+  const order = [...stated.filter((k) => preferred.has(key(k))), ...stated.filter((k) => !preferred.has(key(k))).reverse()];
+  const pts = new Set<Id>();
+  for (const o of c.objects) if (STUDENT_LETTER.test(o.id) && 'kind' in o && (o.kind === 'free-point' || o.kind === 'derived' || o.kind === 'on-circle' || o.kind === 'antipode' || o.kind === 'midpoint' || o.kind === 'perp-offset' || o.kind === 'parallelogram-vertex' || o.kind === 'on-segment' || o.kind === 'on-segment-solved')) pts.add(o.id);
+  const fixed = (iv: [number, number] | null): number | null => (iv && Number.isFinite(iv[1]) && iv[1] - iv[0] <= 1e-6 * Math.max(1, iv[1]) ? (iv[0] + iv[1]) / 2 : null);
+  const apart = (x: number, y: number) => Math.abs(x - y) > 4 * LEN_REL * Math.max(1, x, y);
+  for (const k of order) {
+    const rest = closeLengths(c, k, true);
+    if (rest.proof) continue; // the others contradict each other already: this length is not the one at fault
+    const forced = fixed(rest.interval(k.a, k.b));
+    if (forced !== null && apart(forced, k.value)) return { kind: 'value', seg: [k.a, k.b], forced, stated: k.value };
+    for (const p of pts) {
+      if (p === k.a || p === k.b) continue;
+      const pa = fixed(rest.interval(p, k.a));
+      const pb = fixed(rest.interval(p, k.b));
+      if (pa === null || pb === null) continue;
+      const tri: [Id, Id, Id] = [p, k.a, k.b];
+      if (k.value > pa + pb && apart(k.value, pa + pb)) return { kind: 'triangle', tri, long: [k.a, k.b], longLen: k.value, a: [p, k.a], b: [p, k.b], sum: pa + pb };
+      if (pa > k.value + pb && apart(pa, k.value + pb)) return { kind: 'triangle', tri, long: [p, k.a], longLen: pa, a: [k.a, k.b], b: [p, k.b], sum: k.value + pb };
+      if (pb > k.value + pa && apart(pb, k.value + pa)) return { kind: 'triangle', tri, long: [p, k.b], longLen: pb, a: [k.a, k.b], b: [p, k.a], sum: k.value + pa };
+    }
+  }
+  return null;
 }
 
 /** min over x ∈ [xl, xh], y ∈ [yl, yh] of x² + y² − 2·c·x·y (convex: on the box's edges; no infinite edge). */
