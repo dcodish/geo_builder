@@ -5,7 +5,7 @@
  * src/ — docs/20 §12 rule 1).
  */
 
-import type { Seed3 } from './engine/components3';
+import { sameSeed3, type Seed3 } from './engine/components3';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
@@ -22,6 +22,7 @@ import { Workbench } from '../shell/frame/Workbench';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { ToolButton } from '../shell/frame/ToolButton';
+import { NotDecidedNote } from '../shell/frame/NotDecidedNote';
 // #1376: the row's ORDER is a shared contract — a product supplies actions by id, never by position.
 import { orderToolActions } from '../shell/frame/toolRow';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's own buttons.
@@ -160,6 +161,8 @@ export default function App3() {
   const lastError = useGeo3((s) => s.lastError);
   const lastNotice = useGeo3((s) => s.lastNotice); // #613 — the statement succeeded and added nothing
   const lastCreated = useGeo3((s) => s.lastCreated); // #1467 (ADR-3D-382): the points the last line created by reference
+  /** #2893 (ADR-3D-494): the last action's search reached its work limit — shown while the store holds the figure it was made on */
+  const lastNotDecided = useGeo3((s) => (s.lastNotDecided && s.lastNotDecided.facts === s.facts && sameSeed3(s.lastNotDecided.seed, s.seed) ? s.lastNotDecided : null));
   const queries = useGeo3((s) => s.queries);
   const addQuery = useGeo3((s) => s.addQuery);
   const removeQuery = useGeo3((s) => s.removeQuery);
@@ -671,6 +674,11 @@ export default function App3() {
     }
     jobStore3().dispatchVerdict(v);
     line.after();
+    // #2893 (ADR-3D-494, ruling 3): a line whose search reached its limit stays in the box and is not added
+    if (useGeo3.getState().lastNotDecided) {
+      logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: 'not-decided' });
+      return 'kept';
+    }
     let err = useGeo3.getState().lastError;
     // #2062 (ADR-3D-480): the exam's membership question points at a panel row — open the panel and highlight it
     if (err?.code === 'answer-in-panel') {
@@ -695,6 +703,24 @@ export default function App3() {
     if (err) return 'kept';
     setGuidanceNote(null);
     return 'consumed';
+  };
+
+  /** #2893 (ADR-3D-494, ruling 2): «המשיכו לחפש» — one more round of the same size, from where the search stopped. */
+  const continueSearch = () => {
+    const nd = lastNotDecided;
+    if (!nd) return;
+    const { facts: _f, seed: _s, ...ask } = nd;
+    logDebug3({ kind: 'action', action: 'continue-search', detail: ask.action });
+    void work3.runIfIdle(
+      async () => {
+        const rows = useGeo3.getState().facts;
+        await offPageAction3('continueSearch', [ask], () => jobStore3().continueSearch(ask));
+        const st = useGeo3.getState();
+        // the line was added: it leaves the box, as a line that is taken does
+        if (ask.action === 'submit' && st.facts !== rows && !st.lastNotDecided && !st.lastError && text.trim() === ask.utterance) setText('');
+      },
+      ask.action === 'press' ? { lane: ANOTHER } : undefined,
+    );
   };
 
   const statusDot = (st: FactStatus3 | undefined) => {
@@ -853,7 +879,12 @@ export default function App3() {
               cannot disagree. */}
           <InputArea
             value={text}
-            onChange={setText}
+            onChange={(next) => {
+              setText(next);
+              // #2893 (ruling 3, 2026-11-14): typing something else dismisses the question about the stopped line
+              const nd = useGeo3.getState().lastNotDecided;
+              if (nd?.action === 'submit' && next.trim() !== nd.utterance) useGeo3.setState({ lastNotDecided: null });
+            }}
             onSubmit={() => void submitText()}
             placeholder={t('input.placeholder')}
             submitLabel={t('input.add')}
@@ -987,6 +1018,15 @@ export default function App3() {
             <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {errorText3(t, lastError)}
             </div>
+          )}
+          {/* #2893 (ADR-3D-494; operator 2026-11-14, #2893 q1–q3): a search that reached its work limit, where a refusal shows */}
+          {lastNotDecided && !lastError && !asking && (
+            <NotDecidedNote
+              message={t('suite.notDecided.message')}
+              continueLabel={t('suite.notDecided.continue')}
+              onContinue={continueSearch}
+              busy={working || resampling}
+            />
           )}
 
           {/* The examples dropdown retired (B4 completed, operator's parity catch 2026-08-18):
