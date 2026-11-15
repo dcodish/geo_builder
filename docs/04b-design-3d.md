@@ -948,6 +948,16 @@ every saved question), and answer with their journal. The page (`app/offPage3.ts
 - `derive3` hands the fold the fact list's REPRESENTATIVE (`factLists3`), so a memo below it keyed by the array (the
   narrowing notes) is keyed by content: a worker is handed every list as a clone.
 
+**Stated lengths the metric forbids are read off the pins (#2894, [ADR-3D-495](06b-decisions-3d.md#adr-3d-495)).**
+`metricConflict3` (`engine/metricBounds3.ts`) reads the `length` and `length-rel` pins as a weighted union–find over
+segments: every segment whose length the pins fix, with the pins that fix it. Two metric facts are checked: one length per
+segment, and the triangle inequality on every three points whose sides are all fixed. A conflict counts only beyond
+`CONFLICT_MARGIN` (1e-3, relative and absolute), far outside the slack the pivot's acceptance (1e-10 squared) leaves
+its rows, so the pin set is one no start could meet. `solvePivot` returns an empty pool for it before its first start
+(a probe call excepted); every caller already reads the empty pool as "no placement". The store's no-placement refusal
+asks the same function and, when the conflict involves the blamed row, words it as `lengths-impossible` with the
+reason, naming the rows that added the pins taking part (`pinRow`, recorded where each row's pins are added).
+
 **The configuration search is bounded in work (#2893, [ADR-3D-494](06b-decisions-3d.md#adr-3d-494); ADR-W-210 invariant 3).**
 `searchSeed3` (`engine/evaluate.ts`) walks the search's window, `SEARCH_SEEDS3` = 200 seeds from its start, until one
 meets the requirements, under `withWorkLimit` (`shell/workLimit`) of `SEED_SEARCH_LIMIT3` units, checked before each

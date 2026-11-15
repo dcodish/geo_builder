@@ -20,6 +20,7 @@ import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3, detachedPinLetters3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { congruentShapes3 } from './configs3';
+import { metricConflict3 } from './metricBounds3';
 import { evalAffine, openPinSymsOf, pinSymAnchor3, pinSymsOf, scalarPinOrigin3, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
 import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
@@ -1158,6 +1159,8 @@ export function solvePivot(
     figPlanePerps.length === 0 && gaugeLineRels.length === 0
   )
     return [];
+  // #2894 part 2 C (ADR-3D-495): stated lengths the metric forbids — no start can meet them, so none is paid
+  if (!probe && metricConflict3(c)) return [];
 
   // V8-c: a symbol coupled to a solid dim (`DF = t·… ⟂ plane` where the plane's height
   // is a free dim) becomes an EXTRA pivot unknown, appended after the dims; its ⟂/∥

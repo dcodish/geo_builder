@@ -1054,6 +1054,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   The limit is counted in work, not seconds, so it is the same on every machine and the same input always stops at the
   same place. A range no angle can be in (below 0° or above 180°) is refused at once, with the same sentence.
   - Sources: ADR-3D-494; ADR-W-210 invariant 3; #2893.
+- **FR-SP-35 (Must)** — **Stated lengths no figure can have are refused at once, saying why** (#2894; operator ruling
+  3, 2026-11-15, *"A clearer reason (Recommended)"*). When the stated lengths, together with the relations between
+  lengths the student stated or the shape implies (a square's equal sides), give one segment two different lengths, or
+  break the triangle inequality for three points (|AC| > |AB| + |BC|), the line is refused immediately, with no search.
+  The refusal names the line, exactly the earlier lines whose lengths take part, and the reason: «…יחד הם קובעים |AC| =
+  10 ו-|AB| + |BC| = 6, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|.», or «…יחד הם נותנים לקטע BC שני
+  אורכים שונים, 3 ו-4.», each followed by «בדקו איזה מהאורכים האלה לא נכון.» A case at the edge (the three points collinear, |AC| = |AB| + |BC|) is judged by the solver as
+  before.
+  - Sources: ADR-3D-495; #2894.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

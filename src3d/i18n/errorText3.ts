@@ -261,6 +261,12 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       });
     case 'angle-coef-conflict': // reported as `givens-contradict` by derive3; never reaches the student raw
       return t('err.givensContradictAlone', { stated: `∠${err.was.p}${err.was.vertex}${err.was.q}` });
+    // #2894 part 2 C (ADR-3D-495): the stated lengths break the metric — which lengths, and why
+    case 'lengths-impossible':
+      {
+      const { kind, ...why } = err.why; // the kind picks the sentence; only the student's letters and numbers are interpolated
+      return t(`err.lengthsImpossible.${kind}${err.others.length > 0 ? '' : 'Alone'}`, { stated: err.stated, others: quoteList(err.others), ...why });
+    }
     case 'givens-contradict':
       return err.others.length > 0
         ? t('err.givensContradict', { stated: err.stated, others: quoteList(err.others) })

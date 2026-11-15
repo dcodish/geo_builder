@@ -414,6 +414,21 @@
         "שטח המשולש ABC הוא 12"
       ],
       "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2894-c-3d",
+      "id": "T3",
+      "kind": "3d:assertion",
+      "queued": "2026-11-15",
+      "product": "3d",
+      "base": "http://localhost:5192",
+      "path": "/3d.html",
+      "lines": [
+        "ריבוע ABCD",
+        "|AB| = 3",
+        "|BC| = 4"
+      ],
+      "lookFor": "«…«|BC| = 4» לא מתקיים יחד עם «ריבוע ABCD», «|AB| = 3»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.»"
     }
   ],
   "results": [

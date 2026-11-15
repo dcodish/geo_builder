@@ -65,6 +65,13 @@ const ERRORS3: Record<Code3, Payload[]> = {
   'power-needs-solid': [{ id: 'P' }],
   'injection-unsatisfiable': [{}],
   'givens-contradict': [{ stated: 'AB = 3', others }, { stated: 'AB = 3', others: [] }],
+  // #2894 part 2 C (ADR-3D-495): both reasons, with and without other rows
+  'lengths-impossible': [
+    { stated: '|AC| = 9', others: ['|AB| = 5', '|BC| = 3'], why: { kind: 'triangle', tri: 'ABC', long: 'AC', longLen: '9', a: 'AB', b: 'BC', sum: '8' } },
+    { stated: '|AC| = 9', others: [], why: { kind: 'triangle', tri: 'ABC', long: 'AC', longLen: '9', a: 'AB', b: 'BC', sum: '8' } },
+    { stated: '|BC| = 4', others: ['ריבוע ABCD', '|AB| = 3'], why: { kind: 'value', seg: 'BC', a: '3', b: '4' } },
+    { stated: '|BC| = 4', others: [], why: { kind: 'value', seg: 'BC', a: '3', b: '4' } },
+  ],
   'polygon-collapsed': [
     { stated: 'AB = 3', others, sides: 4, ring: 'ABCD' },
     { stated: 'AB = 3', others: [], sides: 4, ring: 'ABCD' },

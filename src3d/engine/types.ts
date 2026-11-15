@@ -2334,6 +2334,15 @@ export type EngineError3 =
   // #425: the same "no placement" finding on a figure whose pins are not coordinates (angles, equal
   // sides, plane equations) — the givens contradict each other, and the message names which.
   | { code: 'givens-contradict'; stated: string; others: string[] }
+  // #2894 part 2 C (ADR-3D-495): the same finding read off the stated lengths in closed form (`metricConflict3`), saying
+  // why: one segment given two lengths (`value`: a, b), or three points against the triangle inequality (`triangle`).
+  // Numbers are display strings (`cleanNum`); `others` are exactly the rows whose lengths take part.
+  | {
+      code: 'lengths-impossible';
+      stated: string;
+      others: string[];
+      why: { kind: 'value'; seg: string; a: string; b: string } | { kind: 'triangle'; tri: string; long: string; longLen: string; a: string; b: string; sum: string };
+    }
   // #1815 (ADR-3D-309): the same finding when the only figures satisfying the givens FLATTEN a declared
   // polygon — named by the statements and the polygon (noun by its vertex count, and its letters), both
   // on the student's figure. #1849 (ADR-3D-310): every such collapse is refused; `forced` says the

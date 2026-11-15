@@ -143,6 +143,12 @@
     },
     "givensContradict": "The givens contradict each other — no figure satisfies «{{stated}}» together with {{others}}",
     "givensContradictAlone": "The givens contradict each other — no figure satisfies «{{stated}}» together with the rest of the givens",
+    "lengthsImpossible": {
+      "value": "The givens contradict each other — «{{stated}}» cannot hold together with {{others}}: together they give the segment {{seg}} two different lengths, {{a}} and {{b}}. Check which of these lengths is wrong.",
+      "valueAlone": "The givens in «{{stated}}» contradict each other: they give the segment {{seg}} two different lengths, {{a}} and {{b}}. Check which of these lengths is wrong.",
+      "triangle": "The givens contradict each other — «{{stated}}» cannot hold together with {{others}}: together they make |{{long}}| = {{longLen}} and |{{a}}| + |{{b}}| = {{sum}}, but by the triangle inequality in {{tri}}, always |{{long}}| ≤ |{{a}}| + |{{b}}|. Check which of these lengths is wrong.",
+      "triangleAlone": "The givens in «{{stated}}» contradict each other: they make |{{long}}| = {{longLen}} and |{{a}}| + |{{b}}| = {{sum}}, but by the triangle inequality in {{tri}}, always |{{long}}| ≤ |{{a}}| + |{{b}}|. Check which of these lengths is wrong."
+    },
     "ringNotFlat": "A {{kind}} is a flat shape, and the vertices {{vertices}} do not lie in one plane — so «{{stated}}» cannot hold together with {{others}}.",
     "polygonCollapsed": "Can't do that: «{{stated}}» contradicts {{others}} — they can't both hold: only a flat {{shape}} (all its vertices on one line) satisfies both.",
     "polygonCollapsedAlone": "Can't do that: only a flat {{shape}} (all its vertices on one line) satisfies «{{stated}}».",

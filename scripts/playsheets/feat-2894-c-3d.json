@@ -1,0 +1,70 @@
+{
+  "name": "feat-2894-c-3d",
+  "title": "#2894 part 2 C — 3-D: stated lengths no figure can have are refused at once, saying why (PR, port 5192)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5192",
+      "path": "/3d.html",
+      "title": "3-D: a square's diagonal longer than two sides is refused at once, with the triangle inequality as the reason",
+      "lines": ["ריבוע ABCD", "|AB| = 3", "|AC| = 10"],
+      "lookFor": "At once (no wait): «הנתונים סותרים זה את זה — «|AC| = 10» לא מתקיים יחד עם «ריבוע ABCD», «|AB| = 3»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 6, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.» Two rows stay; the drawing does not change.",
+      "before": "prod refuses after about half a second with «הנתונים סותרים זה את זה — אין גוף שמקיים את «|AC| = 10» יחד עם «ריבוע ABCD», «|AB| = 3»».",
+      "expectRefusal": "לפי אי־שוויון המשולש ABC",
+      "expectRows": ["ריבוע ABCD", "|AB| = 3"]
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5192",
+      "path": "/3d.html",
+      "title": "3-D: three stated sides of a triangle that break the triangle inequality are refused at once, naming the two other sides",
+      "lines": ["משולש ABC", "|AB| = 5", "|BC| = 3", "|AC| = 9"],
+      "lookFor": "«…«|AC| = 9» לא מתקיים יחד עם «|AB| = 5», «|BC| = 3»: יחד הם קובעים |AC| = 9 ו-|AB| + |BC| = 8, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.» Three rows stay.",
+      "before": "prod refuses after about 0.8 s with «הנתונים סותרים זה את זה — אין גוף שמקיים את «|AC| = 9» יחד עם «|AB| = 5», «|BC| = 3»».",
+      "expectRefusal": "יחד הם קובעים |AC| = 9 ו-|AB| + |BC| = 8",
+      "expectRows": ["משולש ABC", "|AB| = 5", "|BC| = 3"]
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5192",
+      "path": "/3d.html",
+      "title": "3-D: a square given two different side lengths is refused at once: one segment, two lengths",
+      "lines": ["ריבוע ABCD", "|AB| = 3", "|BC| = 4"],
+      "lookFor": "«…«|BC| = 4» לא מתקיים יחד עם «ריבוע ABCD», «|AB| = 3»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.»",
+      "before": "prod refuses with «הנתונים סותרים זה את זה — אין גוף שמקיים את «|BC| = 4» יחד עם «ריבוע ABCD», «|AB| = 3»».",
+      "expectRefusal": "שני אורכים שונים, 3 ו-4",
+      "expectRows": ["ריבוע ABCD", "|AB| = 3"]
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5192",
+      "path": "/3d.html",
+      "title": "3-D: the edge case (|AC| = |AB| + |BC|) is still judged by the solver: the triangle would be flat",
+      "lines": ["משולש ABC", "|AB| = 5", "|BC| = 3", "|AC| = 8"],
+      "lookFor": "The flat-triangle refusal as today: «…מתקיימים רק אם המשולש ABC שטוח…».",
+      "before": "unchanged.",
+      "expectRefusal": "שטוח",
+      "expectRows": ["משולש ABC", "|AB| = 5", "|BC| = 3"]
+    },
+    {
+      "id": "T5",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5192",
+      "path": "/3d.html",
+      "title": "3-D: a triangle whose stated sides fit builds as before (control)",
+      "lines": ["משולש ABC", "|AB| = 5", "|BC| = 3", "|AC| = 7"],
+      "lookFor": "Four rows, no refusal; the triangle is drawn with its three lengths.",
+      "before": "unchanged.",
+      "expectRows": ["משולש ABC", "|AB| = 5", "|BC| = 3", "|AC| = 7"]
+    }
+  ]
+}
