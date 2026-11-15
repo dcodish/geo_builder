@@ -16262,39 +16262,51 @@ No line's `total` or `prePaint` rises. Two lines' `total` falls (`diagonal-after
 - [ruled] An action pressed while the tool works waits its turn. ADR-W-210 Am. 2, question 1 (*"i go with your recommendations"*, 2026-11-13)
 - [2-D] Save, share, the exports, the language and the guide stay usable while a job runs and act on the figure on screen. Measured in 2-D at `main` @ `f594c42d` during its worker search (a 2-D worker search: save 43 ms, the language 47 ms, the guide 53 ms; the save holds the figure on screen. 3-D on this branch: save 36 ms during a job).
 
-## ADR-3D-494 — The configuration search is bounded in work, and a search that runs out says so: «עדיין לא נמצא פתרון» with «המשיכו לחפש», never a refusal and never an unchecked drawing (#2893)
+## ADR-3D-494 — The configuration search keeps its 200-seed window and is bounded in work: a search the limit cuts short says «עדיין לא נמצא פתרון» with «המשיכו לחפש»; a window walked with no seed is refused as ever (#2893)
 
-**Status:** built · 2026-11-15 · feature (`P2`) · phase 4 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (invariant 3, "bounded and honest") · **Issue:** [#2893](https://github.com/dcodish/geo_builder/issues/2893) · branch `feat/2893-limits-3d` off `main` @ `76301324`, with the shared part merged (`6c2ae928`, `ff25d1cd` on `feat/2893-limits-2d`), a feature PR the operator plays
+**Status:** built · 2026-11-15 · feature (`P2`) · phase 4 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (invariant 3, "bounded and honest") · **Issue:** [#2893](https://github.com/dcodish/geo_builder/issues/2893) · branch `feat/2893-limits-3d`, merged into `feat/2893-phase4` with the shared part, a feature PR the operator plays. Revised the same day to the operator's ruling "1a" (below).
 **Requirements:** [02b](02b-requirements-3d.md) FR-SP-34 (new) · **Design:** [04b](04b-design-3d.md) — "The solver", *The configuration search is bounded in work* · **LADDER stage:** none (no solve stage moves; the search over configurations is above the ladder)
 **Builds on** [ADR-3D-053](#adr-3d-053) (the requirements and their seed search), [ADR-3D-491](#adr-3d-491) (seed verdicts by content), [ADR-3D-493](#adr-3d-493) (the worker), and the shell's `workLimit`, `notDecided` and `NotDecidedNote` (ADR-W-210 phase 4's shared part).
 
 **Measured first (docs/17 §9).**
-- **Clocks.** No wall clock decides a 3-D verdict, a stored fact or a drawing. The three reads of a clock are: `app/offPage3.ts` (the values' 0.3 s display threshold, ADR-3D-493: when the panel's values are drawn, not what they are), `store/narrowing3.ts` (a cost statistic), and `app/triageReplay3.ts` (the log-triage replay's session budget, a dev tool whose run-out is already `unverified`). None changes.
-- **Searches that run out.** One: the configuration search (`firstSatisfyingSeed3`, 200 seeds), reached from four places:
-  - a typed line (`decideCommands3`): `null` became the refusal `bound-unsatisfiable` («אין תצורה של הציור שבה הזווית נמצאת בתחום הזה…»);
-  - an edit (`replaceFact`): the same refusal;
-  - «הציגו תצורה אחרת» (`resample`): `null` drew the next seed anyway (`next ?? base`), a drawing nobody had checked against the stated range;
-  - a load of a figure of several parts (`loadedSeed3`): `null` opened it at its saved configuration.
+- **Clocks.** No wall clock decides a 3-D verdict, a stored fact or a drawing. The three reads of a clock are:
+  - `app/offPage3.ts`: the values' 0.3 s display threshold (ADR-3D-493). It decides when the panel's values are drawn, not what they are.
+  - `store/narrowing3.ts`: a cost statistic.
+  - `app/triageReplay3.ts`: the log-triage replay's session budget, a dev tool whose run-out is already `unverified`.
 
-  200 seeds are a sample, not a proof, so each was a search that ran out reported as one that finished. The other bounded loops are fixed counts that decide nothing as a verdict, and are unchanged: the solver's iterations, the parameter's root scans, the ring reach's 3 × 4 tries, and the narrowing notes' 4 subset trials.
-- **How often.** Over the 176 fixtures' walk and the slow corpus's 14 sequences, the search is asked 160 times and never runs out. Three searches walk the whole 200-seed preference window and fall back: `stated-length-7-9999-2361`'s submit, edit and press. The dearest of them costs 482 891 units (1.2 s).
-- **3-D has no "search that finishes and finds nothing".** Every `bound-unsatisfiable` the store gave came from the 200-seed run-out. Some were provable without a search: the plane-geometry parity row `angle-bound-out-of-range-1712` («זווית ABC גדולה מ-200», which 2-D refuses) was refused only because 200 seeds found nothing. The engine's own `bound-unsatisfiable` (`apply.ts`, a range whose low end is not below its high end) is a proof and stays; the parser already refuses such a range.
+  None changes.
+- **The search, and where it ends.** There is one bounded search over configurations: `firstSatisfyingSeed3`, a window of 200 seeds. It is reached from four places, and each treats a window with no seed in the stated range its own way:
+  - a typed line (`decideCommands3`) refuses it with `bound-unsatisfiable`;
+  - an edit (`replaceFact`) refuses it the same way;
+  - «הציגו תצורה אחרת» (`resample`) draws the next seed anyway;
+  - a load of a figure of several parts (`loadedSeed3`) opens it at its saved configuration.
+
+  Nothing bounded the window's WORK. On a figure the solver places, each seed is a solve: «ריבוע ABCD» · «קטע AS» · «|SA| = 5» · «179 < ∠SAB < 180» froze the page for 113.6 s on `main` before the refusal. The other bounded loops are fixed counts and are unchanged: the solver's iterations, the parameter's root scans, the ring reach's 3 × 4 tries, and the narrowing notes' 4 subset trials.
+- **How often.** Over the 176 fixtures' walk and the slow corpus's 14 sequences, the search is asked 160 times, and none comes near the work limit. Three searches walk the whole window and fall back to a merely valid seed: `stated-length-7-9999-2361`'s submit, edit and press. The dearest of them costs 482 891 units (1.2 s).
+
+**The operator's ruling, 2026-11-15 (#2893):** *"1a"*, *"a fixed try-count is a FINISHED search, like analytic"*. A first build of this ADR, the night before, treated the walked window as a run-out too: «179 < ∠SAB < 180» on a pyramid went from a 0.42 s refusal to a ~10 s round and «עדיין לא נמצא פתרון». The operator ruled against it. The window is the count that defines the search.
 
 **Decision.**
-- **The limit.** `searchSeed3` (`engine/evaluate.ts`) walks seeds under `withWorkLimit(SEED_SEARCH_LIMIT3, …)` and asks `limitReached()` before judging each seed. The hard tier has no seed cap: the limit is the bound. #615's preference window stays 200 seeds. Once a valid seed is met it is an answer, even when the limit comes first.
-- **"Not decided".** Reaching the limit with no seed that meets the requirements is `not-decided` (`shell/notDecided`). It carries `SeedResume3`: the part being walked, the parts already settled, the next seed and the preferences kept. A next round starts there and judges no seed twice.
-- **The count is warmth-independent** (docs/17 §7). The search reads `chargedWork3` (`engine/workLedger3.ts`): the meter's executed units, plus what every memo hit on the per-seed path saved. The seed verdicts, the resolve memo and the ring reach now keep what each answer cost, and the journal carries it. A figure placed in closed form solves nothing (0 units a seed), so every judged seed is charged at least `SEED_FLOOR3`. The same input stops at the same seed cold, warm, after other figures and in another heap.
-- **The store.** Each caller handles the outcome its own way:
+- **The window.** `searchSeed3` (`engine/evaluate.ts`) walks at most `SEARCH_SEEDS3` = 200 seeds. That is the same count as before, and #615's preference window is the same count. A window walked with no seed that meets the requirements is a finished search (`none`), and each caller answers it exactly as on `main`:
+  - a typed line and an edit refuse with today's `bound-unsatisfiable`, word for word;
+  - the press draws the next seed;
+  - a load opens at the saved configuration.
+- **The limit.** The walk runs under `withWorkLimit(SEED_SEARCH_LIMIT3, …)` and asks `limitReached()` before judging each seed. If the limit is reached before the window is walked and no seed meets the requirements, the round is `not-decided` (`shell/notDecided`). It carries `SeedResume3`: the part being walked, the parts already settled, the next seed and the preferences kept. The next round («המשיכו לחפש») goes on through the same window from there and judges no seed twice. If the limit comes after a valid seed was met, that seed is the answer, as at the window's end.
+- **The count is warmth-independent** (docs/17 §7). The search reads `searchWork3`, which is `chargedWork3` (`engine/workLedger3.ts`) plus a per-seed floor:
+  - `chargedWork3` is the meter's executed units, plus what every memo hit on the per-seed path saved. The seed verdicts, the resolve memo and the ring reach keep what each answer cost, and the journal carries it.
+  - A figure placed in closed form solves nothing (0 units a seed), so every judged seed is charged at least `SEED_FLOOR3`.
+
+  The same input stops at the same seed cold, warm, after other figures and in another heap.
+- **The store.** On a round the limit cut short:
   - `decideCommands3` answers the verdict `not-decided`: nothing is added and nothing is refused;
   - `replaceFact` keeps the old statement, and the editor stays open;
-  - `resample` keeps the drawing;
-  - `loadedSeed3` opens at the saved configuration, as before.
+  - `resample` keeps the drawing.
 
-  The first three set `lastNotDecided`. It is transient: never a fact, never in the undo history, never saved. «המשיכו לחפש» is `continueSearch(ask)`: one more round of the same size.
-- **The page.** App3 shows the shell's `NotDecidedNote` (`suite.notDecided.message` / `.continue`) where it shows a refusal, while the store holds the figure the round was made on. A typed line whose round stopped stays in the box and is not added; typing something else dismisses the question. «המשיכו לחפש» is a job. A press's round runs on the press's own lane, so «חושב…» shows where it showed before.
-- **Off the page.** The round runs in the worker. Past the preference window its per-seed answers stay in the worker's heap, because a round may judge a million seeds. The journal carries the round's OUTCOME (`searches`) instead, plus the answers of the seed it lands on. The page's run of the same action takes that outcome (`handedSearches3`, held until the next journal). It is that round's result, not a memo of verdicts.
-- **Bounded memos.** A round walks far more seeds than before, so the per-seed memos it fills are bounded: the solid draws and the ring reach at 1 024 entries each, like the seed verdicts (1 024) and the resolves (64) already were. The first calibration run, before these bounds, ran out of memory at 4 GB.
-- **A range no angle can be in is decided without a search.** An angle lies in [0°, 180°], so `apply.ts` refuses a range whose low end is 180° or more, or whose high end is 0° or less, with the same `bound-unsatisfiable` and the same sentence, at once. This keeps 2-D's verdict on «זווית ABC גדולה מ-200», which would otherwise have become a round of «עדיין לא נמצא פתרון» about a range no drawing can ever reach.
+  Each sets `lastNotDecided`. It is transient: never a fact, never in the undo history, never saved. «המשיכו לחפש» is `continueSearch(ask)`.
+- **The page.** App3 shows the shell's `NotDecidedNote` (`suite.notDecided.message` / `.continue`) where it shows a refusal, while the store holds the figure the round was made on. A typed line whose round stopped stays in the box and is not added; typing something else dismisses the question.
+- **Off the page.** The round runs in the worker. The journal carries its outcome (`searches`), which the page's run of the same action takes once (`handedSearches3`). That outcome is the round's result, not a memo of verdicts.
+- **A range no angle can be in is decided without a search.** An angle lies in [0°, 180°]. So `apply.ts` refuses, at once, a range whose low end is 180° or more or whose high end is 0° or less, with the same `bound-unsatisfiable` and the same sentence. This holds 2-D's verdict on the parity row «זווית ABC גדולה מ-200» on every figure, however dear its seeds.
+- **Bounded memos.** The per-seed memos are bounded: the solid draws and the ring reach at 1 024 entries each, like the seed verdicts (1 024) and the resolves (64) already were.
 - **The letter popover** (`ff25d1cd`) is not wired. 3-D's rename and swap re-letter the rows and keep the configuration, so they run no search and cannot reach a limit.
 
 **Calibration (dev PC, 2026-11-14 to 11-15, with other sessions' suites running).**
@@ -16306,39 +16318,42 @@ No line's `total` or `prePaint` rises. Two lines' `total` falls (`diagonal-after
 | vitest: pyramid / cube / tetrahedron + an out-of-reach angle, 2 000 seeds each | 0.010–0.017 ms, 0 units | — |
 | the fixture walk's dearest search (`stated-length-7-9999-2361`) | 6.1 ms, 2 414 | 390 000 |
 
-`SEED_SEARCH_LIMIT3` = **2 500 000** charged units: 7.8 s at the prism's rate, 14.7 s at the loaded square's rate.
+`SEED_SEARCH_LIMIT3` = **2 500 000** charged units: 7.8 s at the prism's rate, 14.7 s at the loaded square's. `SEED_FLOOR3` = **2** units a seed. With the window, a closed-form figure walks its 200 seeds in well under the limit, and only a figure whose seeds are solves can reach it.
 
-`SEED_FLOOR3` = **2** units a seed, so a closed-form round judges about 1.25 M seeds. With a floor of 4, one browser round on the pyramid (closed form) took 5.0 s; halving the floor doubles the seeds, to about 10 s.
-
-**Measured in a browser** (`scripts/lib/browser-harness.mjs`; this branch at :5188 against `main` at :5173):
+**Measured in a browser** (`scripts/lib/browser-harness.mjs`; this branch at :5188 against `main` at :5173, with the ruling applied):
 
 | sequence | `main` | this branch |
 | --- | --- | --- |
-| «פירמידה ABCDS שבסיסה ריבוע» · «179 < ∠SAB < 180» (closed form) | refused in 0.42 s | «עדיין לא נמצא פתרון…» at 10.8 s, the line still in the box, one row; «המשיכו לחפש»: 10.6 s, the same sentence |
-| «ריבוע ABCD» · «קטע AS» · «|SA| = 5» · «179 < ∠SAB < 180» (solver work) | refused after **113.6 s** of search | the sentence at 11.4 s |
-| «פירמידה ABCDS שבסיסה ריבוע» · «30 < ∠SAB < 85» (a search that finds a seed) | added in 0.42 s | added in 0.42 s |
+| «פירמידה ABCDS שבסיסה ריבוע» · «179 < ∠SAB < 180» (closed form: the window walked at once) | refused in 0.42 s | refused in 0.42 s, the same sentence |
+| «ריבוע ABCD» · «קטע AS» · «|SA| = 5» · «179 < ∠SAB < 180» (each seed a solve) | page frozen **113.6 s**, then refused | «עדיין לא נמצא פתרון…» at 10.8 s, the line still in the box, three rows; «המשיכו לחפש»: 8.9 s, the same sentence |
+| «פירמידה ABCDS שבסיסה ריבוע» · «30 < ∠SAB < 85» (a search that finds a seed) | added in 0.42 s | added in 0.42 s (measured before the ruling; the found path is unchanged by it) |
 
-A range on a closed-form figure that no drawing reaches was refused at once and now takes a round, about 10 s, before the sentence: that is the ruling (the search has a limit and says when it reaches it), and the Heads-up names it.
-
-**The gates.** The work meter counts executed units, and every search on the fixtures and the slow corpus ends as it did: each finds its seed within the preference window, and none runs out. `npm run work:check -- 3d` passes plain, with `--order reverse`, with `--order shuffle:11` (178 tests each) and with `--slow` (15). The re-record (`npm run work:record -- 3d`, then `--slow`) leaves both baselines byte for byte as they were: no line rises and none falls.
+**The gates.** The work meter counts executed units. Every search on the fixtures and the slow corpus ends as it did on `main`: each finds its seed within the window, and none comes near the limit. `npm run work:check -- 3d` passes plain, with `--order reverse` and with `--order shuffle:11` (178 tests each), and with `--slow` (15). Nothing moved, so nothing was re-recorded.
 
 **Tests.** `src3d/__tests__/seed-search-limit-2893.test.ts` (new) locks:
-- a round that reaches its limit is not decided, and says where it stopped;
+- a window walked with no seed is `none` (finished), whatever the limit;
+- a round the limit cuts short is not decided, and says where it stopped;
 - the same stop cold, warm and after another figure, on a closed-form figure and on one the solver places;
 - «המשיכו לחפש» judges no seed twice;
-- in the store: a typed line is not added, not refused and not in the history; the same line typed again is searched again, never served as a verdict; a second round goes on from the first; an edit keeps the old statement; the press keeps the drawing;
+- in the store:
+  - the pyramid's out-of-reach range is refused as ever;
+  - on the square figure, a typed line is not added, not refused and not in the history;
+  - the same line again is searched again, never served as a verdict;
+  - a next round goes on through the window;
+  - an edit keeps the old statement, and the press keeps the drawing;
 - off the page: on a round that stops, the page solves nothing and shows the worker's stop.
 
 Changed tests:
-- `src3d/__tests__/angle-measures.test.ts`, *an UNREACHABLE bound*: the refusal became "not decided", per the ruling.
-- `src3d/__tests__/refusal-batch1-1995.test.ts`, *angle bound unsatisfiable*: the refusal's sentence is checked on «∠SAB > 200» (decided without a search) instead of «179 < ∠SAB < 180» (now not decided).
-- `geo-input-parity.test.ts` and `sibling-phrasings.test.ts` read the new verdict as `asks`.
+- `src3d/__tests__/refusal-batch1-1995.test.ts` also checks the sentence on «∠SAB > 200» (decided without a search).
+- `geo-input-parity.test.ts` and `sibling-phrasings.test.ts` read the not-decided verdict as `asks`.
 - `app/triageReplay3.ts` reads it as `unverified`.
+- `angle-measures.test.ts` is as on `main`.
 
-**Regression scenarios (rule 4).** No line of the slow corpus reaches the limit (measured above), so none became a scenario. The operator's T1 sequence is locked by the store cases above.
+**Regression scenarios (rule 4).** No line of the slow corpus reaches the limit (measured above), so none became a scenario. The square figure's sequence is locked by the store cases above.
 
 ## What the student will see
-- [ruled] When the search for a configuration that meets a stated range reaches its limit (about 10 s of work) without finding one, the tool says «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with a button «המשיכו לחפש», instead of refusing the line or drawing a configuration it has not checked. A search that finishes and finds nothing keeps today's refusal. Operator, 2026-11-13: *"we should say honestly that a solution was not found and if we should continue searching"*; wording, 2026-11-14 (#2893, question 1): *"«עדיין לא נמצא פתרון…» (Recommended)"*.
+- [ruled] When the search for a configuration that meets a stated range reaches its limit (about 10 s of work) before it has finished, the tool says «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with a button «המשיכו לחפש». It does not refuse the line, and it does not draw a configuration it has not checked. Operator, 2026-11-13: *"we should say honestly that a solution was not found and if we should continue searching"*. Wording, 2026-11-14 (#2893, question 1): *"«עדיין לא נמצא פתרון…» (Recommended)"*.
+- [ruled] A search that finishes and finds nothing keeps today's refusal word for word: the search's fixed count of seeds, walked, is a finished search. Operator, 2026-11-15 (#2893): *"1a"*, *"a fixed try-count is a FINISHED search, like analytic"*.
 - [ruled] «המשיכו לחפש» searches the same amount again from where it stopped, and asks again if it still finds nothing. 2026-11-14, question 2: *"Another ~10 s round (Recommended)"*.
 - [ruled] A typed line whose search was stopped stays in the box and is not added; typing something else dismisses the question. 2026-11-14, question 3: *"Stays in the box, not added (Recommended)"*.
 - [ruled] The limit is counted in work, calibrated to about 10 s on the dev PC, the same on every machine. ADR-W-210 invariant 3; *"10s is an ok number"* (2026-11-13).

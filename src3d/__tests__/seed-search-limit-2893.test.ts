@@ -1,11 +1,11 @@
 /**
  * #2893 ([ADR-3D-494](../../docs/06b-decisions-3d.md#adr-3d-494); ADR-W-210 invariant 3) — THE CONFIGURATION SEARCH IS
- * BOUNDED IN WORK, AND A SEARCH THAT RAN OUT SAYS SO.
+ * BOUNDED IN WORK, AND A SEARCH THE LIMIT CUT SHORT SAYS SO.
  *
- * A line whose stated range no configuration was found to meet used to be refused after 200 seeds
- * («אין תצורה של הציור…»), and «הציגו תצורה אחרת» drew the next seed anyway. 200 seeds are a sample, not a proof. Now the
- * search is bounded by `SEED_SEARCH_LIMIT3` units of work and reaching it is "not decided": nothing is added, nothing is
- * refused, and «המשיכו לחפש» runs one more round from where it stopped. These locks hold the mechanism's own rules:
+ * The search is its 200-seed window: walked with no configuration in the stated range, it is FINISHED and the line is
+ * refused as ever (operator 2026-11-15, "1a"). It is also bounded by `SEED_SEARCH_LIMIT3` units of work: reached before
+ * the window is walked, the round is "not decided" — nothing is added, nothing is refused, and «המשיכו לחפש» goes on through
+ * the window from where it stopped. These locks hold the mechanism's own rules:
  *  - the same input gives the same outcome cold and warm and after other figures (a memo hit is charged what it saved);
  *  - a next round judges no seed the round before it judged;
  *  - "not decided" is never served from a memo as a verdict, never a fact, never in the undo history;
@@ -14,8 +14,8 @@
  * pipeline-lock: the checks are the search's stop, its resume and the store's transient state; a fixture or a scenario
  * records only what is added, and here nothing is.
  *
- * test-budget: the store cases each run one round to the real limit (about 10 s of work, by its calibration; about 15 s
- * under vitest): about two minutes in all. The engine cases use a small limit of their own.
+ * test-budget: the store cases on the dear figure each run one round to the real limit (about 10 s of work, by its
+ * calibration; about 15 s under vitest): about two minutes in all. The engine cases use small limits of their own.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { readWork } from '../../shell/workMeter';
@@ -28,19 +28,22 @@ import { searchSeed3, seedVerdictStats3, SEED_SEARCH_LIMIT3, type SeedSearch3 } 
 import type { Construction3 } from '../engine/types';
 
 const PYRAMID = 'פירמידה ABCDS שבסיסה ריבוע';
-/** a square-base pyramid cannot open ∠SAB that far, and no seed shows it: the search can only run out */
+/** a range no seed of these figures shows */
 const OUT_OF_REACH = '179 < ∠SAB < 180';
 /** a figure the solver places: its seeds cost solver work, so a warm memo has something to save */
-const SOLVED = 'ריבוע ABCD|קטע AS'.split('|'); // not a bracketed list: the #1394 parity corpus harvests those as sequences
-/** the engine cases' own limit */
-const SMALL = 150_000;
+const SOLVED = 'ריבוע ABCD;קטע AS'.split(';'); // not a bracketed list: the #1394 parity corpus harvests those as sequences
+/** the figure of the operator's 114 s freeze: about a second of solving a seed, so the real limit comes before the window ends */
+const DEAR = 'ריבוע ABCD;קטע AS;|SA| = 5'.split(';');
+/** the engine cases' own limits, well inside the window of each figure (a closed-form seed is charged its floor, 2) */
+const SMALL = 20_000;
+const SMALL_CLOSED = 100;
 
 function fresh(): void {
   clearSolveCaches3();
   useGeo3.setState({ facts: [], seed: 0, queries: [], lastError: null, lastNotice: null, lastNotDecided: null });
   useGeo3.temporal.getState().clear();
 }
-/** The pyramid with the bound applied, unsearched: the construction the store's search walks. */
+/** The figure with the bound applied, unsearched: the construction the store's search walks. */
 function boundFigure(clear = true, lines: readonly string[] = [PYRAMID]): { facts: Fact3[]; c: Construction3 } {
   if (clear) fresh();
   else useGeo3.setState({ facts: [], seed: 0, lastError: null, lastNotDecided: null });
@@ -54,41 +57,48 @@ function boundFigure(clear = true, lines: readonly string[] = [PYRAMID]): { fact
 }
 const stop = (r: SeedSearch3) => (r.kind === 'not-decided' ? { resume: r.resume, spent: r.spent } : r);
 
-describe('#2893 — the search, bounded in work', () => {
-  it('a round that reaches its limit is "not decided", and says where it stopped', () => {
+describe('#2893 — the search: its window, bounded in work', () => {
+  it('THE WINDOW WALKED with no seed is a FINISHED search ("1a"), whatever the limit', () => {
     const { c } = boundFigure();
-    const r = searchSeed3(c, 0, undefined, SMALL);
+    expect(searchSeed3(c, 0).kind).toBe('none');
+    expect(searchSeed3(c, 0, undefined, 1_000_000_000).kind).toBe('none');
+  });
+
+  it('a round the limit cuts short is "not decided", and says where it stopped', () => {
+    const { c } = boundFigure();
+    const r = searchSeed3(c, 0, undefined, SMALL_CLOSED);
     expect(r.kind).toBe('not-decided');
     if (r.kind !== 'not-decided') return;
     expect(r.resume).toMatchObject({ part: 0, fallback: null });
     expect(r.resume.next).toBeGreaterThan(0);
-    expect(r.spent).toBeGreaterThanOrEqual(SMALL);
+    expect(r.resume.next).toBeLessThan(200);
+    expect(r.spent).toBeGreaterThanOrEqual(SMALL_CLOSED);
   });
 
   it.each([
-    ['a figure placed in closed form (each seed charged its floor)', [PYRAMID]],
-    ['a figure the solver places (each seed charged what it solved)', SOLVED],
-  ])('THE SAME OUTCOME COLD, WARM, AND AFTER ANOTHER FIGURE: %s', (_name, lines) => {
-    const cold = stop(searchSeed3(boundFigure(true, lines).c, 0, undefined, SMALL));
+    ['a figure placed in closed form (each seed charged its floor)', [PYRAMID], SMALL_CLOSED],
+    ['a figure the solver places (each seed charged what it solved)', SOLVED, SMALL],
+  ])('THE SAME OUTCOME COLD, WARM, AND AFTER ANOTHER FIGURE: %s', (_name, lines, limit) => {
+    const cold = stop(searchSeed3(boundFigure(true, lines).c, 0, undefined, limit));
     expect(cold).toMatchObject({ resume: { fallback: null } });
     // the same round again in the same session: every seed a memo hit, charged what it saved
-    expect(stop(searchSeed3(boundFigure(false, lines).c, 0, undefined, SMALL))).toEqual(cold);
+    expect(stop(searchSeed3(boundFigure(false, lines).c, 0, undefined, limit))).toEqual(cold);
     // a session that solved something else first, and searched this figure from elsewhere
     fresh();
     useGeo3.getState().submit('קובייה ABCD');
     useGeo3.getState().submit("M אמצע BB'");
     useGeo3.getState().resample();
     const { c } = boundFigure(false, lines);
-    searchSeed3(c, 3, undefined, SMALL / 2);
-    expect(stop(searchSeed3(c, 0, undefined, SMALL))).toEqual(cold);
+    searchSeed3(c, 3, undefined, limit / 2);
+    expect(stop(searchSeed3(c, 0, undefined, limit))).toEqual(cold);
   });
 
   it('«המשיכו לחפש» GOES ON FROM WHERE IT STOPPED: no seed of the first round is judged again', () => {
     const { c } = boundFigure();
-    const first = searchSeed3(c, 0, undefined, SMALL);
-    if (first.kind !== 'not-decided') throw new Error('the first round found a seed');
+    const first = searchSeed3(c, 0, undefined, SMALL_CLOSED);
+    if (first.kind !== 'not-decided') throw new Error('the first round did not stop');
     const hits = seedVerdictStats3.hits;
-    const second = searchSeed3(c, 0, first.resume, SMALL);
+    const second = searchSeed3(c, 0, first.resume, SMALL_CLOSED);
     expect(seedVerdictStats3.hits - hits).toBe(0);
     expect(second.kind).toBe('not-decided');
     if (second.kind !== 'not-decided') return;
@@ -96,11 +106,24 @@ describe('#2893 — the search, bounded in work', () => {
   });
 });
 
-describe('#2893 — the store: "not decided" is neither a verdict nor a fact', () => {
+describe('#2893 — the store: a finished search refuses; "not decided" is neither a verdict nor a fact', () => {
   beforeEach(fresh);
+  const build = (lines: readonly string[]) => {
+    for (const l of lines) useGeo3.getState().submit(l);
+    expect(useGeo3.getState().facts).toHaveLength(lines.length);
+  };
 
-  it('A TYPED LINE WHOSE SEARCH STOPPED is not added, not refused, and not in the undo history', () => {
-    useGeo3.getState().submit(PYRAMID);
+  it('A FINISHED SEARCH is refused as ever ("1a"): the pyramid walks its 200 seeds at once', () => {
+    build([PYRAMID]);
+    useGeo3.getState().submit(OUT_OF_REACH);
+    const st = useGeo3.getState();
+    expect(st.lastError).toEqual({ code: 'bound-unsatisfiable', id: '' });
+    expect(st.lastNotDecided).toBeNull();
+    expect(st.facts).toHaveLength(1);
+  });
+
+  it('A TYPED LINE WHOSE SEARCH THE LIMIT CUT SHORT is not added, not refused, and not in the undo history', () => {
+    build(DEAR);
     const before = useGeo3.getState().facts;
     const history = useGeo3.temporal.getState().pastStates.length;
     useGeo3.getState().submit(OUT_OF_REACH);
@@ -108,47 +131,41 @@ describe('#2893 — the store: "not decided" is neither a verdict nor a fact', (
     expect(st.facts).toBe(before);
     expect(st.lastError).toBeNull();
     expect(st.lastNotDecided).toMatchObject({ action: 'submit', utterance: OUT_OF_REACH });
+    expect(st.lastNotDecided!.resume.next).toBeLessThan(200);
     expect(useGeo3.temporal.getState().pastStates.length).toBe(history);
     expect(SEED_SEARCH_LIMIT3).toBeGreaterThan(SMALL);
   });
 
-  it('«not decided» IS NEVER SERVED FROM A MEMO AS A VERDICT: the same line again is searched again, and stops again', () => {
-    useGeo3.getState().submit(PYRAMID);
-    useGeo3.getState().submit(OUT_OF_REACH);
-    const first = useGeo3.getState().lastNotDecided;
-    useGeo3.setState({ lastNotDecided: null });
-    useGeo3.getState().submit(OUT_OF_REACH);
-    const st = useGeo3.getState();
-    expect(st.lastError).toBeNull();
-    expect(st.lastNotDecided?.resume).toEqual(first?.resume);
-  });
-
-  it('«המשיכו לחפש» on a typed line: one more round, from where the first stopped', () => {
-    useGeo3.getState().submit(PYRAMID);
+  it('«not decided» IS NEVER SERVED FROM A MEMO AS A VERDICT; «המשיכו לחפש» goes on from where it stopped', () => {
+    build(DEAR);
     useGeo3.getState().submit(OUT_OF_REACH);
     const nd = useGeo3.getState().lastNotDecided!;
-    const ask: SearchAsk3 = { action: 'submit', utterance: nd.action === 'submit' ? nd.utterance : '', resume: nd.resume };
+    // the same line again: searched again, and stops at the same seed (never a verdict from a memo)
+    useGeo3.setState({ lastNotDecided: null });
+    useGeo3.getState().submit(OUT_OF_REACH);
+    expect(useGeo3.getState().lastError).toBeNull();
+    expect(useGeo3.getState().lastNotDecided?.resume).toEqual(nd.resume);
+    // the next round goes on through the window
+    const ask: SearchAsk3 = { action: 'submit', utterance: OUT_OF_REACH, resume: nd.resume };
     useGeo3.getState().continueSearch(ask);
-    const next = useGeo3.getState().lastNotDecided!;
-    expect(next.action).toBe('submit');
-    expect(next.resume.next).toBeGreaterThan(nd.resume.next);
-    expect(useGeo3.getState().facts).toHaveLength(1);
+    const next = useGeo3.getState();
+    if (next.lastNotDecided) expect(next.lastNotDecided.resume.next).toBeGreaterThan(nd.resume.next);
+    else expect(next.lastError).toEqual({ code: 'bound-unsatisfiable', id: '' }); // the window ended inside the round
+    expect(next.facts).toHaveLength(DEAR.length);
   });
 
-  it('an EDIT whose search stopped leaves the old statement standing', () => {
-    useGeo3.getState().submit(PYRAMID);
-    useGeo3.getState().submit('30 < ∠SAB < 85');
+  it('an EDIT whose search the limit cut short leaves the old statement standing', () => {
+    build([...DEAR, '30 < ∠SAB < 85']);
     const before = useGeo3.getState().facts;
-    expect(before).toHaveLength(2);
-    expect(useGeo3.getState().replaceFact(before[1].id, OUT_OF_REACH)).toBe(false);
+    expect(useGeo3.getState().replaceFact(before[3].id, OUT_OF_REACH)).toBe(false);
     const st = useGeo3.getState();
     expect(st.facts).toBe(before);
     expect(st.lastError).toBeNull();
-    expect(st.lastNotDecided).toMatchObject({ action: 'edit', factId: before[1].id, utterance: OUT_OF_REACH });
+    expect(st.lastNotDecided).toMatchObject({ action: 'edit', factId: before[3].id, utterance: OUT_OF_REACH });
   });
 
-  it('«הציגו תצורה אחרת» whose search stopped keeps the drawing (it used to draw a seed nobody had checked)', () => {
-    const { facts } = boundFigure();
+  it('«הציגו תצורה אחרת» whose search the limit cut short keeps the drawing', () => {
+    const { facts } = boundFigure(true, DEAR);
     useGeo3.setState({ facts, seed: 0, lastNotDecided: null });
     useGeo3.getState().resample();
     const st = useGeo3.getState();
@@ -175,12 +192,13 @@ describe('#2893 — off the page: the worker’s round reaches the page as its o
   it('a line whose round stopped: the page solves nothing, and shows the same stop as the worker', async () => {
     fresh();
     worker.store.clearSolveCaches3();
-    await offPageAction3('submit', [PYRAMID], () => useGeo3.getState().submit(PYRAMID));
+    for (const l of DEAR) await offPageAction3('submit', [l], () => useGeo3.getState().submit(l));
     const page0 = readWork().page;
     await offPageAction3('submit', [OUT_OF_REACH], () => useGeo3.getState().submit(OUT_OF_REACH));
     expect(readWork().page - page0).toBe(0);
     const st = useGeo3.getState();
-    expect(st.facts).toHaveLength(1);
+    expect(st.facts).toHaveLength(DEAR.length);
+    expect(st.lastNotDecided).not.toBeNull();
     expect(st.lastNotDecided?.resume).toEqual(worker.store.useGeo3.getState().lastNotDecided?.resume);
   });
 });

@@ -135,13 +135,13 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
     expect(submit("הקטע AA' חותך את π בנקודה P")).toBe('המישור חוצה את הישר מחוץ לקטע שציינתם, ולכן אין על הקטע נקודת חיתוך «P».');
   });
 
-  // #2893 (ADR-3D-494): the refusal is now for a range no angle can be in (decided without a search); a range the
-  // search only failed to reach is "not decided" (seed-search-limit-2893.test.ts)
   it('angle bound unsatisfiable: no empty «ב-» any more; a reachable range is taken', () => {
     setUp([PYRAMID]);
-    const s = submit('∠SAB > 200');
+    const s = submit('179 < ∠SAB < 180');
     expect(s).toBe('אין תצורה של הציור שבה הזווית נמצאת בתחום הזה, ולכן הנתון לא נוסף. בדקו את גבולות התחום.');
     expect(s).not.toMatch(/ב- /);
+    // #2893 (ADR-3D-494): a range no angle can be in is refused with the same sentence, without a search
+    expect(submit('∠SAB > 200')).toBe(s);
     expect(submit('60 < ∠SAB < 90')).toBeNull();
   });
 

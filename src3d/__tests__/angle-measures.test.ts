@@ -181,15 +181,12 @@ describe('ADR-3D-053 — numeric BOUNDS on an angle (#273)', () => {
     expect(useGeo3.getState().lastError).toEqual({ code: 'unknown-symbol', id: 'β' });
   });
 
-  // #2893 (ADR-3D-494): 200 seeds with no configuration in the range were a sample, not a proof, and the line was refused
-  // as if none existed; the search now stops at its work limit and says it has not found one yet (operator, 2026-11-14)
-  it('an UNREACHABLE bound is not added: the search stops at its limit, "not decided", and keeps the prior figure', () => {
+  it('an UNREACHABLE bound refuses and keeps the prior figure', () => {
     reset();
     submit(PYRAMID);
     const before = useGeo3.getState().facts.length;
     submit('179 < ∠SAB < 180'); // a square-base pyramid cannot open that far
-    expect(useGeo3.getState().lastError).toBeNull();
-    expect(useGeo3.getState().lastNotDecided).toMatchObject({ action: 'submit', utterance: '179 < ∠SAB < 180' });
+    expect(useGeo3.getState().lastError).toEqual({ code: 'bound-unsatisfiable', id: '' });
     expect(useGeo3.getState().facts.length).toBe(before);
   });
 });
