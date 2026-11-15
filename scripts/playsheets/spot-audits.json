@@ -398,6 +398,22 @@
         "z1 = 2"
       ],
       "lookFor": "The second line is refused with today's sentence naming «z1 = 1 + i»; no «המשיכו לחפש»."
+    },
+    {
+      "sheet": "feat-2893",
+      "id": "T15",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5190",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "A(0,0)",
+        "B(6,0)",
+        "שטח המשולש ABC הוא 12"
+      ],
+      "lookFor": "The press moves C to another place."
     }
   ],
   "results": [
