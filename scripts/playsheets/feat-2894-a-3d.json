@@ -1,0 +1,55 @@
+{
+  "name": "feat-2894-a-3d",
+  "title": "#2894 part 2 A — 3-D: heavy figures settle at once, and a value the givens fix is shown (PR, port 5193)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5193",
+      "path": "/3d.html",
+      "title": "3-D: a point slid along a side to a stated length draws much sooner",
+      "lines": ["משולש ABC", "D על AB", "AD = 3"],
+      "lookFor": "After «AD = 3» the figure is drawn, D on AB with AD = 3, noticeably sooner than on prod (timed below). Nothing is refused; three rows.",
+      "before": "prod draws the same figure, but «AD = 3» takes several seconds longer (timed below).",
+      "expectRows": ["משולש ABC", "D על AB", "AD = 3"]
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5193",
+      "path": "/3d.html",
+      "title": "3-D: a vector from a known point gives its head's coordinates",
+      "lines": ["A(0,0,0)", "AB = (1,2,3)"],
+      "lookFor": "The data panel lists «B(1, 2, 3)».",
+      "before": "prod lists no row for B: its coordinates are withheld although A and AB fix them.",
+      "expect": ["B(1, 2, 3)"]
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5193",
+      "path": "/3d.html",
+      "title": "3-D: asking for that head answers it",
+      "lines": ["A(0,0,0)", "AB = (1,2,3)"],
+      "asks": ["B"],
+      "lookFor": "The question «B» answers «(1, 2, 3)».",
+      "before": "prod answers that B is not determined.",
+      "expect": ["(1, 2, 3)"]
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5193",
+      "path": "/3d.html",
+      "title": "3-D: the exam cube's answer is still accepted (a double root the speed-up must leave alone)",
+      "lines": ["קובייה ABCD", "נסמן: AB = u, AD = v, AA' = w", "D(0,0,0)", "C(4,3,0)", "A(3,n,p)", "שיעור ה-z של C' חיובי", "A = (3, -4, 0)"],
+      "lookFor": "Every line builds; «A = (3, -4, 0)» is accepted as its own row.",
+      "before": "unchanged",
+      "expectRows": ["A = (3, -4, 0)"]
+    }
+  ]
+}

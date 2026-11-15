@@ -16357,3 +16357,64 @@ Changed tests:
 - [ruled] «המשיכו לחפש» searches the same amount again from where it stopped, and asks again if it still finds nothing. 2026-11-14, question 2: *"Another ~10 s round (Recommended)"*.
 - [ruled] A typed line whose search was stopped stays in the box and is not added; typing something else dismisses the question. 2026-11-14, question 3: *"Stays in the box, not added (Recommended)"*.
 - [ruled] The limit is counted in work, calibrated to about 10 s on the dev PC, the same on every machine. ADR-W-210 invariant 3; *"10s is an ok number"* (2026-11-13).
+
+## ADR-3D-496 — The pivot's cold sweep stops at the anchors' creep and settles at its destination, and every result lies on the givens' set to working precision (#2894)
+
+**Status:** built, **STOPPED at the compare** (not shippable under the rulings; see *Why it stops*) · 2026-11-15 · feature (`P2`) · phase 5, part 2, item A of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) · **Issue:** [#2894](https://github.com/dcodish/geo_builder/issues/2894) · branch `feat/2894-a-claim-checks-3d`, a feature PR the operator plays.
+**Requirements:** [02b](02b-requirements-3d.md) FR-EQ-4 (a value the givens fix is shown) · **Design:** [04b](04b-design-3d.md) — "The solver", *The cold sweep's creep stop and the anchored settle* · **LADDER stage:** the pivot's multi-start (stage: pivot): its stopping rule, a settle after it, and a projection of each result
+**Builds on** [ADR-3D-007](#adr-3d-007) (the pivot), [ADR-3D-133](#adr-3d-133) (the anchors' 1e-4 pull, the #518 park), [ADR-3D-204](#adr-3d-204) (the rider lane), [ADR-3D-260](#adr-3d-260) (the #1311 release), [ADR-3D-464](#adr-3d-464) (the sweep's first early-out).
+
+**Measured first (docs/17 §9).** Step 0 on `main` @ `63ccbc5a` (the phase 5 sampler, fixtures + slow corpus, 209.7 M units): claim verification at the claim seeds 93.8 M (44.7 %), the panel and ask samples 60.3 M (28.8 %), the figure's own pivot 51.9 M (24.7 %). The plan's mechanism was a warm start of the claim seeds from the drawn solution. Instrumenting `leastSquares` showed it would not take the cost. On `rider-length-1735` one derive ran 1 408 solves, and 1 280 of them (2 219 264 of 2 228 762 residual evaluations) had already met the givens. Their error sat at 5e-9 – 2e-8, where the anchors' 1e-4 pull holds it, and crept down a few per cent per ten steps along the curved solution set until the 120-iteration bail; the polish then restarted each up to three times. A warm start creeps the same way. The cost is the creep, at every seed.
+
+**And the creep never arrives.** The full objective's minimum is not on the givens' solution set: the anchors hold the givens' rows at a residual of about 1e-12 (the `ACCEPT` note). So a coordinate the givens fix came out a few 1e-7 off, differently at each knowledge sample, and the samples' 1e-6 comparison withheld it, or not, by chance. Probed on `main`: «קוביה ABCDA'B'C'D'» · «B(0,7,8)» · «BA→=(-3,4,5)», its cube row deleted, reads «A(?, 11, ?)», «A(-3, 11, 13)», nothing, «A(-3, 11, 13)» at seeds 0–3.
+
+**Decision.** In `solvePivot` (`engine/solve3.ts`):
+1. **The creep stop** (`creepStop`). The cold sweep (16 starts, their polish, the dims widening) asks it every 8th accepted step. It ends the solve when the givens' rows are exact to two orders under the acceptance and the full error fell less than 10 % (`CREEP_GAIN`) over those 8 steps.
+2. **The settle** (`settleAnchored`). A stopped solve goes to the point the creep was walking to: a tangent Gauss–Newton step of the anchor rows with the givens' rows held (weight 1e8), then a projection back by a solve of the givens' rows alone, kept while the full error falls. Only unknowns some row reads take part (an undriven dim is placed by the #518 park). Three guards; each one falls back to exactly the solve before the creep stop:
+   - **a regular point only** (`regularOnSet`): one minimum-norm Gauss–Newton step of the givens' rows, in their row space, must cut their error by 1e-4 at least. A tangential point fails: the exam cube's «A(3,n,p)» forces p² = 0, where the step cuts the error by 16, and p stays known as 0;
+   - **defined trial points**: a step that takes a rider's plane through three collinear points ends the settle (`plane-both-forms-2367` without its box threw `normalize3: zero vector` in a first build);
+   - **the creep's own basin**: a settled point that is degenerate from one that was not is refused (#863: A onto C in a first build, which moved the submit's seed search from seed 0 to seed 1).
+3. **Every result on the givens' set** (`onSet`). Each sweep result and each candidate `collect` admits is moved to the set by that certifying step itself, at a regular point only. The shift is about 1e-7, invisible. A fixed quantity then agrees across the samples; a free one still differs at its own scale.
+
+**What it costs and saves (the work meter, exact units).**
+- Fixtures: 138.0 M → 88.5 M (−35.9 %). 163 actions fell, by 50.4 M in all. The largest falls: `rider-length-1735` submit 2 228 762 → 815 490, rename 2 228 056 → 631 865; `symbolic-line-equation-863` submit#3 1 603 973 → 1 048 280; `vector-creates-head-1613` submit#2 455 971 → 244 775.
+- Slow corpus: 71.7 M → 40.1 M (−44.1 %); 66 actions fell, by 31.6 M. Rises: the four #863 sequences' delete, 3 112 → 3 624.
+- **Fixture rises: 137 actions, +0.86 M units in all**: the certifying step's Jacobian (2n + 2 residuals for each candidate). The largest absolute rise is `stated-length-7-9999-2361` delete/untick, 723 017 → 790 255 (+9.3 %); the largest relative ones are `cube-rider-length-1782` / `-reversed`, 12 224 → 17 776 (+45 %). The full list is in the PR. They are not re-recorded: a rise needs the operator's sign-off (docs/17 §7), so `work:check -- 3d` names them until he gives it.
+- **In the browser** (`scripts/lib/browser-harness.mjs`, this branch and `main` served in turn on :5193, three runs each): «משולש ABC» · «D על AB» · «AD = 3»: the third line 1.98 / 1.99 / 2.10 s → 0.66 / 0.70 / 0.76 s. The #863 prism's third line: 1.29 s → 1.57 / 1.58 / 1.64 s (its units fell 35 %; the settle's own linear algebra, outside the meter, is the difference).
+
+**The transcript compare** (every action's store, derivation, panel and asks, exact to the bit; `main` @ `63ccbc5a` against this branch): the 176 fixtures (8 742 records), the slow corpus (702), the refusal walk (396) and the 52 sequences of `scenarios3.test.ts` (2 043).
+- **No verdict, refusal or message changed.** The refusal walk differs in drawings only.
+- **Drawings:** 493 records of 73 figures moved; the largest move is 1.96× the extent, a point no given places, after a delete (`vector-creates-head-1613`, `pyramid-param-pair-vector-2077`), and every one keeps its verdicts. The submit's seed search lands where it did on every sequence.
+- **Values the givens fix, now shown** (ruled a fix, operator 2026-11-15). Each is proven in closed form, and each has a regression test in `src3d/__tests__/settle-anchored-2894.test.ts`:
+
+| sequence (action) | `main` | now | why the givens fix it |
+| --- | --- | --- | --- |
+| «A(0,0,0)» · «AB = (1,2,3)» | no B row; «B» not determined | «B(1, 2, 3)»; «B» answers (1, 2, 3) | B = A + (1,2,3) |
+| «A(0,0,0)» · «נתון: AB = (k-1, k, 3), AC = (k+1, 0, k-3)» | no rows; «C» not determined; «CD» not determined | «B(?, ?, 3)», «C(?, 0, ?)»; the asks follow; «CD» depends on k | z_B = 3 and y_C = 0 for every k; CD = (2, −k, k−6) |
+| `cube-turn-about-ab-2378`, cube row deleted: «A(0,0,0)» · «AB=(2,0,0)» · «מישור ABCD» | «B(?, 0, 0)» | «B(2, 0, 0)» | B = A + (2,0,0) |
+| `length-letter-2092`, box row deleted: «\|AB\| = k» · «\|AD\| = k» · «k = 3» | no relation row | «\|AB\| = \|AD\| = 3» | both lengths are k, and k = 3 |
+| #863 prism (`symbolic-line-equation-863`), renamed | «k = ?», no rows | «k = -1 או k = 2», «D(?, -1, ?)», «C(?, -1, ?)», the five mutual rows | a right prism: AA′ ⟂ AC, (k−1)(k+1) + (k+1)(k−3) = 2(k+1)(k−2) = 0; the line's y is −1 for every t and k |
+| the #863 slow sequences, swapped, and «B» asked | no rows; not determined | «B(?, -1, ?)», «C(?, -1, ?)», the mutual rows; «B» answers (?, -1, ?) | as above, under the swapped letters |
+| «A = (2, 0, -9)» / «K = (-3, 4, 6)» on an empty figure | no row / «K(-3, 4, ?)» | «A(2, 0, -9)» / «K(-3, 4, 6)» | every coordinate is stated |
+| the 2020 prism exam (`scenarios3`), prism row deleted | «B(?, ?, 2)», «K(-3, 4, ?)», «P(?, 4, 6)» | «B(2, 9, 2)», «C(7, -1, 7)», «K(-3, 4, 7)», «P(0, 4, 6)», the vectors' coordinates, «\|KP\| = √10»; plane KBC's parametric form written from K | K and P are stated; B = K + u, C = K + v; KP = (3, 0, −1); the plane is x + 2y + 3z = 26 in both forms |
+
+- **One value shown that the givens do NOT fix: a stop.** The 2023 cube exam (`scenarios3`), its cube row deleted, now reads «|A′C| = 6√3»; `main` shows no row. Without the cube, K = (2,4,2) on line A′C with |A′K| : |A′C| = 2 : 3 admits A′ between K and C too, where |A′C| = 6√3/5. The knowledge samples reach only the first branch; `main` withheld the row only through its imprecision. Filed as [#2907](https://github.com/dcodish/geo_builder/issues/2907). It needs a ruling (below).
+
+**Why it stops: making the samples exact exposes branches the samples never reach.** The 3-D slice (`npm run test:run:3d`) found what the four transcript corpora did not:
+- `issue-2368-leftover-turn`: the cube on «A(0,0,0)» · «AB=(2,0,0)» · «מישור ABCD» · «מישור ABCD מקביל למישור xy» reads, at seed 1, «A′(0, 0, 2)», «B′(2, 0, 2)». The givens leave the cube on either side of the plane z = 0, so z = −2 is admissible too: a value shown that the givens do not fix. `main` reads «A′(0, 0, ?)».
+- `issue-1769-root-pool`: the #863 prism at seed 2 reads «k = ?» (`main`: «k = -1 או k = 2»): an «או» list loses its true options.
+- `#2907` (above) is the same class in the scenario corpus.
+
+The projection (`onSet`) causes the first two: without it both tests pass. Without it, though, `vector-pair-row-1549` after its delete goes «A(-3, 11, 13)» → «A(-3, ?, 13)» (known → withheld), because the anchors' imprecision is what decided it. **The root is outside this item:** the knowledge samples reach only the branches the anchored starts lead to, and `main`'s imprecision withholds, by chance, what one-branch sampling would otherwise show as a fact. Exact samples are the right target, but they are safe only once every admissible branch is sampled (#2907).
+
+Also red on the branch, expected for a change of values: the `decide-submit3-parity-1394` goldens (1, 2, 4) and their static partition (the new test file's lines join the corpus); `fix-test-shape` (the new test file is not grandfathered); `issue-1815-collapse-attribution`'s wall clock (1 225 ms against < 1 000); and the work-meter gate's rises (not re-recorded: a rise needs the operator's sign-off).
+
+**Tests.** `src3d/__tests__/settle-anchored-2894.test.ts` (new): one case per corrected value above, the exam cube's double root (p = 0 known, «A = (3, -4, 0)» accepted), and the box-less «מישור ABCD» building without a throw.
+
+**Regression scenarios (rule 4).** No reported utterance; the corrections are locked by the test above.
+
+## What the student will see
+- [ruled] 3-D heavy figures are drawn sooner; another valid drawing may come first. Operator, 2026-11-15 (#2894), ruling 1: *"Yes if verdicts equal (Recommended)"*.
+- [ruled] Values the givens fix, which 3-D withheld, are shown, with the answers that read them (the table above). Operator, 2026-11-15 (#2894): *"Ship, list them as fixes (Recommended)"*.
+- [proposed] **Item A stops here.** Values become facts that the givens do not fix (the side of a cube, #2368's control; |A′C| after a delete, #2907), and an «או» list is lost at one seed (#1769). Options: (a) first make the knowledge samples reach every admissible branch (#2907, widened to the side-of-a-plane and pooled-root cases), then rebuild A on it (recommended: A's speed is real, −36 % fixtures / −44 % slow corpus, and its corrections are real, but exact samples need full branch coverage to be honest); (b) ship only the creep stop and the settle, without the projection (not recommended: `vector-pair-row-1549` loses a known value); (c) drop A.
+- [proposed] After the 2023 cube exam's cube row is deleted, the panel shows «|A′C| = 6√3», though 6√3/5 is also admissible (#2907). Options: (a) ship A with this listed as a known gap until #2907 samples both branches; (b) hold A until #2907 is fixed (recommended: a value shown must be a fact); (c) show nothing for A′C in that state by keeping its samples' imprecision (not possible without undoing A).

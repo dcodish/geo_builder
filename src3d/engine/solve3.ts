@@ -72,6 +72,24 @@ export function relDiff3(p: number, q: number): number {
   return (p - q) / Math.max(p + q, REL_DIFF_FLOOR);
 }
 
+/** #2894 part 2 A (ADR-3D-496): a cold sweep's solve whose full error fell by less than this factor's complement over 8
+ *  accepted steps, its givens' rows exact, has only the anchors' creep left (see `creepStop` in `solvePivot`). */
+export const CREEP_GAIN = 0.9;
+/** #2894 part 2 A (ADR-3D-496): the settle's rounds, the givens' rows' weight in its tangent step, and its ridge. */
+const SETTLE_ROUNDS = 12;
+const SETTLE_HOLD = 1e8;
+const SETTLE_RIDGE = 1e-14;
+/** #2894 A: a Gauss–Newton step of the givens' rows cuts their error at least this much at a regular point of their
+ *  solution set (quadratic convergence); at a tangential (double-root) point it cuts it by 16 only. */
+const SETTLE_REGULAR = 1e-4;
+/** #2894 A: the certification's ridge, relative to the givens' rows' largest normal entry. */
+const SETTLE_ROW_RIDGE = 1e-12;
+/** #2894 A: an unknown whose Jacobian column is below this share of the largest takes no part in the settle's tangent step. */
+const SETTLE_LIVE = 1e-8;
+/** #2894 A: a result whose givens' error is under this is already on their set to 1e-10 in position, far inside the
+ *  knowledge samples' comparison; it is not projected (the projection's Jacobian is the cost). */
+const ON_SET_FLOOR = 1e-20;
+
 export function leastSquares(
   residuals0: (x: number[]) => number[],
   x0: number[],
@@ -82,7 +100,7 @@ export function leastSquares(
    * and exact" — an attractor LM only approaches geometrically (the scale halves, the error never reaches 1e-24), so
    * the full iteration budget was spent on a candidate the acceptance sites then reject.
    */
-  stop?: (x: number[]) => boolean,
+  stop?: (x: number[], err: number) => boolean,
 ): { x: number[]; err: number } {
   leastSquaresStats.solves++;
   const residuals = (y: number[]): number[] => {
@@ -102,7 +120,7 @@ export function leastSquares(
   // failure, and paid a full central-difference Jacobian for each rung. Cached here and invalidated only
   // where x actually moves, so the trajectory is identical and the tail costs one residual call a rung.
   let jac: { J: number[][]; JtJ: number[][]; Jtr: number[] } | null = null;
-  if (stop && stop(x)) return { x, err };
+  if (stop && stop(x, err)) return { x, err };
   let accepted = 0;
 
   for (let iter = 0; iter < iterations; iter++) {
@@ -159,7 +177,7 @@ export function leastSquares(
       jac = null; // x moved — the Jacobian must be recomputed there
       lambda = Math.max(lambda / 3, 1e-12);
       if (err < 1e-24) break;
-      if (stop && ++accepted % 8 === 0 && stop(x)) break;
+      if (stop && ++accepted % 8 === 0 && stop(x, err)) break;
     } else {
       lambda *= 10;
       if (lambda > 1e12) break;
@@ -2852,6 +2870,195 @@ export function solvePivot(
      *  site rejects it (`collapsed`) and `noteFlatSolid` records it, so further iterations only shrink it further. */
     const exactAtPoint = (x: number[]): boolean => atPoint(x) && primaryErr(x) < 1e-10;
     /**
+     * #2894 part 2 A (ADR-3D-496) — THE CREEP STOP of the cold sweeps. An anchored solve (a rider, a pin letter, a plane
+     * drive) meets its givens' rows in a few steps; what follows is the anchors' 1e-4 pull dragging the free unknowns
+     * toward the seed's sample along the curved solution set, a few per cent of the error per ten steps, until the
+     * 120-iteration bail — and the polish restarts it three more times. Measured on the fixtures, that creep is most of
+     * every resolve's work. Asked every 8th accepted step: once the givens' rows are exact (two orders under the
+     * acceptance) and the full error fell less than {@link CREEP_GAIN} over those 8 steps, the solve stops where it
+     * stands. The point is a solution of the givens; only where its free unknowns rest differs (ruling 1, 2026-11-15).
+     * A fresh one per solve: it keeps the error it last saw.
+     */
+    const creepStop = (): ((x: number[], err: number) => boolean) & { crept: boolean } => {
+      let mark = Infinity;
+      const stop = Object.assign(
+        (x: number[], err: number): boolean => {
+          if (exactAtPoint(x)) return true;
+          const stalled = err > mark * CREEP_GAIN;
+          mark = err;
+          stop.crept = stalled && primaryErr(x) < ACCEPT * 1e-2;
+          return stop.crept;
+        },
+        { crept: false },
+      );
+      return stop;
+    };
+    /**
+     * #2894 part 2 A (ADR-3D-496) — SETTLE A CREEPING SOLVE AT ITS ANCHORED POINT. Where the creep stop ended a solve, the
+     * point meets the givens and the anchors' pull is all that is left: the place the creep was walking to is the point of
+     * the solution set nearest the seed's samples (the anchored minimum). It is reached here directly, as the #518 park and
+     * the #1854 settle reach theirs, instead of by a few per cent per ten steps. Each round takes the Gauss–Newton step of
+     * the full anchored rows with the givens' rows held by their Jacobian (the tangent step), returns to the solution set
+     * by a solve of the givens' rows alone (the projection), and keeps the result only while the full error falls and the
+     * givens stay exact; it ends when the step is negligible. Every residual it evaluates is metered.
+     *
+     * ONLY ON A REGULAR POINT OF THE SOLUTION SET. A small residual of the givens' rows says the point is ON the set only
+     * where their Jacobian is regular. Where a given meets the set tangentially (a double root: the exam cube's
+     * «A(3,n,p)» forces p² = 0, so a residual of 1e-12 leaves p at 1e-3), the residual test passes far from the set, and
+     * the creep was what carried the point the rest of the way (the #518 note below: anchors stall LM on tangential
+     * directions). So the point is certified first: one Gauss–Newton step of the givens' rows alone must cut their error
+     * quadratically (by {@link SETTLE_REGULAR} at least), as it does at a regular point and never at a tangential one
+     * (there it cuts by 16). An uncertified point returns null, and the caller solves exactly as before the creep stop.
+     */
+    const regularOnSet = (x: number[], r0: number[], J: number[][], nP: number): number[] | null => {
+      const n = x.length;
+      let e0 = 0;
+      for (let m = 0; m < nP; m++) e0 += r0[m] * r0[m];
+      if (e0 < 1e-24) return x;
+      // the minimum-norm Gauss–Newton step of the givens' rows, solved in their row space (nP × nP: the rows are few and
+      // independent where the set is regular, while the unknowns' normal matrix is singular along the set by design)
+      const S: number[][] = [];
+      let scale = 0;
+      for (let a = 0; a < nP; a++) {
+        S.push([]);
+        for (let b = 0; b < nP; b++) {
+          let v = 0;
+          for (let j = 0; j < n; j++) v += J[j][a] * J[j][b];
+          S[a].push(v);
+        }
+        scale = Math.max(scale, S[a][a]);
+      }
+      if (!(scale > 0)) return null;
+      for (let a = 0; a < nP; a++) S[a][a] += scale * SETTLE_ROW_RIDGE;
+      const y = solveLinear(
+        S.map((row) => row.map((v) => v / scale)),
+        r0.slice(0, nP).map((v) => v / scale),
+      );
+      if (!y) return null;
+      const d = Array.from({ length: n }, (_, j) => -J[j].slice(0, nP).reduce((acc, v, a) => acc + v * y[a], 0));
+      meterWork();
+      const e1 = fPrimary(x.map((v, i) => v + d[i])).reduce((acc, v) => acc + v * v, 0);
+      return e1 < 1e-24 || e1 <= e0 * SETTLE_REGULAR ? x.map((v, i) => v + d[i]) : null;
+    };
+    /**
+     * A cold sweep's solve from `x0`: the creep stop, then the settle where it fired. Where the settle cannot certify the
+     * point, or reaches a trial point where the residuals are not defined (an undamped tangent step can take a rider's
+     * plane through three collinear points, which the frame refuses to normalise: `plane-both-forms-2367` without its box),
+     * the solve is exactly the one before the creep stop: the 120 iterations with the #2799 early-out. The damped LM steps
+     * never visit such points; the settle's trial points are its own, so they are its own to refuse.
+     */
+    const sweepSolve = (x0: number[]): { x: number[]; err: number } => {
+      const stop = creepStop();
+      const r = leastSquares(fSeed, x0, 120, stop);
+      if (!stop.crept) return onSet(r);
+      let settled: { x: number[]; err: number } | null = null;
+      try {
+        settled = settleAnchored(fSeed, r);
+      } catch {
+        settled = null; // a residual undefined at a trial point: no settle, the solve as before
+      }
+      // the settle reaches the point the creep was walking to, in the creep's own basin: one that ends degenerate (a
+      // collapsed solid, a point off its host) from a point that was not has left that basin (#863: A onto C), so the
+      // start is solved as before
+      if (settled && degenerate(settled.x) && !degenerate(r.x)) settled = null;
+      return onSet(settled ?? leastSquares(fSeed, x0, 120, exactAtPoint));
+    };
+    /**
+     * #2894 A — EVERY SWEEP RESULT ON THE GIVENS' SOLUTION SET, to working precision. The full objective's minimum is not
+     * on the set: the anchors' pull holds the givens' rows at a residual of about 1e-12 (the ACCEPT note), so a coordinate
+     * the givens fix comes out a few 1e-7 off, differently at each knowledge sample, and the samples' 1e-6 comparison
+     * withholds it or not by chance (main read «A(-3, ?, 13)» or «A(-3, 11, 13)» for «B(0,7,8)» · «BA→=(-3,4,5)», seed by
+     * seed). A solve of the givens' rows alone from the result moves it to the nearest point of the set (a shift of that
+     * order, invisible), so a fixed quantity agrees across the samples and a free one still differs at its own scale.
+     */
+    const onSet = (r: { x: number[]; err: number }): { x: number[]; err: number } => {
+      const e0 = primaryErr(r.x);
+      if (!(e0 > ON_SET_FLOOR)) return r;
+      // only at a regular point: at a tangential one (a double root) the projection crawls, and leaves the samples apart
+      const rp = fPrimary(r.x);
+      const Jp: number[][] = r.x.map((v, j) => {
+        const h = 1e-6 * Math.max(1, Math.abs(v));
+        const xp = [...r.x];
+        const xq = [...r.x];
+        xp[j] += h;
+        xq[j] -= h;
+        meterWork();
+        const a = fPrimary(xp);
+        meterWork();
+        const b = fPrimary(xq);
+        return a.map((u, i) => (u - b[i]) / (2 * h));
+      });
+      // the certifying step IS the projection: at a regular point one minimum-norm Gauss–Newton step of the givens' rows
+      // lands on the set to the square of the residual (no further solve needed)
+      const on = regularOnSet(r.x, rp, Jp, rp.length);
+      if (!on || degenerate(on)) return r;
+      meterWork();
+      return { x: on, err: fSeed(on).reduce((acc, v) => acc + v * v, 0) };
+    };
+    const settleAnchored = (f: (x: number[]) => number[], r: { x: number[]; err: number }): { x: number[]; err: number } | null => {
+      const nP = fPrimary(r.x).length;
+      const fm = (y: number[]): number[] => {
+        meterWork();
+        return f(y);
+      };
+      let x = r.x;
+      let err = r.err;
+      for (let round = 0; round < SETTLE_ROUNDS; round++) {
+        const r0 = fm(x);
+        const n = x.length;
+        const J: number[][] = [];
+        for (let j = 0; j < n; j++) {
+          const h = 1e-6 * Math.max(1, Math.abs(x[j]));
+          const xp = [...x];
+          const xq = [...x];
+          xp[j] += h;
+          xq[j] -= h;
+          const a = fm(xp);
+          const b = fm(xq);
+          J.push(a.map((v, i) => (v - b[i]) / (2 * h)));
+        }
+        if (round === 0 && !regularOnSet(x, r0, J, nP)) return null;
+        // the tangent step: the anchors' Gauss–Newton step with the givens' rows weighted to hold (their own GN rows).
+        // Only the unknowns some row reads take part: an unknown no row reads (an undriven dim, which the #518 park
+        // places after the sweep) has a zero column, so its step is the ridge dividing rounding noise; it stays put.
+        const colNorm = J.map((col) => Math.hypot(...col));
+        const maxCol = Math.max(...colNorm);
+        const live = colNorm.map((v) => v > maxCol * SETTLE_LIVE);
+        const A: number[][] = [];
+        const g: number[] = [];
+        for (let i = 0; i < n; i++) {
+          A.push([]);
+          let gi = 0;
+          for (let k = 0; k < n; k++) {
+            let v = 0;
+            if (live[i] && live[k]) for (let m = 0; m < r0.length; m++) v += (m < nP ? SETTLE_HOLD : 1) * J[i][m] * J[k][m];
+            A[i].push(v + (i === k ? (live[i] ? SETTLE_RIDGE : 1) : 0));
+          }
+          if (live[i]) for (let m = nP; m < r0.length; m++) gi -= J[i][m] * r0[m];
+          g.push(gi);
+        }
+        const d = solveLinear(A, g);
+        if (!d) break;
+        let step = 1;
+        let moved = false;
+        for (let half = 0; half < 6 && !moved; half++, step /= 2) {
+          const back = leastSquares(fPrimary, x.map((v, i) => v + step * d[i]), 30);
+          if (back.err >= ACCEPT * 1e-2) continue;
+          const e = fm(back.x).reduce((acc, v) => acc + v * v, 0);
+          if (e < err) {
+            const shift = Math.hypot(...back.x.map((v, i) => v - x[i]));
+            x = back.x;
+            moved = true;
+            const gain = err - e;
+            err = e;
+            if (shift < 1e-9 || gain < err * 1e-9) return { x, err };
+          }
+        }
+        if (!moved) break;
+      }
+      return { x, err };
+    };
+    /**
      * #518 (ADR-3D-133) — park an UNDRIVEN scale at the seed's target, POST-HOC. In-solve anchors were
      * tried at two weights and both failed a full-suite calibration: 1e-4 measurably displaced
      * determined coordinates, and even 1e-6 stalls LM on TANGENTIAL constraint directions (a quadratic
@@ -2953,7 +3160,7 @@ export function solvePivot(
       // #1769 (ADR-3D-395): the same release closes a candidate that is exact on `ACCEPT` but outside the member
       // pins' verifier bar (`membersHold`) — an anchor equilibrium inside the solver's tolerance and outside the
       // validation's. It admits nothing by itself: the candidate is judged again below by the one root predicate.
-      let cand = cand0;
+      let cand = onSet(cand0); // #2894 A: every candidate on the givens' set to working precision (a regular point only)
       if (anchored) {
         const pe = primaryErr(cand0.x);
         const offBar = pe < ACCEPT && !membersHold(mirror, cand0.x);
@@ -2991,10 +3198,10 @@ export function solvePivot(
     };
     const fSeed = fFor(symAnchorTargets);
     for (const x0 of starts) {
-      let r0 = leastSquares(fSeed, x0, 120, exactAtPoint);
+      let r0 = sweepSolve(x0); // #2894 A: the creep's destination, reached directly
       // polish: restart LM (fresh damping) from the found point until it stops improving
       for (let polish = 0; polish < 3 && r0.err > 1e-24 && r0.err < 1e-4; polish++) {
-        const r2 = leastSquares(fSeed, r0.x, 120, exactAtPoint);
+        const r2 = sweepSolve(r0.x);
         if (r2.err >= r0.err * 0.99) break;
         r0 = r2;
       }
@@ -3164,9 +3371,9 @@ export function solvePivot(
         for (const f of variants) {
           const widened = dims0.map(f);
           for (const x0 of starts) {
-            let r = leastSquares(fSeed, [...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)], 120, exactAtPoint);
+            let r = sweepSolve([...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)]);
             for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
-              const r2 = leastSquares(fSeed, r.x, 120, exactAtPoint);
+              const r2 = sweepSolve(r.x);
               if (r2.err >= r.err * 0.99) break;
               r = r2;
             }

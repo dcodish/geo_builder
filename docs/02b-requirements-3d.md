@@ -637,7 +637,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «C(2, ?, ?)», «D(0, ?, ?)», «A'(0, ?, ?)» (x is fixed, the turn keeps it), no «או» row and no equation for
   the plane ABCD, and asking for the plane, D or z_D answers that it is not determined — at every
   configuration, whichever orientation happens to be drawn.
-  - Sources: ADR-3D-283, #1474, [ADR-3D-375](06b-decisions-3d.md#adr-3d-375), #2368.
+  **And a value the givens fix is shown.** «A(0,0,0)» · «AB = (1,2,3)» reads «B(1, 2, 3)», and asking for B answers
+  it; the cube's «A(0,0,0)» · «AB=(2,0,0)» without the cube reads «B(2, 0, 0)». The solver settles every free unknown
+  at its sample, so a quantity every configuration shares agrees across the samples and is never withheld for the
+  solver's own imprecision (operator, 2026-11-15, #2894: *"Ship, list them as fixes (Recommended)"*).
+  - Sources: ADR-3D-283, #1474, [ADR-3D-375](06b-decisions-3d.md#adr-3d-375), #2368, [ADR-3D-496](06b-decisions-3d.md#adr-3d-496).
 - **FR-EQ-4a (Should)** — **A point with EXACTLY TWO configurations lists both in the data panel.** When
   the givens leave a point exactly two admissible positions — the same two at every sampled configuration
   (S above or below the plane, «SM⊥ABC» + «|SM| = 4») — the panel prints one row per configuration,
