@@ -1,0 +1,71 @@
+{
+  "name": "feat-2894-d-analytic",
+  "title": "#2894 D (analytic): the retry walk is one continuation — the same figures for less work",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5197",
+      "path": "/analytic.html",
+      "title": "Exam 2379 section ג builds exactly as before",
+      "lines": [
+        "נתון מעגל שמרכזו M(8,-3)",
+        "המעגל משיק לישר 4x+3y+2=0 בנקודה A",
+        "נתון מעגל שמרכזו N1 ורדיוסו 10",
+        "מעגל N1 משיק למעגל M בנקודה A",
+        "נתון מעגל שמרכזו N2 ורדיוסו 10",
+        "מעגל N2 משיק למעגל M בנקודה A",
+        "N1 משמאל ל-N2",
+        "הישר l משיק לשני מעגלים N1 ו- N2 בנקודות P ו- Q בהתאמה",
+        "הישר l חותך את ציר ה- y בנקודה הנמצאת מעל ציר ה- x"
+      ],
+      "expectRows": [
+        "N1 משמאל ל-N2"
+      ],
+      "lookFor": "On a cleared canvas, type the nine lines. Nine rows; M, A, N₁, N₂, P, Q and the line l drawn exactly where main draws them (N₁ at (−4, −12), N₂ at (12, 0), P at (−10, −4), Q at (6, 8)); the values panel fills a little sooner after lines 8 and 9 (≈6 s and ≈8 s on the dev PC, within noise of main).",
+      "before": "unchanged drawing and values; about 8 % less solver work on lines 8 and 9"
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5197",
+      "path": "/analytic.html",
+      "title": "«הציגו תצורה אחרת» still finds another drawing of a free triangle",
+      "lines": [
+        "משולש ABC",
+        "AB = 5"
+      ],
+      "cycles": 1,
+      "expectConfigsDiffer": true,
+      "lookFor": "The press moves the triangle to another configuration.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5197",
+      "path": "/analytic.html",
+      "title": "Exam 2379: the tenth line still reaches the limit and says so",
+      "lines": [
+        "נתון מעגל שמרכזו M(8,-3)",
+        "המעגל משיק לישר 4x+3y+2=0 בנקודה A",
+        "נתון מעגל שמרכזו N1 ורדיוסו 10",
+        "מעגל N1 משיק למעגל M בנקודה A",
+        "נתון מעגל שמרכזו N2 ורדיוסו 10",
+        "מעגל N2 משיק למעגל M בנקודה A",
+        "N1 משמאל ל-N2",
+        "הישר l משיק לשני מעגלים N1 ו- N2 בנקודות P ו- Q בהתאמה",
+        "הישר l חותך את ציר ה- y בנקודה הנמצאת מעל ציר ה- x",
+        "P(1,1)"
+      ],
+      "expect": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "After about 9 s: «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with «המשיכו לחפש»; nine rows.",
+      "before": "unchanged (item C, a separate PR, makes this a one-round refusal)"
+    }
+  ]
+}

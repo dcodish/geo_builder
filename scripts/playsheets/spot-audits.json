@@ -414,6 +414,20 @@
         "שטח המשולש ABC הוא 12"
       ],
       "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2894-d-analytic",
+      "id": "T2",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5197",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "AB = 5"
+      ],
+      "lookFor": "The press moves the triangle to another configuration."
     }
   ],
   "results": [
