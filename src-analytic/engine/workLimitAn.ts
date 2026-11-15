@@ -3,7 +3,7 @@
  * WORK LIMIT: where a search stops when it has worked about ten seconds without deciding.
  *
  * The check sits in the solver's loop, at the one place a unit of work is counted ({@link solverUnit}: every residual
- * evaluation of `solveLM`, `freeRank`, `jacobianRank` and `scanRoots`). When an open limit (`shell/workLimit`) is
+ * evaluation of `solveLM`, `freeRank`, `jacobianRank` and `scanRoots`; {@link chargeUnit} for a repeat `solveLM` serves). When an open limit (`shell/workLimit`) is
  * reached, the unit throws {@link WORK_LIMIT_REACHED}; the throw unwinds the whole search before any memo stores what
  * it was computing (every memo is written after its value is whole), so nothing half-solved is ever kept, and the
  * operation that opened the limit answers "not decided" (`shell/notDecided`, {@link decideWithin}).
@@ -32,10 +32,27 @@ export const SEARCH_LIMIT_AN = 2_500_000;
 export const WORK_LIMIT_REACHED: unique symbol = Symbol('analytic work limit reached');
 export const isLimitSignal = (e: unknown): boolean => e === WORK_LIMIT_REACHED;
 
-/** One unit of solver work: counted, then the limit checked. The solver's loop calls this where it meters. */
+/**
+ * THE LIMIT'S OWN COUNT: every residual evaluation the solver ASKS for, whether it is computed or served as an exact
+ * repeat (ADR-AG-480's `servingRepeatedPoints`). The work meter counts only what is computed; a limit counted on the
+ * meter would cut later wherever repeats are served, and its stop would move with an optimisation that changes no
+ * answer. Counted here, the same search stops at the same charged unit with or without the repeat table, and the
+ * calibration below keeps its unit.
+ */
+let charged = 0;
+/** The limit's count as it stands (a monotone counter, for `withWorkLimit`'s `read`). */
+export const readCharged = (): number => charged;
+
+/** One evaluation the solver asked for: charged to the limit, then the limit checked. */
+export function chargeUnit(): void {
+  charged += 1;
+  if (limitReached()) throw WORK_LIMIT_REACHED;
+}
+
+/** One unit of solver work computed: metered, and charged to the limit. The solver's loop calls this where it meters. */
 export function solverUnit(): void {
   meterWork();
-  if (limitReached()) throw WORK_LIMIT_REACHED;
+  chargeUnit();
 }
 
 /** What a round that stopped carries: which round it was (the work it did is in the heap's memos). */
@@ -48,13 +65,17 @@ export interface ResumeAn {
  * around it) was reached first. `round` is the round this is (1 for the first press, 2 for «המשיכו לחפש», …).
  */
 export function decideWithin<V>(fn: () => V, round = 1, units = SEARCH_LIMIT_AN): V | NotDecided<ResumeAn> {
-  const out = withWorkLimit(units, () => {
-    try {
-      return { value: fn() };
-    } catch (e) {
-      if (isLimitSignal(e)) return null;
-      throw e;
-    }
-  });
+  const out = withWorkLimit(
+    units,
+    () => {
+      try {
+        return { value: fn() };
+      } catch (e) {
+        if (isLimitSignal(e)) return null;
+        throw e;
+      }
+    },
+    readCharged,
+  );
   return out.value ? out.value.value : notDecided({ round }, out.spent);
 }

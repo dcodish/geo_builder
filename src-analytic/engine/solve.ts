@@ -22,7 +22,8 @@
  * show the least-bad one: `solve` reports that it did not converge, and the caller says so. A drawn
  * figure that violates its own givens is the defect this whole product is built to avoid.
  */
-import { solverUnit } from './workLimitAn';
+import { meterWork } from '../../shell/workMeter';
+import { chargeUnit, solverUnit } from './workLimitAn';
 import { evalExpr, exprText, symbolsOf, type Env } from './expr';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import { CIRCLE_CONIC_WORDS } from '../parser/circleConicWords';
@@ -1614,6 +1615,50 @@ export interface SolveResult {
   anchored?: boolean;
 }
 
+/** The repeat table is on; off only inside {@link withoutServedRepeats}. */
+let repeatsServed = true;
+/**
+ * AN INSTRUMENT (#2893, ADR-AG-479's lock): run `fn` with no repeat served, every evaluation computed — the solve before
+ * ADR-AG-480, which the work limit must stop at the same charged unit. Not a mode: nothing outside the locks calls it.
+ */
+export function withoutServedRepeats<T>(fn: () => T): T {
+  const was = repeatsServed;
+  repeatsServed = false;
+  try {
+    return fn();
+  } finally {
+    repeatsServed = was;
+  }
+}
+
+/**
+ * #2894 ([ADR-AG-480](../../docs/06c-decisions-analytic.md#adr-ag-480), ADR-W-210 phase 5) — AN EXACT REPEAT IS SERVED.
+ *
+ * Within ONE solve, a residual vector already computed at a point bit-for-bit equal to `x` is returned again instead of
+ * being computed again. A residual function is a pure function of its point for the life of a solve, so the iterates,
+ * the result and every verdict built on it are unchanged; only the work meter sees the evaluation that did not happen.
+ * Nothing outlives the solve (the map is the call's). The returned array is shared with the first caller, and no caller
+ * writes into a residual vector. A point with a NaN coordinate is never served (NaN has more than one bit pattern).
+ * 3-D's `leastSquares` reaches the same end by caching its Jacobian (ADR-3D-210); this serves every repeat the
+ * analytic loop makes, wherever it makes it.
+ */
+function servingRepeatedPoints(f: (x: number[]) => number[]): (x: number[]) => number[] {
+  if (!repeatsServed) return f;
+  const seen = new Map<string, number[]>();
+  return (x) => {
+    let key = '';
+    for (const v of x) {
+      if (Number.isNaN(v)) return f(x);
+      key += (Object.is(v, -0) ? '-0' : String(v)) + ',';
+    }
+    const hit = seen.get(key);
+    if (hit) return hit;
+    const r = f(x);
+    seen.set(key, r);
+    return r;
+  };
+}
+
 /**
  * Levenberg–Marquardt over the free carriers.
  *
@@ -1640,9 +1685,17 @@ export function solveLM(
 ): SolveResult {
   // #2873 (ADR-W-210): one residual evaluation is analytic's unit of work. The rank and the finishing solve below are
   // handed the bare function, because each meters its own evaluations.
-  const residuals = (v: number[]): number[] => {
-    solverUnit();
+  // #2894 (ADR-W-210 phase 5): a point this solve has already evaluated is served, not evaluated again — the residuals at
+  // the iterate (taken by the cost, then again at the top of the next iteration), the whole Jacobian after a rejected
+  // step (x has not moved), the finish's re-reads. Measured: 31.9 % of every evaluation was such a repeat.
+  // #2893 (ADR-AG-479): every evaluation ASKED for is charged to the work limit, a served one too; only a computed one is metered.
+  const served = servingRepeatedPoints((v: number[]): number[] => {
+    meterWork();
     return residuals0(v);
+  });
+  const residuals = (v: number[]): number[] => {
+    chargeUnit();
+    return served(v);
   };
   const n = x0.length;
   /*

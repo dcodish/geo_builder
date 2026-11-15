@@ -269,3 +269,50 @@ export function withWorkBudget<T>(units: number, fn: () => T): T {
     }
   });
 }
+
+/**
+ * #2894 (ADR-W-210 phase 5) — AN EXACT REPEAT IS SERVED, AND CHARGED AS IF IT WERE COMPUTED.
+ *
+ * Measured over every 2-D fixture and the slow corpus: 44–47 % of the cost evaluations a `nelderMead` call makes are
+ * at a point that SAME call has already evaluated, bit for bit (a simplex that has contracted onto one point keeps
+ * reflecting and shrinking onto it). `f` is a pure function of `x` for the life of the call, so the value is the one
+ * already computed and the descent's path cannot change.
+ *
+ * What the repeat would have charged is charged again: `work.done`, `work.executed` and the open ledger frame's `own`
+ * advance by exactly what the first evaluation advanced them, so every work budget, the re-attempt cap
+ * (`withExecutedCap`) and every memo entry's ledger read the same numbers as before. Only the work meter (an executed
+ * count of THIS process's solving) sees the evaluation that did not happen. Scoped to one call: the map is the
+ * caller's, so nothing is kept between calls or depends on what ran before. A point with a NaN coordinate is never
+ * served (NaN has more than one bit pattern).
+ */
+export function servingRepeats<T>(f: (x: number[]) => T): (x: number[]) => T {
+  const seen = new Map<string, { value: T; done: number; executed: number; own: number }>();
+  return (x) => {
+    const key = exactKey(x);
+    if (key === null) return f(x);
+    const hit = seen.get(key);
+    if (hit) {
+      work.done += hit.done;
+      work.executed += hit.executed;
+      if (frame) frame.own += hit.own;
+      return hit.value;
+    }
+    const at = frame;
+    const d0 = work.done;
+    const e0 = work.executed;
+    const o0 = at ? at.own : 0;
+    const value = f(x);
+    seen.set(key, { value, done: work.done - d0, executed: work.executed - e0, own: at && frame === at ? at.own - o0 : 0 });
+    return value;
+  };
+}
+
+/** The exact identity of a point: every coordinate by its shortest round-trip text, −0 kept apart; null with a NaN. */
+function exactKey(x: readonly number[]): string | null {
+  let key = '';
+  for (const v of x) {
+    if (Number.isNaN(v)) return null;
+    key += (Object.is(v, -0) ? '-0' : String(v)) + ',';
+  }
+  return key;
+}

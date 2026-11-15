@@ -9,7 +9,9 @@
  * 3. «המשיכו לחפש» goes on from where the round stopped: the rounds together cost about what one uncut decision costs,
  *    so no round repeats what an earlier one finished — and the verdict they reach is the uncut verdict, wherever the
  *    cuts fell (nothing half-solved was kept);
- * 4. a "not decided" is never served from a memo: asked again with no limit, the decision is the uncut verdict.
+ * 4. a "not decided" is never served from a memo: asked again with no limit, the decision is the uncut verdict;
+ * 5. the limit counts every evaluation the solver asks for, a repeat ADR-AG-480 serves too: the same search stops at the
+ *    same charged unit with and without the repeat table.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -20,7 +22,8 @@ import { readWork } from '../../shell/workMeter';
 import { opsAn, type BasisAn } from '../app/opsAn';
 import { clearAnalyticCaches } from '../engine/derive';
 import { settledOf } from '../engine/settle';
-import { SEARCH_LIMIT_AN, WORK_LIMIT_REACHED, decideWithin, solverUnit } from '../engine/workLimitAn';
+import { SEARCH_LIMIT_AN, WORK_LIMIT_REACHED, decideWithin, readCharged, solverUnit } from '../engine/workLimitAn';
+import { withoutServedRepeats } from '../engine/solve';
 import { sequencesOf } from './work-meter/walkAnalytic';
 
 const CORPUS = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'corpus471.json'), 'utf8'));
@@ -39,10 +42,11 @@ function figureBefore(lines: readonly string[], k: number): string[] {
   }
   return kept;
 }
+/** What `fn` costs in the limit's own count (every evaluation asked for, a served repeat too). */
 const spentOn = <T,>(fn: () => T): { value: T; units: number } => {
-  const at = readWork().total;
+  const at = readCharged();
   const value = fn();
-  return { value, units: readWork().total - at };
+  return { value, units: readCharged() - at };
 };
 
 describe('#2893 the limit itself', () => {
@@ -106,13 +110,25 @@ describe.each(CASES)('#2893 cut and resumed: $name', ({ run, prepare }) => {
      */
     for (const share of [3, 2]) {
       const limit = Math.ceil(whole.units / share);
-      // (2) the same input under the same limit: the same stop, the same unit
+      // (2) the same input under the same limit: the same stop, the same charged unit
       clearAnalyticCaches();
-      const a = withWorkLimit(limit, run).value;
+      const a = withWorkLimit(limit, run, readCharged).value;
       clearAnalyticCaches();
-      const b = withWorkLimit(limit, run).value;
+      const b = withWorkLimit(limit, run, readCharged).value;
       expect(isNotDecided(a)).toBe(true);
       expect(JSON.stringify(b)).toBe(JSON.stringify(a));
+      // (5) …and with no repeat served (the solve before ADR-AG-480): the limit counts what the solver ASKS for, so the
+      // stop is the same, while the meter counts fewer units where repeats are served
+      clearAnalyticCaches();
+      const meteredWith = readWork().total;
+      withWorkLimit(limit, run, readCharged);
+      const servedMeter = readWork().total - meteredWith;
+      clearAnalyticCaches();
+      const meteredWithout = readWork().total;
+      const c = withoutServedRepeats(() => withWorkLimit(limit, run, readCharged).value);
+      const unservedMeter = readWork().total - meteredWithout;
+      expect(JSON.stringify(c)).toBe(JSON.stringify(a));
+      expect(servedMeter).toBeLessThan(unservedMeter);
 
       // (3) round after round from where the last stopped: the total stays near one uncut decision
       clearAnalyticCaches();
@@ -120,7 +136,7 @@ describe.each(CASES)('#2893 cut and resumed: $name', ({ run, prepare }) => {
       let rounds = 0;
       let out: unknown;
       do {
-        const r = spentOn(() => withWorkLimit(limit, run).value);
+        const r = spentOn(() => withWorkLimit(limit, run, readCharged).value);
         out = r.value;
         total += r.units;
         rounds += 1;
@@ -133,7 +149,7 @@ describe.each(CASES)('#2893 cut and resumed: $name', ({ run, prepare }) => {
 
       // (4) a stop is never remembered as an answer
       clearAnalyticCaches();
-      expect(isNotDecided(withWorkLimit(limit, run).value)).toBe(true);
+      expect(isNotDecided(withWorkLimit(limit, run, readCharged).value)).toBe(true);
       expect(JSON.stringify(run())).toBe(verdict);
     }
   }, 300_000);

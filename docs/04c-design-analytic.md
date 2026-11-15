@@ -1349,6 +1349,15 @@ trace, repairs) pass no anchor.
 
 *Identifiers:* `ANCHOR_LAMBDA` · `ANCHOR_WINDOW` · `NEWTON_RATIO` · `ANCHOR_MIN_PULL` · `ANCHOR_RAISES` · `POLISH_ITER`
 
+**One solve never evaluates one point twice ([ADR-AG-480](06c-decisions-analytic.md#adr-ag-480), #2894).** `solveLM`'s
+residual function is wrapped in `servingRepeatedPoints`: within the one solve, residuals already computed at a point bit
+for bit equal to the one asked are returned again. That serves the residuals at the iterate (the cost takes them, then
+the top of the next iteration asked again), the whole central-difference Jacobian after a rejected step (the iterate has
+not moved: 3-D's `leastSquares` caches its Jacobian for the same reason, ADR-3D-210) and the finish's re-reads. Measured,
+31.9 % of every evaluation was such a repeat. The residual functions are pure in the point and no caller writes into a
+returned vector, so the iterates and the result are unchanged; the table is the solve's own. `freeRank` and the finish's
+own `solveLM` are separate solves with their own tables.
+
 ### The legibility bound (sr-25) ([ADR-AG-359](06c-decisions-analytic.md#adr-ag-359), ADR-W-175)
 
 One predicate, `legibleAt(c, at, extent)` (`engine/evaluate.ts`, over `rings.ts` `legibilityFaults`): every FREE corner of a
@@ -1561,7 +1570,8 @@ ten seconds on the dev PC), opened with `shell/workLimit`'s `withWorkLimit` by `
 `solverUnit()`, which replaced `meterWork()` at the four places a unit is counted (`solveLM`, `freeRank`,
 `jacobianRank`, `scanRoots`): past an open limit it throws a symbol that unwinds the search, and `decideWithin` answers
 `NotDecided { resume: { round }, spent }` (`shell/notDecided`). A `catch` on a solve's path must rethrow it
-(`isLimitSignal`). Every memo is written once its value is whole, so a stop leaves nothing half-written and hands the
+(`isLimitSignal`). The limit counts on its own counter (`chargeUnit` / `readCharged`): every evaluation asked for, a repeat
+`solveLM` serves (ADR-AG-480) included, so a served repeat skips the meter but never moves the stop. Every memo is written once its value is whole, so a stop leaves nothing half-written and hands the
 page nothing to adopt. The next round («המשיכו לחפש», `round` + 1) finds what the last one finished in the worker's
 content memos (a hit counts no unit) and spends its limit on the rest. A round progresses only if one piece fits in it
 (measured: under 0.16 M units, against 2.5 M). The page keeps the stop in React state (`stopped` in `App.tsx`,

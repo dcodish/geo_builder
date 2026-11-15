@@ -29,7 +29,7 @@ import {
 import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostRowCount, jointCostRows, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
 import { sideRecordsOf, sideShortfall, statedTangency, type SideRecord } from './requirements';
 import { solveLM } from './solveLM';
-import { budgetExceeded, chargeHit, computeWithCell, countWork, registerLedger, solveBudget, type WorkCell } from './solveBudget';
+import { budgetExceeded, chargeHit, computeWithCell, countWork, registerLedger, servingRepeats, solveBudget, type WorkCell } from './solveBudget';
 import { GLUED_NAME_WHOLE } from '../../shell/indexedName';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
@@ -1400,7 +1400,8 @@ function freePolygonVerticesToRecruit(c: Construction, carriers: GeoObject[]): G
  * `accept` gate still judges it, and `solveBudget.aborts` marks the fold so {@link computeReplay}
  * refuses to memoize a truncated one.
  */
-export function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300, step = 0.15): number[] {
+export function nelderMead(cost: (x: number[]) => number, x0: number[], iters = 300, step = 0.15): number[] {
+  const f = servingRepeats(cost); // #2894: a point this call has already evaluated is served, and charged as computed
   const n = x0.length;
   let simplex = [x0.slice(), ...x0.map((_, i) => x0.map((v, j) => (j === i ? v + step : v)))];
   let fv = simplex.map(f);

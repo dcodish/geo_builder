@@ -697,3 +697,31 @@ describe('#1071 — a point placed in a QUADRANT', () => {
     }
   });
 });
+
+/**
+ * #2894 ([ADR-AG-480](../../docs/06c-decisions-analytic.md#adr-ag-480), ADR-W-210 phase 5) — ONE SOLVE NEVER EVALUATES ONE
+ * POINT TWICE. The residuals at the iterate, the Jacobian after a rejected step and the finish's re-reads are served
+ * from the solve's own table; the iterates and the answer are the ones a fresh solve reproduces bit for bit.
+ */
+describe('#2894 — solveLM serves an exact repeat', () => {
+  const rows = (calls: { n: number; repeats: number; seen: Set<string> }) => (x: number[]): number[] => {
+    calls.n++;
+    const k = x.map((v) => (Object.is(v, -0) ? '-0' : String(v))).join(',');
+    if (calls.seen.has(k)) calls.repeats++;
+    calls.seen.add(k);
+    // an inconsistent pair (no exact root: the steps are rejected near the floor) and a consistent one
+    return [x[0] + x[1] - 2, x[0] - x[1], x[0] + x[1] - 2.5, x[2] * x[2] - 4];
+  };
+  it('no point is evaluated twice, on a solve that rejects steps', () => {
+    const calls = { n: 0, repeats: 0, seen: new Set<string>() };
+    const r = solveLM([0.3, -0.2, 1], rows(calls));
+    expect(calls.repeats).toBe(0);
+    expect(calls.n).toBeGreaterThan(0);
+    const again = solveLM([0.3, -0.2, 1], rows({ n: 0, repeats: 0, seen: new Set<string>() }));
+    expect(again).toEqual(r);
+  });
+  it('an anchored figure solve is reproduced bit for bit (its rank probe and its finish are solves of their own)', () => {
+    const r = solveLM([0.3, -0.2, 1], rows({ n: 0, repeats: 0, seen: new Set<string>() }), 120, 2);
+    expect(solveLM([0.3, -0.2, 1], rows({ n: 0, repeats: 0, seen: new Set<string>() }), 120, 2)).toEqual(r);
+  });
+});
