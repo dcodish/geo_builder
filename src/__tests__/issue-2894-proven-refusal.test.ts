@@ -5,6 +5,9 @@
  * The metric closure proves that no figure holds the lengths, and the failure ladder returns the refusal its climb
  * would have ended with, without climbing. The lock: every row of each sequence reads exactly as it does when the
  * ladder climbs (the proof turned off), and the proof is what answered (far less work).
+ *
+ * pipeline-lock: the refusal's other half — the earlier statement it names, `[vs #i]` — is the FOLD's drop-one search, not
+ * the step's, so "the proof reads as the climb" can only be checked on a folded figure, with and without the proof.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { factsOf } from './scenario-pipeline';
