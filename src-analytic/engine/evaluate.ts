@@ -6579,29 +6579,45 @@ function firstAdmittingDrop(
 
 /**
  * WHICH DECLARED POLYGONS THE GIVENS FORCE FLAT (#1849, ADR-AG-247) — the rings the thin-ring arm found the givens
- * holding on only collapsed (`Figure.collapsedRings`), over the window `drawableAt` walks from `seed`. In order of
- * first appearance, so the ring a refusal names is a function of the input and the seed alone.
+ * holding on only collapsed (`Figure.collapsedRings`), over the window `drawableAt` walks from `at`. In order of
+ * first appearance, so the ring a refusal names is a function of the input and the configuration alone.
  *
  * Called only on the refusal path, where `drawableAt` found nothing whole and so evaluated this whole window
- * already: every lookup is a memo hit (ADR-AG-144), never a new solve.
+ * already: every lookup is a memo hit (ADR-AG-144), never a new solve. **The window is the walk's own**
+ * ({@link walkWindow}, #2894 part 2, ADR-AG-481): the requested configuration, then each later seed at reach 1 with the
+ * request's `wide`. It used to be `evaluate(c, s)` with the defaults, which at a seed-0 request (`wide` false) are
+ * other configurations (`wide` true from seed 1 on): every such refusal solved a second 24-seed window it then read.
  */
-/**
- * WHICH OPERAND PAIRS THE GIVENS FORCE TOGETHER (#2506, ADR-AG-399) — `Figure.metPairs` over the same window, the
- * pair twin of {@link collapsedByGivens}. Refusal path only, every lookup a memo hit.
- */
-export function pairsMetByGivens(c: Construction, seed: number): [Id, Id][] {
-  const out: [Id, Id][] = [];
-  for (let s = seed; s <= seed + DRAWABLE_TRIES; s += 1) {
-    for (const p of evaluate(c, s).metPairs ?? []) if (!out.some((q) => q[0] === p[0] && q[1] === p[1])) out.push(p);
+export function collapsedByGivens(c: Construction, at: Seed): Id[] {
+  const out: Id[] = [];
+  for (const f of walkWindow(c, at)) {
+    for (const id of f.collapsedRings ?? []) if (!out.includes(id)) out.push(id);
   }
   return out;
 }
 
-export function collapsedByGivens(c: Construction, seed: number): Id[] {
-  const out: Id[] = [];
-  for (let s = seed; s <= seed + DRAWABLE_TRIES; s += 1) {
-    for (const id of evaluate(c, s).collapsedRings ?? []) if (!out.includes(id)) out.push(id);
+/**
+ * WHICH OPERAND PAIRS THE GIVENS FORCE TOGETHER (#2506, ADR-AG-399) — `Figure.metPairs` over the same window, the
+ * pair twin of {@link collapsedByGivens}. Refusal path only, every lookup a memo hit.
+ */
+export function pairsMetByGivens(c: Construction, at: Seed): [Id, Id][] {
+  const out: [Id, Id][] = [];
+  for (const f of walkWindow(c, at)) {
+    for (const p of f.metPairs ?? []) if (!out.some((q) => q[0] === p[0] && q[1] === p[1])) out.push(p);
   }
+  return out;
+}
+
+/**
+ * THE WINDOW `walkDrawable` EVALUATES FROM `at` (#2894 part 2, ADR-AG-481) — the first figure at the requested
+ * configuration, then seeds `seed + 1 … seed + DRAWABLE_TRIES` at reach 1 with the request's `wide`, exactly the
+ * `evalAt` calls of its forward walk. A reader of "the window the search walked" reads these, so on the refusal path
+ * (where the walk found nothing whole and evaluated all of them) every one is a memo hit.
+ */
+function walkWindow(c: Construction, at: Seed): Figure[] {
+  const { seed, reach, wide } = configurationOf(at);
+  const out: Figure[] = [evaluate(c, seed, reach, wide)];
+  for (let s = seed + 1; s <= seed + DRAWABLE_TRIES; s += 1) out.push(evaluate(c, s, 1, wide));
   return out;
 }
 

@@ -414,6 +414,21 @@
         "שטח המשולש ABC הוא 12"
       ],
       "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2894-c-analytic",
+      "id": "T3",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "lines": [
+        "ריבוע ABCD",
+        "AB = 3",
+        "AC = 10"
+      ],
+      "lookFor": "The third line is refused «לא נמצאה תצורה שבה מתקיים: «AC = 10»»; two rows stay."
     }
   ],
   "results": [

@@ -1741,8 +1741,11 @@ Seeding a derived point's region through its parents; exact root enumeration.
 
 `derive` raises faults in a fixed order and gives a line one message, so the ring arm (#1170) runs after the vacancy
 loop and skips lines already in `faults`. A collapse the givens force is `polygon-collapsed`
-([ADR-AG-247](06c-decisions-analytic.md#adr-ag-247): `Figure.collapsedRings`, `collapsedByGivens(c, seed)`,
+([ADR-AG-247](06c-decisions-analytic.md#adr-ag-247): `Figure.collapsedRings`, `collapsedByGivens(c, at)`,
 `errPolygonCollapsed`). A fault is also the refusal: `decideSubmit` refuses when one lands on the new line.
+`collapsedByGivens` and its pair twin `pairsMetByGivens` read **the walk's own window** (`walkWindow`: the requested
+configuration, then each later seed at reach 1 with the request's `wide`), so on the refusal path every figure they read
+is one `drawableAt` already evaluated ([ADR-AG-481](06c-decisions-analytic.md#adr-ag-481)).
 
 **The vacancy arm reads the OBJECT's freedom, and a stated collinearity is a proof** ([ADR-AG-296](06c-decisions-analytic.md#adr-ag-296), #1963).
 A `vacant` object is refused `does-not-exist` when `Figure.freedomOfRead` over its inputs (`inputsOf`, `carriers.ts`:

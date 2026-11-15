@@ -157,23 +157,27 @@ describe.each(CASES)('#2893 cut and resumed: $name', ({ run, prepare }) => {
 
 /**
  * THE THIRD OUTCOME ON A REAL FIGURE (CLAUDE.md rule 4; found by this phase's measurement, ADR-AG-479). Exam 2379,
- * question 3, typed to section ג (`fixtures/exam-2379-q3-route-2392.analytic.json`, nine lines): any further line costs
- * more than ten seconds of work today. «P(1,1)» (P is the tangent point on N1) cannot hold, and the search that shows it
- * spends 6.5 M units (25.6 s on the dev PC, 2026-11-14). Under the limit: «עדיין לא נמצא פתרון» once (10 s in the
- * browser), and the second round ends in today's refusal, word for word. When phase 5 (#2894) makes this line cheaper, this count changes.
+ * question 3, typed to section ג (`fixtures/exam-2379-q3-route-2392.analytic.json`, nine lines). «P(1,1)» (P is the
+ * tangent point on N1) cannot hold. Its search spent 6.5 M units (25.6 s on the dev PC, 2026-11-14), so under the limit it
+ * said «עדיין לא נמצא פתרון» once and the second round ended in the refusal. Since #2894 part 2 (ADR-AG-481) the refusal
+ * reads the window its own search walked instead of solving a second one, and the line is decided in the FIRST round,
+ * inside the limit: today's refusal, word for word, never «עדיין לא נמצא פתרון». (The third outcome on a cut decision is
+ * held above, on three corpus decisions cut by a smaller limit.)
  */
-describe('#2893 exam 2379: a tenth line reaches the limit, then is refused', () => {
-  it('not decided, then today\'s refusal', () => {
+describe('#2893 exam 2379: a tenth line that cannot hold', () => {
+  it('is refused in the first round, inside the limit, with today’s refusal (ADR-AG-481)', () => {
     const exam = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'exam-2379-q3-route-2392.analytic.json'), 'utf8')) as { lines: string[] };
     clearAnalyticCaches();
     const figure = figureBefore(exam.lines, exam.lines.length);
     expect(figure).toEqual(exam.lines);
-    const outcomes: Array<{ value: unknown; settled: unknown }> = [];
-    for (let round = 1; round <= 2; round += 1) outcomes.push(opsAn.submit({ raw: 'P(1,1)', basis: basisOf(figure), round }));
-    const [first, second] = outcomes;
-    expect(first.value).toEqual({ kind: 'not-decided', resume: { round: 1 }, spent: SEARCH_LIMIT_AN });
-    // a stop hands the page nothing to adopt
-    expect(first.settled).toEqual(settledOf([]));
-    expect(second.value).toMatchObject({ kind: 'refused', error: { key: 'unsatisfiable' } });
+    const first = spentOn(() => opsAn.submit({ raw: 'P(1,1)', basis: basisOf(figure), round: 1 }));
+    expect(first.value.value).toMatchObject({ kind: 'refused', error: { key: 'unsatisfiable', detail: 'P(1,1)' } });
+    expect(first.units).toBeLessThan(SEARCH_LIMIT_AN);
+    // …and cut by a smaller limit it is still the third outcome, and a stop hands the page nothing to adopt
+    clearAnalyticCaches();
+    figureBefore(exam.lines, exam.lines.length);
+    const cut = withWorkLimit(1_000_000, () => opsAn.submit({ raw: 'P(1,1)', basis: basisOf(figure), round: 1 }), readCharged).value;
+    expect(isNotDecided(cut.value)).toBe(true);
+    expect(cut.settled).toEqual(settledOf([]));
   }, 600_000);
 });
