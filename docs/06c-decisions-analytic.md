@@ -16851,3 +16851,21 @@ Wall time of the same actions through `scripts/perf/analytic/driver.mjs`, before
 
 **What the student will see.**
 - [asked] Nothing but speed: no line, verdict, drawing or message changes. *"Speed-only ships, rest waits (Recommended)"* (operator, 2026-11-14)
+
+## ADR-AG-483 — Stated lengths no figure can have are refused at once, in 3-D's words: the triangle inequality and one length per segment (#2894)
+
+**Status:** built, 2026-11-15 · **Issue:** [#2894](https://github.com/dcodish/geo_builder/issues/2894) (phase 5 part 2 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210), item C, the wording) · branch `feat/2894-c-lengths-analytic`
+**Requirements:** [02c](02c-requirements-analytic.md) R16 § *Stated lengths no figure can have are refused at once, saying why* · **Design:** [04c](04c-design-analytic.md) § *Where a fault is raised, and why ORDER matters there*
+
+**Root cause (class).** A line whose stated lengths no figure can have — three points against the triangle inequality, a square's diagonal against its side, one segment given two lengths through a shape's equal sides — was refused only after the configuration walk had run every solve of every seed of its window to failure, then the drop-one probe: x-tri-ineq «AC = 10» cost 140 863 units, x-square-diag 148 665 (14.7× and 8.8× the dearest accepted line of the figure, docs/17 §7 rule 2), and the refusal said only «לא נמצאה תצורה שבה מתקיים», as if the search had missed. 3-D reads the same conflict off its pins in closed form (ADR-3D-495, PR #2900).
+
+**The mechanism.** `engine/metricBounds.ts` is 3-D's `metricBounds3` ported step for step onto analytic's `length-eq` rows: a side with one segment term, homogeneous and linear (`k·|AB|`), is a length; a side with no term is a number; the rows give lengths and ratios; a weighted union–find finds a segment with two lengths, then the triangle inequality is checked on every triple whose three sides are fixed, with 3-D's margin (10⁻³ relative and absolute: the edge case, flat, stays the search's). `evaluate` skips the fits and the solve of a construction with such a conflict (no start can meet it), and `derive` refuses the newest line among the conflicting rows with `lengths-impossible`, naming the other rows and the reason; it stands in for the drop-one blame, which it agrees with by construction. The sentences are 3-D's, word for word in Hebrew and English (`errLengthsImpossible{Value,Triangle}[Alone]`); the numbers are analytic's (`fmtAnalytic`).
+
+**Measured** (units of the refused line's decision): x-tri-ineq 140 863 → 350; x-square-diag 148 665 → 450; «∠ABC = 90» (no length conflict) and a coordinate-pinned length unchanged. The work-meter gate: 0 of 3 205 lines moved (the fixtures hold no such line), the slow corpus 0 of 55.
+
+**Transcript compare** (the two-level transcript of ADR-AG-481/-482, `main` @ `63ccbc5a` against this branch): 3 205 + 55 + 67 actions; **0 drawing differences; 2 verdict differences, both the ruled wording**: x-tri-ineq «AC = 10» and x-square-diag «AC = 10», `refused:unsatisfiable` → `refused:lengths-impossible`. Every other verdict, refusal and message is identical.
+
+**Locks.** `lengths-impossible-2894.test.ts` (the regression scenarios, CLAUDE.md rule 4): the triangle inequality, the square's diagonal, the square's two sides, the equilateral's two sides, each refused with 3-D's exact sentence at seeds 0 and 3; the refusal costs under 20 000 units; the equality case keeps «…משטיח…»; a length the others allow is drawn; the unit (a ratio, a parameter, the margin). `issue-1849-flat-polygon-refused.test.ts`: «AC = 8.1» on 5 and 3 is now `lengths-impossible` (it was `unsatisfiable`). `message-floor-2028.test.ts`: the four sentences.
+
+**What the student will see.**
+- [ruled] A line whose stated lengths cannot hold together is refused at once with the reason and the other lines named, in 3-D's sentence (it said «לא נמצאה תצורה שבה מתקיים: «…»» after a search). Operator, 2026-11-15: *"A clearer reason (Recommended)"* and *"The clearer reason everywhere (Recommended)"*. Text recorded with `judgments.mjs chose` (`text-2894-analytic-lengths-impossible`).

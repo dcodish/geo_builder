@@ -363,6 +363,15 @@ const he = {
   errAngleNameTaken_vs: 'לזווית {{nameOf}} כבר יש שם: {{holder}} (בשורה «{{declared}}»). לכל זווית שם אחד — המשיכו עם {{holder}}.',
   errLengthNameTaken: 'לקטע {{nameOf}} כבר יש שם: {{holder}}. לכל קטע שם אחד — המשיכו עם {{holder}}.',
   errLengthNameTaken_vs: 'לקטע {{nameOf}} כבר יש שם: {{holder}} (בשורה «{{declared}}»). לכל קטע שם אחד — המשיכו עם {{holder}}.',
+  // #2894 (ADR-AG-483) — 3-D's sentence (ADR-3D-495), word for word: stated lengths no figure can have
+  errLengthsImpossibleValue:
+    "הנתונים סותרים זה את זה — «{{detail}}» לא מתקיים יחד עם {{others}}: יחד הם נותנים לקטע {{seg}} שני אורכים שונים, {{lenA}} ו-{{lenB}}. בדקו איזה מהאורכים האלה לא נכון.",
+  errLengthsImpossibleValueAlone:
+    "הנתונים ב«{{detail}}» סותרים זה את זה: הם נותנים לקטע {{seg}} שני אורכים שונים, {{lenA}} ו-{{lenB}}. בדקו איזה מהאורכים האלה לא נכון.",
+  errLengthsImpossibleTriangle:
+    "הנתונים סותרים זה את זה — «{{detail}}» לא מתקיים יחד עם {{others}}: יחד הם קובעים |{{long}}| = {{longLen}} ו-|{{sideA}}| + |{{sideB}}| = {{lenSum}}, אבל לפי אי־שוויון המשולש {{tri}} תמיד |{{long}}| ≤ |{{sideA}}| + |{{sideB}}|. בדקו איזה מהאורכים האלה לא נכון.",
+  errLengthsImpossibleTriangleAlone:
+    "הנתונים ב«{{detail}}» סותרים זה את זה: הם קובעים |{{long}}| = {{longLen}} ו-|{{sideA}}| + |{{sideB}}| = {{lenSum}}, אבל לפי אי־שוויון המשולש {{tri}} תמיד |{{long}}| ≤ |{{sideA}}| + |{{sideB}}|. בדקו איזה מהאורכים האלה לא נכון.",
   errMeasureContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errMeasureContradictsAlone: 'לא ניתן: «{{detail}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errRadiusContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד.',
@@ -980,6 +989,15 @@ const en: typeof he = {
   errAngleNameTaken_vs: 'Angle {{nameOf}} already has a name: {{holder}} (in the line «{{declared}}»). An angle has one name — keep using {{holder}}.',
   errLengthNameTaken: 'Segment {{nameOf}} already has a name: {{holder}}. A segment has one name — keep using {{holder}}.',
   errLengthNameTaken_vs: 'Segment {{nameOf}} already has a name: {{holder}} (in the line «{{declared}}»). A segment has one name — keep using {{holder}}.',
+  // #2894 (ADR-AG-483) — 3-D's sentence (ADR-3D-495), word for word: stated lengths no figure can have
+  errLengthsImpossibleValue:
+    "The givens contradict each other — «{{detail}}» cannot hold together with {{others}}: together they give the segment {{seg}} two different lengths, {{lenA}} and {{lenB}}. Check which of these lengths is wrong.",
+  errLengthsImpossibleValueAlone:
+    "The givens in «{{detail}}» contradict each other: they give the segment {{seg}} two different lengths, {{lenA}} and {{lenB}}. Check which of these lengths is wrong.",
+  errLengthsImpossibleTriangle:
+    "The givens contradict each other — «{{detail}}» cannot hold together with {{others}}: together they make |{{long}}| = {{longLen}} and |{{sideA}}| + |{{sideB}}| = {{lenSum}}, but by the triangle inequality in {{tri}}, always |{{long}}| ≤ |{{sideA}}| + |{{sideB}}|. Check which of these lengths is wrong.",
+  errLengthsImpossibleTriangleAlone:
+    "The givens in «{{detail}}» contradict each other: they make |{{long}}| = {{longLen}} and |{{sideA}}| + |{{sideB}}| = {{lenSum}}, but by the triangle inequality in {{tri}}, always |{{long}}| ≤ |{{sideA}}| + |{{sideB}}|. Check which of these lengths is wrong.",
   errMeasureContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold. The reason: {{what}}.',
   errMeasureContradictsAlone: 'Can\'t do that: «{{detail}}» contradicts an earlier given — they can\'t both hold. The reason: {{what}}.',
   errRadiusContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold.',

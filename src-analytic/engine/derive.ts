@@ -6,6 +6,7 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
+import { metricConflict, type LengthsWhy } from './metricBounds';
 import { centreIdOf, circleByName, commonTouchOf, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
@@ -32,7 +33,10 @@ import { workLane } from '../../shell/workMeter';
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 export interface LineFault {
   index: number;
-  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'not-canonical' | 'third-crossing' | 'tangent-no-second-crossing' | 'forced-collinear';
+  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'not-canonical' | 'third-crossing' | 'tangent-no-second-crossing' | 'forced-collinear' | 'lengths-impossible';
+  /** #2894 (ADR-AG-483): a `lengths-impossible` refusal — the other lines whose lengths take part, and the reason. */
+  others?: string[];
+  why?: LengthsWhy;
   detail: string;
   /** For a name clash: what the name already holds, as a token the locale renders (#1046). */
   existing?: ApplyError['existing'];
@@ -609,7 +613,28 @@ function deriveAt(
   })();
   if (ringOrderFault) faults.push(ringOrderFault);
   const groupOfConstraint = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
-  const completing = figure.unsatisfied.length > 0 ? completingStatement(construction, groupOfConstraint, seed, pinnedBy) : null;
+  /**
+   * STATED LENGTHS NO FIGURE CAN HAVE (#2894 part 2 C, [ADR-AG-483](../../docs/06c-decisions-analytic.md#adr-ag-483); 3-D's
+   * ADR-3D-495, its sentence). `evaluate` skipped the solve for them (`metricConflict`): the refusal says which lengths and
+   * why, on the newest line among the rows that fix them, naming the others. It stands in for the drop-one probe's blame,
+   * which it agrees with by construction (removing the newest of those rows removes the conflict).
+   */
+  const metric = figure.unsatisfied.length > 0 && !ringOrderFault ? metricConflict(construction.constraints) : null;
+  const metricLines = metric ? [...new Set(metric.rows.map((r) => groupOfConstraint[r]).filter((g) => g >= 0))].sort((a, b) => a - b) : [];
+  const lengthsFault: LineFault | null =
+    metric && metricLines.length > 0 && !faults.some((f) => f.index === metricLines[metricLines.length - 1])
+      ? (() => {
+          const index = metricLines[metricLines.length - 1];
+          const others = metricLines.slice(0, -1).map((i) => lines[i]);
+          if (metric.kind === 'value') {
+            return { index, code: 'lengths-impossible' as const, detail: lines[index], others, why: { kind: 'value' as const, seg: metric.seg.join(''), a: metric.forced, b: metric.stated } };
+          }
+          const [a, b] = [[metric.p, metric.q], [metric.q, metric.r], [metric.p, metric.r]].filter(([x, y]) => !(metric.long.includes(x) && metric.long.includes(y))).map((q) => q.join(''));
+          return { index, code: 'lengths-impossible' as const, detail: lines[index], others, why: { kind: 'triangle' as const, tri: [metric.p, metric.q, metric.r].join(''), long: metric.long.join(''), longLen: metric.longLen, a, b, sum: metric.sum } };
+        })()
+      : null;
+  if (lengthsFault) faults.push(lengthsFault);
+  const completing = lengthsFault ? lengthsFault.index : figure.unsatisfied.length > 0 ? completingStatement(construction, groupOfConstraint, seed, pinnedBy) : null;
   /**
    * ONE BLAME MECHANISM FOR THE WHOLE ADMISSION VERDICT (#1699, ADR-AG-240). The probe's answer is a statement whose
    * removal ADMITS a figure — every given holds, every selector holds, the ring is the noun's (`admittedFigure`). So when
@@ -741,7 +766,7 @@ function deriveAt(
    * so. «לא נמצאה תצורה» would tell the student the search missed, when the givens themselves are what flatten it.
    * A given that cannot hold even flat («AC = 8.1» on 5 and 3) leaves no such evidence and keeps the search's words.
    */
-  const flattened = !ringOrderFault && completing !== null ? collapsedByGivens(construction, seed) : [];
+  const flattened = !ringOrderFault && !lengthsFault && completing !== null ? collapsedByGivens(construction, seed) : [];
   const flatFault = flattened.length > 0 ? collapseFault(completing!, flattened[0]) : null;
   /**
    * THE GIVENS HOLD ONLY WHERE TWO NAMED POINTS MEET (#2506, ADR-AG-399 — 2-D's ADR-764, 3-D's ADR-3D-378; ADR-W-146).
@@ -751,7 +776,7 @@ function deriveAt(
    * completing line, the earlier statement it cannot hold with (`partnerStatement`, 2-D's `[vs #i]`), and the
    * completing statement as the reason — never «לא נמצאה תצורה», which says the search missed.
    */
-  const metPairs = !flatFault && !ringOrderFault && completing !== null ? pairsMetByGivens(construction, seed) : [];
+  const metPairs = !flatFault && !ringOrderFault && !lengthsFault && completing !== null ? pairsMetByGivens(construction, seed) : [];
   const partner = metPairs.length > 0 ? partnerStatement(construction, groupOfConstraint, seed, completing!, pinnedBy) : null;
   if (flatFault) faults.push(flatFault);
   else if (metPairs.length > 0) {
@@ -762,7 +787,7 @@ function deriveAt(
       what: lines[completing!],
       ...(partner !== null ? { declared: lines[partner] } : {}),
     });
-  } else if (!ringOrderFault && completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
+  } else if (!ringOrderFault && !lengthsFault && completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
     faults.push({ index: completing, code: 'unsatisfiable', detail: lines[completing] });
   }
   for (const k of !ringOrderFault && completing === null ? figure.unsatisfied : []) {

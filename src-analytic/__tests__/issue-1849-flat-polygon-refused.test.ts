@@ -107,10 +107,11 @@ describe('#1849 — controls: what is not a collapse keeps its verdict', () => {
     for (const seed of SEEDS) expect(typed(['משולש ABC', 'זווית BAC = 3', 'AB = 5', 'AC = 5'], seed).kind, `seed ${seed}`).toBe('record');
   });
 
-  it('a length that cannot hold even flat (5, 3, 8.1) is no collapse: the search’s words stand', () => {
+  // #2894 (ADR-AG-483, ruling 2026-11-15 «The clearer reason everywhere»): no collapse, and now the triangle inequality's words
+  it('a length that cannot hold even flat (5, 3, 8.1) is no collapse: it is refused as the triangle inequality', () => {
     for (const seed of SEEDS) {
       const v = typed(['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8.1'], seed);
-      expect(v.kind === 'refused' && v.error.key, `seed ${seed}`).toBe('unsatisfiable');
+      expect(v.kind === 'refused' && v.error.key, `seed ${seed}`).toBe('lengths-impossible');
     }
   });
 

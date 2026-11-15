@@ -261,7 +261,10 @@ const collapseFields = (f: Derivation['faults'][number]) =>
                             : // #2386 (ADR-AG-310) — a side the line does not have: the word the refusal quotes
                               f.code === 'side-of-vertical' || f.code === 'side-of-horizontal'
                               ? { side: f.side }
-                              : {};
+                              : // #2894 (ADR-AG-483) — stated lengths no figure can have: the other lines, and why
+                                f.code === 'lengths-impossible'
+                                ? { others: f.others, why: f.why }
+                                : {};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {

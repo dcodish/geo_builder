@@ -16,6 +16,12 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'not-handled': [{}],
   'name-taken': [{ detail: '∠ABC = 40°', nameOf: 'ABC', nameKind: 'angle' }, { detail: 'AB = 3', nameOf: 'AB', nameKind: 'length' }],
   'measure-contradicts': [{ detail: '∠ABC = 40°', what: '∠ABC = 40°' }],
+  'lengths-impossible': [
+    { detail: 'AC = 10', others: ['AB = 3', 'BC = 4'], why: { kind: 'triangle', tri: 'ABC', long: 'AC', longLen: 10, a: 'AB', b: 'BC', sum: 7 } },
+    { detail: 'AC = 10', others: [], why: { kind: 'triangle', tri: 'ABC', long: 'AC', longLen: 10, a: 'AB', b: 'BC', sum: 7 } },
+    { detail: 'BC = 4', others: ['ריבוע ABCD', 'AB = 3'], why: { kind: 'value', seg: 'BC', a: 3, b: 4 } },
+    { detail: 'BC = 4', others: [], why: { kind: 'value', seg: 'BC', a: 3, b: 4 } },
+  ], // #2894 (ADR-AG-483)
   'radius-contradicts': [{ detail: 'מעגל O ברדיוס 4', declared: 'מעגל O ברדיוס 3' }, { detail: 'מעגל O ברדיוס 4' }], // #2119 (ADR-684)
   'no-common-tangent': [{ detail: 'כל המשיקים המשותפים לשני המעגלים' }], // #2390 (ADR-AG-314)
   'radius-letter-taken': [
