@@ -159,3 +159,154 @@ export function metricConflict3(c: Pick<Construction3, 'scalarPins'>): MetricCon
   }
   return null;
 }
+
+/**
+ * #2894 ([ADR-3D-495](../../docs/06b-decisions-3d.md#adr-3d-495) Am. 1) — THE REASON, CHOSEN AS 2-D CHOOSES IT (ADR-W-118
+ * B1: one plane-geometry sentence; 2-D's ADR-835 `explainLengthConflict` is the reference; analytic's ADR-AG-483 Am. 1 is
+ * the same code).
+ *
+ * The lengths a figure FORCES are more than the stated ones: a fixed angle between two fixed sides fixes the third (the
+ * law of cosines) — «ריבוע ABCD» · «|AB| = 3» gives |AC| = 3√2 through the square's right angle at B. `closeLengths3` fixes
+ * them: the stated lengths, the ratios, and every angle a pin fixes at a vertex (`vangle`, or a `cos-angle` between two
+ * point pairs that share a point), propagated until nothing new is fixed. The reason: each stated length tried in turn
+ * (the refused row's own first, then the newest first) with the closure of the others — "two lengths" when the others fix
+ * that segment to another value (the forced value first), else the triangle inequality on that segment.
+ */
+interface Known3 {
+  len: number;
+  via: number[];
+}
+interface Angle3 {
+  v: Id;
+  p: Id;
+  q: Id;
+  deg: number;
+  via: number[];
+}
+const uniq3 = (xs: readonly number[]): number[] => [...new Set(xs)].sort((a, b) => a - b);
+
+/** The angles the pins fix at a vertex. */
+function fixedAngles3(pins: readonly ScalarPin[], skip: number | null): Angle3[] {
+  const out: Angle3[] = [];
+  pins.forEach((p, i) => {
+    if (i === skip) return;
+    if (p.kind === 'vangle' && p.vertex !== p.p && p.vertex !== p.q && p.p !== p.q && p.deg > 0 && p.deg < 180) {
+      out.push({ v: p.vertex, p: p.p, q: p.q, deg: p.deg, via: [i] });
+      return;
+    }
+    if (p.kind !== 'cos-angle' || p.u.kind !== 'pair' || p.v.kind !== 'pair' || !(Math.abs(p.cos) < 1)) return;
+    const u = p.u;
+    const w = p.v;
+    // the shared point is the vertex; a ray pointing INTO it is reversed
+    const v = [u.from, u.to].find((x) => x === w.from || x === w.to);
+    if (v === undefined) return;
+    const end = (a: { from: Id; to: Id }): [Id, number] => (a.from === v ? [a.to, 1] : [a.from, -1]);
+    const [P, s1] = end(u);
+    const [Q, s2] = end(w);
+    if (P === Q || P === v || Q === v) return;
+    out.push({ v, p: P, q: Q, deg: (Math.acos(s1 * s2 * p.cos) * 180) / Math.PI, via: [i] });
+  });
+  return out;
+}
+
+/** The lengths the pins fix (all but `skip`), and whether they conflict. */
+function closeLengths3(pins: readonly ScalarPin[], skip: number | null): { known: Map<string, Known3>; conflict: boolean } {
+  const angles = fixedAngles3(pins, skip);
+  const known = new Map<string, Known3>();
+  let conflict = false;
+  const set = (s: string, len: number, via: number[]): boolean => {
+    if (!(len >= 0) || !Number.isFinite(len)) return false;
+    const had = known.get(s);
+    if (!had) {
+      known.set(s, { len, via: uniq3(via) });
+      return true;
+    }
+    if (differ(had.len, len) && Math.abs(had.len - len) > CONFLICT_MARGIN) conflict = true;
+    return false;
+  };
+  pins.forEach((p, i) => {
+    if (i !== skip && p.kind === 'length' && p.a !== p.b) set(segKey(p.a, p.b), p.value, [i]);
+  });
+  for (let round = 0; round < 64; round++) {
+    let moved = false;
+    pins.forEach((p, i) => {
+      if (i === skip || p.kind !== 'length-rel' || !(p.c > 0) || !Number.isFinite(p.c) || p.a1 === p.b1 || p.a2 === p.b2) return;
+      const s1 = segKey(p.a1, p.b1);
+      const s2 = segKey(p.a2, p.b2);
+      const k1 = known.get(s1);
+      const k2 = known.get(s2);
+      if (k2) moved = set(s1, p.c * k2.len, [...k2.via, i]) || moved;
+      if (k1) moved = set(s2, k1.len / p.c, [...k1.via, i]) || moved;
+    });
+    for (const w of angles) {
+      const a = known.get(segKey(w.v, w.p));
+      const b = known.get(segKey(w.v, w.q));
+      if (!a || !b) continue;
+      const c = Math.sqrt(Math.max(0, a.len * a.len + b.len * b.len - 2 * a.len * b.len * Math.cos((w.deg * Math.PI) / 180)));
+      moved = set(segKey(w.p, w.q), c, [...a.via, ...b.via, ...w.via]) || moved;
+    }
+    if (!moved) break;
+  }
+  if (!conflict && triangleBreak3(known, null)) conflict = true;
+  return { known, conflict };
+}
+
+/** The first triple of fixed sides against the triangle inequality (sorted order), optionally with `through` the long side. */
+function triangleBreak3(known: ReadonlyMap<string, Known3>, through: string | null): MetricConflict3 | null {
+  const nbr = new Map<Id, Set<Id>>();
+  for (const s of known.keys()) {
+    const [a, b] = segOf(s);
+    if (!nbr.has(a)) nbr.set(a, new Set());
+    if (!nbr.has(b)) nbr.set(b, new Set());
+    nbr.get(a)!.add(b);
+    nbr.get(b)!.add(a);
+  }
+  for (const s of [...known.keys()].sort()) {
+    const [p, q] = segOf(s);
+    for (const r of [...(nbr.get(p) ?? [])].sort()) {
+      if (r === q || r <= q || !nbr.get(q)?.has(r)) continue;
+      const sides: [Id, Id, Known3][] = [
+        [p, q, known.get(segKey(p, q))!],
+        [q, r, known.get(segKey(q, r))!],
+        [p, r, known.get(segKey(p, r))!],
+      ];
+      for (let k = 0; k < 3; k++) {
+        const [a, b, L] = sides[k];
+        if (through !== null && segKey(a, b) !== through) continue;
+        const sum = sides[(k + 1) % 3][2].len + sides[(k + 2) % 3][2].len;
+        const gap = L.len - sum;
+        if (gap > CONFLICT_MARGIN * Math.max(L.len, 1) && gap > CONFLICT_MARGIN) {
+          return { kind: 'triangle', p, q, r, long: [a, b], longLen: L.len, sum, pins: uniq3(sides.flatMap(([, , x]) => x.via)) };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** Do the pins fix lengths no figure can have, the lengths their angles force included? */
+export function lengthsImpossible3(c: Pick<Construction3, 'scalarPins'>): boolean {
+  return metricConflict3(c) !== null || closeLengths3(c.scalarPins, null).conflict;
+}
+
+/** The reason, chosen as 2-D chooses it (the note above). `prefer`: the refused row's pins. Null when nothing conflicts. */
+export function explainLengths3(c: Pick<Construction3, 'scalarPins'>, prefer: ReadonlySet<number>): MetricConflict3 | null {
+  if (!lengthsImpossible3(c)) return null;
+  const pins = c.scalarPins;
+  const stated = pins.flatMap((p, i) => (p.kind === 'length' && p.value > 0 && p.a !== p.b ? [{ i, a: p.a, b: p.b, value: p.value }] : []));
+  const order = [...stated.filter((k) => prefer.has(k.i)), ...stated.filter((k) => !prefer.has(k.i)).reverse()];
+  for (const k of order) {
+    const rest = closeLengths3(pins, k.i);
+    if (rest.conflict) continue; // the others contradict each other already: this length is not the one at fault
+    const s = segKey(k.a, k.b);
+    const forced = rest.known.get(s);
+    if (forced && differ(forced.len, k.value) && Math.abs(forced.len - k.value) > CONFLICT_MARGIN) {
+      return { kind: 'value', seg: segOf(s), forced: forced.len, stated: k.value, pins: uniq3([...forced.via, k.i]) };
+    }
+    const withIt = new Map(rest.known);
+    withIt.set(s, { len: k.value, via: [k.i] });
+    const t = triangleBreak3(withIt, s) ?? triangleBreak3(withIt, null);
+    if (t) return t;
+  }
+  return metricConflict3(c);
+}

@@ -4,7 +4,7 @@
  * over `scalarPins`; the margin keeps every case the solver could still meet with the solver.
  */
 import { describe, expect, it } from 'vitest';
-import { CONFLICT_MARGIN, metricConflict3 } from '../engine/metricBounds3';
+import { CONFLICT_MARGIN, explainLengths3, lengthsImpossible3, metricConflict3 } from '../engine/metricBounds3';
 import type { ScalarPin } from '../engine/types';
 
 const len = (a: string, b: string, value: number): ScalarPin => ({ kind: 'length', a, b, value });
@@ -37,5 +37,18 @@ describe('metricConflict3', () => {
     expect(at([len('A', 'B', 5), len('C', 'D', 100)])).toBeNull();
     expect(at([rel('A', 'B', 'B', 'C')])).toBeNull();
     expect(at([])).toBeNull();
+  });
+
+  // ADR-3D-495 Am. 1 (ADR-W-118 B1; 2-D's ADR-835): the reason chosen as 2-D chooses it
+  it('explainLengths3: a length the figure forces through a right angle is two lengths, the forced value first', () => {
+    const square = [rel('A', 'B', 'B', 'C'), rel('B', 'C', 'C', 'D'), rel('C', 'D', 'D', 'A')];
+    const right = { kind: 'cos-angle', u: { kind: 'pair', from: 'B', to: 'A' }, v: { kind: 'pair', from: 'B', to: 'C' }, cos: 0 } as never;
+    const m = explainLengths3({ scalarPins: [...square, right, len('A', 'B', 3), len('A', 'C', 10)] }, new Set([5]));
+    expect(m).toMatchObject({ kind: 'value', seg: ['A', 'C'], stated: 10 });
+    expect(m && m.kind === 'value' ? m.forced : 0).toBeCloseTo(3 * Math.SQRT2, 9);
+    expect(lengthsImpossible3({ scalarPins: [...square, right, len('A', 'B', 3), len('A', 'C', 3 * Math.SQRT2)] })).toBe(false);
+  });
+  it('explainLengths3: with no angle, the triangle inequality, as before', () => {
+    expect(explainLengths3({ scalarPins: [len('A', 'B', 3), len('B', 'C', 4), len('A', 'C', 10)] }, new Set([2]))).toMatchObject({ kind: 'triangle', long: ['A', 'C'], longLen: 10, sum: 7 });
   });
 });

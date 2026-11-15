@@ -62,7 +62,7 @@ import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
 import { isBareAltitude3, membershipQuestion3, namesQuadBase3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
 import { cleanNum, dataView, pointPlaneRow3 } from '../engine/dataView';
-import { metricConflict3 } from '../engine/metricBounds3';
+import { explainLengths3 } from '../engine/metricBounds3';
 
 export interface Fact3 {
   id: string;
@@ -2104,7 +2104,9 @@ function deriveCore3(
    * does not involve the blamed row (the solver's own finding stands, worded as before).
    */
   const lengthsConflict = (blamed: string, stated: string): EngineError3 | null => {
-    const m = metricConflict3(c);
+    // the reason chosen as 2-D chooses it (ADR-3D-495 Am. 1): the blamed row's own lengths are tried first
+    const own = new Set(c.scalarPins.flatMap((p, i) => (pinRow.get(p) === blamed ? [i] : [])));
+    const m = explainLengths3(c, own);
     if (!m) return null;
     const rows = new Set(m.pins.map((i) => pinRow.get(c.scalarPins[i])).filter((x): x is string => x !== undefined));
     if (!rows.has(blamed)) return null;

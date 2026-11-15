@@ -1058,9 +1058,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   3, 2026-11-15, *"A clearer reason (Recommended)"*). When the stated lengths, together with the relations between
   lengths the student stated or the shape implies (a square's equal sides), give one segment two different lengths, or
   break the triangle inequality for three points (|AC| > |AB| + |BC|), the line is refused immediately, with no search.
-  The refusal names the line, exactly the earlier lines whose lengths take part, and the reason: «…יחד הם קובעים |AC| =
-  10 ו-|AB| + |BC| = 6, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|.», or «…יחד הם נותנים לקטע BC שני
-  אורכים שונים, 3 ו-4.», each followed by «בדקו איזה מהאורכים האלה לא נכון.» A case at the edge (the three points collinear, |AC| = |AB| + |BC|) is judged by the solver as
+  The refusal names the line, exactly the earlier lines whose lengths take part, and the reason, chosen as 2-D chooses it
+  (ADR-W-118 B1): a length the rest of the figure FORCES, stated otherwise, gives the segment two lengths («ריבוע ABCD» ·
+  «|AB| = 3» · «|AC| = 10»: «…יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10.»); otherwise the triangle inequality
+  («…יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 7, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|.»), each followed by «בדקו איזה מהאורכים האלה לא נכון.» A case at the edge (the three points collinear, |AC| = |AB| + |BC|) is judged by the solver as
   before.
   - Sources: ADR-3D-495; #2894.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
