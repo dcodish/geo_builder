@@ -254,7 +254,7 @@ export const WORDINGS = {
   reservedRadius: { key: 'errors.reservedRadiusAmbiguous', keys: ['errors.reservedRadiusAmbiguousSized', 'errors.reservedRadiusAmbiguous'], saysSubject: true, nextStep: true, circleParams: ['next'], circleListParams: ['circles'] },
   // metricFeasibility.ts (#420, ADR-417): TWO wordings — the curriculum's triangle sentence («סכום שתי צלעות תמיד גדול
   // מהצלע השלישית», operator 2026-07-29) for one intermediate point, the straight-segment principle for a longer cycle.
-  metric: { key: 'errors.metricImpossible', keys: ['errors.metricImpossibleTriangle', 'errors.metricImpossiblePath'] },
+  metric: { key: 'errors.metricImpossiblePath' }, // #2894 (ADR-835 Am. 1): the triangle case is `lengthsTriangle`
   // metricFeasibility.ts (#1329, ADR-538): the triangle's 180° sentence, or a longer ring's own bound.
   angleSum: { key: 'errors.angleSumImpossible', keys: ['errors.angleSumImpossibleTriangle', 'errors.angleSumImpossiblePolygon'] },
   // metricFeasibility.ts (#1712, ADR-587): a stated measure outside its range — the statement is the student's own.
@@ -357,6 +357,15 @@ export function wordingOf(e: EngineError): Worded | null {
     case 'reserved-radius-ambiguous':
       return one('reservedRadius', { key: e.sized ? 'errors.reservedRadiusAmbiguousSized' : 'errors.reservedRadiusAmbiguous', params: { letter: e.letter, circles: joined(e.circles), next: e.circles[e.circles.length - 1] } });
     case 'metric-impossible': {
+      // #2894 (ADR-835 Am. 1, ruling 2026-11-15 «The clearer reason everywhere»): a triangle's inequality is the ONE
+      // length-conflict sentence (3-D's), whoever proved it; a longer path no triangle states keeps its own.
+      if (e.via.length === 1) {
+        const v = e.via[0]!;
+        const seg = (x: string, y: string) => (x <= y ? x + y : y + x);
+        const long = seg(e.a, e.b);
+        const [a, b] = [seg(e.a, v), seg(v, e.b)].sort((s1, s2) => Number(!s1.includes(long[0]!)) - Number(!s2.includes(long[0]!)));
+        return one('lengthsTriangle', { params: { tri: [e.a, v, e.b].sort().join(''), long, longLen: e.value, a: a!, b: b!, sum: e.sum } });
+      }
       const via = joined(e.via);
       return one('metric', { key: e.via.length > 1 ? 'errors.metricImpossiblePath' : 'errors.metricImpossibleTriangle', params: { seg: `${e.a}${e.b}`, value: e.value, sum: e.sum, a: e.a, b: e.b, via, sides: `|${e.a}${via}| + |${via}${e.b}|` } });
     }

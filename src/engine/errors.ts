@@ -56,8 +56,10 @@ export type EngineError =
   | { code: 'restated-size'; circle: ObjectId; value: Num }
   // #2894 (ADR-835): the metric closure's reason, 3-D's `lengths-impossible` shapes — one stated length against the one
   // the rest of the figure forces on that segment, or three lengths against the triangle inequality
-  | { code: 'lengths-value'; seg: Composite; forced: Num; stated: Num }
-  | { code: 'lengths-triangle'; tri: Composite; long: Composite; longLen: Num; a: Composite; b: Composite; sum: Num }
+  // `using`: the statements the lengths rest on — the engine writes its support (`support <token>`), the fold rewrites
+  // it to the statements' fact indices (`with #0, #1`), which the display resolves to the student's lines
+  | { code: 'lengths-value'; seg: Composite; forced: Num; stated: Num; using?: string }
+  | { code: 'lengths-triangle'; tri: Composite; long: Composite; longLen: Num; a: Composite; b: Composite; sum: Num; using?: string }
   | { code: 'over-constrained'; what: Fragment }
   | { code: 'over-constrained-unnamed' }
   | { code: 'not-determined'; who?: ObjectId[]; what: Fragment }
@@ -131,8 +133,8 @@ export const PARAM_KINDS: { [C in EngineErrorCode]: { [F in Fields<ErrorOf<C>>]-
   'pair-position-conflict': { a: 'id', b: 'id', position: 'key', other: 'key' },
   'tangents-exhausted': { pair: 'composite', kind: 'key', position: 'key' },
   'restated-size': { circle: 'id', value: 'num' },
-  'lengths-value': { seg: 'composite', forced: 'num', stated: 'num' },
-  'lengths-triangle': { tri: 'composite', long: 'composite', longLen: 'num', a: 'composite', b: 'composite', sum: 'num' },
+  'lengths-value': { seg: 'composite', forced: 'num', stated: 'num', using: 'key' },
+  'lengths-triangle': { tri: 'composite', long: 'composite', longLen: 'num', a: 'composite', b: 'composite', sum: 'num', using: 'key' },
   'over-constrained': { what: 'fragment' },
   'over-constrained-unnamed': {},
   'not-determined': { who: 'ids', what: 'fragment' },
@@ -221,9 +223,9 @@ export function engineErrorDebugText(e: EngineError): string {
     case 'tangents-exhausted':
       return `tangents-exhausted: common tangent ${e.pair} of kind ${e.kind} on ${e.position} circles`;
     case 'lengths-value':
-      return `over-constrained: segment ${e.seg} would be both ${e.forced} and ${e.stated} cannot hold`;
+      return `over-constrained: segment ${e.seg} would be both ${e.forced} and ${e.stated}${e.using ? ` ${e.using}` : ''} cannot hold`;
     case 'lengths-triangle':
-      return `over-constrained: |${e.long}| = ${e.longLen} but |${e.a}| + |${e.b}| = ${e.sum} in triangle ${e.tri} cannot hold`;
+      return `over-constrained: |${e.long}| = ${e.longLen} but |${e.a}| + |${e.b}| = ${e.sum} in triangle ${e.tri}${e.using ? ` ${e.using}` : ''} cannot hold`;
     case 'restated-size':
       return `over-constrained: radius of ${e.circle} = ${e.value} cannot hold`;
     case 'over-constrained':
@@ -347,8 +349,8 @@ const PARSERS: readonly [RegExp, (m: RegExpMatchArray) => ParsedEngineError][] =
   [new RegExp(String.raw`^over-constrained: circles (\S+) and (\S+) stated (contained|disjoint) and (contained|disjoint|ext-tangent|tangent|crossing) cannot hold${TAIL}$`), (m) => ({ code: 'pair-position-conflict', a: G(m, 1), b: G(m, 2), position: m[3] as 'contained' | 'disjoint', other: m[4] as 'contained' | 'disjoint' | 'ext-tangent' | 'tangent' | 'crossing', ...tailOf(m) })],
   [/^tangents-exhausted: common tangent (\S+) of kind (external|internal|any) on (int-tangent|ext-tangent|contained) circles$/, (m) => ({ code: 'tangents-exhausted', pair: G(m, 1), kind: m[2] as 'external' | 'internal' | 'any', position: m[3] as 'int-tangent' | 'ext-tangent' | 'contained' })],
   [new RegExp(String.raw`^over-constrained: radius of (\S+) = (.+) cannot hold${TAIL}$`), (m) => ({ code: 'restated-size', circle: G(m, 1), value: G(m, 2), ...tailOf(m) })],
-  [new RegExp(String.raw`^over-constrained: segment (\S+) would be both (\S+) and (\S+) cannot hold${TAIL}$`), (m) => ({ code: 'lengths-value', seg: G(m, 1), forced: G(m, 2), stated: G(m, 3), ...tailOf(m) })],
-  [new RegExp(String.raw`^over-constrained: \|(\S+)\| = (\S+) but \|(\S+)\| \+ \|(\S+)\| = (\S+) in triangle (\S+) cannot hold${TAIL}$`), (m) => ({ code: 'lengths-triangle', long: G(m, 1), longLen: G(m, 2), a: G(m, 3), b: G(m, 4), sum: G(m, 5), tri: G(m, 6), ...tailOf(m) })],
+  [new RegExp(String.raw`^over-constrained: segment (\S+) would be both (\S+) and (\S+)(?: ((?:support|with) [^\s]+(?:, #\d+)*))? cannot hold${TAIL}$`), (m) => ({ code: 'lengths-value', seg: G(m, 1), forced: G(m, 2), stated: G(m, 3), ...(m[4] !== undefined ? { using: m[4] } : {}), ...tailOf(m) })],
+  [new RegExp(String.raw`^over-constrained: \|(\S+)\| = (\S+) but \|(\S+)\| \+ \|(\S+)\| = (\S+) in triangle (\S+)(?: ((?:support|with) [^\s]+(?:, #\d+)*))? cannot hold${TAIL}$`), (m) => ({ code: 'lengths-triangle', long: G(m, 1), longLen: G(m, 2), a: G(m, 3), b: G(m, 4), sum: G(m, 5), tri: G(m, 6), ...(m[7] !== undefined ? { using: m[7] } : {}), ...tailOf(m) })],
   [new RegExp(String.raw`^over-constrained: (.+) cannot hold${TAIL}$`), (m) => ({ code: 'over-constrained', what: G(m, 1), ...tailOf(m) })],
   [/^not determined: (.+) (?:is|are) still free, so (.+) cannot be judged in this configuration$/, (m) => ({ code: 'not-determined', who: ids(G(m, 1)), what: G(m, 2) })],
   [/^not determined: (.+) cannot be judged in this configuration$/, (m) => ({ code: 'not-determined', what: G(m, 1) })],

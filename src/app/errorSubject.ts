@@ -46,6 +46,14 @@ export function utteranceForError(
  * `_said` wording, which never pretends to know what it does not.
  */
 export function otherUtteranceForError(facts: readonly Fact[], raw: string | null | undefined): string | undefined {
+  // #2894 (ADR-835 Am. 1): a length conflict names EVERY statement its lengths rest on (`with #i, #j`, the fold's list, in
+  // fact order), as 3-D and analytic do. The frame quotes its `other` («{{other}}»), so the lines are joined by «, »
+  // inside it: «ריבוע ABCD», «AB = 3». A list with a line that has no recorded words falls back to the blame below.
+  const all = raw ? / with (#\d+(?:, #\d+)*) cannot hold/.exec(raw) : null;
+  if (all) {
+    const lines = all[1].split(', ').map((x) => facts[Number(x.slice(1))]).map((g) => (g?.enabled ? g.utterance?.trim() : undefined));
+    if (lines.length && lines.every((x): x is string => !!x)) return lines.join('», «');
+  }
   const m = raw ? /\[vs #(\d+)\]$/.exec(raw.trim()) : null;
   if (!m) return undefined;
   const other = facts[Number(m[1])];

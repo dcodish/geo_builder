@@ -2513,6 +2513,46 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
   }
 
   if (attribute && hoistDepth === 0) tagEqualNested(true); // #2239 / #2206: after the drop-one search (above)
+  /**
+   * #2894 ([ADR-835](docs/06-decisions.md#adr-835) Am. 1) — WHICH STATEMENTS A LENGTH CONFLICT RESTS ON. The engine's
+   * `lengths-value` / `lengths-triangle` refusal carries the obligations and objects its reading used (`support …`); the
+   * fold, which knows who committed each, turns them into those statements' indices (`with #i, #j`, the group's first
+   * row, in fact order, the refused statement itself left out), so the display names every line whose lengths take part,
+   * as 3-D and analytic do. The `[vs #i]` blame is untouched.
+   */
+  {
+    const SUPPORT = / support (\S+)(?= cannot hold)/;
+    const rewritten = new Map<string, string>();
+    for (const f of facts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = SUPPORT.exec(st);
+      if (!m) continue;
+      let out = rewritten.get(st);
+      if (out === undefined) {
+        let named: number[] = [];
+        try {
+          const sup = JSON.parse(decodeURIComponent(m[1]!)) as { c: string[]; o: Id[] };
+          const own = groupKey(f);
+          const owners = new Set<number>();
+          for (const k of sup.c) { const fi = ownerByConKey.get(k); if (fi !== undefined) owners.add(fi); }
+          for (const id of sup.o) { const fi = ownerByObjId.get(id); if (fi !== undefined) owners.add(fi); }
+          const firsts = new Set<number>();
+          for (const fi of owners) {
+            const g = facts[fi];
+            if (!g || groupKey(g) === own) continue;
+            firsts.add(facts.findIndex((x) => groupKey(x) === groupKey(g)));
+          }
+          named = [...firsts].filter((x) => x >= 0).sort((a, b) => a - b);
+        } catch {
+          named = [];
+        }
+        out = st.replace(SUPPORT, named.length ? ` with ${named.map((x) => `#${x}`).join(', ')}` : '');
+        rewritten.set(st, out);
+      }
+      status[f.id] = out;
+    }
+  }
   const buildError = !pending && failedFacts.length ? (status[failedFacts[failedFacts.length - 1].id] as string) : null;
   return {
     cur,

@@ -14,9 +14,9 @@
         "AB = 3",
         "AC = 10"
       ],
-      "lookFor": "The third line is refused at once: «הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.»",
+      "lookFor": "The third line is refused at once: «הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.»",
       "before": "prod: «לא ניתן: «AC = 10» סותר את «AB = 3» — אי אפשר לקיים את שניהם יחד. הסיבה: |AC| = 10.» after about 1.4 s",
-      "expectRefusal": "לקטע AC שני אורכים שונים, 3√2 ו-10"
+      "expectRefusal": "«AC = 10» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10"
     },
     {
       "id": "T2",
@@ -24,16 +24,16 @@
       "product": "2d",
       "base": "http://localhost:5196",
       "path": "/",
-      "title": "A rectangle's diagonal: 5 and 7, naming «BC = 4»",
+      "title": "A rectangle's diagonal: 5 and 7, naming the rectangle and both sides",
       "lines": [
         "מלבן ABCD",
         "AB = 3",
         "BC = 4",
         "AC = 7"
       ],
-      "lookFor": "«AC = 7» is refused: «… «AC = 7» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7. …»",
+      "lookFor": "«AC = 7» is refused naming «מלבן ABCD», «AB = 3», «BC = 4», segment AC, 5 and 7.",
       "before": "prod: the short «לא ניתן … סותר את «BC = 4»» after about 7.5 s",
-      "expectRefusal": "«AC = 7» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7"
+      "expectRefusal": "«AC = 7» לא מתקיים יחד עם «מלבן ABCD», «AB = 3», «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7"
     },
     {
       "id": "T3",
@@ -65,7 +65,7 @@
       ],
       "lookFor": "«AB = 6» is refused naming «AB קוטר במעגל», segment AB, 4 and 6.",
       "before": "prod: the short sentence",
-      "expectRefusal": "לא מתקיים יחד עם «AB קוטר במעגל»: יחד הם נותנים לקטע AB שני אורכים שונים, 4 ו-6"
+      "expectRefusal": "לא מתקיים יחד עם «מעגל O ברדיוס 2», «AB קוטר במעגל»: יחד הם נותנים לקטע AB שני אורכים שונים, 4 ו-6"
     },
     {
       "id": "T5",
@@ -80,9 +80,9 @@
         "BC = 4",
         "ABCD ריבוע"
       ],
-      "lookFor": "«ABCD ריבוע» is refused naming «BC = 4», segment BC, 3 and 4.",
+      "lookFor": "«ABCD ריבוע» is refused naming «AB = 3», «BC = 4», segment BC, 3 and 4.",
       "before": "prod: the short sentence after about 8 s",
-      "expectRefusal": "«ABCD ריבוע» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4"
+      "expectRefusal": "«ABCD ריבוע» לא מתקיים יחד עם «AB = 3», «BC = 4»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4"
     },
     {
       "id": "T6",
@@ -90,16 +90,16 @@
       "product": "2d",
       "base": "http://localhost:5196",
       "path": "/",
-      "title": "Control: a refusal the closure does not decide keeps its own sentence",
+      "title": "The plain triangle: the same sentence as every other length conflict",
       "lines": [
         "משולש ABC",
         "AB = 3",
         "BC = 4",
         "AC = 10"
       ],
-      "lookFor": "«AC = 10» is refused with the triangle-inequality sentence it had (the stage-0 prover, unchanged).",
-      "before": "unchanged",
-      "expectRefusal": "AC"
+      "lookFor": "«AC = 10» is refused: «הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «AB = 3», «BC = 4»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 7, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.»",
+      "before": "prod: «לא ניתן: |AC| = 10 — סכום שתי צלעות תמיד גדול מהצלע השלישית, וכאן |AB| + |BC| = 7. בדקו את הנתונים.»",
+      "expectRefusal": "«AC = 10» לא מתקיים יחד עם «AB = 3», «BC = 4»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 7, אבל לפי אי־שוויון המשולש ABC"
     },
     {
       "id": "T7",

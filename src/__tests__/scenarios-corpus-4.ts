@@ -1828,7 +1828,8 @@ export const SCENARIOS_4: Scenario[] = [
     check: (fig) => {
       const entries = Object.entries(fig.status);
       const last = entries[entries.length - 1]!;
-      expect(String(last[1]), 'refused as impossible, naming the bound').toMatch(/^impossible: \|AC\| = 9 exceeds 8/);
+      // #2894 (ADR-835 Am. 1, ruling 2026-11-15): the one length-conflict sentence, the triangle's three lengths
+      expect(String(last[1]), 'refused as impossible, naming the bound').toMatch(/^over-constrained: \|AC\| = 9 but \|AB\| \+ \|BC\| = 8 in triangle ABC /);
       expect(fig.pending, 'a proven contradiction is never a pending info state').toBe(false);
       // keep-prior: the 4-4 triangle the student did build is still there
       const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));
@@ -6848,11 +6849,12 @@ export const SCENARIOS_4: Scenario[] = [
       allStepsOk(fig);
       const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
       const cases: [string[], string, string][] = [
-        [['ריבוע ABCD', 'AB = 3'], 'AC = 10', 'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.'],
-        [['מלבן ABCD', 'AB = 3', 'BC = 4'], 'AC = 7', 'הנתונים סותרים זה את זה — «AC = 7» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7. בדקו איזה מהאורכים האלה לא נכון.'],
-        [['משולש שווה צלעות ABC', 'AB = 3'], 'BC = 5', 'הנתונים סותרים זה את זה — «BC = 5» לא מתקיים יחד עם «AB = 3»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-5. בדקו איזה מהאורכים האלה לא נכון.'],
-        [['מעגל O ברדיוס 2', 'AB קוטר במעגל'], 'AB = 6', 'הנתונים סותרים זה את זה — «AB = 6» לא מתקיים יחד עם «AB קוטר במעגל»: יחד הם נותנים לקטע AB שני אורכים שונים, 4 ו-6. בדקו איזה מהאורכים האלה לא נכון.'],
-        [['מרובע ABCD', 'AB = 3', 'BC = 4'], 'ABCD ריבוע', 'הנתונים סותרים זה את זה — «ABCD ריבוע» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['משולש ABC', 'AB = 3', 'BC = 4'], 'AC = 10', 'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «AB = 3», «BC = 4»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 7, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['ריבוע ABCD', 'AB = 3'], 'AC = 10', 'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מלבן ABCD', 'AB = 3', 'BC = 4'], 'AC = 7', 'הנתונים סותרים זה את זה — «AC = 7» לא מתקיים יחד עם «מלבן ABCD», «AB = 3», «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['משולש שווה צלעות ABC', 'AB = 3'], 'BC = 5', 'הנתונים סותרים זה את זה — «BC = 5» לא מתקיים יחד עם «משולש שווה צלעות ABC», «AB = 3»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-5. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מעגל O ברדיוס 2', 'AB קוטר במעגל'], 'AB = 6', 'הנתונים סותרים זה את זה — «AB = 6» לא מתקיים יחד עם «מעגל O ברדיוס 2», «AB קוטר במעגל»: יחד הם נותנים לקטע AB שני אורכים שונים, 4 ו-6. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מרובע ABCD', 'AB = 3', 'BC = 4'], 'ABCD ריבוע', 'הנתונים סותרים זה את זה — «ABCD ריבוע» לא מתקיים יחד עם «AB = 3», «BC = 4»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.'],
       ];
       for (const [prior, line, words] of cases) {
         const facts = factsOf(prior);

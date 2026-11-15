@@ -124,7 +124,7 @@ describe('explainLengthConflict — which lengths, and why (#2894, ADR-835)', ()
 
   it('a stated length against two the rest forces: the triangle inequality, in the triangle they make', () => {
     const w = explainLengthConflict(circle2(false, [d('A', 'B', 6)]), [d('A', 'B', 6)]);
-    expect(w).toMatchObject({ kind: 'triangle', tri: ['O', 'A', 'B'], long: ['A', 'B'], longLen: 6, a: ['O', 'A'], b: ['O', 'B'], sum: 4 });
+    expect(w).toMatchObject({ kind: 'triangle', tri: ['A', 'B', 'O'], long: ['A', 'B'], longLen: 6, a: ['A', 'O'], b: ['B', 'O'], sum: 4 });
   });
 
   it('nothing to explain on a figure whose lengths hold', () => {

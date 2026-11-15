@@ -38,8 +38,8 @@ function fold(lines: string[]): { rows: [string | undefined, unknown][]; units: 
 
 /** Two whose climb costs 8–18 s here: their rows are held to the text (main @ 63ccbc5a named the same statement, `[vs #3]`). */
 const MEASURED: Record<string, { lines: string[]; refusal: string }> = {
-  'rectangle diagonal': { lines: ['מלבן ABCD', 'AB = 3', 'BC = 4', 'AC = 7'], refusal: 'over-constrained: segment AC would be both 5 and 7 cannot hold [vs #3]' },
-  'a square over unequal sides': { lines: ['מרובע ABCD', 'AB = 3', 'BC = 4', 'ABCD ריבוע'], refusal: 'over-constrained: segment BC would be both 3 and 4 cannot hold [vs #3]' },
+  'rectangle diagonal': { lines: ['מלבן ABCD', 'AB = 3', 'BC = 4', 'AC = 7'], refusal: 'over-constrained: segment AC would be both 5 and 7 with #0, #1, #3 cannot hold [vs #3]' },
+  'a square over unequal sides': { lines: ['מרובע ABCD', 'AB = 3', 'BC = 4', 'ABCD ריבוע'], refusal: 'over-constrained: segment BC would be both 3 and 4 with #1, #3 cannot hold [vs #3]' },
 };
 
 describe('#2894 — a proven refusal reads exactly as the climbed one', () => {

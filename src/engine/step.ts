@@ -841,8 +841,10 @@ const lengthText = (x: number): string => {
 };
 /** #2894 (ADR-835): the closure's reason as the error bank's variant. */
 function lengthsError(w: LengthConflict): Parameters<typeof engineErrorDebugText>[0] {
-  if (w.kind === 'value') return { code: 'lengths-value', seg: w.seg.join(''), forced: lengthText(w.forced), stated: lengthText(w.stated) };
-  return { code: 'lengths-triangle', tri: w.tri.join(''), long: w.long.join(''), longLen: lengthText(w.longLen), a: w.a.join(''), b: w.b.join(''), sum: lengthText(w.sum) };
+  // the support travels as one token (no whitespace); the fold turns it into the statements' indices (`with #i, #j`)
+  const using = `support ${encodeURIComponent(JSON.stringify({ c: w.support.cons.map(constraintKey), o: [...new Set(w.support.objs)] }))}`;
+  if (w.kind === 'value') return { code: 'lengths-value', seg: w.seg.join(''), forced: lengthText(w.forced), stated: lengthText(w.stated), using };
+  return { code: 'lengths-triangle', tri: w.tri.join(''), long: w.long.join(''), longLen: lengthText(w.longLen), a: w.a.join(''), b: w.b.join(''), sum: lengthText(w.sum), using };
 }
 
 function runFailureLadder(
@@ -1481,7 +1483,11 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   if (positionErr) return { ok: false, error: positionErr, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   const metricErr = metricImpossibility(probed.constraints);
   if (metricErr) {
-    return { ok: false, error: metricImpossibilityError(metricErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+    // #2894 (ADR-835 Am. 1, ruling 2026-11-15 «The clearer reason everywhere»): the same sentence as every other length
+    // conflict — the closure reads the same triangle; a longer path no triangle states keeps its own sentence.
+    const why = explainLengthConflict(probed, probed.constraints.slice(prev.constraints.length));
+    const error = why ? engineErrorDebugText(lengthsError(why)) : metricImpossibilityError(metricErr);
+    return { ok: false, error, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
   // #1329 (ADR-538): the angle twin — a declared polygon's stated interior angles summing past
   // (n − 2)·180° is impossible in the plane. Without this the solver found nothing, the step failed on

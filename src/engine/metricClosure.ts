@@ -60,8 +60,15 @@ const MAX_SWEEPS = 40;
 /** Past this many points the O(n³) triangle sweep is skipped (the other relations still run). */
 const MAX_TRIANGLE_POINTS = 48;
 
-interface Ratio { p: number; q: number; k1: number; k2: number; abs: number } // |p| ∈ [k1, k2]·|q| ± abs (pair indices)
-interface Wedge { v: number; p: number; q: number; t1: number; t2: number } // angle at v between p and q ∈ [t1, t2]°
+interface Ratio { p: number; q: number; k1: number; k2: number; abs: number; src: number } // |p| ∈ [k1, k2]·|q| ± abs (pair indices)
+interface Wedge { v: number; p: number; q: number; t1: number; t2: number; src: number } // angle at v between p and q ∈ [t1, t2]°
+/** #2894 (ADR-835): what a relation was read from — an obligation, or the objects whose definition it is. */
+type Source = { con: Constraint } | { objs: Id[] };
+/** The obligations and objects a forced length rests on (the explanation names their statements). */
+export interface LengthSupport {
+  cons: Constraint[];
+  objs: Id[];
+}
 
 /**
  * The first length no configuration of `c` can take, or null. Reads the obligations (`constraints` and every solve
@@ -75,6 +82,9 @@ export function metricClosureImpossibility(c: Construction): MetricClosureProof 
 interface Closed {
   proof: MetricClosureProof | null;
   interval: (a: Id, b: Id) => [number, number] | null;
+  /** the sources both bounds of a pair's interval rest on (indices into `sources`) */
+  support: (a: Id, b: Id) => Set<number>;
+  sources: Source[];
 }
 
 /** The closure itself; `skip` leaves one stated obligation out (the explanation asks what the OTHERS force). */
@@ -104,6 +114,8 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
   const pairIndex = new Map<string, number>();
   const lo: number[] = [];
   const hi: number[] = [];
+  const loSup: Set<number>[] = [];
+  const hiSup: Set<number>[] = [];
   const pair = (a: Id, b: Id): number => {
     const k = pairKey(a, b);
     let i = pairIndex.get(k);
@@ -112,27 +124,36 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
       pairIndex.set(k, i);
       lo.push(0);
       hi.push(Infinity);
+      loSup.push(new Set());
+      hiSup.push(new Set());
     }
     return i;
   };
+  // the source the next relations are read from (set before each obligation or object is read)
+  const sources: Source[] = [];
+  let src = -1;
+  const from = (x: Source): void => {
+    sources.push(x);
+    src = sources.length - 1;
+  };
   const ratios: Ratio[] = [];
   const wedges: Wedge[] = [];
-  const pinned: { i: number; lo: number; hi: number }[] = [];
+  const pinned: { i: number; lo: number; hi: number; src: number }[] = [];
   const pin = (a: Id, b: Id, value: number, rel: number): void => {
     if (a === b || !Number.isFinite(value) || value < 0) return;
     const m = Math.max(lenAbs, rel * value);
-    pinned.push({ i: pair(a, b), lo: Math.max(0, value - m), hi: value + m });
+    pinned.push({ i: pair(a, b), lo: Math.max(0, value - m), hi: value + m, src });
   };
   const ratio = (a: Id, b: Id, c2: Id, d: Id, k: number, rel: number): void => {
     if (a === b || c2 === d || !(k > 0) || !Number.isFinite(k)) return;
-    ratios.push({ p: pair(a, b), q: pair(c2, d), k1: k * (1 - rel), k2: k * (1 + rel), abs: rel > EXACT_REL ? lenAbs : 0 });
+    ratios.push({ p: pair(a, b), q: pair(c2, d), k1: k * (1 - rel), k2: k * (1 + rel), abs: rel > EXACT_REL ? lenAbs : 0, src });
   };
   const wedge = (v: Id, p: Id, q: Id, deg: number, margin: number): void => {
     if (v === p || v === q || p === q || !Number.isFinite(deg) || deg <= 0 || deg >= 180) return;
     pair(v, p);
     pair(v, q);
     pair(p, q);
-    wedges.push({ v: pt(v), p: pt(p), q: pt(q), t1: Math.max(0, deg - margin), t2: Math.min(180, deg + margin) });
+    wedges.push({ v: pt(v), p: pt(p), q: pt(q), t1: Math.max(0, deg - margin), t2: Math.min(180, deg + margin), src });
   };
 
   // ── the obligations ──
@@ -140,6 +161,7 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
   const skipKey = skip ? JSON.stringify(skip) : null;
   for (const con of obligations) {
     if (skipKey !== null && JSON.stringify(con) === skipKey) continue; // every copy (listed and driven) of the one left out
+    from({ con });
     if (con.type === 'distance') pin(con.a, con.b, con.value, lenRel);
     else if (con.type === 'equal') ratio(con.a, con.b, con.c, con.d, 1, lenRel);
     else if (con.type === 'ratio' && !con.add) ratio(con.a, con.b, con.c, con.d, con.k, lenRel);
@@ -147,12 +169,14 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
   }
   for (const con of obligations) {
     if (con.type !== 'angle' && con.type !== 'perpendicular') continue;
+    from({ con });
     for (const w of pinnedAngleWedges([con])) wedge(w.v, w.p, w.q, w.deg, con.type === 'perpendicular' ? perpMargin : angleMargin);
   }
 
   // ── the structure ──
   const byId = new Map<Id, GeoObject>(c.objects.map((o) => [o.id, o] as const));
   for (const o of c.objects) {
+    from({ objs: [o.id] });
     switch (o.kind) {
       case 'derived': {
         // square-c: C = B ± R90(B − A); square-d: D = A ± R90(B − A)
@@ -198,6 +222,7 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
     const own = list.filter((p) => p !== centre);
     if (!own.length) continue;
     const first = own[0]!;
+    from({ objs: [circleId, ...own] });
     for (const p of own.slice(1)) ratio(centre, p, centre, first, 1, EXACT_REL);
     if (circ.radius.via === 'length') for (const p of own) pin(centre, p, circ.radius.value, EXACT_REL);
   }
@@ -205,6 +230,7 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
     if (o.kind !== 'antipode') continue;
     const circ = byId.get(o.circle);
     if (!circ || circ.kind !== 'circle' || o.of === o.id) continue;
+    from({ objs: [o.id, o.circle] });
     ratio(o.of, o.id, circ.center, o.of, 2, EXACT_REL); // |of → antipode| = 2·|centre → of|
   }
   const interval = (a: Id, b: Id): [number, number] | null => {
@@ -214,12 +240,24 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
     const k = pairIndex.get(i < j ? `${i}|${j}` : `${j}|${i}`);
     return k === undefined ? null : [lo[k]!, hi[k]!];
   };
-  if (!lo.length) return { proof: null, interval };
+  const support = (a: Id, b: Id): Set<number> => {
+    const i = ptIndex.get(a);
+    const j = ptIndex.get(b);
+    const k = i === undefined || j === undefined ? undefined : pairIndex.get(i < j ? `${i}|${j}` : `${j}|${i}`);
+    return k === undefined ? new Set() : new Set([...loSup[k]!, ...hiSup[k]!]);
+  };
+  if (!lo.length) return { proof: null, interval, support, sources };
 
   // ── the closure ──
   for (const p of pinned) {
-    lo[p.i] = Math.max(lo[p.i]!, p.lo);
-    hi[p.i] = Math.min(hi[p.i]!, p.hi);
+    if (p.lo > lo[p.i]!) {
+      lo[p.i] = p.lo;
+      loSup[p.i] = new Set([p.src]);
+    }
+    if (p.hi < hi[p.i]!) {
+      hi[p.i] = p.hi;
+      hiSup[p.i] = new Set([p.src]);
+    }
   }
   const n = pts.length;
   const idx = (i: number, j: number): number | undefined => pairIndex.get(i < j ? `${i}|${j}` : `${j}|${i}`);
@@ -229,14 +267,21 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
   let scale = 0;
   for (const p of pinned) scale = Math.max(scale, p.hi);
   const tiny = 1e-12 * Math.max(1, scale);
-  const narrow = (i: number, l: number, h: number): boolean => {
+  const union = (...xs: (Set<number> | number)[]): Set<number> => {
+    const out = new Set<number>();
+    for (const x of xs) if (typeof x === 'number') out.add(x); else for (const v of x) out.add(v);
+    return out;
+  };
+  const narrow = (i: number, l: number, h: number, sl: () => Set<number>, sh: () => Set<number>): boolean => {
     let moved = false;
     if (l > lo[i]! + tiny) {
       lo[i] = l;
+      loSup[i] = sl();
       moved = true;
     }
     if (h < hi[i]! - tiny) {
       hi[i] = h;
+      hiSup[i] = sh();
       moved = true;
     }
     return moved;
@@ -253,8 +298,8 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
   for (let sweep = 0; sweep < MAX_SWEEPS; sweep++) {
     let moved = false;
     for (const r of ratios) {
-      moved = narrow(r.p, r.k1 * lo[r.q]! - r.abs, r.k2 * hi[r.q]! + r.abs) || moved;
-      moved = narrow(r.q, (lo[r.p]! - r.abs) / r.k2, (hi[r.p]! + r.abs) / r.k1) || moved;
+      moved = narrow(r.p, r.k1 * lo[r.q]! - r.abs, r.k2 * hi[r.q]! + r.abs, () => union(loSup[r.q]!, r.src), () => union(hiSup[r.q]!, r.src)) || moved;
+      moved = narrow(r.q, (lo[r.p]! - r.abs) / r.k2, (hi[r.p]! + r.abs) / r.k1, () => union(loSup[r.p]!, r.src), () => union(hiSup[r.p]!, r.src)) || moved;
     }
     for (const w of wedges) {
       const x = idx(w.v, w.p)!;
@@ -262,7 +307,8 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
       const z = idx(w.p, w.q)!;
       const zMin = Math.sqrt(Math.max(0, minLawOfCosines(lo[x]!, hi[x]!, lo[y]!, hi[y]!, Math.cos((w.t1 * Math.PI) / 180))));
       const zMax = Math.sqrt(Math.max(0, maxLawOfCosines(hi[x]!, hi[y]!, lo[x]!, lo[y]!, Math.cos((w.t2 * Math.PI) / 180))));
-      moved = narrow(z, zMin * (1 - EXACT_REL), zMax * (1 + EXACT_REL)) || moved;
+      const sw = () => union(loSup[x]!, hiSup[x]!, loSup[y]!, hiSup[y]!, w.src);
+      moved = narrow(z, zMin * (1 - EXACT_REL), zMax * (1 + EXACT_REL), sw, sw) || moved;
     }
     if (triangles) {
       for (let i = 0; i < n; i++)
@@ -270,21 +316,33 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
           const ij = idx(i, j)!;
           let l = lo[ij]!;
           let h = hi[ij]!;
+          let sl: () => Set<number> = () => loSup[ij]!;
+          let sh: () => Set<number> = () => hiSup[ij]!;
           for (let k = 0; k < n; k++) {
             if (k === i || k === j) continue;
             const ik = idx(i, k)!;
             const kj = idx(k, j)!;
-            h = Math.min(h, hi[ik]! + hi[kj]!);
-            l = Math.max(l, lo[ik]! - hi[kj]!, lo[kj]! - hi[ik]!);
+            if (hi[ik]! + hi[kj]! < h) {
+              h = hi[ik]! + hi[kj]!;
+              sh = () => union(hiSup[ik]!, hiSup[kj]!);
+            }
+            if (lo[ik]! - hi[kj]! > l) {
+              l = lo[ik]! - hi[kj]!;
+              sl = () => union(loSup[ik]!, hiSup[kj]!);
+            }
+            if (lo[kj]! - hi[ik]! > l) {
+              l = lo[kj]! - hi[ik]!;
+              sl = () => union(loSup[kj]!, hiSup[ik]!);
+            }
           }
-          moved = narrow(ij, l, h) || moved;
+          moved = narrow(ij, l, h, sl, sh) || moved;
         }
     }
     const proof = empty();
-    if (proof) return { proof, interval };
+    if (proof) return { proof, interval, support, sources };
     if (!moved) break;
   }
-  return { proof: empty(), interval };
+  return { proof: empty(), interval, support, sources };
 }
 
 /**
@@ -296,9 +354,12 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
  * when no such reading exists (the refusal then keeps its plain over-constraint). Only the student's own point letters
  * are named: a third point the engine named (`@ctr-…`) is never offered.
  */
-export type LengthConflict =
+export type LengthConflict = (
   | { kind: 'value'; seg: [Id, Id]; forced: number; stated: number }
-  | { kind: 'triangle'; tri: [Id, Id, Id]; long: [Id, Id]; longLen: number; a: [Id, Id]; b: [Id, Id]; sum: number };
+  | { kind: 'triangle'; tri: [Id, Id, Id]; long: [Id, Id]; longLen: number; a: [Id, Id]; b: [Id, Id]; sum: number }
+) & { support: LengthSupport };
+/** A segment by its letters in reading order (AB, never BA), as 3-D and analytic spell it. */
+const seg2 = (x: Id, y: Id): [Id, Id] => (x <= y ? [x, y] : [y, x]);
 const STUDENT_LETTER = /^[A-Z][0-9]*'*$/;
 export function explainLengthConflict(c: Construction, prefer: readonly Constraint[] = []): LengthConflict | null {
   const obligations: Constraint[] = [...c.constraints, ...drivenConstraintsOf(c)];
@@ -315,17 +376,43 @@ export function explainLengthConflict(c: Construction, prefer: readonly Constrai
   for (const k of order) {
     const rest = closeLengths(c, k, true);
     if (rest.proof) continue; // the others contradict each other already: this length is not the one at fault
+    const supportOf = (...sets: Set<number>[]): LengthSupport => {
+      const cons: Constraint[] = [k];
+      const objs: Id[] = [];
+      for (const set of sets)
+        for (const i of set) {
+          const x = rest.sources[i]!;
+          if ('con' in x) cons.push(x.con);
+          else objs.push(...x.objs);
+        }
+      return { cons, objs };
+    };
     const forced = fixed(rest.interval(k.a, k.b));
-    if (forced !== null && apart(forced, k.value)) return { kind: 'value', seg: [k.a, k.b], forced, stated: k.value };
+    if (forced !== null && apart(forced, k.value)) return { kind: 'value', seg: seg2(k.a, k.b), forced, stated: k.value, support: supportOf(rest.support(k.a, k.b)) };
     for (const p of pts) {
       if (p === k.a || p === k.b) continue;
       const pa = fixed(rest.interval(p, k.a));
       const pb = fixed(rest.interval(p, k.b));
       if (pa === null || pb === null) continue;
-      const tri: [Id, Id, Id] = [p, k.a, k.b];
-      if (k.value > pa + pb && apart(k.value, pa + pb)) return { kind: 'triangle', tri, long: [k.a, k.b], longLen: k.value, a: [p, k.a], b: [p, k.b], sum: pa + pb };
-      if (pa > k.value + pb && apart(pa, k.value + pb)) return { kind: 'triangle', tri, long: [p, k.a], longLen: pa, a: [k.a, k.b], b: [p, k.b], sum: k.value + pb };
-      if (pb > k.value + pa && apart(pb, k.value + pa)) return { kind: 'triangle', tri, long: [p, k.b], longLen: pb, a: [k.a, k.b], b: [p, k.a], sum: k.value + pa };
+      const tri = [p, k.a, k.b].sort() as [Id, Id, Id];
+      const support = supportOf(rest.support(p, k.a), rest.support(p, k.b));
+      // the two shorter sides in reading order, the one through the long side's first end first
+      const pair2 = (u: [Id, Id], v: [Id, Id], first: Id): [[Id, Id], [Id, Id]] => (u.includes(first) ? [u, v] : [v, u]);
+      if (k.value > pa + pb && apart(k.value, pa + pb)) {
+        const long = seg2(k.a, k.b);
+        const [a, b] = pair2(seg2(p, k.a), seg2(p, k.b), long[0]);
+        return { kind: 'triangle', tri, long, longLen: k.value, a, b, sum: pa + pb, support };
+      }
+      if (pa > k.value + pb && apart(pa, k.value + pb)) {
+        const long = seg2(p, k.a);
+        const [a, b] = pair2(seg2(k.a, k.b), seg2(p, k.b), long[0]);
+        return { kind: 'triangle', tri, long, longLen: pa, a, b, sum: k.value + pb, support };
+      }
+      if (pb > k.value + pa && apart(pb, k.value + pa)) {
+        const long = seg2(p, k.b);
+        const [a, b] = pair2(seg2(k.a, k.b), seg2(p, k.a), long[0]);
+        return { kind: 'triangle', tri, long, longLen: pb, a, b, sum: k.value + pa, support };
+      }
     }
   }
   return null;
