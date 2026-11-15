@@ -1877,6 +1877,26 @@ pure function of the point for the life of the call, so the descent is unchanged
 `work.done`, `work.executed` and the open ledger frame's `own` by exactly what the first evaluation advanced them, so
 every work budget, the re-attempt cap and every memo entry's ledger read what they read before; only the work meter's
 executed count falls. Nothing is kept between calls.
+
+**A run the solver would repeat is served, and a line no figure can hold is refused before the ladder climbs
+([ADR-833](06-decisions.md#adr-833), #2894).** Two repeats one level above the descent: `resolveFreeDriven`'s relaxed
+pass runs its convex pass's Nelder–Mead descents again, call for call (the same cost closure, start and steps;
+`servedNelderMead`), and the anti-collapse retry of a FAILED plain search whose barrier was zero at every point it
+evaluated is that search again (`regCostB` equals `regCost` there). Both are served by `servedRuns` / `serveRun`
+(`engine/solveBudget.ts`), charged exactly as run, and never past an armed limit: a run cut by a limit is not kept, and
+a hit whose charge would cross one is run instead, so it is cut where a run is. Separately, the failure ladder opens
+with the metric closure (`engine/metricClosure.ts`): an interval reading of every length the construction speaks
+about, from its obligations and its objects' parameter-free structure, closed under the law of cosines and the
+triangle inequality; an empty interval proves that no rung can succeed, and the ladder returns its own last refusal
+at once (docs/LADDER.md stage 2e⁰).
+
+**A view that fails at every seed is tried at one ([ADR-834](06-decisions.md#adr-834), #2894).** A seed enters a replay
+only in its tail (the sample and one evaluate); the fold is the fact list's alone. So a view whose fold failed (its build
+error, a row it filed as failed) or whose construction has nothing to sample fails at every seed, and the configuration
+searches (`firstSatisfyingSeed`, `findValidConfig`, the choice and seat sweeps under a search's limit, «הציגו תצורה
+אחרת») stop retrying it: `failsAtEverySeed` (`replay/core.ts`) reads the fold a Derived was drawn from, recorded only
+when that fold ran whole. The seeds skipped are seeds that fail, so which view a search returns is unchanged; under its
+work limit it gets further.
 ### The knowledge pool of a DETERMINED figure is its admissible set (#434, [ADR-509](06-decisions.md#adr-509))
 
 The relations layer's definite values, the values panel and the forced crossing dots read one shared pool

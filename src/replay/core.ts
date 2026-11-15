@@ -28,7 +28,7 @@ import { pinnedLowering, statedOnCommonTangents } from './statedOnCommonTangents
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities, isShapeCarrier } from '@/engine';
 import { carrierParams, setCarrierVals, CIRCLES_TOUCH_REL, adoptEvaluate, adoptResolved, evaluate as evaluateMemo, resolveDrivenMemo } from '@/engine/evaluate';
-import { adoptDofCount, freeDofCount as freeDofCountMemo } from '@/engine/sample';
+import { adoptDofCount, freeDofCount as freeDofCountMemo, samplesNothing } from '@/engine/sample';
 import { circlePairVariantCase } from '@/engine/variants';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, statedSizeCircles } from '@/engine';
@@ -485,6 +485,12 @@ interface FoldNode {
 const cutObservers: Set<string>[] = [];
 /** The fold key of the cut fold a memoized replay came from (a replay-memo hit never reaches the fold memo). */
 const cutKeyOf = new WeakMap<Derived, string>();
+/**
+ * #2894 ([ADR-834](docs/06-decisions.md#adr-834)): the fold a Derived was drawn from (its ROOT, before the HOIST rescue
+ * chain's per-seed choice), when that fold ran whole. A fold a budget cut is not recorded: it is not THE fold of these
+ * facts, so nothing may be proven from it.
+ */
+const foldOfDerived = new WeakMap<Derived, FoldNode>();
 function noteReattemptCut(key: string): void {
   for (const s of cutObservers) s.add(key);
 }
@@ -927,6 +933,7 @@ function computeReplay(raw: Fact[], seed = 0): Derived {
   let fold = foldVisible(key) ? foldCacheGet(key) : undefined;
   if (fold && !chargeHit(cellOf.get(fold))) fold = undefined; // #1605: unaffordable under the budget → recompute
   if (fold) noteFoldHeld(fold);
+  let whole = true;
   if (!fold) {
     const abortsBefore = solveBudget.aborts;
     const { value, cell } = computeWithCell(() => computeFold(facts));
@@ -937,9 +944,10 @@ function computeReplay(raw: Fact[], seed = 0): Derived {
     if (solveBudget.aborts === abortsBefore) {
       cellOf.set(fold, cell);
       foldCachePut(key, fold);
-    }
+    } else whole = false;
   }
   const out = tailChoice(fold, facts, seed);
+  if (whole) foldOfDerived.set(out, fold);
   if (fold.reattemptCut) {
     noteReattemptCut(key); // #1770 (ADR-586)
     cutKeyOf.set(out, key);
@@ -3349,6 +3357,9 @@ function firstSatisfyingSeedUnder(facts: Fact[], from: number, budget: number): 
   // #194 (ADR-474): the current view is kept only when it is BOTH satisfying and legible — otherwise it
   // is remembered as the strict fallback and the sweep looks for one that is also well spread.
   if (ok(base0) && spreadOk(base0)) return from;
+  // #2894 (ADR-834): no seed can satisfy a figure whose failure no sampled freedom reaches — the sweep below would
+  // try every candidate and return `from`; it returns it now.
+  if (!ok(base0) && failsAtEverySeed(facts, base0, 'build')) return from;
   // Candidate seeds in priority order. When a segment-meet is off its segment the cause is almost always an
   // apex pointing the wrong way, which plain re-seeding rarely fixes — so try the REFLECTION seeds first
   // (targeted mask = mirror exactly the failing apexes, then the other non-empty subsets), each over a small
@@ -3395,6 +3406,48 @@ function firstSatisfyingSeedUnder(facts: Fact[], from: number, budget: number): 
     // #942 (ADR-486): a stacked-but-satisfying seed comes last — worse than any separated view.
     return strictOnly >= 0 ? strictOnly : coincidentOnly >= 0 ? coincidentOnly : from;
   }
+}
+
+/**
+ * #2894 ([ADR-834](docs/06-decisions.md#adr-834), ADR-W-210 phase 5 item E) — SHARED FAILURE MEMORY: does a view that
+ * failed at one seed fail at EVERY seed, provably?
+ *
+ * A seed enters a replay only in its tail ({@link runTail}): the fold — every status, the build error, the pending
+ * classification — is computed from the fact list alone, and the tail samples the fold's construction at the seed
+ * (`applySeed`, the reflections of the seed's high bits) and evaluates it once. So a failure is the same at every seed
+ * when no sampled degree of freedom can reach it, and two shapes of that are read exactly, never estimated:
+ *  - the FOLD fails the bar: its build error is set (a tail never clears it), or a row the fold filed as failed is
+ *    one the bar reads (a tail turns a row from ok to failed, never back) — `bar` names which of the two a search's
+ *    acceptance reads;
+ *  - the fold's construction has NOTHING to sample: `applySeed` returns it unchanged at every seed (its own early
+ *    return: no free point, no free on-circle or on-line point, no free shape scalar) and no point is reflectable,
+ *    so every seed's tail evaluates the same construction and the view at another seed is this one.
+ * The HOIST rescue chain ({@link tailChoice}) picks per seed: a rescue fold that is clean could be the one drawn at
+ * another seed, so the proof needs every rescue fold to be one the choice never takes (its build error set, or
+ * pending), or to have nothing to sample itself.
+ *
+ * The searches that scan seeds over ONE fact list (`firstSatisfyingSeed`, `findValidConfig`'s seed and reflection
+ * tiers, each candidate of `choiceRescue`, the branch tier and «הציגו תצורה אחרת») stop retrying such a list: the
+ * seeds they skip are seeds that fail. Which view a search returns is unchanged; it gets there with less work.
+ */
+export type FailureBar = 'build' | 'statuses';
+export function failsAtEverySeed(facts: Fact[], fig: Derived, bar: FailureBar): boolean {
+  const root = foldOfDerived.get(fig);
+  if (!root) return false;
+  const nothingToSample = (n: FoldNode): boolean => samplesNothing(n.cur) && reflectableFreePoints(n.cur).length === 0;
+  for (let n = root.rescue; n; n = n.rescue) if (n.buildError === null && !n.pending && !nothingToSample(n)) return false;
+  if (root.buildError !== null) return true;
+  if (bar === 'statuses' && root.statusByIndex.length === facts.length) {
+    const waiting = factsWaitingForLetter(facts);
+    if (facts.some((f, i) => f.enabled && root.statusByIndex[i] !== 'ok' && !waiting.has(f.id))) return true;
+  }
+  return nothingToSample(root);
+}
+/** {@link meetsRequirements} at `seed`, and whether its `false` holds at every seed ({@link failsAtEverySeed}). */
+function meetsAt(facts: Fact[], seed: number): { ok: boolean; everySeed: boolean } {
+  const fig = replay(facts, seed);
+  const ok = figureMeetsRequirements(facts, fig);
+  return { ok, everySeed: !ok && failsAtEverySeed(facts, fig, 'statuses') };
 }
 
 /** Branchable derived-point command types — the discrete "alternatives" a figure can have (which of two
@@ -3456,7 +3509,10 @@ export function factsWaitingForLetter(facts: readonly Fact[]): Set<string> {
  * it's waiting for more givens, ADR-104 — so there is nothing to search for).
  */
 export function meetsRequirements(facts: Fact[], seed = 0): boolean {
-  const fig = replay(facts, seed);
+  return figureMeetsRequirements(facts, replay(facts, seed));
+}
+/** {@link meetsRequirements} of a figure already replayed from `facts`. */
+function figureMeetsRequirements(facts: Fact[], fig: Derived): boolean {
   const waiting = factsWaitingForLetter(facts);
   return (
     fig.lastError === null &&
@@ -3598,7 +3654,11 @@ function findValidConfigUnder(facts: Fact[], fromSeed: number): { facts: Fact[];
   // better-spread configuration, which is the ADR-052 guarantee: valid stays drawable.
   let meetingOnly: number | null = null;
   let meetingScore = -1;
-  if (meetsRequirements(facts, s0)) {
+  // #2894 (ADR-834): a failure at s0 that no sampled freedom reaches fails at every seed and every reflection mask, so
+  // the seed sweep and the reflection tier (seeds of these same facts) are skipped; the tiers that REWRITE the facts
+  // (seat, variant, branch) still run, in their order.
+  const at0 = meetsAt(facts, s0);
+  if (at0.ok) {
     const fig0 = replay(facts, s0);
     // #942 (ADR-486): a stacked view never short-circuits the search — it is remembered the same way a
     // squashed one is, so the tiers below get their chance to find a seating that separates the labels.
@@ -3617,7 +3677,7 @@ function findValidConfigUnder(facts: Fact[], fromSeed: number): { facts: Fact[];
   // tier below builds NEW fact content (branch rewrites), whose folds can hit the expensive recruit
   // ladder — the between-replay checks alone couldn't stop a single 30 s candidate.
   {
-    for (let s = fromSeed; s < fromSeed + 40; s++) {
+    for (let s = fromSeed; s < fromSeed + (at0.everySeed ? 0 : 40); s++) {
       if (limitReached()) {
         // #194: at the limit — a remembered meeting-but-squashed config still beats amber.
         if (meetingOnly !== null) {
@@ -3689,7 +3749,7 @@ function findValidConfigUnder(facts: Fact[], fromSeed: number): { facts: Fact[];
     // extension/segment bars, not the full requirement set — so nothing was searching this dimension
     // against `meetsRequirements`. General, not convexity-specific: the ADR-166 apex-side family gains
     // the same coverage.
-    const reflectable = reflectableFreePoints(replay(facts).construction).length;
+    const reflectable = at0.everySeed ? 0 : reflectableFreePoints(replay(facts).construction).length;
     for (let m = 1; m < 1 << Math.min(reflectable, REFLECT_MAX); m++) {
       for (let s = fromSeed; s < fromSeed + 6; s++) {
         if (limitReached()) return null;
@@ -3718,11 +3778,14 @@ function findValidConfigUnder(facts: Fact[], fromSeed: number): { facts: Fact[];
         const k = branchy.findIndex((x) => x.i === idx);
         return k >= 0 ? ({ ...f, cmd: { ...f.cmd, branch: combo[k] } } as Fact) : f;
       });
-      for (let s = 0; s < 6; s++)
-        if (meetsRequirements(fc, s)) {
+      for (let s = 0; s < 6; s++) {
+        const at = meetsAt(fc, s);
+        if (at.ok) {
           lastConfigTier = 'branch';
           return { facts: fc, seed: s };
         }
+        if (at.everySeed) break; // #2894 (ADR-834): this assignment fails at every seed
+      }
     }
     return null;
   }
@@ -4006,13 +4069,19 @@ function searchAnotherViewUnder(facts: Fact[], seed: number, onProgress?: (k: nu
     if (limitReached()) break;
     // Fresh seeds first (the legacy press resampled AND flipped), the current seed as the in-combo fallback.
     const seeds = hasDofs ? [seed + 1, seed + 2, seed + 3, seed] : [seed];
-    for (const s of seeds) {
+    for (let j = 0; j < seeds.length; j++) {
+      const s = seeds[j];
       if (limitReached()) break;
       onProgress?.(++k, totalWork);
-      if (meetsRequirements(fc, s)) {
+      const at = meetsAt(fc, s);
+      if (at.ok) {
         // #942: separated wins outright; coincident is remembered and only used if nothing else turns up.
         if (separatedView(replay(fc, s))) return { facts: fc, seed: s };
         if (!coincident) coincident = { facts: fc, seed: s };
+      } else if (at.everySeed) {
+        // #2894 (ADR-834): this candidate fails at every seed — its remaining seeds are skipped (progress counts them)
+        k += seeds.length - 1 - j;
+        break;
       }
     }
   }
@@ -4106,7 +4175,7 @@ export function choiceRescue(facts: Fact[], limit: 'under-limit' | { workCap: nu
   const mayHaveSide = facts.some((f) => f.enabled && 'ids' in f.cmd);
   if (!mayHaveSide && variantAxes(facts).length === 0) return null;
   // #2893 (ADR-831): the configuration search's tier runs under that search's work limit (it was its clock)
-  if (limit === 'under-limit') return choiceSweep(facts, limitReached);
+  if (limit === 'under-limit') return choiceSweep(facts, limitReached, true);
   // #1857 (ADR-709): the submit gate's rescue is bounded by WORK, in charged units (every memo hit charged the
   // work it saved, ADR-582) — the seat sweep's ADR-584 shape — so whether the cure for an unstated choice
   // counts is the same on every device and cold or warm. The axes' own fold is read inside the epoch, so it is
@@ -4117,7 +4186,7 @@ export function choiceRescue(facts: Fact[], limit: 'under-limit' | { workCap: nu
     return withWorkBudget(limit.workCap, () => {
       const at = work.done + limit.workCap;
       const aborts0 = solveBudget.aborts;
-      const cured = choiceSweep(facts, () => work.done > at || solveBudget.aborts !== aborts0);
+      const cured = choiceSweep(facts, () => work.done > at || solveBudget.aborts !== aborts0, false);
       if (cured) {
         choiceRescueStats.cured++;
         choiceRescueStats.maxCuredCharged = Math.max(choiceRescueStats.maxCuredCharged, work.done - d0);
@@ -4129,7 +4198,13 @@ export function choiceRescue(facts: Fact[], limit: 'under-limit' | { workCap: nu
     choiceRescueStats.charged += work.done - d0;
   }
 }
-function choiceSweep(facts: Fact[], stop: () => boolean): { facts: Fact[]; seed: number } | null {
+/**
+ * `skipProven` (#2894, ADR-834): stop trying an assignment at further seeds once it failed at one for a reason no
+ * sampled freedom reaches ({@link failsAtEverySeed}). Only under a configuration search's limit: the submit gate's
+ * work cap decides whether a line is refused or kept waiting, and a sweep made cheaper could finish where the cap
+ * used to cut it, which would change that verdict.
+ */
+function choiceSweep(facts: Fact[], stop: () => boolean, skipProven: boolean): { facts: Fact[]; seed: number } | null {
   // #1987 (ADR-622): the `reflex` axis joins this tier — a convexity default that YIELDED (ADR-613) is an
   // unstated choice exactly as a variant is, so a figure the convex seat cannot draw belongs here, not in a
   // refusal. Zero cost on a figure with no yielding ring ({@link reflexAxes} registers no axis).
@@ -4144,9 +4219,10 @@ function choiceSweep(facts: Fact[], stop: () => boolean): { facts: Fact[]; seed:
     const fc = withAssignment(facts, axes, assignment);
     for (let s = 0; s < 6; s++) {
       if (stop()) return null;
-      const ok = meetsRequirements(fc, s);
+      const at = skipProven ? meetsAt(fc, s) : { ok: meetsRequirements(fc, s), everySeed: false };
       if (stop()) return null; // a fold the budget cut mid-ladder is not THE fold: it can neither cure nor refute
-      if (ok) return { facts: fc, seed: s };
+      if (at.ok) return { facts: fc, seed: s };
+      if (at.everySeed) break;
     }
   }
   return null;
@@ -4215,14 +4291,14 @@ export function seatSweep(facts: Fact[], limit: 'under-limit' | { workCap: numbe
   const d0 = work.done;
   try {
     const { value: r, cutKeys } = observeReattemptCuts(() => {
-      if (limit === 'under-limit') return withWorkEpoch(() => sweepRotations(rotations, limitReached));
+      if (limit === 'under-limit') return withWorkEpoch(() => sweepRotations(rotations, limitReached, true));
       // #1671 (ADR-584): the submit gate's sweep is bounded by WORK, in charged units (every memo hit charged
       // the work it saved, ADR-582) — the same verdict on every device and cold or warm. A ladder the cap cut
       // mid-fold ends the sweep as incomplete: a cut fold is not THE fold, so it can neither cure nor refute.
       return withWorkBudget(limit.workCap, () => {
         const at = work.done + limit.workCap;
         const aborts0 = solveBudget.aborts;
-        return sweepRotations(rotations, () => work.done > at || solveBudget.aborts !== aborts0);
+        return sweepRotations(rotations, () => work.done > at || solveBudget.aborts !== aborts0, false);
       });
     });
     // #1770 (ADR-586): a sweep that read a rotation whose fold had a re-attempt cut by the ADR-583 cap has not
@@ -4239,7 +4315,8 @@ export function seatSweep(facts: Fact[], limit: 'under-limit' | { workCap: numbe
     seatSweepStats.charged += work.done - d0;
   }
 }
-function sweepRotations(rotations: Fact[][], stop: () => boolean): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
+/** `skipProven`: {@link choiceSweep}'s, for the same reason (the gate's cap decides a verdict). */
+function sweepRotations(rotations: Fact[][], stop: () => boolean, skipProven: boolean): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
   const d0 = work.done;
   for (const fc of rotations) {
     for (let s = 0; s < 6; s++) {
@@ -4247,12 +4324,13 @@ function sweepRotations(rotations: Fact[][], stop: () => boolean): { cured: { fa
         seatSweepStats.cut++;
         return { cured: null, complete: false };
       }
-      const ok = meetsRequirements(fc, s);
+      const at = skipProven ? meetsAt(fc, s) : { ok: meetsRequirements(fc, s), everySeed: false };
       if (stop()) {
         seatSweepStats.cut++;
         return { cured: null, complete: false };
       }
-      if (ok) {
+      if (at.everySeed) break; // #2894 (ADR-834)
+      if (at.ok) {
         seatSweepStats.cured++;
         seatSweepStats.maxCuredCharged = Math.max(seatSweepStats.maxCuredCharged, work.done - d0);
         return { cured: { facts: fc, seed: s }, complete: true };

@@ -18,8 +18,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearReplayCaches, foldStats, getFoldFor, replay, replayMemoConfig, replayMemoSizes, sharedSamples, type Derived, type Fact } from '@/replay/core';
-import { computeWithCell, countWork, servingRepeats, solveBudget, withLadderSpent, withWorkBudget, withWorkEpoch, work } from '@/engine/solveBudget';
-import { nelderMead } from '@/engine/evaluate';
+import { computeWithCell, countWork, measuredRun, repeatConfig, servedRuns, serveRun, servingRepeats, solveBudget, withLadderSpent, withWorkBudget, withWorkEpoch, work } from '@/engine/solveBudget';
+import { drivenSolveStats, evaluate, nelderMead, servedNelderMead } from '@/engine/evaluate';
 import { applyCommand, emptyConstruction, reflectableFreePoints, withReflectMask, type AnyCommand, type Command } from '@/engine';
 import { inWorkerLane } from '../../../shell/workMeter';
 
@@ -491,5 +491,106 @@ describe('#2894 — an exact repeat is served and charged as computed', () => {
     expect(calls).toBeGreaterThan(0);
     // the same descent again, from scratch: the same point to the last bit (the memo is the call's own)
     expect(nelderMead(cost, [0, 0], 400, 0.5)).toEqual(a);
+  });
+});
+
+/**
+ * #2894 ([ADR-833](../../../docs/06-decisions.md#adr-833)) — A WHOLE RUN THAT WOULD BE RUN AGAIN TO THE SAME RESULT IS SERVED,
+ * AND CHARGED AS RUN: the relaxed pass's descents (the convex pass's, call for call) and the anti-collapse retry of a
+ * failed search whose barrier was zero at every point it evaluated (the plain search again).
+ */
+describe('#2894 — a repeated whole run is served and charged as run', () => {
+  const units = (n: number) => () => {
+    for (let i = 0; i < n; i++) countWork();
+    return n;
+  };
+  it('a served run advances work.done, work.executed and the ledger frame exactly as running it did', () => {
+    const serve = servedRuns<number>();
+    let runs = 0;
+    const d0 = work.done;
+    const e0 = work.executed;
+    const { cell } = computeWithCell(() => {
+      serve('k', () => (runs++, units(5)()));
+      serve('k', () => (runs++, units(5)()));
+    });
+    expect(runs).toBe(1);
+    expect(work.done - d0).toBe(10);
+    expect(work.executed - e0).toBe(10);
+    expect(cell.own).toBe(10);
+  });
+
+  it('a hit whose charge would cross an armed limit is refused, so the caller runs it and is cut where a run is', () => {
+    const run = measuredRun(units(5));
+    expect(run.whole).toBe(true);
+    withWorkBudget(4, () => {
+      const d0 = work.done;
+      expect(serveRun(run), 'charging 5 past a limit of 4 is refused').toBe(false);
+      expect(work.done).toBe(d0);
+    });
+    withWorkBudget(5, () => expect(serveRun(run), 'exactly at the limit is served').toBe(true));
+  });
+
+  it('a run during which a limit was crossed is never served (a cut run is not the run)', () => {
+    let run = measuredRun(() => 0);
+    withWorkBudget(2, () => {
+      run = measuredRun(units(5));
+    });
+    expect(run.whole).toBe(false);
+    expect(serveRun(run)).toBe(false);
+    expect(withLadderSpent(() => serveRun(measuredRun(units(1))))).toBe(false);
+  });
+
+  it('serving is off with the repeat table: the lock that a served run counts as a computed one', () => {
+    const run = measuredRun(units(3));
+    repeatConfig.serve = false;
+    try {
+      expect(serveRun(run)).toBe(false);
+    } finally {
+      repeatConfig.serve = true;
+    }
+  });
+
+  it('a served descent is the descent: the same point, the same charge', () => {
+    const cost = (x: number[]): number => (countWork(), (x[0] - 1) ** 2 + 10 * (x[1] + 2) ** 2 + 1e-3);
+    const nm = servedNelderMead();
+    const d0 = work.done;
+    const a = nm(cost, [0, 0], 200, 0.5);
+    const once = work.done - d0;
+    const b = nm(cost, [0, 0], 200, 0.5);
+    expect(b).toEqual(a);
+    expect(b).toEqual(nelderMead(cost, [0, 0], 200, 0.5));
+    expect(work.done - d0).toBe(2 * once + once); // two served/run descents and the plain one
+  });
+
+  it('a failed driven solve reads the same, and charges the same, with its repeated runs served or run', () => {
+    // a free vertex driven onto two incompatible distances: the plain search fails, and the retry is the plain search
+    const c = {
+      objects: [
+        { kind: 'free-point', id: 'A', x: 0, y: 0 },
+        { kind: 'free-point', id: 'B', x: 9, y: 0 },
+        { kind: 'free-point', id: 'C', x: 2, y: 3, solve: { constraint: { type: 'distance', a: 'A', b: 'C', value: 1 }, branch: 0, also: [{ type: 'distance', a: 'B', b: 'C', value: 1 }] } },
+        { kind: 'polygon', id: 'poly-ABDC', vertices: ['A', 'B', 'D', 'C'] },
+        { kind: 'free-point', id: 'D', x: 9, y: 5 },
+      ],
+      constraints: [],
+    } as unknown as Parameters<typeof evaluate>[0];
+    const once = (serve: boolean) => {
+      repeatConfig.serve = serve;
+      try {
+        const d0 = work.done;
+        const r = evaluate(structuredClone(c));
+        return { r: JSON.stringify(r.ok ? [...r.positions] : [r.error, r.violated]), done: work.done - d0 };
+      } finally {
+        repeatConfig.serve = true;
+      }
+    };
+    const r0 = drivenSolveStats.servedRetries;
+    const served = once(true);
+    expect(drivenSolveStats.servedRetries - r0, 'the failed plain search met no barrier: its retry was served').toBeGreaterThan(0);
+    const r1 = drivenSolveStats.servedRetries;
+    const run = once(false);
+    expect(drivenSolveStats.servedRetries - r1, 'serving off: the retry ran').toBe(0);
+    expect(served.r).toBe(run.r);
+    expect(served.done).toBe(run.done);
   });
 });
