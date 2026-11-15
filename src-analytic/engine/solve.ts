@@ -23,6 +23,7 @@
  * figure that violates its own givens is the defect this whole product is built to avoid.
  */
 import { meterWork } from '../../shell/workMeter';
+import { chargeUnit, solverUnit } from './workLimitAn';
 import { evalExpr, exprText, symbolsOf, type Env } from './expr';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import { CIRCLE_CONIC_WORDS } from '../parser/circleConicWords';
@@ -1614,6 +1615,22 @@ export interface SolveResult {
   anchored?: boolean;
 }
 
+/** The repeat table is on; off only inside {@link withoutServedRepeats}. */
+let repeatsServed = true;
+/**
+ * AN INSTRUMENT (#2893, ADR-AG-479's lock): run `fn` with no repeat served, every evaluation computed — the solve before
+ * ADR-AG-480, which the work limit must stop at the same charged unit. Not a mode: nothing outside the locks calls it.
+ */
+export function withoutServedRepeats<T>(fn: () => T): T {
+  const was = repeatsServed;
+  repeatsServed = false;
+  try {
+    return fn();
+  } finally {
+    repeatsServed = was;
+  }
+}
+
 /**
  * #2894 ([ADR-AG-480](../../docs/06c-decisions-analytic.md#adr-ag-480), ADR-W-210 phase 5) — AN EXACT REPEAT IS SERVED.
  *
@@ -1626,6 +1643,7 @@ export interface SolveResult {
  * analytic loop makes, wherever it makes it.
  */
 function servingRepeatedPoints(f: (x: number[]) => number[]): (x: number[]) => number[] {
+  if (!repeatsServed) return f;
   const seen = new Map<string, number[]>();
   return (x) => {
     let key = '';
@@ -1670,10 +1688,15 @@ export function solveLM(
   // #2894 (ADR-W-210 phase 5): a point this solve has already evaluated is served, not evaluated again — the residuals at
   // the iterate (taken by the cost, then again at the top of the next iteration), the whole Jacobian after a rejected
   // step (x has not moved), the finish's re-reads. Measured: 31.9 % of every evaluation was such a repeat.
-  const residuals = servingRepeatedPoints((v: number[]): number[] => {
+  // #2893 (ADR-AG-479): every evaluation ASKED for is charged to the work limit, a served one too; only a computed one is metered.
+  const served = servingRepeatedPoints((v: number[]): number[] => {
     meterWork();
     return residuals0(v);
   });
+  const residuals = (v: number[]): number[] => {
+    chargeUnit();
+    return served(v);
+  };
   const n = x0.length;
   /*
    * A DETERMINED START IS NOT ANCHORED (round #2627, ruling 2026-10-30 "5 A"): with no free direction at the start
@@ -1969,7 +1992,7 @@ function gaussian(A: number[][], n: number): number[] | null {
 export function freeRank(x: number[], equalities: (v: number[]) => number[]): number {
   const n = x.length;
   if (n === 0) return n;
-  meterWork(); // #2873: the one evaluation made here; `jacobianRank` meters its own
+  solverUnit(); // #2873: the one evaluation made here; `jacobianRank` meters its own
   if (equalities(x).length === 0) return n;
   return Math.max(0, n - jacobianRank(x, equalities).rank);
 }
@@ -2002,7 +2025,7 @@ export const RANK_REL_TOL = 10 * SOLVE_TOL;
 export function jacobianRank(x: number[], residuals0: (v: number[]) => number[]): { rank: number; nullBasis: number[][]; sigma: number[] } {
   // #2873 (ADR-W-210): a rank's residual evaluations are solver work in the same unit as `solveLM`'s.
   const residuals = (v: number[]): number[] => {
-    meterWork();
+    solverUnit();
     return residuals0(v);
   };
   const n = x.length;

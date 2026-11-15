@@ -81,7 +81,7 @@ import { applyCentreName, applyCentreSwap, centreLabelOf } from './app/centreNam
 import { segKey } from './render/scene';
 import { segmentName } from './app/lines';
 import { curveMenuOf, type CurveMenuTarget } from './app/curveDisplay';
-import type { LetterRenameResult } from '../shell/frame/letterOffer';
+import type { LetterRenameResult, LetterSwapResult } from '../shell/frame/letterOffer';
 import { decideAn, isAnswered, showFigure } from './app/workerAn';
 import { basisOfState, useShownFigure } from './app/useShownFigure';
 import { PendingText } from './app/PendingText';
@@ -107,12 +107,21 @@ import { WorkingFace, useLatest, useWorking, workingDim } from '../shell/frame/W
 if (import.meta.env.DEV) armBasisGuardAn((message) => console.error(message));
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
+import { NotDecidedNote } from '../shell/frame/NotDecidedNote';
+import { isNotDecided, type NotDecided } from '../shell/notDecided';
+import type { ResumeAn } from './engine/workLimitAn';
+
 import { unstatedChoices } from './engine/unstatedChoices';
 import { unstatedChoiceText } from './app/unstatedChoice';
 import { locusChips } from './app/locusChip';
 import { circleNotesOf, conicChipKey, conicChips, conicMarksOf, isCircleShaped, markAnchors, type CircleNote } from './app/conicMarks';
 import { withConic } from './app/annotations';
 import { displayPointName } from './engine/pointName';
+
+/** #2893 (ADR-AG-479): a fallback solve reached its work limit — thrown out of `runFallback`, caught in `tryFallback`. */
+class FallbackStopped {
+  constructor(readonly stopped: NotDecided<ResumeAn>) {}
+}
 
 
 declare const __BUILD__: string;
@@ -231,6 +240,25 @@ export function App() {
    * model fallback (#1251) is part of its submit's job.
    */
   const working = useWorking(workAn);
+  /**
+   * #2893 (ADR-AG-479, ADR-W-210 phase 4) — A SEARCH THAT REACHED ITS WORK LIMIT: «עדיין לא נמצא פתרון — החיפוש נעצר
+   * אחרי כ-10 שניות.» with «המשיכו לחפש», where a refusal shows (operator, 2026-11-14, #2893 questions 1–3). Page state
+   * only: never a fact, never an undo step. `again` runs the next round, which starts from what this one finished (the
+   * worker's memos); typing in the box, or any other action, dismisses it.
+   */
+  const [stopped, setStopped] = useState<{ again: () => void } | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const stopHere = (nd: NotDecided<ResumeAn>, again: (round: number) => unknown): void => {
+    setError(null);
+    const round = nd.resume.round + 1;
+    setStopped({
+      again: () => {
+        setStopped(null);
+        void again(round);
+      },
+    });
+  };
   /** «הציגו תצורה אחרת» is counted on its own lane and shown on its own button, as 2-D shows it. */
   const resampling = useWorking(workAn, ANOTHER);
 
@@ -422,9 +450,13 @@ export function App() {
   };
 
   /** #2890: a load's audit replays the saved lines in the worker; then the loaded figure is drawn. */
-  const auditInWorker = async (loaded: readonly string[]): Promise<void> => {
+  const auditInWorker = async (loaded: readonly string[], round = 1): Promise<void> => {
+    setStopped(null);
     const { disabled: muted, hosts: recorded } = useAnalyticStore.getState();
-    finishLoadAudit(loaded, await decideAn('audit', { lines: loaded, disabled: muted, hosts: recorded }));
+    const audit = await decideAn('audit', { lines: loaded, disabled: muted, hosts: recorded, round });
+    // #2893 (ADR-AG-479): an audit that stopped has no answer yet — the figure is drawn, and the audit asks to go on
+    if (isNotDecided(audit)) stopHere(audit, (next) => workAn.run(() => auditInWorker(loaded, next)));
+    else finishLoadAudit(loaded, audit);
     await figureOfStore();
   };
 
@@ -947,17 +979,42 @@ export function App() {
     // sentence body is the LATEST render's, so a job that waited its turn reads the figure as it is then.
     void workAn.runIfIdle(() => submitTyped(raw, (sentence) => live.current.submitSentence(sentence), setDraft));
   };
+  /** #2893 (ADR-AG-479): «המשיכו לחפש» on a typed line — the box again, its first sentence as the next round. */
+  const submitRound = (round: number) =>
+    workAn.runIfIdle(() => {
+      let first = true;
+      return submitTyped(
+        draftRef.current,
+        (sentence) => {
+          const r = first ? round : 1;
+          first = false;
+          return live.current.submitSentence(sentence, r);
+        },
+        setDraft,
+      );
+    });
 
   /**
    * One sentence. It reads the LIVE store rather than this render's `active`/`d`: a paragraph's second
    * sentence must see the row its first just recorded («האנך חותך…» after the perpendicular). On a single
    * sentence the two are the same state, and the render's memoized derivation is reused.
    */
-  const submitSentence = async (raw: string): Promise<SentenceOutcome> => {
+  const submitSentence = async (raw: string, round = 1): Promise<SentenceOutcome> => {
+    setStopped(null);
     const live = useAnalyticStore.getState();
     const act = activeOf(live.lines, live.disabled);
     // #2890 (ADR-AG-478): decided in the worker, on the figure the store holds now
-    const verdict = await decideAn('submit', { raw, basis: basisOfState(live) });
+    const verdict = await decideAn('submit', { raw, basis: basisOfState(live), round });
+    /**
+     * #2893 (ADR-AG-479): NOT DECIDED — the search reached its work limit. Not a verdict: nothing is recorded and nothing
+     * is logged as a refusal; the line stays in the box (ruling 3) and «המשיכו לחפש» submits the box again, this
+     * sentence as the next round.
+     */
+    if (isNotDecided(verdict)) {
+      logAnalytic({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: 'not-decided' });
+      stopHere(verdict, submitRound);
+      return 'kept';
+    }
     /**
      * THE TRACE (#1300) — one line per submitted utterance, including the ones that fail.
      *
@@ -992,7 +1049,7 @@ export function App() {
          * tool understood the student and disagreed, and handing that to a model would replace a
          * correct explanation with a guess.
          */
-        if (reachesFallback(verdict)) return (await tryFallback(raw, verdict.error, act, live.seed)) ? 'consumed' : 'kept';
+        if (reachesFallback(verdict)) return (await tryFallback(raw, verdict.error, act, live.seed, round)) ? 'consumed' : 'kept';
         setError(verdict.error);
         return sentenceOutcome(verdict);
       /**
@@ -1034,7 +1091,11 @@ export function App() {
        * is dispatched here rather than decided by `decideSubmit`, which sees only the active lines.
        */
       case 'rename': {
-        const r = await letterInWorker({ kind: 'rename', from: verdict.from, to: verdict.to }, sessionOf(live));
+        const r = await letterInWorker({ kind: 'rename', from: verdict.from, to: verdict.to }, sessionOf(live), round);
+        if (isNotDecided(r)) {
+          stopHere(r, submitRound); // #2893 (ADR-AG-479)
+          return 'kept';
+        }
         if (r.kind !== 'rename') return 'kept';
         applyRenameVerdict(r.verdict, { applyRename: jobStoreAn().applyRename, setError });
         await figureOfStore();
@@ -1042,7 +1103,11 @@ export function App() {
       }
       // #1303 / #1631 — a SWAP («החלף בין A ל-B»): the rename's contract, two letters at once.
       case 'swap': {
-        const r = await letterInWorker({ kind: 'swap', a: verdict.a, b: verdict.b }, sessionOf(live));
+        const r = await letterInWorker({ kind: 'swap', a: verdict.a, b: verdict.b }, sessionOf(live), round);
+        if (isNotDecided(r)) {
+          stopHere(r, submitRound); // #2893 (ADR-AG-479)
+          return 'kept';
+        }
         if (r.kind !== 'swap') return 'kept';
         applySwapVerdict(r.verdict, { applySwap: jobStoreAn().applySwap, setError });
         await figureOfStore();
@@ -1061,12 +1126,28 @@ export function App() {
    */
   /** The whole session a rename or swap rewrites, read from the live store (#1778: mid-paragraph, the render's copy is stale). */
   /** #2890: a letter change decided in the worker, over the whole session. */
-  const letterInWorker = (request: Parameters<typeof decideAn<'letter'>>[1]['request'], state: RenameState) => decideAn('letter', { request, state });
+  const letterInWorker = (request: Parameters<typeof decideAn<'letter'>>[1]['request'], state: RenameState, round = 1) => decideAn('letter', { request, state, round });
+  /** #2893 (ADR-AG-479): the popover's answer when a letter decision reached its limit — the round «המשיכו לחפש» runs. */
+  const renameStopped = (nd: NotDecided<ResumeAn>) => ({ ok: false as const, reason: 'not-decided', round: nd.resume.round + 1 });
+  const swapStopped = (nd: NotDecided<ResumeAn>) => ({ ok: false, notDecided: { round: nd.resume.round + 1 } });
   /** #2890: the fallback's two solves, in the worker. */
-  const fallbackSolver: FallbackSolver = {
-    existing: (ls, at) => decideAn('fallbackExisting', { lines: ls, seed: at }),
-    judge: (utterance, ls, at, answer, existing) => decideAn('fallbackJudge', { utterance, lines: ls, seed: at, answer, existing }),
-  };
+  /**
+   * #2893 (ADR-AG-479): a fallback solve that reached its work limit ends the fallback as "not decided": nothing is
+   * recorded, the line stays in the box, and «המשיכו לחפש» submits it again (the model is asked again: its answer is
+   * not kept between rounds).
+   */
+  const fallbackSolver = (round: number): FallbackSolver => ({
+    existing: async (ls, at) => {
+      const v = await decideAn('fallbackExisting', { lines: ls, seed: at, round });
+      if (isNotDecided(v)) throw new FallbackStopped(v);
+      return v;
+    },
+    judge: async (utterance, ls, at, answer, existing) => {
+      const v = await decideAn('fallbackJudge', { utterance, lines: ls, seed: at, answer, existing, round });
+      if (isNotDecided(v)) throw new FallbackStopped(v);
+      return v;
+    },
+  });
 
   const sessionOf = (live: ReturnType<typeof useAnalyticStore.getState>): RenameState => ({
     lines: live.lines,
@@ -1082,13 +1163,14 @@ export function App() {
   });
 
   /** Answers whether the model's lines were recorded — the sentence was taken (#1778: the paragraph chain goes on). */
-  const tryFallback = async (raw: string, original: InputError, act: readonly string[], atSeed: Seed): Promise<boolean> => {
+  const tryFallback = async (raw: string, original: InputError, act: readonly string[], atSeed: Seed, round = 1): Promise<boolean> => {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
     try {
       // #2874: the wait for the model is counted on the queue's MODEL lane (nested in this submit's job, which
       // has already painted the working state) and released in the queue's `finally`.
-      const out = await workAn.run(
+      const out = await workAn
+        .run(
         () =>
           runFallback(raw, act, atSeed, (utterance, context, keep, contradicted) =>
             llmParseAnalytic(utterance, context, {
@@ -1097,10 +1179,17 @@ export function App() {
               ...(keep?.length ? { keep } : {}),
               ...(contradicted?.length ? { contradicted } : {}),
             }),
-            fallbackSolver,
+            fallbackSolver(round),
           ),
         { lane: MODEL, paint: false },
-      );
+        )
+        .catch((e: unknown) => {
+          if (!(e instanceof FallbackStopped)) throw e;
+          logAnalytic({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', result: 'not-decided' });
+          stopHere(e.stopped, submitRound);
+          return null;
+        });
+      if (!out) return false;
       if (out.retry) logAnalytic(nameRetryEvent(out.retry)); // #2231 (ADR-W-189)
       /**
        * THE ESCALATION'S OUTCOME (#1300) — the event that could not be answered when #1297 was triaged.
@@ -1295,9 +1384,12 @@ export function App() {
   const live = useLatest({
     submitSentence,
     /** #1548 — the mute checkbox: muting always applies; un-muting faces the typed-line gate (`decideToggle`). */
-    toggleRow: async (id: string) => {
+    toggleRow: async (id: string, round = 1): Promise<void> => {
+      setStopped(null);
       const i = Number(id);
-      const verdict = await decideAn('toggle', { index: i, basis: basisOfState(useAnalyticStore.getState()) });
+      const verdict = await decideAn('toggle', { index: i, basis: basisOfState(useAnalyticStore.getState()), round });
+      // #2893 (ADR-AG-479): not decided — the row keeps its state, and the next round is offered
+      if (isNotDecided(verdict)) return stopHere(verdict, (next) => workAn.run(() => live.current.toggleRow(id, next)));
       logAnalytic({
         kind: 'action',
         action: 'toggle',
@@ -1310,10 +1402,16 @@ export function App() {
         await figureOfStore();
       }
     },
-    editRow: async (id: string, next: string): Promise<boolean> => {
+    editRow: async (id: string, next: string, round = 1): Promise<boolean> => {
+      setStopped(null);
       const i = Number(id);
       // #1973 (ADR-AG-430): an edit is an accept — the row records the host its new sentence resolved to
-      const edit = await decideAn('edit', { index: i, text: next, basis: basisOfState(useAnalyticStore.getState()) });
+      const edit = await decideAn('edit', { index: i, text: next, basis: basisOfState(useAnalyticStore.getState()), round });
+      // #2893 (ADR-AG-479): not decided — the row keeps its sentence and its editor stays open; the next round is offered
+      if (isNotDecided(edit)) {
+        stopHere(edit, (r) => workAn.run(() => live.current.editRow(id, next, r)));
+        return false;
+      }
       if (!edit.ok) return false;
       // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
       logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
@@ -1322,12 +1420,14 @@ export function App() {
       return true;
     },
     deleteRow: async (id: string) => {
+      setStopped(null);
       logAnalytic({ kind: 'action', action: 'delete', detail: lines[Number(id)] ?? id });
       jobStoreAn().removeLine(Number(id));
       await figureOfStore();
     },
     /** Undo, redo, and the created notice's «בטל»: a store step, then its figure. */
     storeStep: async (step: () => void) => {
+      setStopped(null);
       step();
       await figureOfStore();
     },
@@ -1338,8 +1438,11 @@ export function App() {
      * figure, while the DOF cue beside it said the figure still had freedom. When nothing differs,
      * saying so beats redrawing in silence.
      */
-    another: async () => {
-      const next = await decideAn('another', { basis: basisOfState(useAnalyticStore.getState()) });
+    another: async (round = 1): Promise<void> => {
+      setStopped(null);
+      const next = await decideAn('another', { basis: basisOfState(useAnalyticStore.getState()), round });
+      // #2893 (ADR-AG-479): a walk that reached its limit is not «אין תצורה אחרת»: it says so and offers the next round
+      if (isNotDecided(next)) return stopHere(next, (r) => workAn.runIfIdle(() => live.current.another(r), { lane: ANOTHER }));
       // #1300: the seed IS the configuration, so a replay that loses this press redraws a
       // different figure from the one the report is about.
       logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });
@@ -1352,15 +1455,17 @@ export function App() {
     },
     /** A POINT's letter popover (#1631): a taken letter is answered IN the popover (its holder, the swap offer);
      *  every other refusal keeps the analytic tree's own sentence in the error line, which says WHY. */
-    renameLetter: async (from: string, to: string): Promise<LetterRenameResult> => {
-      const r = await letterInWorker({ kind: 'rename', from, to }, sessionOf(useAnalyticStore.getState()));
+    renameLetter: async (from: string, to: string, round = 1): Promise<LetterRenameResult> => {
+      const r = await letterInWorker({ kind: 'rename', from, to }, sessionOf(useAnalyticStore.getState()), round);
+      if (isNotDecided(r)) return renameStopped(r);
       if (r.kind !== 'rename') return { ok: false, reason: 'rename-bad-name' };
       const v = applyRenameVerdict(r.verdict, { applyRename: jobStoreAn().applyRename, setError: (e) => (e && e.key === 'rename-taken' ? undefined : setError(e)) });
       await figureOfStore();
       return letterRenameOf(v);
     },
-    swapLetters: async (a: string, b: string) => {
-      const r = await letterInWorker({ kind: 'swap', a, b }, sessionOf(useAnalyticStore.getState()));
+    swapLetters: async (a: string, b: string, round = 1): Promise<LetterSwapResult> => {
+      const r = await letterInWorker({ kind: 'swap', a, b }, sessionOf(useAnalyticStore.getState()), round);
+      if (isNotDecided(r)) return swapStopped(r);
       if (r.kind !== 'swap') return { ok: false };
       const v = applySwapVerdict(r.verdict, { applySwap: jobStoreAn().applySwap, setError });
       await figureOfStore();
@@ -1370,14 +1475,16 @@ export function App() {
     centreOps: (offerId: string) => {
       const actions = { record: (v: Parameters<typeof commitRecord>[0]) => commitRecord(v, jobStoreAn().recordLine, t), applySwap: jobStoreAn().applySwap, setError };
       return {
-        onRename: async (_from: string, to: string) => {
-          const r = await letterInWorker({ kind: 'centreName', offerId, to }, sessionOf(useAnalyticStore.getState()));
+        onRename: async (_from: string, to: string, round = 1): Promise<LetterRenameResult> => {
+          const r = await letterInWorker({ kind: 'centreName', offerId, to }, sessionOf(useAnalyticStore.getState()), round);
+          if (isNotDecided(r)) return renameStopped(r);
           const out = r.kind === 'centreName' ? applyCentreName(r.verdict, actions) : { ok: false as const, reason: 'rename-bad-name' };
           await figureOfStore();
           return out;
         },
-        onSwap: async (_a: string, b: string) => {
-          const r = await letterInWorker({ kind: 'centreSwap', offerId, taken: b }, sessionOf(useAnalyticStore.getState()));
+        onSwap: async (_a: string, b: string, round = 1): Promise<LetterSwapResult> => {
+          const r = await letterInWorker({ kind: 'centreSwap', offerId, taken: b }, sessionOf(useAnalyticStore.getState()), round);
+          if (isNotDecided(r)) return swapStopped(r);
           const out = r.kind === 'centreSwap' ? applyCentreSwap(r.verdict, actions) : { ok: false as const };
           await figureOfStore();
           return out;
@@ -1545,7 +1652,11 @@ export function App() {
           <div ref={inputZoneRef} style={{ display: 'contents' }}>
             <InputArea
               value={draft}
-              onChange={setDraft}
+              onChange={(v) => {
+                // #2893 (ruling 3): typing something else dismisses the question
+                if (v !== draftRef.current) setStopped(null);
+                setDraft(v);
+              }}
               onSubmit={() => submit(draft)}
               placeholder={t('inputPlaceholder')}
               submitLabel={t('add')}
@@ -1607,6 +1718,12 @@ export function App() {
                 <p role="alert" style={{ color: color.danger, fontSize: fs.small, margin: '8px 0 0' }}>
                   {errorText}
                 </p>
+              )}
+              {/* #2893 (ADR-AG-479): a search that reached its work limit, where a refusal shows; never a refusal */}
+              {stopped && (
+                <div style={{ marginTop: 8 }}>
+                  <NotDecidedNote message={t('suite.notDecided.message')} continueLabel={t('suite.notDecided.continue')} onContinue={stopped.again} busy={working} />
+                </div>
               )}
               {/*
                 An informational answer, never the danger colour and never `role="alert"` (#1045):
@@ -2463,7 +2580,7 @@ export function App() {
           */
           const letter = pick.letter;
           // #2874: a rename re-solves the figure — a job; the popover waits for its answer
-          const onRename = (from: string, to: string) => workAn.run(() => live.current.renameLetter(from, to));
+          const onRename = (from: string, to: string, round?: number) => workAn.run(() => live.current.renameLetter(from, to, round));
           return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
               <LetterPopover
@@ -2474,7 +2591,7 @@ export function App() {
                 title={letter}
                 label={letter}
                 onRename={onRename}
-                onSwap={(a, b) => workAn.run(() => live.current.swapLetters(a, b))}
+                onSwap={(a, b, round) => workAn.run(() => live.current.swapLetters(a, b, round))}
                 strings={{
                   placeholder: t('letterPlaceholder'),
                   apply: t('letterApply'),
@@ -2482,6 +2599,8 @@ export function App() {
                   bad: t('letterBad'),
                   takenBy: t('letterTakenBy'),
                   swapLetters: t('letterSwap'),
+                  notDecided: t('suite.notDecided.message'),
+                  keepSearching: t('suite.notDecided.continue'),
                 }}
                 onClose={() => setPick(null)}
                 testId="letter-popover"
@@ -2564,8 +2683,8 @@ export function App() {
         // #2874: naming a centre records a line, and its swap rewrites the session — jobs, decided on the latest render
         const offerId = centrePick.offerId;
         const ops = {
-          onRename: (from: string, to: string) => workAn.run(() => live.current.centreOps(offerId).onRename(from, to)),
-          onSwap: (a: string, b: string) => workAn.run(() => live.current.centreOps(offerId).onSwap(a, b)),
+          onRename: (from: string, to: string, round?: number) => workAn.run(() => live.current.centreOps(offerId).onRename(from, to, round)),
+          onSwap: (a: string, b: string, round?: number) => workAn.run(() => live.current.centreOps(offerId).onSwap(a, b, round)),
         };
         return (
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
@@ -2585,6 +2704,8 @@ export function App() {
                 bad: t('letterBad'),
                 takenBy: t('letterTakenBy'),
                 swapLetters: t('letterSwap'),
+                notDecided: t('suite.notDecided.message'),
+                keepSearching: t('suite.notDecided.continue'),
               }}
               onClose={() => setCentrePick(null)}
               testId="centre-popover"
