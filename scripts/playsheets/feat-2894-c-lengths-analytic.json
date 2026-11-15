@@ -8,10 +8,10 @@
       "product": "analytic",
       "base": "http://localhost:5198",
       "path": "/analytic.html",
-      "title": "A square's diagonal longer than two sides is refused at once, saying why",
+      "title": "A square's diagonal stated otherwise than the square forces is refused at once, saying why",
       "lines": ["ריבוע ABCD", "AB = 3", "AC = 10"],
-      "expectRefusal": "לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|",
-      "lookFor": "On a cleared canvas, type the three lines. The third is refused at once: «הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 6, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.» Two rows stay.",
+      "expectRefusal": "יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10",
+      "lookFor": "On a cleared canvas, type the three lines. The third is refused at once: «הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.» (the square forces AC = 3√2, as 2-D says). Two rows stay.",
       "before": "«לא נמצאה תצורה שבה מתקיים: «AC = 10»» after a search (148 665 units; now 450)."
     },
     {

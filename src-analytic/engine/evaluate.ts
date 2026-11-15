@@ -35,7 +35,7 @@ import { followObjects } from './roles';
 import { ContentCache, contentOf } from './content';
 import { offInkExtensions } from '../../shell/offInk';
 import { isLimitSignal } from './workLimitAn';
-import { metricConflict } from './metricBounds';
+import { lengthsImpossible } from './metricBounds';
 import { curveByName, inDomain, isFree, isPositional, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
 export interface FigurePoint {
@@ -3998,7 +3998,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * them, so none is paid: the fits and the solve are skipped, and the check below reports the rows unmet at the seed's own
    * figure. 3-D's pivot does the same (ADR-3D-495); `derive` names the rows and the reason.
    */
-  const metricallyImpossible = metricConflict(c.constraints) !== null;
+  const metricallyImpossible = lengthsImpossible(c.constraints);
   // `paramReach`, never `reach`: this body has locals of that name (a span), and the parameter must not be shadowed
   let env = foldSignSelectors(c, sampleEnv(c, seed, paramReach, wide));
   // #2380 (ADR-AG-303): a parameter a given pins starts AT one of its roots — found by scan, chosen by the seed.

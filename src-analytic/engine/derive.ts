@@ -6,7 +6,7 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { metricConflict, type LengthsWhy } from './metricBounds';
+import { explainLengths, type LengthsWhy } from './metricBounds';
 import { centreIdOf, circleByName, commonTouchOf, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
@@ -619,7 +619,10 @@ function deriveAt(
    * why, on the newest line among the rows that fix them, naming the others. It stands in for the drop-one probe's blame,
    * which it agrees with by construction (removing the newest of those rows removes the conflict).
    */
-  const metric = figure.unsatisfied.length > 0 && !ringOrderFault ? metricConflict(construction.constraints) : null;
+  // the reason chosen as 2-D chooses it (ADR-AG-483 Am. 1): the newest line's own lengths are tried first
+  const newestLine = Math.max(-1, ...groupOfConstraint);
+  const newestRows = new Set(groupOfConstraint.flatMap((g, r) => (g === newestLine ? [r] : [])));
+  const metric = figure.unsatisfied.length > 0 && !ringOrderFault ? explainLengths(construction.constraints, newestRows) : null;
   const metricLines = metric ? [...new Set(metric.rows.map((r) => groupOfConstraint[r]).filter((g) => g >= 0))].sort((a, b) => a - b) : [];
   const lengthsFault: LineFault | null =
     metric && metricLines.length > 0 && !faults.some((f) => f.index === metricLines[metricLines.length - 1])

@@ -30,7 +30,10 @@ function typed(lines: readonly string[], seed = 0) {
   return decideSubmit(lines[lines.length - 1], held, seed);
 }
 
-/** 3-D's sentences (scenarios3, `lengths-impossible-2894`), in analytic's spelling of a length (no bars on the rows). */
+/**
+ * 3-D's sentences, the reason and its values chosen as 2-D chooses them (ADR-835; ADR-AG-483 Am. 1): a length the figure
+ * FORCES (the square's diagonal, the rectangle's) is «two lengths»; otherwise the triangle inequality.
+ */
 const SCENARIOS: Array<[string[], string]> = [
   [
     ['משולש ABC', 'AB = 3', 'BC = 4', 'AC = 10'],
@@ -38,7 +41,15 @@ const SCENARIOS: Array<[string[], string]> = [
   ],
   [
     ['ריבוע ABCD', 'AB = 3', 'AC = 10'],
-    'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 6, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.',
+    'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.',
+  ],
+  [
+    ['מלבן ABCD', 'AB = 3', 'BC = 4', 'AC = 7'],
+    'הנתונים סותרים זה את זה — «AC = 7» לא מתקיים יחד עם «מלבן ABCD», «AB = 3», «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7. בדקו איזה מהאורכים האלה לא נכון.',
+  ],
+  [
+    ['משולש ABC', '∠ABC = 60', 'AB = 3', 'BC = 3', 'AC = 10'],
+    'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «∠ABC = 60», «AB = 3», «BC = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3 ו-10. בדקו איזה מהאורכים האלה לא נכון.',
   ],
   [
     ['ריבוע ABCD', 'AB = 3', 'BC = 4'],

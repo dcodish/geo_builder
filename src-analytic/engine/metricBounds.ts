@@ -209,3 +209,212 @@ export function metricConflict(constraints: readonly Constraint[]): MetricConfli
   }
   return null;
 }
+
+/**
+ * #2894 ([ADR-AG-483](../../docs/06c-decisions-analytic.md#adr-ag-483) Am. 1) — THE REASON, CHOSEN AS 2-D CHOOSES IT
+ * (ADR-W-118 B1: one plane-geometry sentence, one verdict; 2-D's ADR-835 `explainLengthConflict` is the reference).
+ *
+ * The lengths a figure FORCES are more than the stated ones: a right angle between two fixed sides fixes the third
+ * («ריבוע ABCD» · «AB = 3» gives |AC| = 3√2), and so does any stated angle between two fixed sides (the law of cosines).
+ * `closeLengths` fixes them: the stated lengths, the ratios between lengths, and every angle the rows fix at a vertex —
+ * a stated angle in degrees, or a right angle read off the perpendicular and parallel rows (a rectangle's sides) —
+ * propagated until nothing new is fixed. A length fixed twice to values that differ, or three fixed sides against the
+ * triangle inequality, is a conflict (the margin of {@link CONFLICT_MARGIN}).
+ *
+ * The reason, as 2-D gives it: each stated length is tried in turn (the refused line's own first, then the newest first),
+ * and the closure is run WITHOUT it. When the rest already fixes that segment to another value, the reason is "two
+ * lengths" with the forced value first; otherwise, when the rest fixes the two other sides of a triangle on that segment,
+ * the triangle inequality. A row whose removal leaves the rest contradicting itself is not the one at fault.
+ */
+interface Known {
+  len: number;
+  via: number[];
+}
+interface Angle {
+  v: Id;
+  p: Id;
+  q: Id;
+  deg: number;
+  via: number[];
+}
+interface Closed {
+  known: Map<string, Known>;
+  conflict: boolean;
+}
+
+const uniq = (xs: readonly number[]): number[] => [...new Set(xs)].sort((a, b) => a - b);
+
+/** The angles the rows fix at a vertex: stated ones (degrees), and right angles read off ⊥ and ∥ between point pairs. */
+function fixedAngles(constraints: readonly Constraint[], skip: number | null): Angle[] {
+  const out: Angle[] = [];
+  // ∥ classes of point-pair lines, and ⊥ between classes
+  const up = new Map<string, { to: string; via: number[] }>();
+  const root = (s: string): { r: string; via: number[] } => {
+    const via: number[] = [];
+    let at = s;
+    for (let e = up.get(at); e && e.to !== at; e = up.get(at)) {
+      via.push(...e.via);
+      at = e.to;
+    }
+    return { r: at, via };
+  };
+  const line = (a: Id, b: Id): string | null => (a === b ? null : segKey(a, b));
+  const lines = new Set<string>();
+  const perps: { x: string; y: string; row: number }[] = [];
+  constraints.forEach((k, row) => {
+    if (row === skip) return;
+    if (k.t === 'angle' && k.measure === undefined && k.at.v !== k.at.a && k.at.v !== k.at.b && k.at.a !== k.at.b) {
+      const deg = evalExpr(k.value, {});
+      if (Number.isFinite(deg) && deg > 0 && deg < 180) out.push({ v: k.at.v, p: k.at.a, q: k.at.b, deg, via: [row] });
+      return;
+    }
+    let pair: [string | null, string | null] | null = null;
+    let rel: 'parallel' | 'perpendicular' | null = null;
+    if (k.t === 'relation' && k.u.k === 'points' && k.v.k === 'points') {
+      pair = [line(k.u.a, k.u.b), line(k.v.a, k.v.b)];
+      rel = k.rel;
+    } else if (k.t === 'perpendicular') {
+      pair = [line(k.a, k.b), line(k.c, k.d)];
+      rel = 'perpendicular';
+    }
+    if (!pair || !pair[0] || !pair[1]) return;
+    const [x, y] = pair as [string, string];
+    lines.add(x);
+    lines.add(y);
+    if (rel === 'parallel') {
+      const a = root(x);
+      const b = root(y);
+      if (a.r !== b.r) up.set(a.r, { to: b.r, via: [...a.via, ...b.via, row] });
+    } else perps.push({ x, y, row });
+  });
+  const perpOf = new Map<string, number[]>(); // "rootX|rootY" → rows
+  for (const { x, y, row } of perps) {
+    const a = root(x);
+    const b = root(y);
+    const via = uniq([...a.via, ...b.via, row]);
+    perpOf.set(`${a.r}|${b.r}`, via);
+    perpOf.set(`${b.r}|${a.r}`, via);
+  }
+  if (perpOf.size === 0) return out;
+  const all = [...lines].sort();
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      const [a1, b1] = segOf(all[i]);
+      const [a2, b2] = segOf(all[j]);
+      const v = a1 === a2 || a1 === b2 ? a1 : b1 === a2 || b1 === b2 ? b1 : null;
+      if (v === null) continue;
+      const p = a1 === v ? b1 : a1;
+      const q = a2 === v ? b2 : a2;
+      if (p === q) continue;
+      const x = root(all[i]);
+      const y = root(all[j]);
+      const via = perpOf.get(`${x.r}|${y.r}`);
+      if (via) out.push({ v, p, q, deg: 90, via: uniq([...via, ...x.via, ...y.via]) });
+    }
+  }
+  return out;
+}
+
+/** The lengths the rows fix (all but `skip`), and whether they conflict. */
+function closeLengths(constraints: readonly Constraint[], skip: number | null): Closed {
+  const pins = lengthPins(constraints).filter((p) => p.row !== skip);
+  const angles = fixedAngles(constraints, skip);
+  const known = new Map<string, Known>();
+  let conflict = false;
+  const set = (s: string, len: number, via: number[]): boolean => {
+    if (!(len >= 0) || !Number.isFinite(len)) return false;
+    const had = known.get(s);
+    if (!had) {
+      known.set(s, { len, via: uniq(via) });
+      return true;
+    }
+    if (differ(had.len, len) && Math.abs(had.len - len) > CONFLICT_MARGIN) conflict = true;
+    return false;
+  };
+  for (const p of pins) if (p.kind === 'length') set(segKey(...p.seg), p.value, [p.row]);
+  for (let round = 0; round < 64; round++) {
+    let moved = false;
+    for (const p of pins) {
+      if (p.kind !== 'rel' || !(p.ratio > 0) || !Number.isFinite(p.ratio)) continue;
+      const s1 = segKey(...p.s1);
+      const s2 = segKey(...p.s2);
+      const k1 = known.get(s1);
+      const k2 = known.get(s2);
+      if (k2) moved = set(s1, p.ratio * k2.len, [...k2.via, p.row]) || moved;
+      if (k1) moved = set(s2, k1.len / p.ratio, [...k1.via, p.row]) || moved;
+    }
+    for (const w of angles) {
+      const a = known.get(segKey(w.v, w.p));
+      const b = known.get(segKey(w.v, w.q));
+      if (!a || !b) continue;
+      const c = Math.sqrt(Math.max(0, a.len * a.len + b.len * b.len - 2 * a.len * b.len * Math.cos((w.deg * Math.PI) / 180)));
+      moved = set(segKey(w.p, w.q), c, [...a.via, ...b.via, ...w.via]) || moved;
+    }
+    if (!moved) break;
+  }
+  if (!conflict && triangleBreak(known, null)) conflict = true;
+  return { known, conflict };
+}
+
+/** The first triple of fixed sides against the triangle inequality (sorted order), optionally through one segment. */
+function triangleBreak(known: ReadonlyMap<string, Known>, through: string | null): MetricConflict | null {
+  const nbr = new Map<Id, Set<Id>>();
+  for (const s of known.keys()) {
+    const [a, b] = segOf(s);
+    if (!nbr.has(a)) nbr.set(a, new Set());
+    if (!nbr.has(b)) nbr.set(b, new Set());
+    nbr.get(a)!.add(b);
+    nbr.get(b)!.add(a);
+  }
+  for (const s of [...known.keys()].sort()) {
+    const [p, q] = segOf(s);
+    for (const r of [...(nbr.get(p) ?? [])].sort()) {
+      if (r === q || r <= q || !nbr.get(q)?.has(r)) continue;
+      const sides: [Id, Id, Known][] = [
+        [p, q, known.get(segKey(p, q))!],
+        [q, r, known.get(segKey(q, r))!],
+        [p, r, known.get(segKey(p, r))!],
+      ];
+      for (let k = 0; k < 3; k++) {
+        const [a, b, L] = sides[k];
+        if (through !== null && segKey(a, b) !== through) continue;
+        const sum = sides[(k + 1) % 3][2].len + sides[(k + 2) % 3][2].len;
+        const gap = L.len - sum;
+        if (gap > CONFLICT_MARGIN * Math.max(L.len, 1) && gap > CONFLICT_MARGIN) {
+          return { kind: 'triangle', p, q, r, long: [a, b], longLen: L.len, sum, rows: uniq(sides.flatMap(([, , x]) => x.via)) };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** Do the rows (all of them) fix lengths no figure can have, with the forced lengths included? */
+export function lengthsImpossible(constraints: readonly Constraint[]): boolean {
+  return metricConflict(constraints) !== null || closeLengths(constraints, null).conflict;
+}
+
+/**
+ * The reason, chosen as 2-D's `explainLengthConflict` chooses it (see the note above): the stated lengths tried in turn —
+ * the rows in `prefer` (the refused line's) first, then the newest first — each with the closure of the others. Null when
+ * the rows hold no conflict.
+ */
+export function explainLengths(constraints: readonly Constraint[], prefer: ReadonlySet<number>): MetricConflict | null {
+  if (!lengthsImpossible(constraints)) return null;
+  const stated = lengthPins(constraints).filter((p): p is Extract<Pin, { kind: 'length' }> => p.kind === 'length' && p.value > 0 && p.seg[0] !== p.seg[1]);
+  const order = [...stated.filter((p) => prefer.has(p.row)), ...stated.filter((p) => !prefer.has(p.row)).reverse()];
+  for (const k of order) {
+    const rest = closeLengths(constraints, k.row);
+    if (rest.conflict) continue; // the others contradict each other already: this length is not the one at fault
+    const s = segKey(...k.seg);
+    const forced = rest.known.get(s);
+    if (forced && differ(forced.len, k.value) && Math.abs(forced.len - k.value) > CONFLICT_MARGIN) {
+      return { kind: 'value', seg: segOf(s), forced: forced.len, stated: k.value, rows: uniq([...forced.via, k.row]) };
+    }
+    const withIt = new Map(rest.known);
+    withIt.set(s, { len: k.value, via: [k.row] });
+    const t = triangleBreak(withIt, s) ?? triangleBreak(withIt, null);
+    if (t) return t;
+  }
+  return metricConflict(constraints);
+}
