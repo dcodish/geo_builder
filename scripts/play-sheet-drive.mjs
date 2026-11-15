@@ -295,6 +295,9 @@ async function driveCase(browser, spec, outDir, prefix) {
     steps.push({ line: '(driver)', refusals: [`driver error: ${e.message}`] });
   }
 
+  // #2893: a text a search puts up when it ends (a line's search runs after its own fold) appears only then: wait for it
+  if (Array.isArray(spec.expect) && spec.expect.length)
+    await page.waitForFunction((texts) => texts.every((t) => document.body.innerText.includes(t)), spec.expect, { timeout: 120000 }).catch(() => {});
   const bodyText = await page.evaluate(() => document.body.innerText).catch(() => '');
   // The givens list, row by row: the shared FactList marks each statement `data-fact-text`.
   const rowTexts = await page

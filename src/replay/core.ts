@@ -3246,7 +3246,14 @@ function reflectMaskForFailing(fig: Derived, facts: Fact[] = []): number {
  * THE CALIBRATION IS THE BROWSER'S (2026-11-15, the dev PC, the page on :5180 with ADR-832's served repeats, through the
  * browser harness): «הציגו תצורה אחרת» on «ABC משולש ישר זוית · AC=15 · BC=10 · חצי מעגל שקוטרו AB העובר דרך C», a search
  * that solves almost everything it touches, reached a 4 M limit after 5.19 s and 5.17 s (two runs): 770 k charged units a
- * second. Ten seconds is 7.7 M, the limit. (At 7.7 M that press finishes in one round, 8.7 s.) A search that reads
+ * second: ten seconds was 7.7 M. (At 7.7 M that press finishes in one round, 8.7 s.)
+ *
+ * THE LIMIT IS 12 M BY THE OPERATOR'S RULING (2026-11-15, #2893: *"2 b"*): large enough that every corpus search but the
+ * #1768 kite's decides in one round, the smallest round number that does. Measured over the 171 fixtures and the slow
+ * corpus, every search run to its end (`searchLimitStats.maxSpent`): the most any search but the kite's charges is
+ * 11 629 515 (#572's configuration search; then the hexagon press 10 095 301, #572's press 9 710 496); the kite's
+ * charge 14 445 116 and 12 451 719, past it. At ~770 k charged units a second a search that solves what it touches
+ * reaches 12 M after about 15 s in the browser. A search that reads
  * most of what it needs from the memos charges faster: after the #566 two-circle line the configuration search reached
  * 7.7 M in 2.1 s (main, with no limit, finishes it in 0.3 s: most of its 11.6 M charged units are memo hits). A
  * figure whose units are slow (heavy joint solves: #207's ladder runs ~50 k units/s) takes longer to reach it; a unit
@@ -3255,7 +3262,7 @@ function reflectMaskForFailing(fig: Derived, facts: Fact[] = []): number {
  * One constant per search kind, all the same size by the ruling (one limit "the same in every tool"); each is named so
  * a later calibration can move one kind without touching the others.
  */
-export const TEN_SECONDS_OF_WORK = 7_700_000;
+export const TEN_SECONDS_OF_WORK = 12_000_000;
 /** The configuration searches: «הציגו תצורה אחרת» (`searchAnotherView`) and the post-commit search (`findValidConfig`). */
 export const SEARCH_WORK_LIMIT = TEN_SECONDS_OF_WORK;
 /**

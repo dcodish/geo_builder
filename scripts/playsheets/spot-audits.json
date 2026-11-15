@@ -384,6 +384,20 @@
         "שטח המשולש ABC הוא 12"
       ],
       "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2893-2d",
+      "id": "T5",
+      "kind": "complex:assertion",
+      "queued": "2026-11-15",
+      "product": "complex",
+      "base": "http://localhost:5180",
+      "path": "/complex.html",
+      "lines": [
+        "z1 = 1 + i",
+        "z1 = 2"
+      ],
+      "lookFor": "The second line is refused with today's sentence naming «z1 = 1 + i»; no «המשיכו לחפש»."
     }
   ],
   "results": [
