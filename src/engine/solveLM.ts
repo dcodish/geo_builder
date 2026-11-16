@@ -74,6 +74,14 @@ export interface SolveLMOptions {
    * its full budget against an inconsistent system.
    */
   maxEvals?: number;
+  /**
+   * #2763 ([ADR-862](../../docs/06-decisions.md#adr-862)): the LEAN core — the Jacobian is kept across a rejected step
+   * and the descent stops once a step's relative gain or size falls below what any acceptance tolerance can see.
+   * Same iterates, fewer evaluations. The descents of `multiStartSolve` run lean; the rescue rung does not.
+   */
+  lean?: boolean;
+  /** #2763 (ADR-862): run the (regularised) search phase only — the caller polishes, on its own schedule. */
+  searchOnly?: boolean;
 }
 
 export interface SolveLMResult {
@@ -91,6 +99,9 @@ export interface SolveLMMultiStartResult extends SolveLMResult {
   seedIndex: number;
 }
 
+/** #2763 (ADR-862): the lean core's stop — a step whose relative gain is under this buys nothing a caller can see
+ *  (measured: a regularised search crawls at gains of 1e-6..1e-9 for its last ~25 iterations, the point unchanged). */
+const LEAN_GAIN = 1e-4;
 const sumSq = (r: number[]): number => {
   let s = 0;
   for (const v of r) s += v * v;
@@ -108,6 +119,7 @@ function lmCore(
   maxIter: number,
   lambda0: number,
   spent: () => boolean = () => false,
+  lean = false,
 ): { u: number[]; r: number[]; err: number; iters: number } {
   const n = u0.length;
   let u = u0.slice();
@@ -116,24 +128,36 @@ function lmCore(
   let iters = 0;
   if (!isFinite(err)) return { u, r, err, iters }; // nothing to descend from
   let lambda = lambda0;
+  // #2763 (ADR-862): the LEAN descent keeps the Jacobian of the point it stands on — a rejected step leaves u where it
+  // was, so the next iteration's matrix is this one (the plain core recomputes it: 2n evaluations for the same numbers).
+  let J: number[][] = [];
+  let fresh = false;
+  let exact = false; // J was differenced at u (not a Broyden update of an earlier point's)
   for (let iter = 0; iter < maxIter; iter++) {
     if (spent()) break; // the caller's evaluation cap (maxEvals): keep the last accepted point
     iters = iter + 1;
     // numeric Jacobian (central differences) in u-space: J[j][k] = ∂r_k/∂u_j
     const m = r.length;
-    const J: number[][] = [];
-    for (let j = 0; j < n; j++) {
-      const h = 1e-6 * Math.max(1, Math.abs(u[j]));
+    if (!(lean && fresh)) J = [];
+    for (let j = 0; j < n && !(lean && fresh); j++) {
+      // #2763 (ADR-862): the lean core differences FORWARD from the point it stands on (n evaluations, not 2n) — the
+      // residuals at u are already known, and an approximate Jacobian costs LM only its rate, never its root
+      const h = (lean ? 1e-7 : 1e-6) * Math.max(1, Math.abs(u[j]));
       const up = u.slice();
-      const um = u.slice();
       up[j] += h;
-      um[j] -= h;
       const rp = fn(up);
-      const rm = fn(um);
+      let rm = r;
+      let span = h;
+      if (!lean) {
+        const um = u.slice();
+        um[j] -= h;
+        rm = fn(um);
+        span = 2 * h;
+      }
       const col: number[] = new Array<number>(m);
       let finite = true;
       for (let k = 0; k < m; k++) {
-        const d = (rp[k] - rm[k]) / (2 * h);
+        const d = (rp[k] - rm[k]) / span;
         if (!isFinite(d)) {
           finite = false;
           break;
@@ -144,6 +168,8 @@ function lmCore(
       // (the damping floor keeps the normal equations solvable); never a poisoned matrix
       J.push(finite ? col : new Array<number>(m).fill(0));
     }
+    if (!(lean && fresh)) exact = true;
+    fresh = true;
     // normal equations (JᵀJ + λ·diag) δ = −Jᵀr
     const A: number[][] = [];
     const b: number[] = [];
@@ -174,12 +200,38 @@ function lmCore(
     const rNew = fn(uNew);
     const errNew = sumSq(rNew);
     if (isFinite(errNew) && errNew < err) {
+      const gain = err - errNew;
+      const wasExact = exact;
+      if (lean) {
+        // #2763 (ADR-862): a BROYDEN rank-one update carries the matrix to the new point (one evaluation per step, the
+        // trial's own) — J += (Δr − J·δ)·δᵀ / δᵀδ; a step it misjudges is re-differenced below, never trusted twice
+        const dd = sumSq(delta);
+        if (dd > 0) {
+          for (let k = 0; k < m; k++) {
+            let pred = 0;
+            for (let j = 0; j < n; j++) pred += J[j][k] * delta[j];
+            const c = (rNew[k] - r[k] - pred) / dd;
+            if (isFinite(c)) for (let j = 0; j < n; j++) J[j][k] += c * delta[j];
+          }
+        }
+        exact = false;
+      }
       u = uNew;
       r = rNew;
       err = errNew;
+      fresh = lean;
       lambda = Math.max(lambda / 3, 1e-12);
       if (err < 1e-24) break; // machine-exact
       if (sumSq(delta) < 1e-30) break; // step stalled — at a (local) minimum
+      // #2763 (ADR-862): the lean descent also stops where a step no longer buys anything the acceptance tolerances can
+      // see — a relative gain under 1e-10 or a step under 1e-10 in u-space (every unknown is O(1) there). The plain core
+      // runs on until rounding rejects a step and the damping climbs to 1e12, ~24 more iterations at a converged point.
+      if (lean && (gain <= LEAN_GAIN * err || sumSq(delta) < 1e-20)) {
+        if (wasExact) break;
+        fresh = false; // judged on an updated matrix: difference it once more before calling the point a minimum
+      }
+    } else if (lean && !exact) {
+      fresh = false; // the updated matrix misjudged the step: re-difference at u, the damping unchanged
     } else {
       lambda *= 10;
       if (lambda > 1e12) break; // damping exhausted — a local minimum (or inconsistent system)
@@ -231,22 +283,30 @@ export function solveLM(
   };
 
   const u0 = seed.map((v, i) => v / scale[i]);
-  const rSeed = residuals(seed);
+  // #2763 (ADR-862): the lean descent spends no evaluation on this probe when there are unknowns — its search's first
+  // evaluation is the same point, and an empty row set descends nowhere (no step ever lowers a zero cost)
+  const rSeed = opts.lean && n > 0 ? [NaN] : residuals(seed);
   if (n === 0 || rSeed.length === 0) {
     const cost = sumSq(rSeed);
     return { x: seed.slice(), cost, converged: isFinite(cost) && cost <= tol, iterations: 0 };
   }
 
   // Phase 1: the (possibly regularised) search — picks the basin / manifold point.
-  const search = lmCore(rAug, u0, maxIter, lambda0, spent);
+  const lean = !!opts.lean;
+  const search = lmCore(rAug, u0, maxIter, lambda0, spent, lean);
   let final = search;
   let iterations = search.iters;
+  if (towardU && opts.searchOnly) {
+    // the caller asked for the search alone (it judges the point itself): `cost` is the SEARCH cost there, the
+    // regulariser rows included, and never reads as converged — no extra evaluation is spent on the primary rows
+    return { x: toX(search.u), cost: search.err, converged: false, iterations };
+  }
   if (towardU) {
     // Phase 2: pure-primary polish from the point the pull chose (the multiStartSolve
     // discipline). From a near-manifold point the accepted steps are ~residual-sized,
     // so the polish zeroes the residuals without wandering back along the manifold;
     // it only ever accepts primary improvements, so it cannot degrade the search.
-    const polish = lmCore(rPrimary, search.u, Math.min(50, maxIter), lambda0, spent);
+    const polish = lmCore(rPrimary, search.u, Math.min(50, maxIter), lambda0, spent, lean);
     final = polish;
     iterations += polish.iters;
   }

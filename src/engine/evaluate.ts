@@ -554,6 +554,32 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   };
   const rescue = { convex: { rows: rowsFor(true), scale: seed.map(() => span), admit }, relaxed: { rows: rowsFor(false), scale: seed.map(() => span), admit } };
   const barrier = collapseBarrier(c, cons, ids);
+  // #2763 (ADR-862): `residFull`, `regCost` and `regCostB` as least-squares rows for the LM descents — the constraint
+  // terms through jointCostRows, every side's shortfall and every frozen coordinate a row of its own (so each row is
+  // smooth where it vanishes), the barrier one √ row. Σ row² is the scalar cost the Nelder–Mead descents read.
+  const descentRows = (search: boolean, withBarrier: boolean) => {
+    const rowCount = cons.reduce((n, con) => n + jointCostRowCount(con), 0) + sides.length + 2 * frozen.length + (withBarrier ? 1 : 0);
+    return (x: number[]): number[] => {
+      const r = evaluateCore(place(x), { skipConstraints: true });
+      const bad = new Array<number>(rowCount).fill(NaN);
+      if (!r.ok) return bad;
+      const out: number[] = [];
+      for (const con of cons) {
+        for (const id of constraintRefs(con)) if (!r.positions.has(id)) return bad;
+        out.push(...jointCostRows(con, (id) => r.positions.get(id)!, aim));
+      }
+      for (const sd of sides) out.push(steer ? Math.sqrt(SIDE_W) * sideShortfall(sd, r.positions, r.circles, search ? SIDE_AIM : 0) : 0);
+      for (const i of frozen) {
+        const w = steer ? Math.sqrt(FREEZE_W) / span : 0;
+        out.push(w * (x[2 * i] - freezeAt[2 * i]), w * (x[2 * i + 1] - freezeAt[2 * i + 1]));
+      }
+      if (withBarrier) out.push(Math.sqrt(barrier(r.positions)));
+      else if (search && !barrierMet && barrier(r.positions) !== 0) barrierMet = true; // #2894's served retry, as regCost
+      return out;
+    };
+  };
+  const lmPlain: LmDescent = { search: descentRows(true, false), polish: descentRows(false, false), scale: seed.map(() => span), weight: Math.sqrt(1e-3), toward: seed };
+  const lmBarrier: LmDescent = { ...lmPlain, search: descentRows(true, true) };
   const lambda = 1e-3 / (span * span); // scale-free; only breaks ties on the solution manifold
   // #2894 (ADR-833): whether the plain search met a point where the barrier-augmented cost differs from its own (a
   // non-zero barrier, or a figure the barrier cannot read) — while it never does, the retry is the same search.
@@ -594,9 +620,10 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   // #2894 (ADR-833): the descents of one `solveAll` (its aim and steer fixed) — the relaxed pass repeats the convex
   // pass's descents call for call, and they are served (charged as run). Opened per `solveAll`.
   let nm: NelderMeadRun = nelderMead;
+  let lmRun: LmRun = lmDescent;
   const finish = (requireConvex: boolean, useBarrier = false): { x: number[]; ok: boolean } => {
     const best = multiStartSolve(seed, offsets, span * 0.2, useBarrier ? regCostB : regCost, resid, [span * 0.05, span * 0.005], 400, (x) =>
-      accepted(x, requireConvex), requireConvex ? rescue.convex : rescue.relaxed, nm,
+      accepted(x, requireConvex), requireConvex ? rescue.convex : rescue.relaxed, nm, useBarrier ? lmBarrier : lmPlain, lmRun,
     );
     return { x: best, ok: accepted(best, requireConvex) };
   };
@@ -627,6 +654,7 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   const convexMatters = declaresConvexity(c);
   const solveAll = (): { x: number[]; ok: boolean } => {
     nm = servedNelderMead();
+    lmRun = servedLmDescent();
     // sticky over the solveAll: the relaxed pass's served descents are the convex pass's, whose points it records
     barrierMet = false;
     const conv = pick(true);
@@ -677,6 +705,14 @@ export function multiStartSolve(
   rescue?: LmRescue,
   /** #2894 (ADR-833): the descent to run — a caller that repeats descents passes {@link servedNelderMead}'s */
   nm: NelderMeadRun = nelderMead,
+  /**
+   * #2763 ([ADR-862](docs/06-decisions.md#adr-862)): the same two costs as least-squares ROWS — when given, every descent
+   * (each start's regularised search and the polish) is a Levenberg–Marquardt descent on them instead of a Nelder–Mead
+   * one. The schedule, the regulariser's meaning and the accept gate are this function's, unchanged.
+   */
+  lm?: LmDescent,
+  /** #2763 (ADR-862): the LM descent to run — a caller that repeats descents passes {@link servedLmDescent}'s */
+  lmRun: LmRun = lmDescent,
 ): number[] {
   let best = seed;
   let bestReg = regCost(seed);
@@ -687,12 +723,24 @@ export function multiStartSolve(
   // we go lets us fall back to it instead of throwing away a solution we already found.
   let accepted: number[] | null = null;
   let acceptedCost = Infinity;
+  const searched: { x: number[]; fx: number }[] = [];
+  // #2763 (ADR-862): with the LM descents, the best accepted candidate the step will also keep as a FIGURE
+  // (`rescue.admit`, the step's own `gateDefects`). A derivative descent goes to the root nearest its start, and
+  // that root can be one the step refuses as not a figure (the regular hexagon's FA = 4 has a root with F, A, B on one
+  // line) — an accepted-but-refused candidate must not end the search while an admitted one exists.
+  const admits = lm && rescue?.admit ? rescue.admit : null;
+  let fit: number[] | null = null;
+  let fitCost = Infinity;
   const consider = (x: number[]) => {
     if (accept(x)) {
       const pc = polishCost(x);
       if (pc < acceptedCost) {
         acceptedCost = pc;
         accepted = x;
+      }
+      if (admits && pc < fitCost && admits(x)) {
+        fitCost = pc;
+        fit = x;
       }
     }
   };
@@ -702,21 +750,51 @@ export function multiStartSolve(
     // a candidate to judge.
     if (start !== seed && budgetExceeded()) break;
     consider(start); // a seeded restart (e.g. the grid-scan / binding-aware seed) may already be a valid solution
-    const x = nm(regCost, start, 400, searchStep);
+    const x = lm ? lmRun(lm.search, start, lm.scale, { weight: lm.weight, toward: lm.toward }, LM_SEARCH_ITERS) : nm(regCost, start, 400, searchStep);
     const fx = regCost(x);
     if (fx < bestReg) {
       bestReg = fx;
       best = x;
     }
+    if (lm) searched.push({ x, fx });
     consider(x);
   }
-  for (const st of polishSteps) {
-    if (budgetExceeded()) break; // #259 — same reasoning, for the polish passes
-    best = nm(polishCost, best, polishIters, st);
-    consider(best);
+  if (lm) {
+    // #2763 (ADR-862): ONE polish descent on the pure rows — LM's damped Gauss–Newton steps shrink on their own as it
+    // nears the root, which is what Nelder–Mead's decade schedule of simplex sizes manufactures
+    const chosen = best;
+    if (!budgetExceeded()) {
+      best = lmRun(lm.polish, best, lm.scale, null, LM_POLISH_ITERS);
+      consider(best);
+    }
+    // #2763 (ADR-862): the NEXT BASIN, failure path only — when the chosen basin's root is not a figure the step keeps
+    // (refused by `admit`, or not accepted at all), polish the other starts' search points in order of their search
+    // cost until one lands on an admitted root. Nelder–Mead's simplex wandered between basins on its own; a derivative
+    // descent stays in the one it starts in, so the other basins are visited explicitly. Bounded by the starts.
+    if (admits && !fit && !(accept(best) && admits(best))) {
+      const seen = new Set<number[]>([chosen]);
+      for (const c of searched.sort((a, b) => a.fx - b.fx)) {
+        if (fit || budgetExceeded()) break;
+        if (seen.has(c.x) || !isFinite(c.fx)) continue;
+        seen.add(c.x);
+        consider(lmRun(lm.polish, c.x, lm.scale, null, LM_POLISH_ITERS));
+      }
+    }
+  } else
+    for (const st of polishSteps) {
+      if (budgetExceeded()) break; // #259 — same reasoning, for the polish passes
+      best = nm(polishCost, best, polishIters, st);
+      consider(best);
+    }
+  if (admits) {
+    // #2763 (ADR-862): an admitted figure first; an accepted one the step would refuse only after the rescue rung
+    // below also found no admitted one (what the step then refuses is what it refused before)
+    if (accept(best) && admits(best)) return best;
+    if (fit) return fit;
+  } else {
+    if (accept(best)) return best;
+    if (accepted) return accepted; // keep an accepted solution if the polish ended on a rejected one
   }
-  if (accept(best)) return best;
-  if (accepted) return accepted; // keep an accepted solution if the polish ended on a rejected one
   // THE LM RESCUE RUNG (#2797, ADR-816) — retry-only, the ADR-238/547/594 shape: reached only when Nelder–Mead
   // accepted NOTHING, so a solve it already accepts returns byte-identical. Past ~8 unknowns the derivative-free
   // descent does not converge even beside a root (ADR-281); Levenberg–Marquardt on the same terms' signed rows
@@ -755,7 +833,51 @@ export function multiStartSolve(
       }
     }
   }
+  if (admits) {
+    if (accept(best)) return best;
+    if (accepted) return accepted;
+  }
   return seed;
+}
+
+/**
+ * #2763 ([ADR-862](docs/06-decisions.md#adr-862)): a driven solve's two costs as least-squares rows, for
+ * {@link multiStartSolve}'s descents. `search`'s rows squared and summed, plus `weight²·Σ((x − seed)/scale)²`, IS the
+ * caller's `regCost` (the tie-breaker toward `toward`, the point its `regCost` pulls to — the solve's seed —, the same λ);
+ * `polish`'s rows squared and summed IS its `polishCost`. A fixed row count per function; NaN rows where the figure
+ * does not evaluate (LM rejects that trial).
+ */
+export interface LmDescent {
+  search: (x: number[]) => number[];
+  polish: (x: number[]) => number[];
+  scale: number[];
+  weight: number;
+  toward: number[];
+}
+/** #2763 (ADR-862): one LM descent — the rows, the start, the unknowns' scale, the pull (null: none), the iterations. */
+export type LmRun = (rows: (x: number[]) => number[], x0: number[], scale: number[], pull: { weight: number; toward: number[] } | null, iters: number) => number[];
+/** #2763 (ADR-862): a search descent's iterations (the regularised phase); each costs ≈ 2n + 1 evaluations, and a
+ *  descent stops on its own once a step buys nothing (the lean core). */
+export const LM_SEARCH_ITERS = 50;
+/** #2763 (ADR-862): the polish descent's iterations (pure rows, from the chosen point). */
+export const LM_POLISH_ITERS = 50;
+/** #2763 (ADR-862): the default descent — the LEAN core, the search phase alone (the caller polishes). */
+export const lmDescent: LmRun = (rows, x0, scale, pull, iters) =>
+  solveLM(servingRepeats(rows), x0, { scale, regularize: pull ?? undefined, maxIter: iters, lean: true, searchOnly: true }).x;
+/**
+ * #2763 (ADR-862) — {@link servedNelderMead}'s discipline for the LM descents: the same rows FUNCTION (the caller's
+ * closure, pure for the memo's life), start, pull and iterations return the descent already run, charged as run.
+ */
+export function servedLmDescent(): LmRun {
+  const serve = servedRuns<number[]>();
+  const ids = new Map<(x: number[]) => number[], number>();
+  return (rows, x0, scale, pull, iters) => {
+    const k = exactKey(x0);
+    if (k === null) return lmDescent(rows, x0, scale, pull, iters);
+    let id = ids.get(rows);
+    if (id === undefined) ids.set(rows, (id = ids.size));
+    return serve(`${id}|${iters}|${pull ? pull.weight : 0}|${k}`, () => lmDescent(rows, x0, scale, pull, iters)).slice();
+  };
 }
 
 /** #2797 ([ADR-816](docs/06-decisions.md#adr-816)): the rescue rung's starts past the seed. Measured (the ADR's table):
@@ -1185,6 +1307,28 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     const barrier = collapseBarrier(c, cons, specs.map((s) => s.id));
     const lambda = 1e-3; // tiny tie-breaker toward the seed (normalised space)
     let barrierMet = false; // #2894 (ADR-833): see resolveFreeDriven's `pick`
+    // #2763 (ADR-862): `costFull`, `regCost` and `regCostB` as least-squares rows for the LM descents (see
+    // resolveFreeDriven's `descentRows`) — already in u-space, so every scale is 1 and the pull's weight is √λ.
+    const descentRows = (search: boolean, withBarrier: boolean) => {
+      const rowCount = cons.reduce((n, con) => n + jointCostRowCount(con), 0) + sides.length + held.length + (withBarrier ? 1 : 0);
+      return (u: number[]): number[] => {
+        const r = evaluateCore(place(u), { skipConstraints: true });
+        const bad = new Array<number>(rowCount).fill(NaN);
+        if (!r.ok) return bad;
+        const out: number[] = [];
+        for (const con of cons) {
+          for (const id of constraintRefs(con)) if (!r.positions.has(id)) return bad;
+          out.push(...jointCostRows(con, (id) => r.positions.get(id)!, aim));
+        }
+        for (const sd of sides) out.push(Math.sqrt(SIDE_W) * sideShortfall(sd, r.positions, r.circles, search ? SIDE_AIM : 0));
+        for (const h of held) out.push(Math.sqrt(FREEZE_W) * (u[h.k] - h.t));
+        if (withBarrier) out.push(Math.sqrt(barrier(r.positions)));
+        else if (search && !barrierMet && barrier(r.positions) !== 0) barrierMet = true; // #2894's served retry, as regCost
+        return out;
+      };
+    };
+    const lmPlain: LmDescent = { search: descentRows(true, false), polish: descentRows(false, false), scale: seedU.map(() => 1), weight: Math.sqrt(lambda), toward: seedU };
+    const lmBarrier: LmDescent = { ...lmPlain, search: descentRows(true, true) };
     const regCost = (u: number[]): number => {
       const { s: base, pos } = costFull(u, true);
       if (!isFinite(base)) return Infinity;
@@ -1262,7 +1406,8 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     const extraRestarts: number[][] = [];
     let near: number[] | null = null;
     if (ranges.length > 0) {
-      near = nelderMead(cost, seedU.slice(), 500, 0.12);
+      // #2763 (ADR-862): the near-first local solve is an LM descent on the pure rows, from the seed (no pull: as before)
+      near = lmDescent(lmPlain.polish, lmDescent(lmPlain.polish, seedU.slice(), lmPlain.scale, { weight: lmPlain.weight, toward: seedU }, LM_SEARCH_ITERS), lmPlain.scale, null, LM_POLISH_ITERS);
       const gridSeed = seedU.slice();
       for (let iter = 0; iter < 12 && cost(gridSeed) > 1e-12; iter++) {
         let improved = false;
@@ -1297,19 +1442,20 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       ...extraRestarts,
       ...[0.5, 1, -1, 2, -2].flatMap((d) => seedU.map((_, j) => seedU.map((v, i) => (i === j ? v + d : v)))),
     ];
-    const run = (rc: (u: number[]) => number): { u: number[]; ok: boolean } => {
-      const best = multiStartSolve(seedU, restarts, 0.3, rc, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, (x) =>
-        acc(x), rescue,
+    const run = (useBarrier: boolean): { u: number[]; ok: boolean } => {
+      const best = multiStartSolve(seedU, restarts, 0.3, useBarrier ? regCostB : regCost, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, (x) =>
+        acc(x), rescue, nelderMead, useBarrier ? lmBarrier : lmPlain,
       );
       return { u: best, ok: acc(best) };
     };
-    if (near && acc(near)) {
+    // #2763 (ADR-862): the near-first LM descent goes to the nearest root — kept only when the step keeps it as a figure
+    if (near && acc(near) && admit(near)) {
       // NEAR-FIRST stability: a small reshape keeps the current configuration — unless it parked
       // near-degenerate (barrier > 0), where a barrier-augmented re-search may find a healthy
       // configuration; keep `near` when it doesn't (ADR-238).
       const bn = barrierAt(near);
       if (bn === 0) return { result: place(near), ok: true };
-      const retry = run(regCostB);
+      const retry = run(true);
       return retry.ok && barrierAt(retry.u) < bn ? { result: place(retry.u), ok: true } : { result: place(near), ok: true };
     }
     // Plain search first (previously-green basin choices preserved); the barrier-augmented RETRY runs
@@ -1317,13 +1463,13 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     // #2894 (ADR-833): a FAILED plain search that met a zero barrier at every cost evaluation is the retry's search
     // point for point, to the same failure: served (charged as run), not run again. Not with the side steer.
     barrierMet = false;
-    const plain = measuredRun(() => run(regCost));
+    const plain = measuredRun(() => run(false));
     let best = plain.value;
     const b0 = best.ok ? barrierAt(best.u) : Infinity;
     if (!best.ok && !barrierMet && !steer && serveRun(plain)) {
       drivenSolveStats.servedRetries++; // the retry, served
     } else if (!best.ok || b0 > 0) {
-      const retry = run(regCostB);
+      const retry = run(true);
       if (retry.ok && barrierAt(retry.u) < b0) best = retry;
     }
     // THE SHAPE-SCALAR BRACKET RESCUE (#2118, [ADR-717](docs/06-decisions.md#adr-717) — ADR-071's radius
@@ -1347,7 +1493,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       }
       if (shapeRanges.length > 0) {
         drivenSolveStats.shapeRescue++;
-        const u = multiStartSolve(bindingSweep([...ranges, ...shapeRanges]), [], 0.3, regCost, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, acc, rescue);
+        const u = multiStartSolve(bindingSweep([...ranges, ...shapeRanges]), [], 0.3, regCost, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, acc, rescue, nelderMead, lmPlain);
         if (acc(u)) best = { u, ok: true };
       }
     }
