@@ -34,6 +34,7 @@
  *     pivot with the enrolled unknowns in its rider lane and the relations as a scalar pin, so both move at once.
  * A stated relation is a claim as well (`freeRelationHolds3`): what neither rung can satisfy is refuted, by name.
  */
+import { boundHolds3, boundUpperOnly3, boundWindow3, foldBounds3, symBound3, type Bound3 } from './bound3';
 import { sample } from './rng';
 import { leastSquares } from './solve3';
 import { cross3, dot3, norm3, v3, type Vec3 } from './vec3';
@@ -550,20 +551,20 @@ function projectedSample(c: Construction3, sys: FreeSystem3, seed: number): numb
 // Value
 // ---------------------------------------------------------------------------
 
-const compSign = (c: Construction3, name: string, ax: 'x' | 'y' | 'z'): number | undefined => {
-  const g = c.componentSigns.find((cs) => cs.target.kind === 'vector' && cs.target.name === name && cs.axis === ax);
-  return g ? (g.positive ? 1 : -1) : undefined;
-};
-const symSign = (c: Construction3, sym: string): number | undefined => {
-  const g = [...c.paramSigns].reverse().find((p) => p.sym === sym);
-  return g ? (g.positive ? 1 : -1) : undefined;
-};
+// #1524 (ADR-3D-477): a stated sign OR range on a free component / a letter, folded in the order stated
+const compSign = (c: Construction3, name: string, ax: 'x' | 'y' | 'z'): Bound3 | undefined =>
+  foldBounds3(c.componentSigns.filter((cs) => cs.target.kind === 'vector' && cs.target.name === name && cs.axis === ax).map((cs) => cs.bound));
+const symSign = (c: Construction3, sym: string): Bound3 | undefined => symBound3(c, sym);
 
 /** The seeded sample of every unknown — step 1's sampler for components (sign, norm floor), a letter in ±range. */
 function sampleUnknowns(c: Construction3, sys: FreeSystem3, seed: number): number[] {
   const s = new Array<number>(sys.unknowns.length).fill(0);
-  const draw = (key: string, sg: number | undefined): number =>
-    sg === undefined ? sample(seed, key, -FREE_VEC_RANGE, FREE_VEC_RANGE) : sg * sample(seed, key, 0.15, 1) * FREE_VEC_RANGE;
+  // the window the range leaves; an upper-only range draws mirrored, as the negative sign always did (bit-identical)
+  const draw = (key: string, b: Bound3 | undefined): number => {
+    if (b === undefined) return sample(seed, key, -FREE_VEC_RANGE, FREE_VEC_RANGE);
+    const [l, h] = boundWindow3(b, -FREE_VEC_RANGE, FREE_VEC_RANGE, 0.15 * FREE_VEC_RANGE);
+    return boundUpperOnly3(b) ? h - (sample(seed, key, l, h) - l) : sample(seed, key, l, h);
+  };
   sys.unknowns.forEach((u, j) => {
     if (u.kind === 'sym') s[j] = draw(`fvsym-${u.sym}`, symSign(c, u.sym));
   });
@@ -642,8 +643,8 @@ function aboveFloor(sys: FreeSystem3, vars: readonly number[], x: readonly numbe
 function signsHold(c: Construction3, sys: FreeSystem3, vars: readonly number[], x: readonly number[]): boolean {
   return vars.every((j) => {
     const u = sys.unknowns[j];
-    const sign = u.kind === 'sym' ? symSign(c, u.sym) : compSign(c, u.name, AXES[u.axis]);
-    return sign === undefined || sign * x[j] > 0;
+    const bound = u.kind === 'sym' ? symSign(c, u.sym) : compSign(c, u.name, AXES[u.axis]);
+    return bound === undefined || boundHolds3(bound, x[j]);
   });
 }
 

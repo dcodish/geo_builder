@@ -156,3 +156,127 @@ describe('ADR-3D-032 — M(k,1,3): the coord-sym point (part ד)', () => {
     expect(state().lastError).toEqual({ code: 'no-roots', sym: 'k', stated: 'אורך המקצוע AM הוא 1', others: [] });
   });
 });
+
+/**
+ * #1524 (ADR-3D-477) — A RANGE ON A LETTER, the sign's sibling: «t ≥ 0» (the sign that allows zero), «k ≤ 3», «2 ≤ k ≤ 5»,
+ * «k גדול מ-2». Before: every one of these was "not understood"; only the strict sign at zero read.
+ */
+describe('#1524 — a parameter range: parse', () => {
+  const bound = (sym: string, lo: number | null, hi: number | null, loStrict = false, hiStrict = false) => [
+    { type: 'param-bound', sym, lo, hi, loStrict, hiStrict },
+  ];
+  it.each([
+    ['t ≥ 0', bound('t', 0, null)],
+    ['t >= 0', bound('t', 0, null)],
+    ['t ≤ 0', bound('t', null, 0)],
+    ['k ≤ 3', bound('k', null, 3)],
+    ['k <= 3', bound('k', null, 3)],
+    ['k > 2', bound('k', 2, null, true)],
+    ['2 < k', bound('k', 2, null, true)],
+    ['k ≥ -1.5', bound('k', -1.5, null)],
+    ['2 ≤ k ≤ 5', bound('k', 2, 5)],
+    ['5 > k > 2', bound('k', 2, 5, true, true)],
+    ['k גדול מ-2', bound('k', 2, null, true)],
+    ['k גדול או שווה ל-2', bound('k', 2, null)],
+    ['k קטן מ-3', bound('k', null, 3, false, true)],
+    ['k קטן או שווה ל 3', bound('k', null, 3)],
+    ['k לפחות 2', bound('k', 2, null)],
+    ['k לכל היותר 3', bound('k', null, 3)],
+    ['הפרמטר k הוא מספר גדול מ-2', bound('k', 2, null, true)],
+    ['k is at least 2', bound('k', 2, null)],
+    ['k is at most 3', bound('k', null, 3)],
+    ['the parameter k is greater than or equal to 2', bound('k', 2, null)],
+    ['k is less than 3', bound('k', null, 3, false, true)],
+  ])('«%s» reads as the range', (u, want) => {
+    expect(cmd(u)).toEqual(want);
+  });
+
+  it('a strict end at 0, alone, IS the sign — one command whichever way it is spelled', () => {
+    expect(cmd('k גדול מ-0')).toEqual([{ type: 'param-sign', sym: 'k', positive: true }]);
+    expect(cmd('0 > k')).toEqual([{ type: 'param-sign', sym: 'k', positive: false }]);
+  });
+
+  it('the appositive range clause rides the point, like the sign', () => {
+    expect(cmd('נתונה נקודה M(k,1,3), k ≥ 0')).toEqual([
+      { type: 'point3', id: 'M', x: null, y: 1, z: 3, syms: ['k', null, null], srcs: ['k', '1', '3'] },
+      { type: 'param-bound', sym: 'k', lo: 0, hi: null, loStrict: false, hiStrict: false },
+    ]);
+  });
+
+  it('no theft: a capital pair, a coordinate letter and a mixed chain are not a parameter range', () => {
+    for (const u of ['AB > 3', 'x > 0', '2 < k > 5']) expect(parse3(u).ok, u).toBe(false);
+    // a two-sided bound around a NON-reserved letter stays the #394 angle-label register's guidance
+    expect(parse3('60 < a < 90').ok).toBe(false);
+    expect(cmd('60 < t < 90')).toEqual([{ type: 'param-bound', sym: 't', lo: 60, hi: 90, loStrict: true, hiStrict: true }]);
+  });
+});
+
+describe('#1524 — a parameter range: the figure', () => {
+  beforeEach(reset);
+
+  it('a free letter is drawn inside its range at every configuration, beside or far from the default window', () => {
+    for (const [u, lo, hi] of [['k ≥ 2', 2, Infinity], ['2 ≤ k ≤ 5', 2, 5], ['k ≥ 5', 5, Infinity], ['k ≤ -4', -Infinity, -4]] as const) {
+      reset();
+      for (const b of BASE) submit(b);
+      submit('נתונה נקודה M(k,1,3)');
+      submit(u);
+      expect(state().lastError, u).toBeNull();
+      const xs = [0, 1, 2, 3].map((sd) => {
+        const d = derived(sd);
+        expect(Object.values(d.status).every((s) => s === 'ok'), u).toBe(true);
+        return d.resolved.positions.get('M')!.x;
+      });
+      for (const x of xs) expect(x >= lo && x <= hi, `${u}: ${x}`).toBe(true);
+      expect(new Set(xs.map((x) => x.toFixed(6))).size, `${u}: still a free DOF`).toBeGreaterThan(1);
+    }
+  });
+
+  it('a determined letter keeps the root in its range: «k ≥ 0» takes +2√15, «k ≤ 0» takes −2√15', () => {
+    for (const [u, want] of [['k ≥ 0', 2 * Math.sqrt(15)], ['k ≤ 0', -2 * Math.sqrt(15)]] as const) {
+      reset();
+      for (const b of BASE) submit(b);
+      submit(`נתונה נקודה M(k,1,3), ${u}`);
+      submit('גודל הזווית שבין הישר AB ובין הישר AM הוא 60');
+      expect(state().lastError, u).toBeNull();
+      for (const sd of [0, 1]) expect(derived(sd).resolved.param?.value, u).toBeCloseTo(want, 4);
+    }
+  });
+
+  it('REFUSAL: a range no root lies in is refused, naming it; the figure is unchanged', () => {
+    for (const b of BASE) submit(b);
+    submit('נתונה נקודה M(k,1,3)');
+    submit('גודל הזווית שבין הישר AB ובין הישר AM הוא 60');
+    const before = state().facts.length;
+    submit('k ≥ 8');
+    expect(state().lastError).toEqual({ code: 'param-bound-unsatisfiable', id: 'k' });
+    expect(state().facts.length).toBe(before);
+  });
+
+  it('REFUSAL: a range that contradicts an earlier one refuses the NEWER statement', () => {
+    for (const b of BASE) submit(b);
+    submit('נתונה נקודה M(k,1,3)');
+    submit('k ≥ 2');
+    submit('k ≤ 1');
+    expect(state().lastError).toEqual({ code: 'param-bound-unsatisfiable', id: 'k' });
+    const d = derived();
+    expect(Object.values(d.status).every((s) => s === 'ok')).toBe(true);
+    expect(d.resolved.positions.get('M')!.x).toBeGreaterThanOrEqual(2);
+  });
+
+  it('REFUSAL: a range on a letter the figure does not carry is the honest unknown-symbol', () => {
+    submit('q ≥ 2');
+    expect(state().lastError).toEqual({ code: 'unknown-symbol', id: 'q' });
+  });
+
+  it('a pin symbol is anchored inside its range («B(2t,t,1) · t ≥ 3»)', () => {
+    submit("תיבה ABCDA'B'C'D'");
+    submit('B(2t,t,1)');
+    submit('t ≥ 3');
+    expect(state().lastError).toBeNull();
+    for (const sd of [0, 1, 2]) {
+      const d = derived(sd);
+      expect(Object.values(d.status).every((s) => s === 'ok')).toBe(true);
+      expect(d.resolved.pivot?.pinSymbols?.t).toBeGreaterThanOrEqual(3);
+    }
+  });
+});

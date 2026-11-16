@@ -111,6 +111,7 @@ const VECTOR_READING_3: Record<Command3['type'], VectorReading3> = {
   'line-plane-angle': 'plain',
   'line-projection': 'plain',
   'param-sign': 'plain',
+  'param-bound': 'plain',
   'param-decl': 'plain',
   'perp-to-base': 'plain',
   'plane-cut': 'plain',
