@@ -81,6 +81,10 @@
     "notDecided": {
       "message": "No solution found yet — the search stopped after about 10 seconds.",
       "continue": "Keep searching"
+    },
+    "hiddenRow": {
+      "mark": "hidden",
+      "title": "This segment is hidden on the figure — click to show it again"
     }
   }
 }

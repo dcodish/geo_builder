@@ -21516,3 +21516,24 @@ Wall time of the same actions through `scripts/perf/2d/driver.mjs` on the same m
 - Scenario `new-solutions-first-tangent-right-triangle-2831` (`scenarios-corpus-4.ts`): presses 0–2 are three shapes, no fourth, and presses 3–5 repeat them.
 
 **Behaviour change for a student:** on a figure the givens fix with several different solutions, «הציגו תצורה אחרת» shows each of them before a mirror image of one already shown. The figure keeps its placement while the button cycles, where it used to also resample the placement on every press.
+
+## ADR-825 — Hiding a segment hides its length, its knee and a foot the tool named for it (#2852)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2852](https://github.com/dcodish/geo_builder/issues/2852) (feature, `P2`, `2d`/`analytic`) · round #2855
+**Requirements:** [02](02-requirements.md) — FR-RN-10 (a hidden segment takes its value, its marks and a point the tool named only for it) · **Design:** [04](04-design.md) § *A hidden segment takes what exists only for it* · **LADDER stage:** none (display)
+**Builds** [ADR-W-207](06w-decisions-workspace.md#adr-w-207) for 2-D · **amends** [ADR-072](#adr-072) (its 2026-06-21 segment hide/dash amendment: a hidden segment's endpoints were "unaffected") · sibling [ADR-AG-474](06c-decisions-analytic.md#adr-ag-474)
+
+**Measured at pickup** (`c82d767c`, `Figure` static markup): «משולש ABC» · «AB = 5», AB hidden → the ghost AB, «5» still drawn. «CH גובה לצלע AB», CH hidden → the knee at H still drawn. «גובה מ-C לצלע AB» (the tool names the foot F), CF hidden → F still drawn. `Figure.tsx` consulted `segStyle` for the segment's own ink only.
+
+**Class.** *A display element that exists only for a hidden segment is drawn as if the segment were not hidden.* The same in analytic (ADR-AG-474).
+
+**Decision.**
+1. `Figure.tsx` reads its scene into `hiddenWith` (`shell/frame/segmentDisplay`): the construction's segments split hidden / drawn by `segStyle`, `labels.lengths` as the values, the right `angleMarks` as the knees, the declared equal classes (`statedEqual`) as the ticks, and every angle, area and arc label's points as marked. It builds the scene from what is left: the lengths and knees filtered, `buildScene`'s new `suppress` set drops the lone points (and so their dashed extensions). A hovered relations class draws no tick on a hidden segment; the class itself is unchanged.
+2. **Lone points** — `src/app/hideOwnership.ts` `lonePoints(facts, construction)`: a point whose letter no active row TYPED (`typedLabels`, the reader the submit seams use), that at most one row names, and that nothing but a segment or a polygon is built from. App passes it as `lonePoints`.
+3. **The row mark** — `hiddenRowGroups(facts, hidden)`: a row whose `segment` or `set-distance` command is on a hidden segment shows «מוסתר» (`FactRow.hidden`); its click toggles those segments back.
+
+**Locks.** Unit: `shell/__tests__/segment-display-meta-1653.test.ts` (#2852 block — `hiddenWith` over the rhombus, the triangle, a student's point, a held point). Render: `src/__tests__/segment-display-1653.test.tsx` (#2852 block — the triangle's «5» and the row mark, a tool-named foot gone and back, a student-named foot kept with its knee gone, a foot another row uses kept).
+
+**Behaviour change for a student:** in 2-D, hiding a segment also hides the length written on it, the right-angle mark along it, and a point the tool named only for it (the foot F of «גובה מ-C לצלע AB»); the row that stated it shows «מוסתר», and clicking the faint line or the mark brings it all back.
+
+**Amendment 1 (2026-11-12, operator ruling on PR #2863, question 1 option a): a rename makes the point the student's — NOT YET BUILT in 2-D.** 2-D's rename (`renameFacts`) rewrites the commands and relabels the utterance, but a tool-chosen letter (the foot F) never appears in the utterance, so after F → K nothing in the facts says the student chose K. The ruling needs a record 2-D does not keep; the mechanism is with the orchestrator (PR #2863). Until then a renamed tool letter in 2-D still goes with a hidden segment that is its only user.
