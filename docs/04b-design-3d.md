@@ -560,6 +560,21 @@ configuration. `knowledgeSamples3(c, seeds, { readback: true })` adds one image 
 non-zero; `dataView` and every `answerQuery` lane read back, claims and narrowing keep the plain samples, and the
 drawing never walks.
 
+**The read-back stands on every admissible root a free lane has** (#2907, [ADR-3D-498](06b-decisions-3d.md#adr-3d-498)).
+The cold starts spread only the placement, and a free lane (a never-positioned point's coordinates, a rider's offset on
+its line, plane or circle) starts at the seed's one sample in every start, so a pool held the root nearest that sample
+only. `solvePivot`'s **branch fan** (`freeLaneFan`, pooled path only, run per mirror after the walks and only when the
+mirror found a root) takes the first sign-honouring root, holds its placement, measures which fanned points are
+DETERMINED (a point's world position adds no rank to the central-difference Jacobian of the primary rows over the
+non-placement unknowns), and pins each such point just beside every other point of the figure, on its own side and the
+far side (0.1 of the extent), then releases on the anchored rows as a cold start is. An exact, open, member-holding
+result whose fanned point stands somewhere new joins the pool flagged `reach: <point>`. `applySolutions` keeps the pick
+over the unflagged pool (the drawing, `solutions`, «הציגו תצורה אחרת» unchanged), lists the reached roots after it in
+`symRoots` and `pointRoots`, and publishes `pivot.others`, one per reached root (distinct by its point). With
+`{ readback: true }`, `knowledgeSamples3` adds `resolve3(c, s, { configuration: k })` for each, which replays the plain
+pools (`pivotStageMemo3`) and stands the pick on the k-th reached root. Claims, narrowing and the drawing keep the plain
+samples.
+
 ### Who may introduce a point (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253); #1310, [ADR-3D-397](06b-decisions-3d.md#adr-3d-397))
 
 A **carrier** («נסמן: AB = u») never introduces its own subject in its own lane (`v7-t1`). The bare segment

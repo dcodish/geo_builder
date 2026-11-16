@@ -111,7 +111,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   (a coordinate, a component given such as «AB = (1,2,3)», an equation, a component sign) is never turned. A plane
   declared by name only («מישור π3») places nothing: declaring it, or tying it to the figure («A על המישור π3»,
   «π3 ∥ ABC»), never moves the figure and draws no axes; only the plane moves (#2592). **A number drawn on the canvas must be seed-invariant knowledge** — the
-  shared statement is [FR-DP-3](02w-requirements-workspace.md).
+  shared statement is [FR-DP-3](02w-requirements-workspace.md). **Knowledge spans every admissible configuration**
+  (#2907, [ADR-3D-498](06b-decisions-3d.md#adr-3d-498)): a value is shown as known only when every configuration the
+  givens allow agrees on it, and an «או» row lists every option. A point the givens fix up to two discrete roots that
+  no seed happens to draw («A'K : A'C = 2 : 3» on a free A′) reads «A'(6, 0, 6) או (6/5, 24/5, 6/5)», never one root
+  as fact; the drawing and «הציגו תצורה אחרת» are unchanged by this.
   An **anchored** figure (an absolute object, a coordinate, or a stated vector fixes it in space) that the givens
   still let turn about a pinned point or axis, or resize, is turned to a new angle and resized by «הציגו
   תצורה אחרת»; the first drawing may be tilted (operator 2026-10-23, #2378: *"Each press turns the cube about

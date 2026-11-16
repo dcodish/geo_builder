@@ -252,6 +252,12 @@ export interface PivotResult {
    *  measuring / walking probes only — see {@link PlacementFreedom3}). */
   placementFreedom?: () => PlacementFreedom3;
   err: number;
+  /**
+   * #2907 (ADR-3D-498) — a configuration only the BRANCH FAN reached (see `freeLaneFan`). It is admissible and joins
+   * every record of the admissible set (`pointRoots`, `symRoots`, the knowledge samples), but the drawing's pick keeps
+   * to the configurations the cold starts and walks found, so no figure is redrawn by it.
+   */
+  reach?: Id;
   /** The solved parameter vector [t, w, logScale, dims…] — the warm-start vehicle: a
    *  later DRIVE (ADR-3D-033) perturbs the pinned figure from here, so it lands in the
    *  same basin (branch choices preserved) instead of gambling on the rotation starts. */
@@ -1253,7 +1259,7 @@ export function solvePivot(
   // lane (the drift that left «נקודה E במישור ABC»'s two in-plane parameters unknowable). A `zero`-
   // anchored parameter is an OFFSET from the sampled seat (placement adds it there), so an undriven
   // figure stays byte-identical; `bis-dist` is the rider's sampled distance from its ray's apex.
-  let riders: { id: string; t0: number; lo: number; hi: number; spread: boolean }[] = [];
+  let riders: { id: string; t0: number; lo: number; hi: number; spread: boolean; point?: Id }[] = [];
   /** #1415 — the rider indices that belong to a BLOCK-ENROLLED point (`free3`/`partial`): their
    *  coordinates are counted as free by the cue whether or not a residual drove them, so the
    *  scalar-consumption rank probe must measure over them too (the refinement ADR-3D-204's note
@@ -1280,7 +1286,7 @@ export function solvePivot(
           t0 = p ? p[cp.t0.slice(-1) as 'x' | 'y' | 'z'] : null;
         }
         if (t0 !== null) {
-          riders.push({ id: cp.key, t0, lo: cp.lo, hi: cp.hi, spread: cp.spread });
+          riders.push({ id: cp.key, t0, lo: cp.lo, hi: cp.hi, spread: cp.spread, point: id });
           if (blockEnrolled) blockRiderIdx.add(riders.length - 1); // #1415
         }
       }
@@ -2927,6 +2933,7 @@ export function solvePivot(
     };
     let best: { x: number[]; err: number } | null = null;
     const seen = new Set<string>();
+    let reaching: Id | null = null; // #2907: the fanned point, while the branch fan offers its candidates to `collect`
     /** #1735: exact candidates of this mirror discarded ONLY because a rider left its host. */
     const offHostRejects: number[][] = [];
     const noteOffHost = (x: number[]): void => {
@@ -2990,9 +2997,127 @@ export function solvePivot(
       const symbols = coupled ? cx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
       const pinSymbols = pinSymbolsAt(cx);
       const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, cx[riderBase + i]])) : undefined;
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...cx], mirror), heldPins: heldPinsAt([...cx], mirror), err: rAccept, x: [...cx] });
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...cx], mirror), heldPins: heldPinsAt([...cx], mirror), err: rAccept, x: [...cx], ...(reaching !== null ? { reach: reaching } : {}) });
     };
     const fSeed = fFor(symAnchorTargets);
+    /**
+     * #2907 (ADR-3D-498) — THE BRANCH FAN: a free lane's other discrete roots, reached WARM from the found solution.
+     *
+     * Every cold start puts a free lane (a never-positioned point's coordinates, a rider's offset on its line, plane or
+     * circle) at the seed's ONE sample — the eight starts spread only the placement, which coordinate points pin — so the
+     * pool holds the root nearest that sample and nothing else. «A'K : A'C = 2 : 3» on a free A' has two roots on the line
+     * CK (K between A' and C, or A' between them); every seed's pool carried the first, and every knowledge gate, which
+     * judges agreement across the pools, read the first as the only one. The #797 walk (pin symbols), #820's spread
+     * (segment riders), #2714 / #2814's fans (shape dims) each reach a neighbour of this lane, never this one.
+     *
+     * The #2714 pattern, one lane over: from this mirror's first root that honours every stated sign, with the placement
+     * held, ONE free-lane point at a time — only one the givens DETERMINE (measured by rank below; a free point's other
+     * positions are a continuum, never a second root) — is pinned just beside every other point of the figure, on its
+     * own side and the far side, and released on the anchored rows as a cold start is. A fixed step, a reflection through
+     * another point and a deflation of the found root were each measured on the issue's figure and reached the second
+     * root at some seeds only: the length-ratio residual's basins meet AT a point of the figure (A' = K) and it runs away
+     * past C. An exact, open, member-holding result whose point stands somewhere new joins the pool flagged `reach`.
+     * Cost (docs/17 §7): paid only on the pooled path, only when this mirror found a root, only per determined point —
+     * one rank probe (2 residual evaluations per unknown), then 2 × (the figure's distinct points − 1) pinned solves
+     * (40 iterations) and as many anchored releases (120).
+     */
+    function freeLaneFan(): void {
+      if (!collectAll || nRider === 0 || probe) return;
+      // the base honours every stated sign when one of this mirror's roots does: a root the selector drops fans nothing it keeps
+      const signsHold = (x: number[]): boolean => {
+        const at = atFor(mirror, x);
+        return signConds.every((cd) => {
+          const v = cd.value(at);
+          return v === undefined ? true : cd.positive ? v > 1e-9 : v < -1e-9;
+        });
+      };
+      const mine = results.filter((r) => r.mirror === mirror && !r.reach);
+      const base = mine.find((r) => signsHold(r.x)) ?? mine[0];
+      if (!base) return;
+      const bx = base.x;
+      const groups = new Map<Id, number[]>();
+      riders.forEach((r, i) => {
+        if (r.point === undefined || r.spread || r.lo > -Infinity || r.hi < Infinity) return; // a host-bounded lane is #820's
+        const list = groups.get(r.point) ?? [];
+        if (list.length === 0) groups.set(r.point, list);
+        list.push(i);
+      });
+      if (groups.size === 0) return;
+      const atBase = atFor(mirror, bx);
+      let extent = 1;
+      for (const id of c.points.keys()) {
+        const q = atBase(id);
+        if (q) extent = Math.max(extent, Math.abs(q.x), Math.abs(q.y), Math.abs(q.z));
+      }
+      const tol = 1e-3 * extent;
+      // the placement is HELD: the cold starts' rotations own it, and a fanned lane must not turn the rest of the figure
+      const gauge = bx.slice(0, 7);
+      const held = (f: (y: number[]) => number[]) => (y: number[]): number[] => f([...gauge, ...y.slice(7)]);
+      // DETERMINED, measured: the point's position adds no rank to the givens' rows over the free unknowns (central
+      // differences, the #2368 probe's chart), so its other positions are discrete roots, never a continuum
+      const n = bx.length;
+      const h = 1e-4;
+      const colsJ: number[][] = [];
+      const colsP = new Map<Id, number[][]>();
+      for (let j = 7; j < n; j++) {
+        const xp = [...bx];
+        const xm = [...bx];
+        xp[j] += h;
+        xm[j] -= h;
+        const rp = fPrimary(xp);
+        const rm = fPrimary(xm);
+        colsJ.push(rp.map((v, i) => (v - rm[i]) / (2 * h)));
+        const ap = atFor(mirror, xp);
+        const am = atFor(mirror, xm);
+        for (const id of groups.keys()) {
+          const p = ap(id);
+          const m = am(id);
+          const col = p && m ? [(p.x - m.x) / (2 * h * extent), (p.y - m.y) / (2 * h * extent), (p.z - m.z) / (2 * h * extent)] : [0, 0, 0];
+          const list = colsP.get(id) ?? [];
+          if (list.length === 0) colsP.set(id, list);
+          list.push(col);
+        }
+      }
+      const rank0 = colsJ.length === 0 || colsJ[0].length === 0 ? 0 : numericRank(colsJ);
+      const sites: Vec3[] = [];
+      for (const q of c.points.keys()) {
+        const p = atBase(q);
+        if (p && !sites.some((t) => norm3(sub3(t, p)) <= tol)) sites.push(p);
+      }
+      const fP = held(fPrimary);
+      const fS = held(fSeed);
+      for (const id of groups.keys()) {
+        const pc = colsP.get(id)!;
+        if (numericRank(colsJ.map((col, j) => [...col, ...pc[j]])) !== rank0) continue; // free on the solution set
+        const here = atBase(id);
+        if (!here) continue;
+        const roots: Vec3[] = [here];
+        for (const site of sites) {
+          const away = sub3(here, site);
+          const d = norm3(away);
+          if (d <= tol) continue;
+          // the figure's points cut the point's carrier into the stretches its discrete roots live in (between K and C,
+          // or beyond K): the point is pinned just beside each other point, on its own side and on the far side, then
+          // released as a cold start is
+          for (const side of [1, -1]) {
+            const target = add3(site, scale3(away, (side * 0.1 * extent) / d));
+            const pinned = (y: number[]): number[] => {
+              const p = atFor(mirror, [...gauge, ...y.slice(7)])(id);
+              return [...fP(y), ...(p ? [1e3 * (p.x - target.x), 1e3 * (p.y - target.y), 1e3 * (p.z - target.z)] : [])];
+            };
+            const r0 = leastSquares(fS, leastSquares(pinned, [...bx], 40).x, 120, exactAtPoint);
+            const x = [...gauge, ...r0.x.slice(7)];
+            if (degenerate(x) || primaryErr(x) >= ACCEPT || !membersHold(mirror, x)) continue;
+            const got = atFor(mirror, x)(id);
+            if (!got || roots.some((q) => norm3(sub3(q, got)) <= tol)) continue;
+            roots.push(got);
+            reaching = id;
+            collect({ x, err: fSeed(x).reduce((acc, v) => acc + v * v, 0) });
+            reaching = null;
+          }
+        }
+      }
+    }
     for (const x0 of starts) {
       let r0 = leastSquares(fSeed, x0, 120, exactAtPoint);
       // polish: restart LM (fresh damping) from the found point until it stops improving
@@ -3189,6 +3314,7 @@ export function solvePivot(
         symbolWalk();
       }
     }
+    freeLaneFan();
     // #1735 (ADR-3D-306): deferred — fired below only when the WHOLE pool is empty after the #1499
     // frozen-dims retry, so every figure that builds today is bit-identical. Each kept candidate is
     // re-seated (its off-host riders pinned back at their samples, then released on the anchored
