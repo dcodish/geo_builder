@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { solveResiduals } from '../tier2';
+import { nearestOnSet, solveResiduals } from '../tier2';
 import { deriveLines } from '../../app/deriveLines';
 
 describe('the minimiser itself', () => {
@@ -189,5 +189,98 @@ describe('an arithmetic sequence now SOLVES, through the same tier', () => {
     const d = deriveLines(['z1 = 1', 'z2 = 10i', 'z3 = 5', 'z1, z2, z3 סדרה חשבונית']);
     expect(d.unsatisfied).toHaveLength(1);
     expect(d.unsatisfied[0]).toContain('חשבונית');
+  });
+});
+
+/**
+ * #2801 / #2802 (ADR-CX-101, stages 3b–3c) — a CONTINUUM is drawn at the point of its set nearest the sampled
+ * start, so the drawing is a function of (the set, the seed), never of the rows that describe the set.
+ */
+describe('#2801 — the nearest-point polish (stage 3c)', () => {
+  const polar = (x: readonly number[]) => [x[0] * Math.cos((x[1] * Math.PI) / 180), x[0] * Math.sin((x[1] * Math.PI) / 180)];
+  const bounds = [{ lo: 1e-6 }, {}];
+
+  it('a LINE: lands on the orthogonal projection of the start, from any point of the line', () => {
+    const f = (x: readonly number[]) => [polar(x)[0] - 2];
+    for (const y of [-3.5, 0.5, 8]) {
+      const r = nearestOnSet(f, polar, [Math.hypot(2, y), (Math.atan2(y, 2) * 180) / Math.PI], [2.96, 152.64], bounds)!;
+      const p = polar(r);
+      expect(p[0]).toBeCloseTo(2, 9);
+      expect(p[1]).toBeCloseTo(2.96 * Math.sin((152.64 * Math.PI) / 180), 8);
+    }
+  });
+
+  it('a CIRCLE: lands on c + R·(p0 − c)/|p0 − c|', () => {
+    const f = (x: readonly number[]) => [Math.hypot(polar(x)[0] - 1, polar(x)[1]) - 2];
+    const x0 = [2.96, 140];
+    const p0 = polar(x0);
+    const ang = Math.atan2(p0[1], p0[0] - 1);
+    const start = { re: 1 + 2 * Math.cos(-0.7), im: 2 * Math.sin(-0.7) };
+    const r = nearestOnSet(f, polar, [Math.hypot(start.re, start.im), (Math.atan2(start.im, start.re) * 180) / Math.PI], x0, bounds)!;
+    expect(polar(r)[0]).toBeCloseTo(1 + 2 * Math.cos(ang), 8);
+    expect(polar(r)[1]).toBeCloseTo(2 * Math.sin(ang), 8);
+  });
+
+  it('two different residuals of ONE set give the same point (the rows do not matter)', () => {
+    const line1 = (x: readonly number[]) => [polar(x)[0] - 2, 0];
+    const line2 = (x: readonly number[]) => {
+      const [a, b] = polar(x);
+      return [Math.hypot(a - 1, b) - Math.hypot(a - 3, b)];
+    };
+    const both = (x: readonly number[]) => [...line1(x), ...line2(x)];
+    const at = (f: (x: readonly number[]) => number[], y: number) =>
+      polar(nearestOnSet(f, polar, [Math.hypot(2, y), (Math.atan2(y, 2) * 180) / Math.PI], [2.5, 60], bounds)!);
+    const ref = at(line1, 4);
+    for (const p of [at(line2, -1), at(both, 7)]) {
+      expect(p[0]).toBeCloseTo(ref[0], 9);
+      expect(p[1]).toBeCloseTo(ref[1], 9);
+    }
+  });
+
+  it('a start it cannot keep on the set answers null (the caller keeps the descent\'s endpoint)', () => {
+    expect(nearestOnSet(() => [1], polar, [1, 0], [2, 0], bounds)).toBeNull();
+  });
+});
+
+describe('#2802 — a lone locus is drawn near the view, and moves along it with the configuration', () => {
+  it.each(['|z - 1 - i| = |z|', '|z - 1| = 2', 'Re(z^2) = 0', 'Re(z) = 1'])('«%s» at seeds 0–7: |z| ≤ 10', (line) => {
+    const zs = [0, 1, 2, 3, 4, 5, 6, 7].map((s) => {
+      const d = deriveLines([line], s, s);
+      expect(d.configCount, 'drawn from a solve that reached tolerance').toBeGreaterThanOrEqual(1);
+      expect(d.unsatisfied).toEqual([]);
+      return d.points.find((p) => p.name === 'z')!.z;
+    });
+    for (const z of zs) expect(Math.hypot(z.re, z.im)).toBeLessThanOrEqual(10);
+    expect(new Set(zs.map((z) => `${z.re.toFixed(3)},${z.im.toFixed(3)}`)).size).toBeGreaterThanOrEqual(2);
+  });
+});
+
+/** #2801 — the class matrix of the deferred family: a restated relation moves nothing, both orders, seeds 0–7. */
+describe('#2801 — a restated deferred relation leaves the drawing still', () => {
+  it.each([
+    ['Re(z) = 2', '|z - 1| = |z - 3|'],
+    ['|z - 1| = 2', '|z - 1| = 2'],
+    ['|z - 1| = 2', '|1 - z| = 2'],
+    ['Re(z) = 1', 'Re(z) = 1'],
+  ])('«%s» · «%s»', (a, b) => {
+    for (const [first, second] of [[a, b], [b, a]]) {
+      for (const s of [0, 1, 2, 3, 4, 5, 6, 7]) {
+        const before = deriveLines([first], s, s);
+        const after = deriveLines([first, second], s, s);
+        expect(after.configCount, 'a continuum, not taken for isolated points').toBe(before.configCount);
+        const [z0, z1] = [before, after].map((d) => d.points.find((p) => p.name === 'z')!.z);
+        // to the polish's precision, the numeric Jacobian's (~1e-8)
+        expect(Math.hypot(z1.re - z0.re, z1.im - z0.im), `${first} · ${second} @ ${s}`).toBeLessThanOrEqual(1e-7);
+      }
+    }
+  });
+
+  it('stage 3b: a residual that holds identically is not a constraint — «arg(z) = 90» · «Re(z^3) = 0» keeps its drawing', () => {
+    for (const s of [0, 1, 2, 3]) {
+      const a = deriveLines(['arg(z) = 90'], s, s);
+      const b = deriveLines(['arg(z) = 90', 'Re(z^3) = 0'], s, s);
+      expect(b.configCount).toBe(a.configCount);
+      expect(b.points.find((p) => p.name === 'z')!.z.im).toBeCloseTo(a.points.find((p) => p.name === 'z')!.z.im, 9);
+    }
   });
 });

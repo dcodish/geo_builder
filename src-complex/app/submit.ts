@@ -50,7 +50,7 @@ import { complexScopeOf, parseAsk } from './deriveLines';
 import { type ComplexScope, gluedISpelledOut, juxtaposedNumbersSpelledOut } from '../parser/exprParse';
 import type { Derived2 } from '../replay/derive2';
 import { type InputError, type InputNote, type SavedSession, useComplexStore } from '../store/useComplexStore';
-import { deriveLines, lineEntailed } from './deriveLines';
+import { deriveLines, lineAlreadyHeld } from './deriveLines';
 
 /** This product's save-file envelope (shell/save): the marker `serialize()` writes, and the
  *  highest `SavedSession.version` this build can read. */
@@ -493,7 +493,9 @@ export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = fa
   // solve already entails is ACCEPTED as its own row, with the already-held notice — it holds its relation alone once the
   // row that implied it is muted or deleted. Seed-free, so a value that merely holds in this drawing records silently.
   // A load replays the student's rows as saved and asks nothing (`replaying`).
-  const held = !replaying && lineEntailed(active, line);
+  // #2801 (ADR-CX-102): and a deferred relation that moves nothing drawn — the restated circle, the line
+  // not through the origin in another spelling — gets the same notice, decided on the drawn figure
+  const held = !replaying && lineAlreadyHeld(active, line);
   return { kind: 'record', line, seed: verdict.seed, ...(held ? { note: { key: 'already-held', detail: line } as const } : {}) };
 }
 

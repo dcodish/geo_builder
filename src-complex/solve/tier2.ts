@@ -169,6 +169,24 @@ function descend(
   return { x, residuals: r, solved: r.every((v) => Math.abs(v) <= TOL), iterations };
 }
 
+/** Central differences: the polish compares directions, so it needs the O(h²) error, not O(h). */
+function central(f: (x: readonly number[]) => number[], x: readonly number[]): number[][] {
+  const n = x.length;
+  let out: number[][] | null = null;
+  for (let j = 0; j < n; j++) {
+    const h = 1e-5 * Math.max(1, Math.abs(x[j]));
+    const xp = [...x];
+    const xm = [...x];
+    xp[j] += h;
+    xm[j] -= h;
+    const rp = f(xp);
+    const rm = f(xm);
+    out ??= rp.map(() => new Array<number>(n).fill(0));
+    for (let i = 0; i < rp.length; i++) out[i][j] = (rp[i] - rm[i]) / (2 * h);
+  }
+  return out ?? [];
+}
+
 /** Forward differences with a step scaled to the coordinate — the residuals have no analytic form. */
 function jacobian(
   f: (x: readonly number[]) => number[],
@@ -272,4 +290,231 @@ function bisect(g: (v: number) => number, lo: number, hi: number): number {
     }
   }
   return (a + b) / 2;
+}
+
+/**
+ * #2801/#2802 (ADR-CX-101, LADDER-CX stage 3c) — the point of a CONTINUUM nearest the sampled start.
+ *
+ * Where the givens leave a curve of solutions (a line, a circle), the descent above stops wherever its
+ * path ends, and that path depends on the ROWS that describe the set, not on the set: the same line
+ * typed in another spelling, or twice, moved the drawn point (#2801), and a locus could be drawn hundreds
+ * of units off the canvas (#2802). The member drawn must be a function of (the set, the sampled start).
+ *
+ * From `x`, a point of the set (every residual within `TOL`), this walks the set towards the start,
+ * every length measured in the DRAWN plane (through `pos`'s Jacobian), never in the solver's own
+ * coordinates (a modulus and a degree are not commensurable):
+ *  - a TANGENT step: the Gauss–Newton step on ½|pos − pos(x0)|², restricted to the null space of the
+ *    residuals' Jacobian, its length chosen by a one-step quadratic fit (on a circle the plain step
+ *    overshoots by the curvature term, and the walk would only oscillate inwards);
+ *  - a CORRECTION back onto the set: the least drawn displacement that zeroes the linearised residuals.
+ * A step is kept only when it lands on the set and nearer the start; the walk stops when the tangent
+ * component is negligible.
+ *
+ * Returns the polished point, or `null` when it could not keep every residual within tolerance — the
+ * caller then keeps the descent's own endpoint, which is the old answer.
+ */
+export function nearestOnSet(
+  f: (x: readonly number[]) => number[],
+  pos: (x: readonly number[]) => number[],
+  x: readonly number[],
+  x0: readonly number[],
+  bounds?: readonly Bound[],
+  maxIterations = 40,
+): number[] | null {
+  const n = x.length;
+  if (n === 0) return null;
+  const onSet = (r: readonly number[]): boolean => r.every((v) => Math.abs(v) <= TOL);
+  const p0 = pos(x0);
+  const dist2 = (p: readonly number[]): number => p.reduce((a, v, i) => a + (v - p0[i]) ** 2, 0);
+  const dot = (a: readonly number[], b: readonly number[]): number => a.reduce((s, v, i) => s + v * b[i], 0);
+  const dist2Between = (a: readonly number[], b: readonly number[]): number => a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0);
+  const ridge = (M: number[][], rel: number): number[][] => {
+    const eps = rel * Math.max(1e-12, ...M.map((row, i) => Math.abs(row[i])));
+    return M.map((row, a) => row.map((v, b) => (a === b ? v + eps : v)));
+  };
+
+  /**
+   * The residual rows that constrain independently — Gram–Schmidt, keeping a row only when it adds a
+   * direction. Two rows of ONE set («Re(z) = 2» and «|z − 1| = |z − 3|») are parallel up to differencing
+   * error, and solving for both at once would amplify that error into a wild step.
+   */
+  const independent = (J: readonly (readonly number[])[]): { rows: number[]; basis: number[][] } => {
+    const rowScale = Math.max(1e-300, ...J.map(norm));
+    const basis: number[][] = [];
+    const rows: number[] = [];
+    J.forEach((row, i) => {
+      const v = [...row];
+      for (const q of basis) {
+        const d = dot(q, v);
+        for (let k = 0; k < n; k++) v[k] -= d * q[k];
+      }
+      const len = norm(v);
+      if (len > 1e-9 && len > 1e-6 * rowScale) {
+        basis.push(v.map((vk) => vk / len));
+        rows.push(i);
+      }
+    });
+    return { rows, basis };
+  };
+
+  /** back onto the set: the least DRAWN displacement δ with J·δ = −r, a handful of Newton steps */
+  const correct = (
+    start: readonly number[],
+    at?: { readonly Jr: readonly (readonly number[])[]; readonly Jp: readonly (readonly number[])[] },
+  ): number[] | null => {
+    let y = [...start];
+    /**
+     * The step operator δ = −X·S⁻¹·r of the least drawn displacement, from Jacobians taken at ONE point and reused
+     * (a chord Newton: the walk's steps are short, so the Jacobian of the point it stepped from serves), refreshed
+     * only when an iteration stops halving the residual.
+     */
+    const operator = (JAll: readonly (readonly number[])[], Jp: readonly (readonly number[])[]) => {
+      const keep = independent(JAll).rows;
+      const J = keep.map((i) => JAll[i]);
+      // W = JpᵀJp (+ a ridge: a coordinate the drawing does not see is the cheapest one to move)
+      const W = ridge(
+        Array.from({ length: n }, (_, a) => Array.from({ length: n }, (__, b) => Jp.reduce((s, row) => s + row[a] * row[b], 0))),
+        1e-8,
+      );
+      // X = W⁻¹Jᵀ, column by column
+      const X: number[][] = [];
+      for (const row of J) {
+        const col = solveDense(W.map((w) => [...w]), [...row]);
+        if (!col) return null;
+        X.push(col);
+      }
+      const S = ridge(
+        Array.from({ length: J.length }, (_, a) => Array.from({ length: J.length }, (__, b) => dot(J[a], X[b]))),
+        1e-12,
+      );
+      return { keep, X, S };
+    };
+    let op = at ? operator(at.Jr, at.Jp) : operator(central(f, y), central(pos, y));
+    let refreshes = at ? 2 : 1;
+    let lastNorm = Infinity;
+    // one step past tolerance: the set is then met to rounding, so two descriptions of one set polish to one point,
+    // not to two points within TOL of each other
+    let met: number[] | null = null;
+    for (let it = 0; it < 16; it++) {
+      const rAll = f(y);
+      if (onSet(rAll)) {
+        if (met || norm(rAll) <= 1e-15) return y;
+        met = y;
+      } else if (met) return met;
+      const rn = norm(rAll);
+      if (rn > 0.5 * lastNorm && refreshes > 0) {
+        op = operator(central(f, y), central(pos, y));
+        refreshes--;
+      }
+      lastNorm = rn;
+      if (!op) return null;
+      const { keep, X, S } = op;
+      const w = solveDense(S.map((row) => [...row]), keep.map((i) => -rAll[i]));
+      if (!w) return null;
+      y = clampAll(
+        y.map((v, k) => v + w.reduce((s, wi, i) => s + wi * X[i][k], 0)),
+        bounds,
+      );
+    }
+    return onSet(f(y)) ? y : met;
+  };
+
+  const walk = (from: readonly number[]): number[] | null => {
+    const first = onSet(f(from)) ? [...from] : correct(from);
+    if (!first) return null;
+    let cur: number[] = first;
+    let curPos = pos(cur);
+    let curD = dist2(curPos);
+    for (let it = 0; it < maxIterations; it++) {
+      const Jr = central(f, cur);
+      const Jp = central(pos, cur);
+      // an orthonormal basis of the constrained directions (the residual rows)
+      const Q = independent(Jr).basis;
+      const project = (v: readonly number[]): number[] => {
+        const out = [...v];
+        for (const q of Q) {
+          const d = dot(q, out);
+          for (let i = 0; i < n; i++) out[i] -= d * q[i];
+        }
+        return out;
+      };
+      // the tangent Gauss–Newton step on ½|pos − p0|², restricted to the null space
+      const e = curPos.map((v, i) => v - p0[i]);
+      const g = project(Array.from({ length: n }, (_, k) => Jp.reduce((s, row, i) => s + row[k] * e[i], 0)));
+      // below this the step only chases the numeric Jacobian's noise (the line search then ends the walk)
+      if (norm(g) <= 1e-12 * Math.max(1, Math.sqrt(curD))) break;
+      const cols = Array.from({ length: n }, (_, k) => project(Array.from({ length: n }, (__, j) => (j === k ? 1 : 0))));
+      const JpN = Jp.map((row) => cols.map((c) => dot(row, c)));
+      const A = ridge(
+        Array.from({ length: n }, (_, a) => Array.from({ length: n }, (__, b) => JpN.reduce((s, row) => s + row[a] * row[b], 0))),
+        1e-10,
+      );
+      const y = solveDense(A, g.map((v) => -v));
+      if (!y) break;
+      const step = project(y);
+      const at = (t: number): { x: number[]; p: number[]; d: number } | null => {
+        const trial = correct(clampAll(cur.map((v, i) => v + t * step[i]), bounds), { Jr, Jp });
+        if (!trial) return null;
+        const p = pos(trial);
+        return { x: trial, p, d: dist2(p) };
+      };
+      // the distance is flat to rounding near its minimum (|e|² with |e| ~ 1 resolves a move only down to ~1e-8), so a
+      // step that does not raise it beyond rounding is kept and the gradient, not the distance, says when to stop
+      const flat = curD * (1 + 1e-12) + 1e-24;
+      let best: { x: number[]; p: number[]; d: number } | null = null;
+      for (let t = 1; t >= 1 / 16 && !best; t /= 2) {
+        const c = at(t);
+        if (c && c.d <= flat) best = c;
+        // the quadratic through d(0), its slope 2·gᵀ·step and d(t): its minimum, when it is a better length
+        if (c) {
+          const slope = 2 * dot(g, step);
+          const curv = (c.d - curD - slope * t) / (t * t);
+          if (curv > 0) {
+            const tq = Math.min(2 * t, -slope / (2 * curv));
+            if (tq > 0 && Math.abs(tq - t) > 1e-3 * t) {
+              const q = at(tq);
+              if (q && q.d <= flat && (!best || q.d < best.d)) best = q;
+            }
+          }
+        }
+      }
+      // near the nearest point the distance changes only quadratically: a step that does not move it up is
+      // kept, and the walk ends when the drawing stops moving
+      if (!best || best.d > flat) break;
+      const moved = Math.sqrt(dist2Between(best.p, curPos));
+      ({ x: cur, p: curPos, d: curD } = best);
+      if (moved <= 1e-13 * Math.max(1, Math.sqrt(curD))) break;
+    }
+    return onSet(f(cur)) ? cur : null;
+  };
+  /**
+   * From the start itself, projected onto the set, and from the solve's own point only when that fails. An end on a
+   * SINGULAR point of the set is no answer: at the crossing of «Im(z²) = 0»'s two axes every residual is flat (its
+   * gradient in the drawn plane vanishes), so a whole disc around the crossing is "on the set" within `TOL`, a
+   * projection from near the diagonal converges into it, and the walk cannot leave it. Such an end — its drawn gradient
+   * a thousandth of the solve's own point's — is refused; with neither end usable, `null`, and the caller keeps the
+   * solve's own point.
+   */
+  const drawnGradient = (y: readonly number[]): number => {
+    const Jr = central(f, y);
+    const Jp = central(pos, y);
+    const W = ridge(
+      Array.from({ length: n }, (_, a) => Array.from({ length: n }, (__, b) => Jp.reduce((s2, row) => s2 + row[a] * row[b], 0))),
+      1e-8,
+    );
+    // |G|² = trace(Jr·W⁻¹·Jrᵀ), G the residuals' gradient in the drawn plane
+    let t = 0;
+    for (const row of Jr) {
+      const col = solveDense(W.map((w) => [...w]), [...row]);
+      if (!col) return 0;
+      t += dot(row, col);
+    }
+    return Math.sqrt(Math.max(0, t));
+  };
+  const regular = drawnGradient(x);
+  for (const from of [x0, x]) {
+    const end = walk(from);
+    if (end && drawnGradient(end) >= 1e-3 * regular) return end;
+  }
+  return null;
 }
