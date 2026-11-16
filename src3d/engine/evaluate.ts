@@ -45,7 +45,7 @@ import {
 } from './operands';
 import { configurationOrder3, samePointConfig3 } from './configs3';
 import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3, type CanonicalEval3 } from './solve3';
-import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
+import { scaleGivenActive, scaleGivenLane3, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
 import { absolutePointCount, claimPointIds, evalAffine, scalarPinOrigin3, type ScalarPin, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, orientationStated3, pinSymAnchor3, pinSymsOf, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol, type SymComp } from './types';
@@ -3756,6 +3756,41 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     }
   }
 
+  // ---- #2792 (ADR-3D-521): the scale given's CONTENT lane. The figure's only ties to the absolute world are point pins on
+  // one point C (or none), so the stated size is reached by the similarity p ↦ C + k(p − C) on the figure's OWN points —
+  // never on a stated point, an equation plane or a typed line, which stay exactly where the student put them — and it
+  // runs BEFORE the placement funnel, so the funnel's extent, translation range and clearance all read the true size.
+  // C is fixed by the map, so a pin on it still holds. A mixed point (a midpoint of a vertex and a stated point) is
+  // re-derived from its own definition afterwards, as after every rigid motion (ADR-3D-456).
+  {
+    const lane = scaleGivenActive(c) ? scaleGivenLane3(c) : null;
+    if (lane?.lane === 'content') {
+      const g = c.scaleGivens[0];
+      const m0 = scaleGivenMagnitude(g, c, pos);
+      const power = scaleGivenPower(g);
+      const stated = scaleGivenValue(g);
+      if (m0 !== null && m0 > 1e-9 && power !== null && stated !== null) {
+        const k = Math.pow(stated / m0, 1 / power);
+        const C = lane.centre;
+        const map = (p: Vec3): Vec3 => v3(C.x + k * (p.x - C.x), C.y + k * (p.y - C.y), C.z + k * (p.z - C.z));
+        const lanes = figureLanes3(c);
+        for (const [id, p] of pos) if (lanes.get(id) === 'figure') pos.set(id, map(p));
+        // a plane or line already resolved from the figure (not a stated equation or a typed line) rides the same map
+        for (const [name, pl] of planes) {
+          const def = c.planes.get(name);
+          if (def && !def.free) continue; // an equation plane: absolute
+          planes.set(name, { n: pl.n, d: k * pl.d + (k - 1) * dot3(pl.n, C) });
+        }
+        for (const [name, ln] of lines) {
+          if (c.lines.get(name)?.kind === 'parametric') continue; // a typed line: absolute
+          lines.set(name, { ...ln, anchor: map(ln.anchor) });
+        }
+        if (freePlaneOffsetPinned3(c)) reresolveFreeObjects3(c, seed, pos, planes, lines, freePlaneDofs, freeLineDofs);
+        if (mixedPointIds3(c).length > 0) reseatMixed3(c, seed, pos, planes, lines, pivot?.riderTs ? new Map(Object.entries(pivot.riderTs)) : undefined);
+      }
+    }
+  }
+
   // ---- #367: nothing pinned the placement, but the figure DOES carry an absolute-frame object.
   // The canonical placement is then an unstated choice, not a gauge — sample it, so the solid sits
   // somewhere different against the line/plane in every configuration instead of asserting the
@@ -4199,7 +4234,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   // the shape DOFs it did not touch keep varying with the seed. Everything still resolved at this
   // point is position-derived (`scaleGivenSafe` admits no absolute object), so the derived plane
   // offsets scale with the same factor and every incidence survives verbatim.
-  if (scaleGivenActive(c)) {
+  if (scaleGivenActive(c) && scaleGivenLane3(c)?.lane === 'origin') {
     const g = c.scaleGivens[0];
     const m0 = scaleGivenMagnitude(g, c, pos);
     const power = scaleGivenPower(g);

@@ -148,9 +148,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   - For the coordinate, vector and measure rules: a true restatement is never refused, and one the figure already
     holds is its own row with the held notice (FR-SP-19a); an unstated or symbolic component is not checked, and
     on a solid or a free figure the statement drives instead.
+  - **A size stated on a solid (a length, an area, a volume) holds in both orders beside any object or coordinate**
+    («קובייה» · «P(1,2,3)» · «אורך AB = 4»; «A(1,2,3)» on a vertex; «x+y+z=1»; a typed line): the object stays where it
+    was stated and the solid takes the stated size by one uniform factor. It is refused only when the stated coordinates
+    or objects fix a different size, and then the refusal names them («A(1,2,3)» · «B(5,2,3)» · «אורך AB = 5»)
+    ([ADR-3D-521](06b-decisions-3d.md#adr-3d-521), #2792, ADR-W-199).
   - **A refusal never tells a student who may be right that they miscalculated:** a given the tool cannot
-    yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit (for a solid's size,
-    «… היכולת הזאת נמצאת בפיתוח, ולכן הצעד לא נוסף.», ADR-3D-363); «בדקו את החישוב» is kept for a given the student's own data contradicts.
+    yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit (for a revolution solid's size,
+    «… היכולת הזאת נמצאת בפיתוח, ולכן הצעד לא נוסף.», ADR-3D-363; a polyhedron's size beside an object is no longer
+    such a case, ADR-3D-521); «בדקו את החישוב» is kept for a given the student's own data contradicts.
   - **A cone, cylinder or sphere size is read whole or refused, never cut:** inside the declaration the
     radius and height take a whole number or a decimal («חרוט שרדיוסו 2.5 וגובהו 3»). A size written as a
     fraction or a root («כדור שרדיוסו 1/2», «חרוט שרדיוסו √2 וגובהו 3») is refused with the same «not yet»

@@ -1144,7 +1144,7 @@ object is never one: a free plane (`PlaneDef.free`) and a free line have their o
 by their resolvers, so sampling the figure's six as well would sample one relative pose twice. Declaring or pinning
 one leaves the figure where it was. A free plane given an equation stops being free and counts.
 
-**One absolute-frame predicate (#2746, [ADR-3D-453](06b-decisions-3d.md#adr-3d-453)).** The scale given (#754) asks the
+**One absolute-frame predicate (#2746, [ADR-3D-453](06b-decisions-3d.md#adr-3d-453); its refusal replaced by lanes, ADR-3D-521).** The scale given (#754) asks the
 same question, "would a uniform rescale detach an absolute object?", so `scaleGivenSafe` calls `hasAbsoluteFrameObject`
 and keeps no list of its own; only a rescale's own exclusions stay there (no solid, a revolution or a `circles3`,
 `scaleFixingPins3`). The predicate lives in `types.ts` beside `absolutePointCount`,
@@ -1170,6 +1170,20 @@ figure lane; the funnel's extent and clearance read only it. After each candidat
 re-derived (`reseatMixed3`), and a candidate where one no longer exists (a stated crossing carried off its edge: the #780
 `crossingOnInk3` bound the status pass reads) ranks below every candidate that keeps them all; when none does, the
 solved placement is kept.
+
+**The scale given has three lanes (#2792, [ADR-3D-521](06b-decisions-3d.md#adr-3d-521)).** `scaleGivenLane3`
+(`scaleGiven.ts`) decides once how a stated size acts, and `scaleGivenSafe` is "the lane is a rescale". **origin**: every
+absolute object is invariant and no pin fixes the size (the #2789 rescale about the origin after placement, unchanged).
+**content**: the figure's only ties to the absolute world are point pins on ONE figure point C with every component
+stated, or none, read off `pivotFamilies3` (only `pins` and similarity-invariant `scalarPins` that read the figure lane may
+be present) and no coordinate-plane or axis relation, and no stated sign beside a pin. The resolver applies
+p ↦ C + k(p − C) to the figure-lane points (`figureLanes3`) and to the planes and lines resolved from the figure, never to an
+equation plane, a typed line or a stated point, BEFORE the placement funnel, then re-seats the mixed points; the funnel
+then samples and clears the placement at the true size. **pivot**: anything else (two pinned points, a vector, pair or
+plane pin, a membership, a frame relation, a size-fixing pin). The given is minted only on a rescale lane and only when it
+reads figure-lane points (`scaleGivenReadsFigure3`: «אורך AP = 4» to a stated P is not a size). On the pivot lane it enters
+the pivot as its own pin with its arbiter, and a recorded given whose figure turns to the pivot lane is handed over at the
+outermost apply (`handScaleGivenToPivot3`), so the pivot reaches the size or the pin-owner guard names the statements.
 
 **A stated sign is aimed at (#2793, [ADR-3D-465](06b-decisions-3d.md#adr-3d-465)).** The funnel ranks a candidate first by how
 many stated signs it keeps, in statement order to the first that breaks (an impossible set keeps the earlier statements, so
@@ -1306,7 +1320,8 @@ admissibility (`settleFlatRings`) runs on a solid-free figure too, and #2503's d
 relation's PLANE operands beside its pairs (`pinOperandPlanes3`): a solution where a ⟂ / ∥ / angle-to-plane holds only
 because the plane's points fell on one line is not a configuration, so «AB∥ACD» · «AB ⊥ ACD» is a contradiction. On a rigid figure the FIRST magnitude is still the #754 scale given; a later magnitude
 that reads a free carrier, or arrives while the scale given does, **demotes** it to a pin recorded as its own
-arbiter (`given: true`), and its fact joins the pin owners so a later contradiction names it. A later magnitude
+arbiter (`given: true`), and its fact joins the pin owners so a later contradiction names it. The same demotion
+(`handScaleGivenToPivot3`) runs when a later object or pin turns the scale given's lane to the pivot (#2792, ADR-3D-521). A later magnitude
 that reads no free carrier is then checked exactly (`magnitudeSizeStated3`, `scaleGiven.ts`).
 `lengthClaim` lowers a marked «וקטור AB = 5» to the one-word form's arrow. A candidate the anchors left just
 above `ACCEPT` is polished on the primary residuals alone and kept only if that closes it without collapsing

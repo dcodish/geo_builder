@@ -637,6 +637,11 @@ const SEEDED: SeededCorpus = {
   // #1829 (ADR-3D-471): the operator's rectangle, saved with his «AE» ask (before: «AE⃗ — לא נקבע על ידי הנתונים»; now
   // «u + t·v»). The answers, the shared t and the panel parity are asserted in queries.test.ts; this is the build + drift net.
   'vector-answer-in-parameter-1829.geo3.json': ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'AB=1', '|AD|=√7', 'DF→ = t*DC→', 'BE→ = t*BC→'],
+  // #2792 (ADR-3D-521): a size beside a fixed object off the origin, in the order that turned it red (before: «אורך AB = 4»
+  // size-on-solid, the cube at edge 1; the volume red, V = 0.38). The lanes, both orders and the kept refusals are asserted
+  // in placement-gauge.test.ts; these are the build + drift net.
+  'cube-size-beside-point-2792.geo3.json': ["קובייה ABCDA'B'C'D'", 'אורך AB = 4', 'P(1,2,3)'],
+  'pyramid-volume-beside-plane-2792.geo3.json': ['פירמידה ABCDS', 'נפח הפירמידה ABCDS = 12', 'x+y+z=1'],
   // #2834 (ADR-3D-520): the exam box fixed by the plane A'B'C'D', B and the line AB (before: the nine labels on one pixel,
   // the patch grown to a parallel line's "crossing" at t ≈ 1e12). The framing is asserted in line-perp-plane-mark.test.ts;
   // this is the build + drift net.

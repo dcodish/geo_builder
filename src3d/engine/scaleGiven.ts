@@ -22,11 +22,12 @@
  * scale given is in force (the "guard bound to the event, not the code path" discipline).
  */
 
-import { scaleFixingPins3 } from './solve3';
+import { PIN_FIXES_SCALE, scaleFixingPins3 } from './solve3';
+import { pivotFamilies3, scalarPinReadsOffFigure3 } from './evaluate';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
-import { cross3, norm3, sub3, type Vec3 } from './vec3';
-import { reachesFreeCarrier3 } from './carriers';
-import { absoluteFrameObjects3, claimPointIds, type Claim3, type Construction3, type Id } from './types';
+import { cross3, norm3, sub3, v3, type Vec3 } from './vec3';
+import { figureLanes3, reachesFreeCarrier3 } from './carriers';
+import { absoluteFrameObjects3, claimPointIds, type Claim3, type Construction3, type Id, type ScalarPin } from './types';
 
 /** The magnitude claim kinds that pin the scale, with the POWER the factor enters at. */
 export function scaleGivenPower(claim: Claim3): 1 | 2 | 3 | null {
@@ -75,10 +76,61 @@ export function isScaleGivenClaim(claim: Claim3): boolean {
  * Asked WITHOUT reference to `scaleGivens` itself so it serves both roles: at APPLY time (may a
  * new magnitude become the scale given?) and at RESOLVE/report time (is the recorded scale given
  * still in force, or did a later fact bring an absolute object that supersedes it?).
+ *
+ * #2792 (ADR-3D-521): "safe" now means the router ({@link scaleGivenLane3}) gives a rescale lane, origin or content; a
+ * figure whose ties fix or couple its size hands the given to the pivot instead ({@link handScaleGivenToPivot3}).
  */
 export function scaleGivenSafe(c: Construction3): boolean {
-  if (c.solids.length === 0) return false;
-  if (c.revolutions.length > 0 || c.circles3.length > 0) return false;
+  const lane = scaleGivenLane3(c);
+  return lane !== null && lane.lane !== 'pivot';
+}
+
+/**
+ * #2792 ([ADR-3D-521](../../docs/06b-decisions-3d.md#adr-3d-521)) — HOW THE SCALE GIVEN ACTS ON THIS FIGURE. It had one way, a
+ * uniform rescale of every position about the world origin after placement, and wherever that would detach an absolute
+ * object the given was refused `size-on-solid` — though a cube of edge 4 beside «P(1,2,3)» exists (ADR-W-199). Three ways,
+ * each exact for its family, decided here once and read by the apply-time router, the resolver and the store:
+ *  - `'origin'`  — every absolute object is a cone through the origin and no pin fixes the size (#2789's lane): the
+ *                   rescale about the origin after placement, unchanged;
+ *  - `'content'` — the figure's only ties to the absolute world are point pins on ONE point with every component stated
+ *                   (or none at all): the figure's own points are scaled about that point (or the gauge origin) BEFORE the
+ *                   placement funnel, so the absolute objects never move and the funnel clears them at the true size;
+ *  - `'pivot'`   — anything else ties or sizes the figure (two pinned points, a vector or plane pin, a membership, a
+ *                   frame relation, a size-fixing pin, a magnitude read off a fixed point): the given is a pivot pin, which
+ *                   reaches the size or proves that no figure exists, and the pin-owner guard names the statements.
+ * `null` — no solid, or a revolution or a circle (unchanged: no uniform factor is defined there).
+ */
+export type ScaleGivenLane3 = { lane: 'origin' } | { lane: 'content'; centre: Vec3 } | { lane: 'pivot' };
+export function scaleGivenLane3(c: Construction3): ScaleGivenLane3 | null {
+  if (c.solids.length === 0) return null;
+  if (c.revolutions.length > 0 || c.circles3.length > 0) return null;
+  if (scaleGivenOriginSafe3(c)) return { lane: 'origin' };
+  // the figure's ties to the absolute world, read off the ONE family list the pivot is entered by (`pivotFamilies3`)
+  for (const f of pivotFamilies3(c)) {
+    if (!f.present) continue;
+    if (f.key === 'pins' || f.key === 'scalarPins') continue; // judged below
+    return { lane: 'pivot' };
+  }
+  if (c.scalarPins.some((p) => PIN_FIXES_SCALE[p.kind] || (p.kind === 'free-joint' && p.gauge)) || scalarPinReadsOffFigure3(c)) return { lane: 'pivot' };
+  // a relation to a coordinate plane or an axis states where the figure faces or sits (`absoluteFrameObjects3`'s claim walk)
+  if (absoluteFrameObjects3(c).some((o) => o.kind === 'coord-plane')) return { lane: 'pivot' };
+  if (c.pins.length === 0) return { lane: 'content', centre: v3(0, 0, 0) };
+  const id = c.pins[0].id;
+  const at = (q: (typeof c.pins)[number]): Vec3 | null =>
+    typeof q.x === 'number' && typeof q.y === 'number' && typeof q.z === 'number' ? v3(q.x, q.y, q.z) : null;
+  const centre = at(c.pins[0]);
+  if (!centre || figureLanes3(c).get(id) !== 'figure') return { lane: 'pivot' };
+  for (const q of c.pins) {
+    const p = at(q);
+    if (q.id !== id || !p || p.x !== centre.x || p.y !== centre.y || p.z !== centre.z) return { lane: 'pivot' };
+  }
+  // a stated sign is kept by the funnel's aim, which a pinned point turns off: the pivot holds it with the size
+  if (c.signGivens.length > 0 || c.componentSigns.length > 0) return { lane: 'pivot' };
+  return { lane: 'content', centre };
+}
+
+/** #2789 (ADR-3D-457): the origin lane's own test — the rescale about the origin keeps every absolute object. */
+function scaleGivenOriginSafe3(c: Construction3): boolean {
   // #2746 (ADR-3D-453): "would a uniform rescale detach an absolute object?" is the placement funnel's own question,
   // so it is asked of the ONE predicate (an equation plane, a parametric line, a coordinate point, a coordinate-plane
   // or axis relation). This used to be a second, hand-kept list counting EVERY plane and line, and it drifted when
@@ -94,6 +146,15 @@ export function scaleGivenSafe(c: Construction3): boolean {
 }
 
 /** Is a recorded scale given in force for THIS construction? (the one predicate all seams share) */
+/**
+ * #2792 (ADR-3D-521) — does this magnitude claim read only the figure's own points? A size between a vertex and a stated
+ * point («אורך AP = 4» beside «P(1,2,3)») ties the figure to P; it is not a scale given and keeps its own lanes.
+ */
+export function scaleGivenReadsFigure3(c: Construction3, claim: Claim3): boolean {
+  const lanes = figureLanes3(c);
+  return claimPointIds(c, claim).every((id) => !c.points.has(id) || lanes.get(id) === 'figure');
+}
+
 export function scaleGivenActive(c: Construction3): boolean {
   return c.scaleGivens.length > 0 && scaleGivenSafe(c);
 }
@@ -143,5 +204,38 @@ export function scaleGivenMagnitude(claim: Claim3, c: Construction3, pos: Map<Id
       return subjectVolume(resolveSolidSubject(c, claim.noun, claim.ids), pos);
     default:
       return null;
+  }
+}
+
+/** #1447: a magnitude claim as the pivot pin that drives it (length, sum, area, volume); null for every other claim. */
+export function magnitudeScalarPin3(cl: Claim3): ScalarPin | null {
+  return cl.type === 'length-eq'
+    ? { kind: 'length', a: cl.a, b: cl.b, value: cl.value }
+    : cl.type === 'length-sum' // #1680 (ADR-3D-392): drives like `length`, by its own signed residual
+      ? { kind: 'length-sum', terms: cl.terms, value: cl.value }
+      : cl.type === 'area-eq'
+        ? { kind: 'area3', ids: cl.ids, value: cl.value }
+        : cl.type === 'volume-poly'
+          ? { kind: 'volume3', noun: cl.noun, ids: cl.ids, value: cl.value }
+          : null;
+}
+
+/**
+ * #1782 (ADR-3D-393), #2792 (ADR-3D-521) — HAND THE SCALE GIVEN TO THE PIVOT: each recorded given becomes its own pin, and
+ * the rescale lane empties, so the two mechanisms never both own the size. Its claim is already recorded; a demoted LENGTH
+ * becomes the pin's arbiter (`given: true`, the #1567 seam), judged as the given it now is — never as an answer the
+ * size-on-solid guard would refuse on a figure the pivot sized. Same slot, so its owner holds. Mutates `next` (a fresh
+ * apply result). Called where a later magnitude reaches a free carrier, and at the outermost apply when a line leaves the
+ * given on a figure whose ties now fix or couple its size ({@link scaleGivenLane3} → 'pivot').
+ */
+export function handScaleGivenToPivot3(next: Construction3): void {
+  const givens = next.scaleGivens;
+  next.scaleGivens = [];
+  for (const g of givens) {
+    const gp = magnitudeScalarPin3(g);
+    if (!gp) continue;
+    next.scalarPins.push(gp);
+    const at = next.claims.indexOf(g);
+    if (g.type === 'length-eq' && at >= 0) next.claims[at] = { ...g, given: true };
   }
 }
