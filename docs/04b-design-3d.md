@@ -176,8 +176,12 @@ every pin family that can land elsewhere records its claim: `coords-eq` for the 
 letter written for the first time names a free component (ADR-3D-175); written a second time (`coordLetterShared3`: a pin
 symbol, the figure parameter, or a named point component) it is lowered to 1·k (`coordLetterExprs3`) and the earlier
 statement's named component is promoted to the same pin symbol (`promoteNamedComponents3`). The `coords-eq` claim carries
-the symbolic components (`sym`), read at `pinLettersAt3`: the pivot's `pinSymbols`, or, where the pivot does not run, a
-least-squares read of the letters off the placed points over every point pin (`readPinLetters3`, `evaluate.ts`).
+the symbolic components (`sym`), read at `lettersAt3` — the ONE letter reader ([ADR-3D-472](06b-decisions-3d.md#adr-3d-472) Am. 1): the pivot's
+`pinSymbols`, or, where the pivot does not run, a least-squares read of the letters off the placed points over every
+point pin (`readPinLetters3`, `evaluate.ts`); then every remaining vector-coefficient letter, read jointly over every lettered `vec-eq` (`vecEqSystem3`,
+`solveNormal3`) with the coordinate letters as numbers. A letter a coordinate and a vector relation both carry is one
+pin symbol: `coordLetterShared3` counts a `vec-letter` owner, the vector relation's lowering promotes a named point
+component (`promoteNamedComponents3`), and the `vec-eq` pin reads it at the pivot's `symAt`.
 A NEW point written with letters (#2563, [ADR-3D-489](06b-decisions-3d.md#adr-3d-489)) is a `sym-coord` point unless it is
 ADR-3D-032's one-letter coord-sym: components over the same pool, absolute, own DOF 0, placed from the pivot's pin symbols
 (the override `solvePivot`/`resolve3` thread to `evaluateSolidsAndPoints`) or, where the pivot does not run, from
@@ -1561,6 +1565,21 @@ flat-polygon arm, in the mixed run when a known corner is itself free, and in `q
 ring with exactly ONE placeholder corner first yields it to ARM 2 (the family's own corner: closed form for the
 parallelogram family and the kite, a plane rider otherwise), keeping the point's original slot in the order
 (`keepPointSlot3`) so its dependents still follow it.
+
+### Letters in a vector equation over placed points (#1551, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472))
+
+A `vec-eq` given may carry lettered coefficients (`VecTerm.letter`: coefficient = `coeff + p·sym`). Its letters are
+never pivot unknowns. At any drawing the equation is `R = Σₛ s·Dₛ` with numbers R and Dₛ, so `vecEqLetters3`
+(`vecExpr.ts`) solves the letters by linear least squares and returns the residual no letter can absorb. That residual
+is the pin's three rows in the pivot (the free shape moves until the relation can hold; scale-covariant like the
+numeric `vec-eq`, so the `invariantOnly` lane and the rank probe need no change, and the probe charges the box only
+for the residual's rank), the drive's measure. The verifier, the panel's `vec-letter` owner and the claims' number reader read the letters
+through `lettersAt3` (ADR-3D-472 Am. 1): jointly over every lettered equation, so one letter has one value in every
+relation that writes it; the `vec-eq` claim is judged at those values (the span residual for a letter the drawing
+leaves open). A value given to a letter («a = 1/2») substitutes; dependent letter
+directions leave the letters undetermined (`a = ?`). A definition with several letters (`vecDefs[].symbols`, each term
+naming its letter in `SymTerm.sym`) samples each letter as a one-letter ratio is sampled, and `vecDefLetterAt3` reads
+the letters back through the same least squares.
 
 ### Claims
 
