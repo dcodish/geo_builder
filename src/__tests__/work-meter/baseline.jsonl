@@ -13,7 +13,7 @@
 {"k":"2022-summer-a-issue59.geo.json|submit#7","total":2371,"page":0,"prePaint":2371}
 {"k":"2022-summer-a-issue59.geo.json|submit#8","total":23585,"page":0,"prePaint":23585}
 {"k":"2022-summer-a-issue59.geo.json|submit#9","total":284609,"page":0,"prePaint":284609}
-{"k":"2022-summer-a-issue59.geo.json|toggle","total":43,"page":0,"prePaint":43}
+{"k":"2022-summer-a-issue59.geo.json|toggle","total":40,"page":0,"prePaint":40}
 {"k":"2022-summer-a-issue59.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"arc-endpoints-2037.geo.json|another#1","total":16416,"page":0,"prePaint":16416}
 {"k":"arc-endpoints-2037.geo.json|detect","total":16427,"page":0,"prePaint":0}
@@ -81,7 +81,7 @@
 {"k":"chord-tangent-other-circle-2197.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"chord-tangent-other-circle-2197.geo.json|submit#2","total":1,"page":0,"prePaint":1}
 {"k":"chord-tangent-other-circle-2197.geo.json|submit#3","total":7345,"page":0,"prePaint":7345}
-{"k":"chord-tangent-other-circle-2197.geo.json|toggle","total":15,"page":0,"prePaint":15}
+{"k":"chord-tangent-other-circle-2197.geo.json|toggle","total":14,"page":0,"prePaint":14}
 {"k":"chord-tangent-other-circle-2197.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"circle-radius-point-2489.geo.json|another#1","total":47988,"page":0,"prePaint":47988}
 {"k":"circle-radius-point-2489.geo.json|delete","total":2,"page":0,"prePaint":2}
@@ -243,14 +243,14 @@
 {"k":"diameter-and-chord-2215.geo.json|toggle","total":1,"page":0,"prePaint":1}
 {"k":"diameter-and-chord-2215.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"diameter-tangent-other-circle-2197.geo.json|another#1","total":9175,"page":0,"prePaint":9175}
-{"k":"diameter-tangent-other-circle-2197.geo.json|delete","total":15,"page":0,"prePaint":15}
+{"k":"diameter-tangent-other-circle-2197.geo.json|delete","total":14,"page":0,"prePaint":14}
 {"k":"diameter-tangent-other-circle-2197.geo.json|detect","total":175700,"page":0,"prePaint":0}
 {"k":"diameter-tangent-other-circle-2197.geo.json|edit","total":44358,"page":0,"prePaint":44358}
 {"k":"diameter-tangent-other-circle-2197.geo.json|load","total":44362,"page":0,"prePaint":44362}
 {"k":"diameter-tangent-other-circle-2197.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"diameter-tangent-other-circle-2197.geo.json|submit#2","total":1,"page":0,"prePaint":1}
 {"k":"diameter-tangent-other-circle-2197.geo.json|submit#3","total":44361,"page":0,"prePaint":44361}
-{"k":"diameter-tangent-other-circle-2197.geo.json|toggle","total":15,"page":0,"prePaint":15}
+{"k":"diameter-tangent-other-circle-2197.geo.json|toggle","total":14,"page":0,"prePaint":14}
 {"k":"diameter-tangent-other-circle-2197.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"divides-bisector-foot-2591.geo.json|another#1","total":2107,"page":0,"prePaint":2107}
 {"k":"divides-bisector-foot-2591.geo.json|delete","total":9,"page":0,"prePaint":9}
@@ -318,16 +318,16 @@
 {"k":"equilateral-around-circle-incircle-2538.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"equilateral-around-circle-incircle-2538.geo.json|submit#2","total":36948,"page":0,"prePaint":36948}
 {"k":"equilateral-around-circle-incircle-2538.geo.json|submit#3","total":258709,"page":0,"prePaint":258709}
-{"k":"equilateral-around-circle-incircle-2538.geo.json|toggle","total":11,"page":0,"prePaint":11}
+{"k":"equilateral-around-circle-incircle-2538.geo.json|toggle","total":9,"page":0,"prePaint":9}
 {"k":"equilateral-around-circle-incircle-2538.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"equilateral-inscribed.geo.json|another#1","total":122422,"page":0,"prePaint":122422}
-{"k":"equilateral-inscribed.geo.json|delete","total":5,"page":0,"prePaint":5}
+{"k":"equilateral-inscribed.geo.json|delete","total":3,"page":0,"prePaint":3}
 {"k":"equilateral-inscribed.geo.json|detect","total":121456,"page":0,"prePaint":0}
 {"k":"equilateral-inscribed.geo.json|edit","total":4713,"page":0,"prePaint":4713}
 {"k":"equilateral-inscribed.geo.json|load","total":4716,"page":0,"prePaint":4716}
 {"k":"equilateral-inscribed.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"equilateral-inscribed.geo.json|submit#2","total":4715,"page":0,"prePaint":4715}
-{"k":"equilateral-inscribed.geo.json|toggle","total":5,"page":0,"prePaint":5}
+{"k":"equilateral-inscribed.geo.json|toggle","total":3,"page":0,"prePaint":3}
 {"k":"equilateral-inscribed.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"held-row-2790.geo.json|another#1","total":1977,"page":0,"prePaint":1977}
 {"k":"held-row-2790.geo.json|delete","total":63714,"page":0,"prePaint":63714}
@@ -345,8 +345,8 @@
 {"k":"hexagon-regular-by-angles-2797.geo.json|another#1","total":1597583,"page":0,"prePaint":1597583}
 {"k":"hexagon-regular-by-angles-2797.geo.json|delete","total":1741140,"page":0,"prePaint":1741140}
 {"k":"hexagon-regular-by-angles-2797.geo.json|detect","total":1484130,"page":0,"prePaint":0}
-{"k":"hexagon-regular-by-angles-2797.geo.json|edit","total":2759978,"page":0,"prePaint":2759978}
-{"k":"hexagon-regular-by-angles-2797.geo.json|load","total":2620408,"page":0,"prePaint":2620408}
+{"k":"hexagon-regular-by-angles-2797.geo.json|edit","total":1859885,"page":0,"prePaint":1859885}
+{"k":"hexagon-regular-by-angles-2797.geo.json|load","total":1720315,"page":0,"prePaint":1720315}
 {"k":"hexagon-regular-by-angles-2797.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"hexagon-regular-by-angles-2797.geo.json|submit#10","total":2416885,"page":0,"prePaint":2416885}
 {"k":"hexagon-regular-by-angles-2797.geo.json|submit#2","total":2150,"page":0,"prePaint":2150}
@@ -357,7 +357,7 @@
 {"k":"hexagon-regular-by-angles-2797.geo.json|submit#7","total":325182,"page":0,"prePaint":325182}
 {"k":"hexagon-regular-by-angles-2797.geo.json|submit#8","total":159555,"page":0,"prePaint":159555}
 {"k":"hexagon-regular-by-angles-2797.geo.json|submit#9","total":162875,"page":0,"prePaint":162875}
-{"k":"hexagon-regular-by-angles-2797.geo.json|toggle","total":1741140,"page":0,"prePaint":1741140}
+{"k":"hexagon-regular-by-angles-2797.geo.json|toggle","total":1271344,"page":0,"prePaint":1271344}
 {"k":"hexagon-regular-by-angles-2797.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"indefinite-second-triangle-2127.geo.json|another#1","total":6544,"page":0,"prePaint":6544}
 {"k":"indefinite-second-triangle-2127.geo.json|delete","total":7,"page":0,"prePaint":7}
@@ -432,7 +432,7 @@
 {"k":"issue-1443-trapezoid-height.geo.json|load","total":684,"page":0,"prePaint":684}
 {"k":"issue-1443-trapezoid-height.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-1443-trapezoid-height.geo.json|submit#2","total":683,"page":0,"prePaint":683}
-{"k":"issue-1443-trapezoid-height.geo.json|toggle","total":4,"page":0,"prePaint":4}
+{"k":"issue-1443-trapezoid-height.geo.json|toggle","total":3,"page":0,"prePaint":3}
 {"k":"issue-1443-trapezoid-height.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-1445-triangle-angle-by-vertex.geo.json|another#1","total":4555,"page":0,"prePaint":4555}
 {"k":"issue-1445-triangle-angle-by-vertex.geo.json|delete","total":24543,"page":0,"prePaint":24543}
@@ -469,7 +469,7 @@
 {"k":"issue-1604-saved-reload.geo.json|submit#7","total":20573,"page":0,"prePaint":20573}
 {"k":"issue-1604-saved-reload.geo.json|submit#8","total":47890,"page":0,"prePaint":47890}
 {"k":"issue-1604-saved-reload.geo.json|submit#9","total":8070,"page":0,"prePaint":8070}
-{"k":"issue-1604-saved-reload.geo.json|toggle","total":134771,"page":0,"prePaint":134771}
+{"k":"issue-1604-saved-reload.geo.json|toggle","total":94852,"page":0,"prePaint":94852}
 {"k":"issue-1604-saved-reload.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-1607-diagonal-length.geo.json|another#1","total":2116,"page":0,"prePaint":2116}
 {"k":"issue-1607-diagonal-length.geo.json|delete","total":2770,"page":0,"prePaint":2770}
@@ -561,7 +561,7 @@
 {"k":"issue-1694-eew5ezi5-exact.geo.json|submit#3","total":3686,"page":0,"prePaint":3686}
 {"k":"issue-1694-eew5ezi5-exact.geo.json|submit#4","total":23068,"page":0,"prePaint":23068}
 {"k":"issue-1694-eew5ezi5-exact.geo.json|submit#5","total":3175,"page":0,"prePaint":3175}
-{"k":"issue-1694-eew5ezi5-exact.geo.json|toggle","total":6,"page":0,"prePaint":6}
+{"k":"issue-1694-eew5ezi5-exact.geo.json|toggle","total":4,"page":0,"prePaint":4}
 {"k":"issue-1694-eew5ezi5-exact.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-1697-naming-by-use-is-a-fact.geo.json|another#1","total":1,"page":0,"prePaint":1}
 {"k":"issue-1697-naming-by-use-is-a-fact.geo.json|delete","total":2,"page":0,"prePaint":2}
@@ -581,9 +581,9 @@
 {"k":"issue-172-sector-area-and-arc-length.geo.json|submit#1","total":8,"page":0,"prePaint":8}
 {"k":"issue-172-sector-area-and-arc-length.geo.json|submit#2","total":787,"page":0,"prePaint":787}
 {"k":"issue-172-sector-area-and-arc-length.geo.json|submit#3","total":11365,"page":0,"prePaint":11365}
-{"k":"issue-172-sector-area-and-arc-length.geo.json|toggle","total":5,"page":0,"prePaint":5}
+{"k":"issue-172-sector-area-and-arc-length.geo.json|toggle","total":3,"page":0,"prePaint":3}
 {"k":"issue-172-sector-area-and-arc-length.geo.json|undo","total":0,"page":0,"prePaint":0}
-{"k":"issue-1771-semicircle-three-vertices.geo.json|another#1","total":3783619,"page":0,"prePaint":3783619}
+{"k":"issue-1771-semicircle-three-vertices.geo.json|another#1","total":3171253,"page":0,"prePaint":3171253}
 {"k":"issue-1771-semicircle-three-vertices.geo.json|delete","total":63880,"page":0,"prePaint":63880}
 {"k":"issue-1771-semicircle-three-vertices.geo.json|detect","total":2703429,"page":0,"prePaint":0}
 {"k":"issue-1771-semicircle-three-vertices.geo.json|edit","total":131282,"page":0,"prePaint":131282}
@@ -607,7 +607,7 @@
 {"k":"issue-1851-angle-symbol-constant.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-1851-angle-symbol-constant.geo.json|submit#2","total":2,"page":0,"prePaint":2}
 {"k":"issue-1851-angle-symbol-constant.geo.json|submit#3","total":3588,"page":0,"prePaint":3588}
-{"k":"issue-1851-angle-symbol-constant.geo.json|toggle","total":3,"page":0,"prePaint":3}
+{"k":"issue-1851-angle-symbol-constant.geo.json|toggle","total":2,"page":0,"prePaint":2}
 {"k":"issue-1851-angle-symbol-constant.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-1891-hexagon-in-circle.geo.json|another#1","total":1,"page":0,"prePaint":1}
 {"k":"issue-1891-hexagon-in-circle.geo.json|detect","total":16,"page":0,"prePaint":0}
@@ -659,7 +659,7 @@
 {"k":"issue-1913-parallelogram-on-circle-sides.geo.json|submit#3","total":706,"page":0,"prePaint":706}
 {"k":"issue-1913-parallelogram-on-circle-sides.geo.json|submit#4","total":12174,"page":0,"prePaint":12174}
 {"k":"issue-1913-parallelogram-on-circle-sides.geo.json|submit#5","total":222252,"page":0,"prePaint":222252}
-{"k":"issue-1913-parallelogram-on-circle-sides.geo.json|toggle","total":5,"page":0,"prePaint":5}
+{"k":"issue-1913-parallelogram-on-circle-sides.geo.json|toggle","total":3,"page":0,"prePaint":3}
 {"k":"issue-1913-parallelogram-on-circle-sides.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-1914-inscribed-then-parallelogram.geo.json|another#1","total":2334,"page":0,"prePaint":2334}
 {"k":"issue-1914-inscribed-then-parallelogram.geo.json|delete","total":2,"page":0,"prePaint":2}
@@ -747,7 +747,7 @@
 {"k":"issue-1965-height-ignores-foreign-parallel.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-1965-height-ignores-foreign-parallel.geo.json|submit#2","total":2043,"page":0,"prePaint":2043}
 {"k":"issue-1965-height-ignores-foreign-parallel.geo.json|submit#3","total":4049,"page":0,"prePaint":4049}
-{"k":"issue-1965-height-ignores-foreign-parallel.geo.json|toggle","total":6814,"page":0,"prePaint":6814}
+{"k":"issue-1965-height-ignores-foreign-parallel.geo.json|toggle","total":4524,"page":0,"prePaint":4524}
 {"k":"issue-1965-height-ignores-foreign-parallel.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-1966-placed-foot-trapezoid.geo.json|another#1","total":5407,"page":0,"prePaint":5407}
 {"k":"issue-1966-placed-foot-trapezoid.geo.json|delete","total":372513,"page":0,"prePaint":372513}
@@ -757,7 +757,7 @@
 {"k":"issue-1966-placed-foot-trapezoid.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-1966-placed-foot-trapezoid.geo.json|submit#2","total":4,"page":0,"prePaint":4}
 {"k":"issue-1966-placed-foot-trapezoid.geo.json|submit#3","total":1063,"page":0,"prePaint":1063}
-{"k":"issue-1966-placed-foot-trapezoid.geo.json|toggle","total":372513,"page":0,"prePaint":372513}
+{"k":"issue-1966-placed-foot-trapezoid.geo.json|toggle","total":2979,"page":0,"prePaint":2979}
 {"k":"issue-1966-placed-foot-trapezoid.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-1972-cyclic-triangle-reveals-its-circle.geo.json|another#1","total":1,"page":0,"prePaint":1}
 {"k":"issue-1972-cyclic-triangle-reveals-its-circle.geo.json|delete","total":6,"page":0,"prePaint":6}
@@ -881,7 +881,7 @@
 {"k":"issue-2024-symbol-endpoint-length.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-2024-symbol-endpoint-length.geo.json|submit#2","total":2,"page":0,"prePaint":2}
 {"k":"issue-2024-symbol-endpoint-length.geo.json|submit#3","total":2553,"page":0,"prePaint":2553}
-{"k":"issue-2024-symbol-endpoint-length.geo.json|toggle","total":3,"page":0,"prePaint":3}
+{"k":"issue-2024-symbol-endpoint-length.geo.json|toggle","total":2,"page":0,"prePaint":2}
 {"k":"issue-2024-symbol-endpoint-length.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2027-similarity-ratio.geo.json|another#1","total":4893,"page":0,"prePaint":4893}
 {"k":"issue-2027-similarity-ratio.geo.json|delete","total":18,"page":0,"prePaint":18}
@@ -900,7 +900,7 @@
 {"k":"issue-2032-bare-arc-length.geo.json|load","total":791,"page":0,"prePaint":791}
 {"k":"issue-2032-bare-arc-length.geo.json|submit#1","total":8,"page":0,"prePaint":8}
 {"k":"issue-2032-bare-arc-length.geo.json|submit#2","total":784,"page":0,"prePaint":784}
-{"k":"issue-2032-bare-arc-length.geo.json|toggle","total":3,"page":0,"prePaint":3}
+{"k":"issue-2032-bare-arc-length.geo.json|toggle","total":2,"page":0,"prePaint":2}
 {"k":"issue-2032-bare-arc-length.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2040-smaller-by-factor-area.geo.json|another#1","total":1922,"page":0,"prePaint":1922}
 {"k":"issue-2040-smaller-by-factor-area.geo.json|delete","total":10,"page":0,"prePaint":10}
@@ -919,7 +919,7 @@
 {"k":"issue-2040-smaller-by-factor-length.geo.json|load","total":2046,"page":0,"prePaint":2046}
 {"k":"issue-2040-smaller-by-factor-length.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-2040-smaller-by-factor-length.geo.json|submit#2","total":2063,"page":0,"prePaint":2063}
-{"k":"issue-2040-smaller-by-factor-length.geo.json|toggle","total":3,"page":0,"prePaint":3}
+{"k":"issue-2040-smaller-by-factor-length.geo.json|toggle","total":2,"page":0,"prePaint":2}
 {"k":"issue-2040-smaller-by-factor-length.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2040-three-quarters-area.geo.json|another#1","total":1861,"page":0,"prePaint":1861}
 {"k":"issue-2040-three-quarters-area.geo.json|delete","total":10,"page":0,"prePaint":10}
@@ -967,7 +967,7 @@
 {"k":"issue-2089-rider-foot-quad.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-2089-rider-foot-quad.geo.json|submit#2","total":4,"page":0,"prePaint":4}
 {"k":"issue-2089-rider-foot-quad.geo.json|submit#3","total":6004,"page":0,"prePaint":6004}
-{"k":"issue-2089-rider-foot-quad.geo.json|toggle","total":372513,"page":0,"prePaint":372513}
+{"k":"issue-2089-rider-foot-quad.geo.json|toggle","total":2979,"page":0,"prePaint":2979}
 {"k":"issue-2089-rider-foot-quad.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2089-rider-perp-quad.geo.json|another#1","total":29682,"page":0,"prePaint":29682}
 {"k":"issue-2089-rider-perp-quad.geo.json|delete","total":2621,"page":0,"prePaint":2621}
@@ -987,7 +987,7 @@
 {"k":"issue-2090-midsegment-ignores-foreign-parallel.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-2090-midsegment-ignores-foreign-parallel.geo.json|submit#2","total":26130,"page":0,"prePaint":26130}
 {"k":"issue-2090-midsegment-ignores-foreign-parallel.geo.json|submit#3","total":30785,"page":0,"prePaint":30785}
-{"k":"issue-2090-midsegment-ignores-foreign-parallel.geo.json|toggle","total":11316,"page":0,"prePaint":11316}
+{"k":"issue-2090-midsegment-ignores-foreign-parallel.geo.json|toggle","total":6736,"page":0,"prePaint":6736}
 {"k":"issue-2090-midsegment-ignores-foreign-parallel.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2097-abs-length.geo.json|another#1","total":2669,"page":0,"prePaint":2669}
 {"k":"issue-2097-abs-length.geo.json|delete","total":2989,"page":0,"prePaint":2989}
@@ -1036,7 +1036,7 @@
 {"k":"issue-2111-reserved-r-valued.geo.json|submit#2","total":2,"page":0,"prePaint":2}
 {"k":"issue-2111-reserved-r-valued.geo.json|submit#3","total":1557,"page":0,"prePaint":1557}
 {"k":"issue-2111-reserved-r-valued.geo.json|submit#4","total":698,"page":0,"prePaint":698}
-{"k":"issue-2111-reserved-r-valued.geo.json|toggle","total":3,"page":0,"prePaint":3}
+{"k":"issue-2111-reserved-r-valued.geo.json|toggle","total":2,"page":0,"prePaint":2}
 {"k":"issue-2111-reserved-r-valued.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2114-cycled-configuration.geo.json|another#1","total":22516,"page":0,"prePaint":22516}
 {"k":"issue-2114-cycled-configuration.geo.json|delete","total":5,"page":0,"prePaint":5}
@@ -1057,7 +1057,7 @@
 {"k":"issue-2165-letter-equation.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-2165-letter-equation.geo.json|submit#2","total":2,"page":0,"prePaint":2}
 {"k":"issue-2165-letter-equation.geo.json|submit#3","total":22892,"page":0,"prePaint":22892}
-{"k":"issue-2165-letter-equation.geo.json|toggle","total":3,"page":0,"prePaint":3}
+{"k":"issue-2165-letter-equation.geo.json|toggle","total":2,"page":0,"prePaint":2}
 {"k":"issue-2165-letter-equation.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2172-chord-arc-labels.geo.json|another#1","total":197904,"page":0,"prePaint":197904}
 {"k":"issue-2172-chord-arc-labels.geo.json|delete","total":5,"page":0,"prePaint":5}
@@ -1069,7 +1069,7 @@
 {"k":"issue-2172-chord-arc-labels.geo.json|submit#3","total":1,"page":0,"prePaint":1}
 {"k":"issue-2172-chord-arc-labels.geo.json|submit#4","total":702,"page":0,"prePaint":702}
 {"k":"issue-2172-chord-arc-labels.geo.json|submit#5","total":45502,"page":0,"prePaint":45502}
-{"k":"issue-2172-chord-arc-labels.geo.json|toggle","total":5,"page":0,"prePaint":5}
+{"k":"issue-2172-chord-arc-labels.geo.json|toggle","total":3,"page":0,"prePaint":3}
 {"k":"issue-2172-chord-arc-labels.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2175-long-angle-label-thin-angle.geo.json|another#1","total":1,"page":0,"prePaint":1}
 {"k":"issue-2175-long-angle-label-thin-angle.geo.json|delete","total":4,"page":0,"prePaint":4}
@@ -1089,7 +1089,7 @@
 {"k":"issue-2405-all-common-tangents-apart.geo.json|load","total":458885,"page":0,"prePaint":458885}
 {"k":"issue-2405-all-common-tangents-apart.geo.json|submit#1","total":6,"page":0,"prePaint":6}
 {"k":"issue-2405-all-common-tangents-apart.geo.json|submit#2","total":755427,"page":0,"prePaint":755427}
-{"k":"issue-2405-all-common-tangents-apart.geo.json|toggle","total":272,"page":0,"prePaint":272}
+{"k":"issue-2405-all-common-tangents-apart.geo.json|toggle","total":144,"page":0,"prePaint":144}
 {"k":"issue-2405-all-common-tangents-apart.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"issue-2405-all-common-tangents-ext-touch.geo.json|another#1","total":246526,"page":0,"prePaint":246526}
 {"k":"issue-2405-all-common-tangents-ext-touch.geo.json|delete","total":28,"page":0,"prePaint":28}
@@ -1278,8 +1278,8 @@
 {"k":"issue-572-load-collapse.geo.json|another#1","total":129661,"page":0,"prePaint":129661}
 {"k":"issue-572-load-collapse.geo.json|delete","total":4719,"page":0,"prePaint":4719}
 {"k":"issue-572-load-collapse.geo.json|detect","total":1488478,"page":0,"prePaint":0}
-{"k":"issue-572-load-collapse.geo.json|edit","total":557337,"page":0,"prePaint":557337}
-{"k":"issue-572-load-collapse.geo.json|load","total":3006003,"page":0,"prePaint":3006003}
+{"k":"issue-572-load-collapse.geo.json|edit","total":43329,"page":0,"prePaint":43329}
+{"k":"issue-572-load-collapse.geo.json|load","total":1475634,"page":0,"prePaint":1475634}
 {"k":"issue-572-load-collapse.geo.json|submit#1","total":3,"page":0,"prePaint":3}
 {"k":"issue-572-load-collapse.geo.json|submit#2","total":1,"page":0,"prePaint":1}
 {"k":"issue-572-load-collapse.geo.json|submit#3","total":20,"page":0,"prePaint":20}
@@ -1378,7 +1378,7 @@
 {"k":"parallel-chords.geo.json|load","total":552,"page":0,"prePaint":552}
 {"k":"parallel-chords.geo.json|submit#1","total":5,"page":0,"prePaint":5}
 {"k":"parallel-chords.geo.json|submit#2","total":549,"page":0,"prePaint":549}
-{"k":"parallel-chords.geo.json|toggle","total":3,"page":0,"prePaint":3}
+{"k":"parallel-chords.geo.json|toggle","total":2,"page":0,"prePaint":2}
 {"k":"parallel-chords.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"pentagon-closing-side-2797.geo.json|another#1","total":18152,"page":0,"prePaint":18152}
 {"k":"pentagon-closing-side-2797.geo.json|delete","total":1431726,"page":0,"prePaint":1431726}
@@ -1393,7 +1393,7 @@
 {"k":"pentagon-closing-side-2797.geo.json|submit#6","total":267766,"page":0,"prePaint":267766}
 {"k":"pentagon-closing-side-2797.geo.json|submit#7","total":105469,"page":0,"prePaint":105469}
 {"k":"pentagon-closing-side-2797.geo.json|submit#8","total":143366,"page":0,"prePaint":143366}
-{"k":"pentagon-closing-side-2797.geo.json|toggle","total":1431726,"page":0,"prePaint":1431726}
+{"k":"pentagon-closing-side-2797.geo.json|toggle","total":976520,"page":0,"prePaint":976520}
 {"k":"pentagon-closing-side-2797.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"pentagon-closing-side-order3-2797.geo.json|another#1","total":18215,"page":0,"prePaint":18215}
 {"k":"pentagon-closing-side-order3-2797.geo.json|delete","total":238963,"page":0,"prePaint":238963}
@@ -1435,10 +1435,10 @@
 {"k":"perpendicular-to-two-2219.geo.json|submit#3","total":1,"page":0,"prePaint":1}
 {"k":"perpendicular-to-two-2219.geo.json|submit#4","total":1,"page":0,"prePaint":1}
 {"k":"perpendicular-to-two-2219.geo.json|submit#5","total":27818,"page":0,"prePaint":27818}
-{"k":"perpendicular-to-two-2219.geo.json|toggle","total":25351,"page":0,"prePaint":25351}
+{"k":"perpendicular-to-two-2219.geo.json|toggle","total":21165,"page":0,"prePaint":21165}
 {"k":"perpendicular-to-two-2219.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"perpendicular-to-two-he-2219.geo.json|another#1","total":1926,"page":0,"prePaint":1926}
-{"k":"perpendicular-to-two-he-2219.geo.json|delete","total":25351,"page":0,"prePaint":25351}
+{"k":"perpendicular-to-two-he-2219.geo.json|delete","total":21165,"page":0,"prePaint":21165}
 {"k":"perpendicular-to-two-he-2219.geo.json|detect","total":275534,"page":0,"prePaint":0}
 {"k":"perpendicular-to-two-he-2219.geo.json|edit","total":49868,"page":0,"prePaint":49868}
 {"k":"perpendicular-to-two-he-2219.geo.json|load","total":23973,"page":0,"prePaint":23973}
@@ -1447,7 +1447,7 @@
 {"k":"perpendicular-to-two-he-2219.geo.json|submit#3","total":1,"page":0,"prePaint":1}
 {"k":"perpendicular-to-two-he-2219.geo.json|submit#4","total":1,"page":0,"prePaint":1}
 {"k":"perpendicular-to-two-he-2219.geo.json|submit#5","total":27818,"page":0,"prePaint":27818}
-{"k":"perpendicular-to-two-he-2219.geo.json|toggle","total":25351,"page":0,"prePaint":25351}
+{"k":"perpendicular-to-two-he-2219.geo.json|toggle","total":21165,"page":0,"prePaint":21165}
 {"k":"perpendicular-to-two-he-2219.geo.json|undo","total":0,"page":0,"prePaint":0}
 {"k":"point-on-two-circles-2185.geo.json|another#1","total":1,"page":0,"prePaint":1}
 {"k":"point-on-two-circles-2185.geo.json|delete","total":2,"page":0,"prePaint":2}

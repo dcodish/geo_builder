@@ -1892,6 +1892,23 @@ at once (docs/LADDER.md stage 2e⁰). Since [ADR-835](06-decisions.md#adr-835) t
 each stated length out in turn and reads, exactly, what the others force on its segment (or two lengths against the
 triangle inequality), and the error bank carries it as `lengths-value` / `lengths-triangle` in the over-constrained frame.
 
+**A point is keyed by its bits, a refusal the ladder reached is served, and the proof comes before the solve
+([ADR-836](06-decisions.md#adr-836), #2912).** Three changes of mechanism, each speed-only. (1) `servingRepeats` keys a
+point with `exactPointMap` (`engine/solveBudget.ts`): a hash of every coordinate's 64 bits and an exact compare on a hit
+(`Object.is`, so −0 is another point; a NaN point is never looked up), the same hits and misses as the old text key,
+without building a string per evaluation. (2) `runFailureLadder` (`engine/step.ts`) keeps the refusals it reached by
+the exact content of its inputs (both constructions, the prior positions, the primary evaluation, the stage prefix,
+the solver's tolerance scale; every number by its bits), and serves one to a later call on content-equal NEW objects —
+another fold reaching the same failing step, as the submit gate's choice rescue does after the prefold — charged
+exactly as climbed (`serveRun`): `work.done`, `work.executed`, the ledger frame's `own`, and now the memo entries the
+climb touched, linked into the serving frame and marked charged in its epoch (`ChargedRun.deps`), so a fold whose
+climb was served is charged later as one whose climb ran. A call handed any of the very objects the recorded climb
+was handed climbs: the identity memos inside answer it for less, and the recorded charge would be wrong. Only a whole
+climb (no limit crossed) is kept, never past an armed limit; the newest 32 are held. (3) The metric closure's proven
+refusal (stage 2e⁰) is asked BEFORE the primary solve in the main, M1 and coupled paths (`provenRefusal`), when it has
+its own reading (`explainLengthConflict`) and the step is not a composition with a mirror: the primary would fail and
+the ladder's first act is the same proof and the same sentence. The rider re-reads after a main refusal still run.
+
 **A view that fails at every seed is tried at one ([ADR-834](06-decisions.md#adr-834), #2894).** A seed enters a replay
 only in its tail (the sample and one evaluate); the fold is the fact list's alone. So a view whose fold failed (its build
 error, a row it filed as failed) or whose construction has nothing to sample fails at every seed, and the configuration

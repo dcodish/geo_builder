@@ -591,6 +591,23 @@
         "A = (3, -4, 0)"
       ],
       "lookFor": "Every line builds; «A = (3, -4, 0)» is accepted as its own row."
+    },
+    {
+      "sheet": "fix-2912-2d-waits",
+      "id": "T5",
+      "kind": "2d:assertion",
+      "queued": "2026-11-16",
+      "product": "2d",
+      "base": "http://localhost:5206",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "מעגל O",
+        "AB משיק למעגל בנקודה D",
+        "BC משיק למעגל בנקודה E",
+        "CA משיק למעגל בנקודה F"
+      ],
+      "lookFor": "אותו סירוב כמו ב-main: «… הסיבה: A, C, F על ישר אחד…» (נמדד: 4.6 ש׳ בענף, 5.8 ש׳ ב-main). הסירוב עצמו שגוי ונשאר ל-#2104"
     }
   ],
   "results": [

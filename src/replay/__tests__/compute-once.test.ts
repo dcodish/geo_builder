@@ -18,7 +18,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearReplayCaches, foldStats, getFoldFor, replay, replayMemoConfig, replayMemoSizes, sharedSamples, type Derived, type Fact } from '@/replay/core';
-import { computeWithCell, countWork, measuredRun, repeatConfig, servedRuns, serveRun, servingRepeats, solveBudget, withLadderSpent, withWorkBudget, withWorkEpoch, work } from '@/engine/solveBudget';
+import { computeWithCell, countWork, exactKey, exactPointMap, measuredRun, repeatConfig, servedRuns, serveRun, servingRepeats, solveBudget, withLadderSpent, withWorkBudget, withWorkEpoch, work } from '@/engine/solveBudget';
+import { applyStep, ladderMemoConfig, ladderMemoStats } from '@/engine/step';
 import { drivenSolveStats, evaluate, nelderMead, servedNelderMead } from '@/engine/evaluate';
 import { applyCommand, emptyConstruction, reflectableFreePoints, withReflectMask, type AnyCommand, type Command } from '@/engine';
 import { inWorkerLane } from '../../../shell/workMeter';
@@ -592,5 +593,88 @@ describe('#2894 — a repeated whole run is served and charged as run', () => {
     expect(drivenSolveStats.servedRetries - r1, 'serving off: the retry ran').toBe(0);
     expect(served.r).toBe(run.r);
     expect(served.done).toBe(run.done);
+  });
+});
+
+describe('#2912 — the exact point table keys a point as its text did, without building the text', () => {
+  it('hits exactly where the shortest-round-trip text key hits: −0 apart from 0, length part of the point', () => {
+    const table = exactPointMap<number>();
+    const text = new Map<string, number>();
+    let s = 12345;
+    const rnd = () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
+    const pool = [0, -0, 1, 0.1 + 0.2, 0.3, 1e-300, -1e-300, 5e-324, Number.MAX_VALUE, Infinity, -Infinity, 2, 2 + 2 ** -51];
+    let hits = 0;
+    for (let i = 0; i < 20000; i++) {
+      const n = 1 + Math.floor(rnd() * 4);
+      const x = Array.from({ length: n }, () => (rnd() < 0.6 ? pool[Math.floor(rnd() * pool.length)] : Math.round(rnd() * 8) / 4));
+      const k = exactKey(x)!;
+      expect(table.get(x) !== undefined, `point [${k}]`).toBe(text.has(k));
+      if (text.has(k)) hits++;
+      table.set(x, i);
+      text.set(k, i);
+      expect(table.get(x)).toBe(i);
+    }
+    expect(hits, 'the walk revisits points').toBeGreaterThan(1000);
+  });
+  it('keeps its own copy of the point: a caller that later changes its array does not change the entry', () => {
+    const table = exactPointMap<string>();
+    const x = [1, 2];
+    table.set(x, 'a');
+    x[0] = 3;
+    expect(table.get([1, 2])).toBe('a');
+    expect(table.get([3, 2])).toBeUndefined();
+  });
+});
+
+describe('#2912 — a failure ladder already climbed to a refusal is served, and charged as climbed', () => {
+  // «ריבוע ABCD» · «G על AD» · «∠GBA = 120°»: G rides AD, so ∠GBA is at most 45°; no stage-0 prover reads it, the ladder climbs
+  const prefix: AnyCommand[] = [
+    { type: 'square', ids: ['A', 'B', 'C', 'D'] } as AnyCommand,
+    { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' } as AnyCommand,
+  ];
+  const refused = { type: 'set-angle', vertex: 'B', ray1: 'G', ray2: 'A', value: 120 } as unknown as Command;
+  const build = () => prefix.reduce((c, cmd) => applyCommand(c, cmd as Command), emptyConstruction());
+  const climb = () => {
+    const d0 = work.done;
+    const e0 = work.executed;
+    const s0 = ladderMemoStats.served;
+    const r = applyStep(build(), refused);
+    return { r: JSON.stringify([r.ok, r.ok ? null : r.error, r.ladder, r.ok ? null : r.degenerate]), done: work.done - d0, executed: work.executed - e0, served: ladderMemoStats.served - s0 };
+  };
+  it('the second climb of a content-equal step is served: the same refusal, trace and charge, as with serving off', () => {
+    const first = climb();
+    expect(first.r).toContain('false');
+    const second = climb();
+    expect(second.served, 'a content-equal step (new objects) is served').toBe(1);
+    ladderMemoConfig.serve = false;
+    let off: ReturnType<typeof climb>;
+    try {
+      off = climb();
+    } finally {
+      ladderMemoConfig.serve = true;
+    }
+    expect(off.served).toBe(0);
+    for (const x of [second, off]) {
+      expect(x.r).toBe(first.r);
+      expect(x.done, 'work.done advances as the climb did').toBe(first.done);
+      expect(x.executed, 'work.executed advances as the climb did').toBe(first.executed);
+    }
+  });
+  it('a hit whose charge would cross an armed work limit climbs instead, and is cut where a climb is', () => {
+    climb();
+    const cut = () =>
+      withWorkBudget(1, () => {
+        const s0 = ladderMemoStats.served;
+        const r = applyStep(build(), refused);
+        return { r: JSON.stringify([r.ok, r.ok ? null : r.error]), served: ladderMemoStats.served - s0 };
+      });
+    const a = cut();
+    expect(a.served, 'a climb dearer than the limit is never served under it').toBe(0);
+    ladderMemoConfig.serve = false;
+    try {
+      expect(cut().r).toBe(a.r);
+    } finally {
+      ladderMemoConfig.serve = true;
+    }
   });
 });

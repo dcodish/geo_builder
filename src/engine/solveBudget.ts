@@ -307,11 +307,10 @@ export const searchLimitStats: Record<string, { runs: number; reached: number; m
 export const repeatConfig = { serve: true };
 export function servingRepeats<T>(f: (x: number[]) => T): (x: number[]) => T {
   if (!repeatConfig.serve) return f;
-  const seen = new Map<string, { value: T; done: number; executed: number; own: number }>();
+  const seen = exactPointMap<{ value: T; done: number; executed: number; own: number }>();
   return (x) => {
-    const key = exactKey(x);
-    if (key === null) return f(x);
-    const hit = seen.get(key);
+    for (let i = 0; i < x.length; i++) if (Number.isNaN(x[i])) return f(x);
+    const hit = seen.get(x);
     if (hit) {
       work.done += hit.done;
       work.executed += hit.executed;
@@ -323,7 +322,7 @@ export function servingRepeats<T>(f: (x: number[]) => T): (x: number[]) => T {
     const e0 = work.executed;
     const o0 = at ? at.own : 0;
     const value = f(x);
-    seen.set(key, { value, done: work.done - d0, executed: work.executed - e0, own: at && frame === at ? at.own - o0 : 0 });
+    seen.set(x, { value, done: work.done - d0, executed: work.executed - e0, own: at && frame === at ? at.own - o0 : 0 });
     return value;
   };
 }
@@ -347,6 +346,13 @@ export interface ChargedRun<T> {
   own: number;
   /** no limit was crossed while it ran, so running it again (under the same limits) runs it whole */
   whole: boolean;
+  /**
+   * #2912: the memo entries the run touched (the open ledger frame's deps it added). A served run links them into the
+   * frame it is served in, so that frame's ledger holds the run's work as a run would have left it (a run's nested
+   * computations are cells of their own, not `own` units); without them a memo entry whose computation was served
+   * was later charged less than one that ran.
+   */
+  deps: WorkCell[];
 }
 const overLimit = (): boolean =>
   solveBudget.ladderSpent || (work.limitAt !== null && work.done > work.limitAt) || (executedCap.limitAt !== null && work.executed > executedCap.limitAt);
@@ -356,9 +362,11 @@ export function measuredRun<T>(fn: () => T): ChargedRun<T> {
   const d0 = work.done;
   const e0 = work.executed;
   const o0 = at ? at.own : 0;
+  const n0 = at ? at.deps.length : 0;
   const whole0 = !overLimit();
   const value = fn();
-  return { value, done: work.done - d0, executed: work.executed - e0, own: at && frame === at ? at.own - o0 : 0, whole: whole0 && !overLimit() };
+  const same = at !== null && frame === at;
+  return { value, done: work.done - d0, executed: work.executed - e0, own: same ? at.own - o0 : 0, whole: whole0 && !overLimit(), deps: same ? at.deps.slice(n0) : [] };
 }
 /** Charge a recorded run as if it ran again; false (nothing charged) when it was cut, serving is off, or the charge
  *  would cross an armed limit — the caller then runs it. */
@@ -369,7 +377,22 @@ export function serveRun<T>(run: ChargedRun<T>): boolean {
   work.done += run.done;
   work.executed += run.executed;
   if (frame) frame.own += run.own;
+  // what a run would have left: its cells in this frame's ledger, charged in this epoch (a run computes or charges them now)
+  for (const d of run.deps) {
+    if (epochOpen) markCharged(d);
+    link(d);
+  }
   return true;
+}
+/** Mark a cell and everything it rests on as charged in the open epoch. */
+function markCharged(cell: WorkCell): void {
+  const stack = [cell];
+  while (stack.length) {
+    const c = stack.pop()!;
+    if (c.charged === epochId) continue;
+    c.charged = epochId;
+    for (const d of c.deps) stack.push(d);
+  }
 }
 /** A memo of whole runs by key, scoped to its caller: a hit is served by {@link serveRun}, a miss (or a refused hit)
  *  runs and is kept when it ran whole. */
@@ -381,6 +404,59 @@ export function servedRuns<T>(): (key: string, compute: () => T) => T {
     const run = measuredRun(compute);
     if (run.whole) seen.set(key, run);
     return run.value;
+  };
+}
+
+/**
+ * #2912 — A MAP KEYED BY A POINT'S EXACT IDENTITY, without building a key. Two points are the same key exactly when
+ * they have the same length and every coordinate is the same double (`Object.is`: −0 and +0 are different points),
+ * which is exactly when {@link exactKey} gives them the same text (the shortest round-trip text of a double is unique
+ * to it). The lookup hashes the coordinates' 64 bits and confirms a hit by comparing them, so it never allocates a
+ * string: the text key was 12–17 % of the self time of the slowest 2-D lines (#2912), for the same hits and misses.
+ * A point with a NaN coordinate must not be looked up (the callers never serve one; NaN has many bit patterns).
+ * The stored key is a copy, so a caller that later mutates its array cannot alter an entry.
+ */
+const hashView = new Float64Array(1);
+const hashBits = new Uint32Array(hashView.buffer);
+function pointHash(x: readonly number[]): number {
+  let h = Math.imul(x.length ^ 0x811c9dc5, 0x01000193);
+  for (let i = 0; i < x.length; i++) {
+    hashView[0] = x[i];
+    h = Math.imul(h ^ hashBits[0], 0x9e3779b1);
+    h = Math.imul(h ^ hashBits[1], 0x85ebca6b);
+    h ^= h >>> 15;
+  }
+  return h;
+}
+function samePoint(a: Float64Array, b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+  return true;
+}
+export interface ExactPointMap<V> {
+  get(x: readonly number[]): V | undefined;
+  set(x: readonly number[], v: V): void;
+}
+export function exactPointMap<V>(): ExactPointMap<V> {
+  const buckets = new Map<number, { x: Float64Array; v: V }[]>();
+  return {
+    get(x) {
+      const b = buckets.get(pointHash(x));
+      if (b) for (const e of b) if (samePoint(e.x, x)) return e.v;
+      return undefined;
+    },
+    set(x, v) {
+      const h = pointHash(x);
+      const b = buckets.get(h);
+      if (b) {
+        for (const e of b)
+          if (samePoint(e.x, x)) {
+            e.v = v;
+            return;
+          }
+        b.push({ x: Float64Array.from(x), v });
+      } else buckets.set(h, [{ x: Float64Array.from(x), v }]);
+    },
   };
 }
 
