@@ -430,6 +430,71 @@
         "AC = 6"
       ],
       "lookFor": "Four rows; the triangle drawn."
+    },
+    {
+      "sheet": "feat-2894-e-2d",
+      "id": "T2",
+      "kind": "2d:assertion",
+      "queued": "2026-11-15",
+      "product": "2d",
+      "base": "http://localhost:5195",
+      "path": "/",
+      "lines": [
+        "ABCD דלתון חסום במעגל",
+        "AB=AD",
+        "CB=CD",
+        "E על DC",
+        "BE⊥DC",
+        "AC",
+        "N = חיתוך BE ו-AC",
+        "שטח משולש NCE = שטח משולש ACD"
+      ],
+      "lookFor": "After the eight lines, one press reads «אין תצורה אחרת»."
+    },
+    {
+      "sheet": "feat-2894-c-2d",
+      "id": "T2",
+      "kind": "2d:assertion",
+      "queued": "2026-11-15",
+      "product": "2d",
+      "base": "http://localhost:5194",
+      "path": "/",
+      "lines": [
+        "מלבן ABCD",
+        "AB = 3",
+        "BC = 4",
+        "AC = 7"
+      ],
+      "lookFor": "«AC = 7» is refused, naming «BC = 4»."
+    },
+    {
+      "sheet": "feat-2894-d-analytic",
+      "id": "T2",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5197",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "AB = 5"
+      ],
+      "lookFor": "The press moves the triangle to another configuration."
+    },
+    {
+      "sheet": "feat-2894-c-analytic",
+      "id": "T3",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "lines": [
+        "ריבוע ABCD",
+        "AB = 3",
+        "AC = 10"
+      ],
+      "lookFor": "The third line is refused «לא נמצאה תצורה שבה מתקיים: «AC = 10»»; two rows stay."
     }
   ],
   "results": [

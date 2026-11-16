@@ -769,7 +769,7 @@ function deriveAt(
    * so. «לא נמצאה תצורה» would tell the student the search missed, when the givens themselves are what flatten it.
    * A given that cannot hold even flat («AC = 8.1» on 5 and 3) leaves no such evidence and keeps the search's words.
    */
-  const flattened = !ringOrderFault && !lengthsFault && completing !== null ? collapsedByGivens(construction, seed) : [];
+  const flattened = !ringOrderFault && !lengthsFault && completing !== null ? collapsedByGivens(construction, at) : [];
   const flatFault = flattened.length > 0 ? collapseFault(completing!, flattened[0]) : null;
   /**
    * THE GIVENS HOLD ONLY WHERE TWO NAMED POINTS MEET (#2506, ADR-AG-399 — 2-D's ADR-764, 3-D's ADR-3D-378; ADR-W-146).
@@ -779,7 +779,7 @@ function deriveAt(
    * completing line, the earlier statement it cannot hold with (`partnerStatement`, 2-D's `[vs #i]`), and the
    * completing statement as the reason — never «לא נמצאה תצורה», which says the search missed.
    */
-  const metPairs = !flatFault && !ringOrderFault && !lengthsFault && completing !== null ? pairsMetByGivens(construction, seed) : [];
+  const metPairs = !flatFault && !ringOrderFault && !lengthsFault && completing !== null ? pairsMetByGivens(construction, at) : [];
   const partner = metPairs.length > 0 ? partnerStatement(construction, groupOfConstraint, seed, completing!, pinnedBy) : null;
   if (flatFault) faults.push(flatFault);
   else if (metPairs.length > 0) {
