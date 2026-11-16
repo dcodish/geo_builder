@@ -1378,7 +1378,11 @@ not-drivable rows: a side-point's height and riders of free planes/lines (#557).
 
 **The circle rider** (`on-circle3`, #2611, [ADR-3D-410](06b-decisions-3d.md#adr-3d-410)). The on-line rider's circle
 twin: one sampled angle in the circle's own frame (`seatOnCircleRider3`, key `oncircle-th-<id>`, stepped clear of
-placed points as the plane rider is). The point pass resolves the circle on the spot (`circleGeom3`, the one circle
+placed points as the plane rider is). A rider that closes a declared ring is seated where the ring is simple
+([ADR-3D-525](06b-decisions-3d.md#adr-3d-525), #2829): `ringSimpleWith3` tests each draw against the declared rings that hold
+it (corners not seated yet left out, so several riders of one ring go in point order), the clearest simple draw of up
+to 24 wins, and when none is simple and the ring's other corners are on the circle, `ringArcSeat3` maps the first
+key's angle into the arc between the rider's ring neighbours. A ring no seat can make simple keeps the old seat. The point pass resolves the circle on the spot (`circleGeom3`, the one circle
 resolver the post-pivot circle pass also calls); a circle whose carrier resolves only after the pass seats its rider
 after the circle pass. A POLYGON's circle (`circum` / `incircle`, `ringCircle3`) makes its rider a gauge-frame point
 and a drivable row of the carrier table; a tangent-line circle's rider still counts but is not driven. The

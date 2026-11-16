@@ -4184,7 +4184,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   for (const [id, def] of c.points) {
     if (def.kind !== 'on-circle3' || pos.has(id)) continue;
     const g = circles3.find((k) => k.id === def.circle);
-    if (g) seatOnCircleRider3(seed, pos, g, id);
+    if (g) seatOnCircleRider3(c, seed, pos, g, id);
   }
 
   // ---- a FINAL fill for foot-line points whose named line only resolved late (a through-line
@@ -4736,7 +4736,7 @@ function evaluateSolidsAndPoints(
       // plane resolves only later the rider is seated after the circle pass instead
       const k = c.circles3.find((x) => x.id === def.circle);
       const g = k && circleGeom3(c, k, seed, pos, planes, lines);
-      if (g) seatOnCircleRider3(seed, pos, g, id, riderTOverride);
+      if (g) seatOnCircleRider3(c, seed, pos, g, id, riderTOverride);
     } else if (def.kind === 'plane-cut') {
       // V8-b (G2): the point where a plane crosses segment a–b (the plane may be an
       // equation, a point-run, or a ⊥/∥ rel-plane — resolved from current positions)
@@ -5188,13 +5188,51 @@ function circleGeom3(
 }
 
 /**
+ * #2829 ([ADR-3D-525](../../docs/06b-decisions-3d.md#adr-3d-525)) — THE RING TEST A FREE CORNER IS SEATED BY: the declared
+ * rings (`declaredRings3`, the store's one enumeration) that hold `id`, as a test of a candidate position for it with
+ * `ringSelfCrossing3`, the store's own predicate. A ring corner not seated yet (not placed, or in `unseated`) is LEFT
+ * OUT of the ring, so several riders of one ring are seated in point order, each judged against the corners before it;
+ * a ring with fewer than four judged corners cannot cross and is not judged. `null` when no ring is judged: the seat
+ * is then the plain general-position seat, untouched. Never a veto: a seat with no simple candidate keeps its old pick
+ * and the store's ring pass keeps its verdict.
+ */
+function ringSimpleWith3(c: Construction3, pos: Positions3, id: Id, unseated: ReadonlySet<Id>): { rings: Id[][]; simple: (q: Vec3) => boolean } | null {
+  const rings = declaredRings3(c)
+    .filter((ring) => ring.includes(id))
+    .map((ring) => ring.filter((q) => q === id || (pos.has(q) && !unseated.has(q))))
+    .filter((ring) => ring.length >= 4);
+  if (!rings.length) return null;
+  const simple = (p: Vec3): boolean => rings.every((ring) => !ringSelfCrossing3(ring.map((q) => (q === id ? p : (pos.get(q) as Vec3)))));
+  return { rings, simple };
+}
+
+/** The riders of one circle that come after `id` in point order: not seated yet when `id` is (#2829). */
+function laterRidersOf3(c: Construction3, id: Id, circle: string): Set<Id> {
+  const out = new Set<Id>();
+  let after = false;
+  for (const [q, def] of c.points) {
+    if (q === id) after = true;
+    else if (after && def.kind === 'on-circle3' && def.circle === circle) out.add(q);
+  }
+  return out;
+}
+
+/**
  * #2611 ([ADR-3D-410](../../docs/06b-decisions-3d.md#adr-3d-410)) — a point riding a circle, the on-line rider's circle
  * twin: ONE sampled DOF, the angle in the circle's own frame (ADR-052 — resampled by «הציגו תצורה אחרת»), read from the
  * circle as resolved, so it follows the circle whatever defines it. A sampled angle that parks the rider next to an
  * existing point steps deterministically to a clear spot (ADR-3D-080's general-position rule; k = 0 keeps the first key).
  * A DRIVEN rider (the carrier table's entry) turns from its sampled seat by the solved offset; 0 is the seat itself.
+ *
+ * #2829 ([ADR-3D-525](../../docs/06b-decisions-3d.md#adr-3d-525)): a rider that closes a DECLARED ring is seated where the
+ * ring is simple (a ring order is a given, general position a preference — ADR-3D-327, 02b FR-RD-7). The draws are the
+ * same keys in the same order (k = 0 first, so a ring already simple and clear there is byte-identical), up to 23 of
+ * them, and a simple draw beats a clearer crossed one. When no draw lands simple and every other judged corner lies on
+ * the rider's circle, the first key's angle is mapped into the admissible arc ({@link ringArcSeat3}), so the seat never
+ * misses.
  */
 function seatOnCircleRider3(
+  c: Construction3,
   seed: number,
   pos: Positions3,
   k: Resolved3['circles3'][number],
@@ -5207,17 +5245,88 @@ function seatOnCircleRider3(
   const angle = (n: number): number => sample(seed, n === 0 ? `oncircle-th-${id}` : `oncircle-th-${id}-${n}`, 0, 2 * Math.PI);
   const sepOf = (q: Vec3): number => placed.reduce((m, r) => Math.min(m, dist3(q, r)), Infinity);
   const minSep = 0.35 * k.radius;
+  const ring = ringSimpleWith3(c, pos, id, laterRidersOf3(c, id, k.id));
   let th = angle(0);
   let best = sepOf(at(th));
-  for (let n = 1; n <= 11 && best < minSep; n++) {
-    const t = angle(n);
-    const s = sepOf(at(t));
-    if (s > best) {
-      th = t;
-      best = s;
+  if (!ring) {
+    for (let n = 1; n <= 11 && best < minSep; n++) {
+      const t = angle(n);
+      const s = sepOf(at(t));
+      if (s > best) {
+        th = t;
+        best = s;
+      }
+    }
+  } else {
+    // the same walk with the ring first: the clearest SIMPLE draw, stopping at the first simple one that is clear
+    let simpleTh: number | null = null;
+    let simpleBest = -Infinity;
+    for (let n = 0; n <= 23; n++) {
+      const t = n === 0 ? th : angle(n);
+      const p = at(t);
+      const s = sepOf(p);
+      if (ring.simple(p) && s > simpleBest) {
+        simpleTh = t;
+        simpleBest = s;
+        if (s >= minSep) break;
+      }
+    }
+    if (simpleTh !== null) th = simpleTh;
+    else {
+      const arcTh = ringArcSeat3(pos, k, ring.rings[0], id, th);
+      if (arcTh !== null && ring.simple(at(arcTh))) th = arcTh;
+      else {
+        // no simple seat on this circle: the plain general-position walk, as before (the store's ring pass judges it)
+        for (let n = 1; n <= 11 && best < minSep; n++) {
+          const t = angle(n);
+          const s = sepOf(at(t));
+          if (s > best) {
+            th = t;
+            best = s;
+          }
+        }
+      }
     }
   }
   pos.set(id, at(th + (riderTOverride?.get(id) ?? 0)));
+}
+
+/**
+ * #2829 ([ADR-3D-525](../../docs/06b-decisions-3d.md#adr-3d-525)) — the seat a ring-closing circle rider takes when no
+ * draw lands simple: the open arc between its two ring neighbours that holds no other corner of the ring. Read only
+ * when every other corner of the (judged) ring lies on the rider's circle, where the ring is simple exactly when its
+ * order is the circle's order. The first key's angle, as a fraction of the turn, is mapped into the arc's middle
+ * 80 %, so the seat still varies with the seed (ADR-052) and stays clear of both neighbours. `null` when a corner is
+ * off the circle or no such arc exists (the other corners are already out of the circle's order).
+ */
+function ringArcSeat3(pos: Positions3, k: Resolved3['circles3'][number], ring: readonly Id[], id: Id, th0: number): number | null {
+  const TAU = 2 * Math.PI;
+  const tol = 1e-6 * k.radius;
+  const phi = (q: Id): number | null => {
+    const p = pos.get(q);
+    if (!p) return null;
+    const d = sub3(p, k.center);
+    if (Math.abs(dot3(d, k.normal)) > tol || Math.abs(norm3(d) - k.radius) > tol) return null;
+    const a = Math.atan2(dot3(d, k.e2), dot3(d, k.e1));
+    return a < 0 ? a + TAU : a;
+  };
+  const ccw = (from: number, to: number): number => (((to - from) % TAU) + TAU) % TAU;
+  const i = ring.indexOf(id);
+  const n = ring.length;
+  const prev = phi(ring[(i - 1 + n) % n]);
+  const next = phi(ring[(i + 1) % n]);
+  const rest = ring.filter((_, j) => j !== i && j !== (i - 1 + n) % n && j !== (i + 1) % n).map(phi);
+  if (prev === null || next === null || rest.some((a) => a === null)) return null;
+  const clear = (from: number, width: number): boolean =>
+    width > 1e-9 && (rest as number[]).every((a) => {
+      const u = ccw(from, a);
+      return u <= 1e-9 || u >= width - 1e-9;
+    });
+  const fwd = ccw(prev, next);
+  const back = ccw(next, prev);
+  const [from, width] = clear(prev, fwd) ? [prev, fwd] : clear(next, back) ? [next, back] : [NaN, NaN];
+  if (Number.isNaN(from)) return null;
+  return from + width * (0.1 + 0.8 * (th0 / TAU));
 }
 
 /** A free point riding a named line (ADR-3D-031, the on-plane rider's line edition): sampled t along
@@ -5367,7 +5476,7 @@ function reresolveFreeObjects3(
         (((k.def.kind === 'center-plane-radius' || k.def.kind === 'free') && k.def.plane !== undefined && freePlane(k.def.plane)) ||
           (k.def.kind === 'tangent-line' && isFreeLine3(c, k.def.line)));
       const g = free ? circleGeom3(c, k, seed, pos, planes, lines) : null;
-      if (g) seatOnCircleRider3(seed, pos, g, id);
+      if (g) seatOnCircleRider3(c, seed, pos, g, id);
     } else if (def.kind === 'foot-plane' && freePlane(def.plane)) {
       const from = pos.get(def.from);
       const pl = planes.get(def.plane);
