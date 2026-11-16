@@ -19,6 +19,7 @@ import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GeoObject, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, pinnedAngleWedges, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { reachImpossibility } from '@/engine/reachFeasibility';
+import { metricClosureImpossibility } from '@/engine/metricClosure';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
 import { DIAGONAL_HEIGHT_VS, diagonalHeightError, diagonalHeightImpossibility } from '@/engine/heightFeasibility';
@@ -3037,6 +3038,12 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   // #2797 (ADR-817): the reach member — a rider of a fixed ray or circle stated at a distance it can never reach. The
   // residual moves (the rider's free parameter moves it), which is not whether it can reach zero.
   if (reachImpossibility([...probe.constraints, ...drivenConstraintsOf(probe)]) && !reachImpossibility([...cur.constraints, ...drivenConstraintsOf(cur)])) return false;
+  // #2572 (ADR-859): the bound the METRIC CLOSURE proves — a chord or an inscribed side past the diameter, a side of a
+  // triangle around a circle under it (ADR-837's floor), any length the closure's relations exclude. The residual moves
+  // (the free points move it), which is not whether it can reach zero: ADR-104's bet that a later given pins the figure
+  // holds only within reach, and no given added later widens a range the closure already proved empty. Read on the probe
+  // and not on the figure before it, as the reach member is: a proof already true without the line is not this line's.
+  if (metricClosureImpossibility(probe) && !metricClosureImpossibility(cur)) return false;
   // #1470 (ADR-549): the side twin — a stated side and a statement that structurally puts the point
   // elsewhere. No later given can move a point off the circle it rides.
   if (cmds.some((cmd) => sideImpossibility(probe, cmd))) return false;

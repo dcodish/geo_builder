@@ -6867,6 +6867,36 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(factsOf(['ריבוע ABCD']), 'AC = 10').kind, 'a square with only its diagonal stated commits').toBe('commit');
     },
   },
+  {
+    id: 'unreachable-length-refused-2572',
+    title: '#2572 (ADR-859): a length the figure can never reach — a chord or an inscribed side past the diameter, a side of a triangle around a circle under it — is refused naming the line that bounds it, never parked as waiting for givens',
+    guards:
+      'Operator ruling "2572 - A" (2026-10-28): «Refuse it, naming the circle\'s line. The same refusal the diameter already gets.» Measured at main 3f6132c2 through decideDeterministic2D (model mocked): «AB = 6» on a radius-2 chord, «AB = 8» inscribed in radius 3, «AB = 4» around radius 3 (#2538\'s X1) and «AB = 10» for two points on radius 3 (#2272) all committed as deferred («waiting for givens»), though the metric closure already proved each impossible (the fold\'s own status carried its reason). Root cause: ADR-104\'s deferral gate (`constraintIsPending`) asked whether the residual MOVES, never whether the closure proves it cannot reach zero. Fix (ADR-859): the gate consults `metricClosureImpossibility` on the trial (a proof the figure before the line already had is not this line\'s). The gate unit test is src/store/__tests__/deferral-gate.test.ts § #2572.',
+    // The refused line never becomes a fact, so each line is driven through the submit gate in `check`.
+    steps: ['מעגל O ברדיוס 2'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const bare = (s: string) => s.replace(/[⁦-⁩]/g, '');
+      const cases: [string[], string, string][] = [
+        [['מעגל O ברדיוס 2', 'AB מיתר במעגל'], 'AB = 6', 'הנתונים סותרים זה את זה — «AB = 6» לא מתקיים יחד עם «מעגל O ברדיוס 2», «AB מיתר במעגל»: יחד הם קובעים |AB| = 6 ו-|AO| + |BO| = 4, אבל לפי אי־שוויון המשולש ABO תמיד |AB| ≤ |AO| + |BO|. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מעגל O ברדיוס 3', 'משולש ABC חסום במעגל O'], 'AB = 8', 'הנתונים סותרים זה את זה — «AB = 8» לא מתקיים יחד עם «מעגל O ברדיוס 3», «משולש ABC חסום במעגל O»: יחד הם קובעים |AB| = 8 ו-|AO| + |BO| = 6, אבל לפי אי־שוויון המשולש ABO תמיד |AB| ≤ |AO| + |BO|. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O'], 'AB = 4', 'לא ניתן: «AB = 4» סותר את «משולש ABC חוסם את מעגל O» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 4.'],
+        [['מעגל O ברדיוס 3', 'A, B על מעגל O'], 'AB = 10', 'הנתונים סותרים זה את זה — «AB = 10» לא מתקיים יחד עם «מעגל O ברדיוס 3», «A, B על מעגל O»: יחד הם קובעים |AB| = 10 ו-|AO| + |BO| = 6, אבל לפי אי־שוויון המשולש ABO תמיד |AB| ≤ |AO| + |BO|. בדקו איזה מהאורכים האלה לא נכון.'],
+      ];
+      for (const [prior, line, words] of cases) {
+        const facts = factsOf(prior);
+        const v = gateVerdict(facts, line);
+        expect(v.kind === 'refused' && v.reason, `«${line}» after «${prior.join(' · ')}» is refused before it becomes a fact, never parked`).toBe('error');
+        const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+        expect(bare(humanizeError(detail, he, line, otherUtteranceForError(facts, detail))), `«${line}»: names the line that bounds it`).toBe(words);
+      }
+      // the controls: a length the same figure can reach still commits
+      expect(gateVerdict(factsOf(['מעגל O ברדיוס 2', 'AB מיתר במעגל']), 'AB = 3').kind, 'a chord of 3 in a radius-2 circle').toBe('commit');
+      expect(gateVerdict(factsOf(['מעגל O ברדיוס 2', 'AB מיתר במעגל']), 'AB = 4').kind, 'a chord equal to the diameter').toBe('commit');
+      expect(gateVerdict(factsOf(['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O']), 'AB = 8').kind, 'a side of 8 around a radius-3 circle (X2)').toBe('commit');
+    },
+  },
 ];
 /** #2370 / #2444 (ADR-828): the vertex of ABC that carries a right angle ('' = none, two letters never happen in a triangle). */
 function rightAngleSeat(f: ReturnType<typeof replay>): string {
