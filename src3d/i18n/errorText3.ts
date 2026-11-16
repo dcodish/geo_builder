@@ -86,10 +86,11 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     case 'right-angle-vertex':
       return t('err.rightAngleVertex', { triangle: err.triangle, angle: err.angle, more: err.more });
     // #1666: the tool draws the givens; a claim to prove is named and left out. #2492 (ADR-W-194): the suite's sentence.
-    // No «where to check it» line here yet: 3-D's ask box shows no length on a figure with no stated size, so an
-    // equal-lengths claim has nothing to compare there; that arm waits for the operator (#2492).
+    // #2492 (ADR-W-205, the operator's ruling of 2026-11-10, option (b)): then where 3-D can check it. Not the suite's
+    // panel line: 3-D's ask box shows no length on a figure with no stated size, so the line names what it DOES answer
+    // (an angle, a perpendicular, a parallel). The panel's and the button's names are nested from the keys App3 draws.
     case 'proof-target':
-      return t(PROOF_TARGET_KEY, { sentence: err.sentence });
+      return `${t(PROOF_TARGET_KEY, { sentence: err.sentence })} ${t('err.proofTargetCheck')}`;
     // #2062 (ADR-3D-480; the operator's ruling of 2026-10-14, card `d14b-2062-question` A): the exam's membership question
     // is answered by pointing at the panel row that holds it; where the panel has none, the ask lane's undetermined note.
     case 'answer-in-panel':
