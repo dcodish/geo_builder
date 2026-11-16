@@ -1715,6 +1715,12 @@ the shared [`shell/math.tsx`](04w-design-shell.md). **Every annotation is sized 
 bar a stated ∥ is verified at. Every reader of a fold line takes it from there: the scene's fold-centred patches, a
 `plane-plane` line, the second line pass. A pair the solver holds parallel therefore never gets a far-away fold line.
 
+**A line meets a plane by one scale-free test ([ADR-3D-520](06b-decisions-3d.md#adr-3d-520), #2834).** `linePlaneCrossingT3`
+(`engine/vec3.ts`) returns where `anchor + t·dir` meets `n·p + d = 0`, or `null` when `|n·dir| ≤ 1e-10·|n|·|dir|`. A
+point-run plane's normal is not unit, so an absolute bar on raw vectors read a solver's parallel residue as a crossing at
+t ≈ 1e12. The patch sweep, the line ⟂ plane knees, `segMeetsPlane` and the engine's `line-plane`, `plane-cut` and
+apex-line points all read this one predicate; a pair the engine calls parallel is never given a far-away crossing to draw.
+
 **A name is its own display text ([ADR-3D-412](06b-decisions-3d.md#adr-3d-412), #2610).** A plane's, a line's and a
 vector's construction key is what the canvas label, the planes list, the data panel and a refusal print; there is no
 separate display name. So every reader that declares an object names it as the student wrote it: a point-run plane by

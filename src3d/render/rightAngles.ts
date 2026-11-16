@@ -43,7 +43,7 @@
 import type { Resolved3, ResolvedPlane } from '../engine/evaluate';
 import { DIRECTION_REL_TOL, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
 import type { Construction3, Id, Operand3, Positions3, VecAtom } from '../engine/types';
-import { add3, centroid3, cross3, dist3, dot3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
+import { add3, centroid3, cross3, dist3, dot3, linePlaneCrossingT3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
 import { dihedralAnchors, dihedralGeometry } from './dihedral';
 import { planeBasis, projectOntoPlane } from './planeGeom';
 import { ANGLE_TOL_DEG } from '../engine/claims';
@@ -230,9 +230,9 @@ function segMeetsPlane(a: Id, b: Id, pl: ResolvedPlane, pos: Positions3, scale: 
   const tol = scale * 1e-6;
   if (Math.abs(fa) <= tol) return pa;
   if (Math.abs(fb) <= tol) return pb;
-  const den = fa - fb;
-  if (Math.abs(den) < EPS) return null; // parallel to the plane (can't happen for a true ⊥, but be safe)
-  const t = fa / den;
+  // #2834: the one scale-free parallel test (t = fa / (fa − fb), the same parameter)
+  const t = linePlaneCrossingT3(pl.n, pl.d, pa, sub3(pb, pa));
+  if (t === null) return null; // parallel to the plane (can't happen for a true ⊥, but be safe)
   if (t <= 1e-6 || t >= 1 - 1e-6) return null; // the segment stops short of the plane
   return add3(pa, scale3(sub3(pb, pa), t));
 }
@@ -317,9 +317,8 @@ export function rightAngles3(
     const ln = resolved.lines.get(lp.line);
     const pl = resolved.planes.get(lp.plane);
     if (!ln || !pl) continue;
-    const denom = dot3(pl.n, ln.dir);
-    if (Math.abs(denom) < EPS) continue; // parallel — no crossing to mark
-    const t = -(dot3(pl.n, ln.anchor) + pl.d) / denom;
+    const t = linePlaneCrossingT3(pl.n, pl.d, ln.anchor, ln.dir);
+    if (t === null) continue; // parallel — no crossing to mark (#2834: scale-free)
     const vertex = add3(ln.anchor, scale3(ln.dir, t));
     const u1 = normalize3(ln.dir);
     const u2 = inPlaneDir(pl, vertex, pos);
@@ -332,9 +331,8 @@ export function rightAngles3(
     const ln = resolved.lines.get(lp.line);
     const pl = planeFromIds(lp.ids, pos);
     if (!ln || !pl) continue;
-    const denom = dot3(pl.n, ln.dir);
-    if (Math.abs(denom) < EPS) continue; // parallel — no crossing to mark
-    const t = -(dot3(pl.n, ln.anchor) + pl.d) / denom;
+    const t = linePlaneCrossingT3(pl.n, pl.d, ln.anchor, ln.dir);
+    if (t === null) continue; // parallel — no crossing to mark (#2834: scale-free)
     const vertex = add3(ln.anchor, scale3(ln.dir, t));
     const u1 = normalize3(ln.dir);
     const u2 = inPlaneDir(pl, vertex, pos);
@@ -516,9 +514,9 @@ function operandPairKnee(a: Operand3, b: Operand3, c: Construction3, resolved: R
     vertex = segMeetsPlane(ends[0], ends[1], pl, pos, scale);
     u1 = vertex ? armDir(ends[0], ends[1], vertex, pos) : null;
   } else {
-    const denom = dot3(pl.n, lg.dir!);
-    if (Math.abs(denom) < EPS) return null;
-    vertex = add3(lg.point!, scale3(lg.dir!, -(dot3(pl.n, lg.point!) + pl.d) / denom));
+    const t = linePlaneCrossingT3(pl.n, pl.d, lg.point!, lg.dir!);
+    if (t === null) return null; // #2834: scale-free parallel test
+    vertex = add3(lg.point!, scale3(lg.dir!, t));
     u1 = normalize3(lg.dir!);
   }
   if (!vertex || !u1) return null;

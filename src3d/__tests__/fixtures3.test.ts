@@ -637,6 +637,18 @@ const SEEDED: SeededCorpus = {
   // #1829 (ADR-3D-471): the operator's rectangle, saved with his «AE» ask (before: «AE⃗ — לא נקבע על ידי הנתונים»; now
   // «u + t·v»). The answers, the shared t and the panel parity are asserted in queries.test.ts; this is the build + drift net.
   'vector-answer-in-parameter-1829.geo3.json': ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'AB=1', '|AD|=√7', 'DF→ = t*DC→', 'BE→ = t*BC→'],
+  // #2834 (ADR-3D-520): the exam box fixed by the plane A'B'C'D', B and the line AB (before: the nine labels on one pixel,
+  // the patch grown to a parallel line's "crossing" at t ≈ 1e12). The framing is asserted in line-perp-plane-mark.test.ts;
+  // this is the build + drift net.
+  'exam-box-plane-line-2834.geo3.json': [
+    'תיבה',
+    "מישור A'B'C'D' הוא x+4y-8z-142=0",
+    'B(0,7,6)',
+    'משוואת הישר AB היא x = (0,7,6) + t(0,2,1)',
+    'אורך המקצוע AB הוא 5√5',
+    'שיעור ה-y של הקודקוד A שלילי',
+    'נתונה נקודה M(k,1,3)',
+  ],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

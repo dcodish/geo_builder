@@ -16545,3 +16545,24 @@ The reason: projected starts change which basins the restarts fall into, so the 
 ## What the student will see
 - [ruled] 3-D heavy figures are drawn sooner; another valid drawing may come first (the #863 prism draws its seed-1 configuration first). Operator, 2026-11-15 (#2894), ruling 1: *"Yes if verdicts equal (Recommended)"*.
 - [ruled] Values the givens fix, which 3-D withheld, are shown, with the answers that read them (the table above). Operator, 2026-11-15 (#2894): *"Ship, list them as fixes (Recommended)"*.
+
+## ADR-3D-520 — A line meets a plane by one scale-free test: a parallel pair on a point-run plane no longer grows its patch to infinity (#2834)
+
+**Status:** built · 2026-11-16 · fix (`P2`, `wrong-answer`) · round #2914 · **Issue:** [#2834](https://github.com/dcodish/geo_builder/issues/2834)
+**Requirements:** none (a drawing fault against [02b](02b-requirements-3d.md) FR-RD-1) · **Design:** [04b](04b-design-3d.md) — "The renderer", *A line meets a plane by one scale-free test* · **LADDER stage:** none (render and placement arithmetic)
+
+**Measured first (docs/17 §5 step 0).** The plan (2026-11-11, `main` @ `8e96473d`) measured the exam box («תיבה» · «מישור A'B'C'D' הוא x+4y-8z-142=0» · «B(0,7,6)» · line AB · «אורך המקצוע AB הוא 5√5» · …) drawing its nine points on one pixel: the resolved plane A'B'C'D' is a point-run plane with an unnormalised normal (|n| ≈ 166), line AB is parallel to it, and `n·dir` evaluated to 2.94e-9. The patch sweep in `buildScene3` tested `|n·dir| < 1e-9`, an absolute bar on raw vectors, read a crossing at t ≈ 1e12 and grew the patch to it; the fit then shrank the figure to a dot. **Re-measured at pickup (`main` @ `3f6132c2`): the reported figure draws correctly** — `n·dir` is now ≤ 1.2e-12 at seeds 0–39 and the box spans 160–270 px. [ADR-3D-499](#adr-3d-499) (#2894, the anchored settle) made the solver's positions exact where they used to sit a few 1e-7 off, so the residue that crossed the bar is gone for this figure. The class is not: the bar is still absolute, and any solver residue on a point-run plane of this size crosses it again. The item was rescoped to the class, locked at the measured residue.
+
+**Decision.** One predicate, `linePlaneCrossingT3(n, d, anchor, dir)` in `engine/vec3.ts`: the parameter where `anchor + t·dir` meets `n·p + d = 0`, or `null` when `|n·dir| ≤ 1e-10·|n|·|dir|` — the engine's existing line-plane tolerance (`evaluate.ts`, since the `line-plane` point), now the only one. Every line-or-segment-meets-plane site reads it:
+- `render/scene3.ts`, the patch sweep "where a drawn LINE crosses this plane" (the report);
+- `render/rightAngles.ts`: `segMeetsPlane`, the named line ⟂ named plane knee, its point-run twin (#383), and the line ⟂ plane operand knee;
+- `engine/evaluate.ts`: the `line-plane` point (both passes), the `plane-cut` point (segment ∥ plane was an absolute 1e-12), and the right pyramid's apex line through the base centre.
+
+Not members (measured): the line-plane angle arc in `scene3.ts` and `linePlaneConstruction` in `dihedral.ts` normalise both vectors before their `1e-9` test, so their bar is already relative; `crossings3.ts` already tests `1e-9·|n|·|dir|`. A genuinely shallow crossing far away is a real crossing and is drawn as before.
+
+**Locks.** `src3d/__tests__/line-perp-plane-mark.test.ts` (the home of the patch-reaches-the-crossing rule): the predicate at the measured residue is parallel at normal scales ×1e-3 to ×1e3, a genuine crossing returns the same parameter at any scale; the exam box with its plane's `n·dir` set to the measured 2.94e-9 (scaled to each seed's |n|) projects its eight corners to eight distinct points spanning more than a third of the viewport at seeds 0–5, with the patch corners near the figure (on `main` the same test reads a spread of 5.5e-9 px). Fixture `fixtures3/exam-box-plane-line-2834.geo3.json`: the operator's seven lines, the build + drift net.
+
+**Requirements / design.** Requirements: none. Design: 04b, a paragraph beside "Two planes are parallel at the verdict's bar".
+
+## What the student will see
+- [ruled] A box (or any figure) with a line parallel to a plane given by its points is drawn framed, never as its labels piled on one spot. 02b FR-RD-1 (a textbook wireframe the student can orbit). The geometry is unchanged; the operator's exam figure already draws correctly since ADR-3D-499.

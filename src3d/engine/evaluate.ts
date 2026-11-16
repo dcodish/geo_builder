@@ -61,7 +61,7 @@ import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, r
   triangleIncircle3,
   bisectorDir3,
   lineCrossing3,
-  ringSelfCrossing3} from './vec3';
+  ringSelfCrossing3, linePlaneCrossingT3} from './vec3';
 import { seedKey3, canonicalSeed3, partsOf3, seedNumber3, seedOfPart3, type Part3, type Seed3 } from './components3';
 import { baseRingOf, boundSolidDimCount3, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
@@ -4159,11 +4159,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     const line = lines.get(def.line);
     const pl = planes.get(def.plane);
     if (!line || !pl) continue;
-    const denom = dot3(pl.n, line.dir);
-    if (Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(line.dir), 1e-12)) {
-      const t = -(dot3(pl.n, line.anchor) + pl.d) / denom;
-      pos.set(id, add3(line.anchor, scale3(line.dir, t)));
-    }
+    const t = linePlaneCrossingT3(pl.n, pl.d, line.anchor, line.dir);
+    if (t !== null) pos.set(id, add3(line.anchor, scale3(line.dir, t)));
   }
 
   const revolutions = c.revolutions.map((rev, i) => {
@@ -4745,9 +4742,8 @@ function evaluateSolidsAndPoints(
       const B = pos.get(def.b);
       if (!pl || !A || !B) continue;
       const dir = sub3(B, A);
-      const denom = dot3(pl.n, dir);
-      if (Math.abs(denom) < 1e-12) continue; // segment ∥ plane — no crossing
-      const t = -(dot3(pl.n, A) + pl.d) / denom;
+      const t = linePlaneCrossingT3(pl.n, pl.d, A, dir);
+      if (t === null) continue; // segment ∥ plane — no crossing (#2834: scale-free)
       pos.set(id, add3(A, scale3(dir, t)));
     } else if (def.kind === 'centroid') {
       const ps = def.of.map((p) => pos.get(p));
@@ -4997,11 +4993,8 @@ function evaluateSolidsAndPoints(
         // would have gone live silently the moment an isosceles-trapezoid or right-kite base existed.
         const centre = ringCircumcentre3(bp);
         const nb = cross3(sub3(bp[1], bp[0]), sub3(bp[2], bp[0]));
-        const denom = dot3(pl.n, nb);
-        if (centre && Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(nb), 1e-12)) {
-          const s = -(dot3(pl.n, centre) + pl.d) / denom;
-          pos.set(id, add3(centre, scale3(nb, s)));
-        }
+        const s = centre ? linePlaneCrossingT3(pl.n, pl.d, centre, nb) : null;
+        if (centre && s !== null) pos.set(id, add3(centre, scale3(nb, s)));
       }
     } else if (def.kind === 'foot-face') {
       // V8-e (G5): the height's foot — ⟂ from `from` onto the plane through the face pts
@@ -5015,11 +5008,8 @@ function evaluateSolidsAndPoints(
       const line = lines.get(def.line);
       const pl = planes.get(def.plane);
       if (line && pl) {
-        const denom = dot3(pl.n, line.dir);
-        if (Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(line.dir), 1e-12)) {
-          const t = -(dot3(pl.n, line.anchor) + pl.d) / denom;
-          pos.set(id, add3(line.anchor, scale3(line.dir, t)));
-        }
+        const t = linePlaneCrossingT3(pl.n, pl.d, line.anchor, line.dir);
+        if (t !== null) pos.set(id, add3(line.anchor, scale3(line.dir, t)));
         // parallel ⇒ no position — derive3 flags `line-misses-plane` honestly
       }
     }
