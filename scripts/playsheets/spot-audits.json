@@ -541,6 +541,37 @@
         "שנה שם A ל-M"
       ],
       "lookFor": "Start from «נקה הכל». The rows read «קובייה MBCDA'B'C'D'» and «מישור MBCD»; M is drawn where A was, A' keeps its letter."
+    },
+    {
+      "sheet": "feat-2894-part2",
+      "id": "T5",
+      "kind": "2d:assertion",
+      "queued": "2026-11-16",
+      "product": "2d",
+      "base": "http://localhost:5203",
+      "path": "/",
+      "lines": [
+        "מרובע ABCD",
+        "AB = 3",
+        "BC = 4",
+        "ABCD ריבוע"
+      ],
+      "lookFor": "«ABCD ריבוע» is refused naming «AB = 3», «BC = 4», segment BC, 3 and 4."
+    },
+    {
+      "sheet": "feat-2894-part2",
+      "id": "T4",
+      "kind": "2d:assertion",
+      "queued": "2026-11-16",
+      "product": "2d",
+      "base": "http://localhost:5203",
+      "path": "/",
+      "lines": [
+        "מעגל O ברדיוס 2",
+        "AB קוטר במעגל",
+        "AB = 6"
+      ],
+      "lookFor": "«AB = 6» is refused naming «AB קוטר במעגל», segment AB, 4 and 6."
     }
   ],
   "results": [
