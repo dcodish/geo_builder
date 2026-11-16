@@ -4,7 +4,7 @@
  *
  * Measured at ebacadd1 through `decideSubmit3`: «AB = 2 3» (after «קטע AB» or a box) and «A(2 3, 1, 0)» were
  * `not-understood`, handed to the model. Now `readStatement3` — the reader submit and the ✎ edit share — refuses them
- * with the suite's sentence (`shell/juxtaposedNumbers`), `guided`, never a model call.
+ * with the suite's sentence (`shell/lexicon/juxtaposedNumbers`), `guided`, never a model call.
  */
 import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
@@ -13,7 +13,7 @@ import { errorText3 } from '../i18n/errorText3';
 import { decideSubmit3, type Fact3 } from '../store/store3';
 import { decideDeterministic3, refusalCategory3 } from '../app/decideDeterministic3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
-import { findNumberPair } from '../../shell/juxtaposedNumbers';
+import { findNumberPair } from '../../shell/lexicon/juxtaposedNumbers';
 
 const t = i18n3d.getFixedT('he') as (k: string, o?: Record<string, unknown>) => string;
 const tEn = i18n3d.getFixedT('en') as (k: string, o?: Record<string, unknown>) => string;

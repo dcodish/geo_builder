@@ -65,12 +65,12 @@ import type { Construction, Id } from '../engine/types';
 import { positionalOf } from '../engine/types';
 import { activeOf, activePins, rowOf } from './active';
 import type { LetterRenameResult } from '../../shell/frame/letterOffer';
-import { foldIndexedName } from '../../shell/indexedName';
+import { foldIndexedName } from '../../shell/lexicon/indexedName';
 import type { SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import type { AnnotationMap } from './annotations';
 import { segKey } from '../render/scene';
 import type { Seed } from '../engine/evaluate';
-import { foldPrimes } from '../../shell/primes';
+import { foldPrimes } from '../../shell/lexicon/primes';
 import { POINT_NAME as POINT_NAME_ATOM, isPointName, splitPointNames } from '../engine/pointName';
 
 export { parseRenameAnalytic, parseSwapAnalytic };

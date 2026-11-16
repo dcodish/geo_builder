@@ -27,7 +27,7 @@
  */
 
 import type { Command3, Id } from '../engine/types';
-import { readShapePhrase3, SHAPE_ADJ_WORDS3 } from '../lexicon/shapePhrase3';
+import { readShapePhrase3, SHAPE_ADJ_WORDS3 } from '../../shell/lexicon/shapePhrase3';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { QUAD_PYRAMIDS, type QuadBase } from '../engine/baseShapes';
 import { CONSTRUCT_NOUNS, RADICAND, evalRadical, foldPrimes3, labelTokens, normalize3 } from './parse3';

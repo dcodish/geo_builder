@@ -44,7 +44,7 @@ import { claimSeeds } from '../engine/claims';
 import { knowledgeSamples3 } from '../engine/evaluate';
 import { sampleStats } from '../engine/rng';
 import { declaredKind3, QUAD_PYRAMIDS } from '../engine/baseShapes';
-import { readShapePhrase3 } from '../lexicon/shapePhrase3';
+import { readShapePhrase3 } from '../../shell/lexicon/shapePhrase3';
 import type { Command3, Construction3, Id, Positions3, SolidCommand } from '../engine/types';
 import type { NarrowedRing3 } from '../engine/notices';
 

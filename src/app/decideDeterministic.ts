@@ -77,10 +77,10 @@ import {
   trialFacts,
 } from '@/store/geoStore';
 import { spanShadow } from '@/parser/spanAccounting';
-import { findProofTarget, PROOF_TARGET_KEY } from '../../shell/proofTarget';
-import { findRadianAngle } from '../../shell/radianAngle';
-import { findNumberPair, teachPair, type NumberPair } from '../../shell/juxtaposedNumbers';
-import { unreadScript } from '../../shell/inputScript';
+import { findProofTarget, PROOF_TARGET_KEY } from '../../shell/lexicon/proofTarget';
+import { findRadianAngle } from '../../shell/lexicon/radianAngle';
+import { findNumberPair, teachPair, type NumberPair } from '../../shell/lexicon/juxtaposedNumbers';
+import { unreadScript } from '../../shell/lexicon/inputScript';
 import type { CevianHost } from '../../shell/cevianHost';
 import { honestyGateReport } from './honestyGates';
 import { tangentsExhaustedKey } from '@/i18n/humanizeError';
@@ -88,7 +88,7 @@ import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { solveBudget, work, withWorkBudget, withWorkEpoch } from '@/engine/solveBudget';
 import { drawnPointIds } from '@/engine/inkCrossings';
-import { LABEL_G, LABEL_WHOLE } from '../parser/lexicon';
+import { LABEL_G, LABEL_WHOLE } from '../../shell/lexicon/atoms';
 
 /**
  * #1584 ([ADR-583](../../docs/06-decisions.md#adr-583)) — a ROLE RE-READING is a re-attempt of a line that
@@ -306,7 +306,7 @@ export function decidePreParse(utterance: string, view: DecideView, centresShown
   // SHOW, never a given. Refused here, PRE-parse, for the negation's reason: the relation rules matched the
   // claim inside the sentence and committed it as a constraint, so the figure was forced to satisfy what
   // was to be proved. The `proof` scope category below only ever ran after a FAILED parse. The rule is
-  // shared by all three builders (`shell/proofTarget`); the note quotes the proof sentence (#2492: `proofTargetNote`).
+  // shared by all three builders (`shell/lexicon/proofTarget`); the note quotes the proof sentence (#2492: `proofTargetNote`).
   const proof = findProofTarget(utterance);
   if (proof) {
     return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:proof' }], note: proofTargetNote(proof.sentence) };
@@ -314,13 +314,13 @@ export function decidePreParse(utterance: string, view: DecideView, centresShown
   // AN ANGLE WRITTEN IN RADIANS (#1837, ADR-710 / ADR-W-142) — «∠ABC = π/2»: radians are the complex builder's
   // notation only (operator rulings 2026-10-07 "Refuse and teach degrees", 2026-10-08). Refused here, PRE-parse
   // and `guided`, so it never reaches the model (every spelling escalated) and «∠ABC = pi/2» no longer commits
-  // 2°. The rule is shared by the plane-geometry builders (`shell/radianAngle`); the note teaches degrees.
+  // 2°. The rule is shared by the plane-geometry builders (`shell/lexicon/radianAngle`); the note teaches degrees.
   if (findRadianAngle(utterance)) {
     return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:radian-angle' }], note: { key: 'input.scope.radian-angle' } };
   }
   // TWO NUMBERS WITH ONLY A SPACE BETWEEN THEM (#2286, ADR-AG-397; operator ruling 2026-11-03 *"Refuse it, naming the line,
   // in every builder"*) — «AB = 2 3» is 2.3, 23 or 2·3, and the grammar cannot tell which, so it went to the model.
-  // Refused here, PRE-parse and `guided`, with the suite's sentence (`shell/juxtaposedNumbers`). The mixed number
+  // Refused here, PRE-parse and `guided`, with the suite's sentence (`shell/lexicon/juxtaposedNumbers`). The mixed number
   // «2 1/2» is not this shape (#2248).
   const pair = findNumberPair(utterance);
   if (pair) {
@@ -331,7 +331,7 @@ export function decidePreParse(utterance: string, view: DecideView, centresShown
   // unlabelled and the noun's default names were drawn with a green ✓. The student's three letters
   // vanished. Refused here, PRE-parse, for the proof target's reason and the honesty invariant's: a
   // stated name is never silently replaced. The rule is shared by all four builders
-  // (`shell/inputScript`), after the glyph fold's look-alike row — «משולש КМО» is still KMO.
+  // (`shell/lexicon/inputScript`), after the glyph fold's look-alike row — «משולש КМО» is still KMO.
   const unread = unreadScript(utterance);
   if (unread) {
     return {

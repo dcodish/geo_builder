@@ -18,7 +18,7 @@ import { derive } from '../engine/derive';
 import { parseLine } from '../parser/parseAnalytic';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
 import { declinedThrough, loweringKey } from '../app/lostPart';
-import { THROUGH_OPEN } from '../../shell/incidencePhrase';
+import { THROUGH_OPEN } from '../../shell/lexicon/incidencePhrase';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { analyticCorpus } from './analyticCorpus';

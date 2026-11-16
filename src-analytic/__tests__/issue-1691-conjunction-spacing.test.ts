@@ -4,7 +4,7 @@
  * Prod, 2026-10-01: a student typed «מעגל O», then «AB ו- BC משיקים למעגל»; the second line was not
  * understood and cost a paid escalation, while «AB ו-BC» built. Measured at pickup: analytic's tangency target
  * reader split «ו-?(?=\S)» and left the piece «- BC»; and every builder (2-D and 3-D too) missed «ו -X» / «ו - X»
- * in its other list readers. The fix is one shared fold at each builder's parser boundary (`shell/conjunction`).
+ * in its other list readers. The fix is one shared fold at each builder's parser boundary (`shell/lexicon/conjunction`).
  *
  * These locks CALL the shipped path (`decideSubmit`); the cross-builder rows are `conj-space-*-1691-*` in the
  * shared parity fixture.

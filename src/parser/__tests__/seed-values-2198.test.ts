@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { droppedGivenNumbers, statedNumberOccurrences } from '@/parser';
 import { isSeedValue, seedFields, type AnyCommand } from '@/engine';
-import { readNumbers, type Reader } from '../../../shell/readExtent';
+import { readNumbers, type Reader } from '../../../shell/lexicon/readExtent';
 
 describe('ADR-677 — the accountant skips seed values', () => {
   it('a free-radius 5, a free apex x = 12 and a line marker’s offset 5 do not account a stated 5 / 12', () => {

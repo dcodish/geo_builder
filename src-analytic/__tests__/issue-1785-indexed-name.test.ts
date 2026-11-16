@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { decideSubmit } from '../app/submit';
 import { derive } from '../engine/derive';
 import { INDEXED_TOKEN, paramRegister } from '../engine/carriers';
-import { INDEXED_NAME_RE } from '../../shell/indexedName';
+import { INDEXED_NAME_RE } from '../../shell/lexicon/indexedName';
 import { parseExpr } from '../engine/expr';
 import { parseLengthExpr } from '../engine/lengths';
 

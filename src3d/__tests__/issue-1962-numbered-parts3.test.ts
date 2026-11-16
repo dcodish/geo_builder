@@ -22,7 +22,7 @@ import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
 import { decideSubmit3, useGeo3 } from '../store/store3';
 import { lostPart3 } from '../store/unreadParts3';
-import type { PartsCut } from '../../shell/readExtent';
+import type { PartsCut } from '../../shell/lexicon/readExtent';
 
 type T = (k: string, o?: Record<string, unknown>) => string;
 const render = (lng: string, err: Parameters<typeof errorText3>[1]) =>

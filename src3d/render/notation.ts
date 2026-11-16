@@ -13,7 +13,7 @@
  * the term grammar, which is the #313 MathML rework's job; this formatter never guesses.
  */
 
-import { COMBINING_ARROW, foldPrimes3, PRIME_GLYPHS3, SPACING_ARROWS, VECTOR_WORD_SRC } from '../lexicon/marks3';
+import { COMBINING_ARROW, foldPrimes3, PRIME_GLYPHS3, SPACING_ARROWS, VECTOR_WORD_SRC } from '../../shell/lexicon/marks3';
 import type { Claim3, Command3, SegmentEquationReading3 } from '../engine/types';
 // #1195: the preview composes bidi isolation with the notation, so the display layer reads the
 // isolation transform. `i18n/bidi` imports NOTHING — it is a leaf — so this edge runs downward, the

@@ -19,7 +19,7 @@ import { decideSteps3, type Fact3 } from '../store/store3';
 import { errorText3 } from '../i18n/errorText3';
 import he from '../i18n/locales/he.json';
 import { parse3, CEVIAN_NOUNS3_EN, CEVIAN_NOUNS3_HE } from '../parser/parse3';
-import { SHAPE_ADJ_WORDS3 } from '../lexicon/shapePhrase3';
+import { SHAPE_ADJ_WORDS3 } from '../../shell/lexicon/shapePhrase3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
 import { droppedPropertyWords3, propertyOccurrences3, PROPERTY_VOCABULARY3 } from '../parser/propertyWords3';
 import type { Command3 } from '../engine/types';

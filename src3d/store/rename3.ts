@@ -16,7 +16,7 @@
  */
 
 import type { Command3 } from '../engine/types';
-import { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
+import { foldPrimes3, PRIME_GLYPHS3 } from '../../shell/lexicon/marks3';
 import type { Fact3 } from './store3';
 import type { PlaneDisplayMode3Map } from './figureFile3';
 import type { LetterRenameResult } from '../../shell/frame/letterOffer';

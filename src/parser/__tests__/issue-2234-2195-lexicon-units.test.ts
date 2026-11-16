@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { definedLabels, latinProseLabels, normalizeUtterance, parse, rightAngledAtVertex } from '@/parser';
-import { ANGLE_KW, AT_VERTEX, enWord, RIGHT_ANGLED, rx } from '@/parser/lexicon';
+import { ANGLE_KW, AT_VERTEX, enWord, RIGHT_ANGLED, rx } from '../../../shell/lexicon/atoms';
 import type { AnyCommand } from '@/engine';
 
 const rec = (line: string) => rightAngledAtVertex(normalizeUtterance(line));

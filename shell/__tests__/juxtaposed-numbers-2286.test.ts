@@ -1,11 +1,11 @@
 /**
  * #2286 ([ADR-AG-397](../../docs/06c-decisions-analytic.md#adr-ag-397)) — the suite's one detector for two numbers with
- * only whitespace between them (`shell/juxtaposedNumbers`). The builders' own locks drive it through their gates
+ * only whitespace between them (`shell/lexicon/juxtaposedNumbers`). The builders' own locks drive it through their gates
  * (`src-analytic/__tests__/juxtaposed-numbers-2286.test.ts`, `src/app/__tests__/…`, `src3d/__tests__/…`); this one
  * holds the shape itself: what is a pair, what is not, and what each pair teaches.
  */
 import { describe, expect, it } from 'vitest';
-import { findJuxtaposedNumbers, findNumberPair, juxtaposedNumbersSpelledOut, teachPair } from '../juxtaposedNumbers';
+import { findJuxtaposedNumbers, findNumberPair, juxtaposedNumbersSpelledOut, teachPair } from '../lexicon/juxtaposedNumbers';
 
 describe('#2286 — a bare pair of numbers', () => {
   it.each([

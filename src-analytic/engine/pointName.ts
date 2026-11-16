@@ -10,13 +10,13 @@
  * down.
  *
  * The prime is ASCII `'` here: the boundary (`orthography`) folds every prime glyph to it through the shared
- * `shell/primes` fold, so a reader never sees ′ or ’. A prime glued to a LOWERCASE letter is an English possessive
+ * `shell/lexicon/primes` fold, so a reader never sees ′ or ’. A prime glued to a LOWERCASE letter is an English possessive
  * («A's»), never a prime, so the atom does not take it. The drawn label renders it as A′ ({@link displayPointName}).
  *
  * Regex SOURCE with no capture group and no anchor, so composing it never renumbers a rule.
  */
-import { displayPrimes } from '../../shell/primes';
-import { NAME_ATOM, isPointName as isNameAtom, splitPointNames as splitNameAtoms } from '../../shell/indexedName';
+import { displayPrimes } from '../../shell/lexicon/primes';
+import { NAME_ATOM, isPointName as isNameAtom, splitPointNames as splitNameAtoms } from '../../shell/lexicon/indexedName';
 
 /**
  * One point name: a capital, an optional index (a digit run, ADR-AG-398), an optional prime — the SHARED atom since #2624

@@ -1,7 +1,7 @@
 /**
  * A STUDENT'S NAME GLYPH, ONCE — the letter a name is spelled with, an index on it, and the guard that keeps
- * a number from being read out of a name (#1814, [ADR-600](../docs/06-decisions.md#adr-600); first copy
- * analytic #1785, [ADR-AG-244](../docs/06c-decisions-analytic.md#adr-ag-244)).
+ * a number from being read out of a name (#1814, [ADR-600](../../docs/06-decisions.md#adr-600); first copy
+ * analytic #1785, [ADR-AG-244](../../docs/06c-decisions-analytic.md#adr-ag-244)).
  *
  * The class both builders hit: «α1», «S1», «a2», «S_1», «S₁» are the book's INDEXED NAMES — one name each.
  * A reader that does not know the name alphabet reads the index as a magnitude: analytic's tokenizer made
@@ -41,7 +41,7 @@ const SUBSCRIPT_DIGITS = '₀₁₂₃₄₅₆₇₈₉';
 const subscriptOf = (digits: string): string => [...digits].map((d) => SUBSCRIPT_DIGITS[Number(d)]).join('');
 
 /**
- * #1812 ([ADR-AG-394](../docs/06c-decisions-analytic.md#adr-ag-394), [ADR-782](../docs/06-decisions.md#adr-782)) — AN
+ * #1812 ([ADR-AG-394](../../docs/06c-decisions-analytic.md#adr-ag-394), [ADR-782](../../docs/06-decisions.md#adr-782)) — AN
  * INDEXED NAME AS THE BOOK WRITES IT: the trailing digits as subscript digits, «A1» → «A₁», «A12» → «A₁₂»; a name with
  * no index is unchanged («A», «α»). Operator ruling 2026-10-06: an angle labelled «A1» reads «A₁», with no angle sign,
  * in every builder. Text only — an SVG `<text>`, a panel row and a sentence all carry it as is.
@@ -63,7 +63,7 @@ const UNDERSCORE_TO_GLYPH = /(?<![A-Za-z_])([A-Z])\s*_\s*(?:\{\s*([0-9]+)\s*\}|(
 const GLUED_TO_GLYPH = /(?<![a-z])([A-Z])([0-9]+)(?![a-z_₀-₉]|\.\d)/g;
 
 /**
- * ONE INDEXED NAME, ONE SPELLING (#2075, [ADR-AG-398](../docs/06c-decisions-analytic.md#adr-ag-398)) — the fold every
+ * ONE INDEXED NAME, ONE SPELLING (#2075, [ADR-AG-398](../../docs/06c-decisions-analytic.md#adr-ag-398)) — the fold every
  * builder's parser boundary calls so «X_1», «X_{1}», «X1» (and in analytic «X₁») are the one name they are, a digit
  * run included («X12», «X_{12}»). Two canonical forms, because the builders' ids already differ and a saved figure
  * must keep its letters: `'glued'` — 2-D's ASCII `X1`, drawn with the digits lowered (`subscriptLabel`); `'glyph'` —
@@ -77,11 +77,11 @@ export function foldIndexedName(s: string, to: 'glued' | 'glyph'): string {
 }
 
 /**
- * #2624 ([ADR-W-197](../docs/06w-decisions-workspace.md#adr-w-197)) — THE PRIME ON A POINT NAME, ONCE: «A'», «B1'». The book
+ * #2624 ([ADR-W-197](../../docs/06w-decisions-workspace.md#adr-w-197)) — THE PRIME ON A POINT NAME, ONCE: «A'», «B1'». The book
  * names a second point after the first this way («A ו-A' הן נקודות החיתוך…»), so a name atom that has no prime reads «A'»
  * as A and a stray mark — the silent drop 2-D shipped (#2624) and analytic closed inline first (#2621 C,
- * [ADR-AG-395](../docs/06c-decisions-analytic.md#adr-ag-395)). Every builder's boundary folds the prime glyphs (′ ’ ׳ …)
- * to ASCII `'` first (`shell/primes`), so the atom is spelled with `'` alone.
+ * [ADR-AG-395](../../docs/06c-decisions-analytic.md#adr-ag-395)). Every builder's boundary folds the prime glyphs (′ ’ ׳ …)
+ * to ASCII `'` first (`shell/lexicon/primes`), so the atom is spelled with `'` alone.
  *
  * The guard: a prime followed by a lone «s» is an English possessive («ABC's area»), never a prime. It is spelled with the
  * letter itself, not a lowercase class, because most grammar rules are compiled case-INSENSITIVE (2-D's `rx` defaults to

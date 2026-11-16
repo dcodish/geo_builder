@@ -2,7 +2,7 @@
  * #2198 ([ADR-678](../../docs/06-decisions.md#adr-678)) — A NUMBER THE READING NEVER READ.
  *
  * The number sibling of #1888's label member (`unreadParts`) and #1904's word member (`unreadRoles`), over the same
- * shell module (`shell/readExtent.ts`, the number class), in the same battery, so both 2-D commit seams have it.
+ * shell module (`shell/lexicon/readExtent.ts`, the number class), in the same battery, so both 2-D commit seams have it.
  *
  * WHAT WENT WRONG. The number gate (`droppedGivenNumbers`, ADR-250) accounts a stated number by VALUE: it is kept
  * when some command carries the same value. So a value the rule wrote for another reason paid for it. «שני מעגלים
@@ -21,7 +21,7 @@
 import { parse, statedNumberOccurrences } from '@/parser';
 import type { ParseContext } from '@/parser';
 import type { AnyCommand } from '@/engine';
-import { readNumbers, type Reader } from '../../shell/readExtent';
+import { readNumbers, type Reader } from '../../shell/lexicon/readExtent';
 import { loweringKey } from './unreadParts';
 
 /** 2-D's reader in a context: the lowering key of a successful parse, null otherwise. */

@@ -28,7 +28,7 @@
  */
 
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
-import { AT_VERTEX, COPULA_HE, RIGHT_ANGLED, LABEL, ULABEL, LABEL_G } from './lexicon';
+import { AT_VERTEX, COPULA_HE, RIGHT_ANGLED, LABEL, ULABEL, LABEL_G } from '../../shell/lexicon/atoms';
 
 export type ScopeCategory =
   | 'analytic'

@@ -22,7 +22,7 @@
  * A fraction with no comparand («BE = רבע») proposes nothing: there is nothing the canonical form could say.
  */
 import type { ParseContext } from './parse';
-import { HE_FRACTION_DENOM, HE_FRACTION_NUM, EN_FRACTION_DENOM, EN_FRACTION_NUM, LABEL_G } from './lexicon';
+import { HE_FRACTION_DENOM, HE_FRACTION_NUM, EN_FRACTION_DENOM, EN_FRACTION_NUM, LABEL_G } from '../../shell/lexicon/atoms';
 
 type Id = string;
 

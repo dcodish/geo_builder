@@ -102,7 +102,7 @@ relaxed, and then there is no guard at all.
 
 ## ADR-W-003 — Product boundaries are a machine-readable manifest, and directory classification is total
 
-**Status:** Accepted (2026-08-08) · **Issue:** #453 · **Amends:** [ADR-266](06-decisions.md#adr-266), docs/22 §9 · **Guard:** `server/__tests__/isolation.test.ts`
+**Status:** Accepted (2026-08-08) · **Issue:** #453 · **Amends:** [ADR-266](06-decisions.md#adr-266), docs/22 §9 · **Guard:** `server/__tests__/isolation.test.ts` · **⚠ Amended by [ADR-W-220](#adr-w-220)** (2026-11-17, #2766): the deferred question is decided for the `lexicon` layer — plane-geometry language is shared (one home, `shell/lexicon/`), engines stay per product.
 
 **Context.** The isolation rule — product trees never import each other — was enforced by a test that
 **hard-coded exactly two edges** (`src` ↔ `src3d`) and asserted nothing else. Three gaps followed from the
@@ -8045,3 +8045,35 @@ Each limit is counted so that the same input stops at the same unit cold or warm
 - [ruled] 2-D's limit is raised so every corpus search but the kite's decides in one round. *"2 b"* (2026-11-15). ADR-831.
 - [ruled] 2-D: the typed line stays added when its search stops, as built. *"3 a"* (2026-11-15). The submit gates, the variant settle and the load's refresh ask at their limit, built when a figure first reaches one ([#2896](https://github.com/dcodish/geo_builder/issues/2896)). *"4 yes"* (2026-11-15).
 - [ruled] Analytic: a figure's values have no limit. *"5 yes"* (2026-11-15). ADR-AG-479.
+
+## ADR-W-220 — Plane-geometry language is shared, engines stay per product: one lexicon home, `shell/lexicon/` (#2766)
+
+**Status:** accepted · 2026-11-17 · feature (workspace) · fix round #2914, stream J · branch `feat/2766-shared-plane-language` · phases 1–2 of #2766's plan built; phase 3 written up below as the next step · **amends** [ADR-W-003](#adr-w-003) ("What this does NOT decide", for the `lexicon` layer) · **moves** the leaves of [ADR-3D-188](06b-decisions-3d.md#adr-3d-188) and [ADR-501](06-decisions.md#adr-501) · LADDER stage: **none** (no reading changes)
+**Operator:** 2026-11-08, on the six-reviewer audit (#2755, C1): *"it is time to do this. the full testing will ensure we dont break anything. for future, this will be more maintainable"*.
+**Requirements:** none (internal: no sentence reads differently in any builder) · **Design:** [04w](04w-design-shell.md) § "The shared plane-geometry lexicon, `shell/lexicon/`"; [04](04-design.md) § "One vocabulary home"; [04b](04b-design-3d.md) (paths); [22 §9](22-workflow.md) "Isolation rules"; [17](17-design-rules.md) tripwire 8 and the §3 lexical-atoms row
+
+**Context.** Plane geometry is read three times, by separate grammars in 2-D (`src/parser`), 3-D (`src3d/parser`) and analytic (`src-analytic/parser`). The 2026-11-08 architecture review measured the cost: analytic's grammar grew from 4,222 to 11,028 lines since 1 October, cross-product parser and engine commits rose from 4 in July to 39 in October, and a third of analytic bugs and a quarter of 3-D bugs since October are titled by their difference from 2-D. A shared layer was already forming one helper at a time: `shell/` held the spelling readers every builder calls (glyph fold, input script, indexed name, primes …), 2-D kept its lexical atoms in `src/parser/lexicon.ts`, and 3-D kept its noun vocabulary in `src3d/lexicon/` — while BOUNDARIES.json still called the lexicon layer's sharing "undecided" (ADR-W-003).
+
+**Decision.**
+1. **The isolation rule changes for one layer.** Plane-geometry LANGUAGE (the words and spellings a student types) is shared; ENGINES (what a builder makes of them: points, lines, DOF, constraints) stay per product and are still copied, never shared. Product trees still never import each other.
+2. **One home.** The `lexicon` layer's `sharing` is `shared`, and its `home` is `shell/lexicon/` (BOUNDARIES.json). Moved there unchanged, every importer re-pointed, no re-export stubs left behind:
+   - `src/parser/lexicon.ts` → `shell/lexicon/atoms.ts` (2-D's lexical atoms; still the docs/17 §3 chokepoint and the lexical ratchet's subject);
+   - `src3d/lexicon/{marks3,nouns3,revolutionSize3,shapePhrase3}.ts` → `shell/lexicon/` (the directory is gone);
+   - from `shell/`: `arcLengthUnit`, `arcRun`, `conjunction`, `glyphFold`, `incidencePhrase`, `indexedName`, `inputScript`, `juxtaposedNumbers`, `primes`, `proofTarget`, `radianAngle`, `readExtent`, `vulgarFractions`.
+
+   What stays in `shell/` beside the home PRINTS or ROUTES text rather than reading vocabulary: `literal` (composes `format`), `sentences` (composes `bidi`), `studentText`, `cevianHost` (the row tag's wording), `narrowing`, `converge`.
+3. **The home is a leaf.** A file in it imports nothing outside it (ADR-3D-188's rule for `src3d/lexicon`, generalized), so a product's parser and engine may both read it, and it can never reach a product, the server or chrome. It never reasons about geometry and never branches on which product called it.
+4. **A lexicon directory outside the home** is listed in the manifest's `productLocal` with its reason, and a plane builder (2-D, 3-D, analytic: the manifest's `planeTrees`) holds none. The one entry is `src-complex/formulas`, the complex builder's formula table, which imports the complex model and no plane builder reads.
+
+**Enforcement.** `server/__tests__/isolation.test.ts`, a new block read from the manifest: the layer is decided and its home is classified `lexicon`; the home is a leaf (with a negative control that feeds it a file importing `../format`, a product path and a package); every other lexicon directory is in `productLocal`, none in a plane tree; every plane builder imports the home. The existing totality check classifies `shell/lexicon`. The source-reading locks that named the old paths read the new ones: 2-D's `lexical-ratchet` and `lexicon-consumers` (`shell/lexicon/atoms.ts`; consumers are still counted in `src/`), 3-D's `issue-753` (the leaf and its two readers). The inline-Hebrew ratchet already skipped any `lexicon/` directory, so five baseline entries for moved files left the baseline (the counts did not change; the files are now the grammar, where Hebrew belongs).
+
+**Behaviour change for a student:** none. The move is byte-identical apart from import paths and comment links; the parity goldens `decide-parity-1395-*` and `decide-submit3-parity-1394-*` and the parity table are unchanged (the PR records the runs).
+
+**Cross-product check (ADR-W-004).** Every builder: 2-D, 3-D and analytic import the home (asserted); complex imports the three readers it already used (input script, juxtaposed numbers, proof target) from their new paths.
+
+**Next step: phase 3, the trial shared plane reader (not built in this ADR).** #2766's plan continues with one shared reader for one family, cevians (altitude, median, angle bisector, perpendicular): sentence → a product-neutral form → each builder's commands, judged by that family's parity rows (about 85 rows in `geo-input-parity.ts`; 2-D and analytic agree on nearly all, and 3-D's cells are mostly parked by #1679). It was not started here because a reader that is wired into one builder and not the others is the half-wired state the plan forbids, and the measured work is larger than a refactor:
+- 2-D's cevian rules (`src/parser/parse.ts`, 15k lines) read the figure context while they read the sentence (the host shape, the apex, the hypotenuse, the base of an isosceles triangle): reading must first be separated from reference resolution, which is the plan's phase-4 precondition met early for one family;
+- analytic's are `parseCevianFamily`, `cevianWithTarget` and `parseRoleCevian` in `parseAnalytic.ts`; 3-D's reach only the bare forms (`isBareAltitude3`);
+- the neutral form needs at least: role (`altitude | median | bisector | perpendicular`), apex, foot letter, target side or angle, host shape or role word (`base`, `leg`, `hypotenuse`), and the plural «בהתאמה» pairing.
+
+The shape it takes: `shell/lexicon/` holds the vocabulary it composes; the reader itself is a new `language`-like layer (sentence structure, not geometry) and needs its own classification and leaf rule in this manifest before it lands. Each builder keeps a small lowering from the neutral form to its own commands. The acceptance gate is the family's parity rows unchanged in all three builders, the two parity goldens by name, and `test:full`.

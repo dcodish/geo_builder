@@ -13,7 +13,7 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
-import { indexedNameText, GLUED_NAME_G, GLUED_NAME_WHOLE } from '../../shell/indexedName';
+import { indexedNameText, GLUED_NAME_G, GLUED_NAME_WHOLE } from '../../shell/lexicon/indexedName';
 import { givenText } from '../../shell/literal';
 import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GeoObject, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';

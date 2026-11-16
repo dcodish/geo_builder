@@ -13,7 +13,7 @@
  * distribution, all-or-nothing) and the clause splitter `clausesOf` (the coverage gate sees each incidence) — one
  * helper, never forked. Returns the distributed clauses, or null when the line is not an incidence list.
  */
-import { RESPECTIVELY, ULABEL, rx } from './lexicon';
+import { RESPECTIVELY, ULABEL, rx } from '../../shell/lexicon/atoms';
 
 const LABELS = String.raw`${ULABEL}(?:\s*(?:,\s*|\s+ו-?\s*|\s+and\s+)${ULABEL})*`;
 const HE_LIST = rx(

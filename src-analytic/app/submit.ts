@@ -282,7 +282,7 @@ const definingLineOf = (lines: readonly string[], id: string): string | null => 
   return null;
 };
 
-/** The figure's letters — never a stand-in for a substituted label (`shell/readExtent.ts`). */
+/** The figure's letters — never a stand-in for a substituted label (`shell/lexicon/readExtent.ts`). */
 const figureLabelsOf = (d: Derivation): string[] => d.construction.objects.map((o) => o.id).filter(isPointName);
 
 /** #1888 / #1889 (ADR-AG-251) — the refusal a lost part gets: the whole line, with its parts in the student's words. */

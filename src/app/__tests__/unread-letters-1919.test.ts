@@ -20,7 +20,7 @@ import { runEditCommit } from '../editPipeline';
 import { groupKey, replay, useGeoStore } from '@/store/geoStore';
 import { COMMAND_CATALOG } from '@/parser/catalog';
 import i18n from '@/i18n';
-import { unreadScriptRuns } from '../../../shell/inputScript';
+import { unreadScriptRuns } from '../../../shell/lexicon/inputScript';
 import { unreadLetterFaults, type UnreadGate } from '../../../shell/__tests__/fixtures/unread-letter-rows';
 import { createWorkQueue } from '../../../shell/work';
 

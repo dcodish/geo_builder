@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { derive3, useGeo3 } from '../store/store3';
 import { answerQuery } from '../engine/queries';
-import { DECL_WORDS_HE, POLYGON_HE, SHAPE_SUBJ } from '../lexicon/nouns3';
+import { DECL_WORDS_HE, POLYGON_HE, SHAPE_SUBJ } from '../../shell/lexicon/nouns3';
 
 const reset = () => {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
@@ -71,19 +71,19 @@ describe('#753 — ONE vocabulary, not two copies', () => {
    * could not depend on it and the copy would come back.
    */
   it('the lexicon leaf imports NOTHING — that is what lets both layers depend on it', () => {
-    const src = readFileSync(join(__dirname, '..', 'lexicon', 'nouns3.ts'), 'utf8');
+    const src = readFileSync(join(__dirname, '..', '..', 'shell', 'lexicon', 'nouns3.ts'), 'utf8');
     expect(src).not.toMatch(/^\s*import\s/m);
   });
 
   it('the parser reads its noun list from the leaf, and keeps no private copy', () => {
     const src = readFileSync(join(__dirname, '..', 'parser', 'parse3.ts'), 'utf8');
-    expect(src).toMatch(/from '\.\.\/lexicon\/nouns3'/);
+    expect(src).toMatch(/from '\.\.\/\.\.\/shell\/lexicon\/nouns3'/);
     expect(src).not.toContain("const DECL_WORDS_HE = ["); // the copy is gone, not shadowed
   });
 
   it('the query lane reads the same leaf', () => {
     const src = readFileSync(join(__dirname, '..', 'engine', 'queries.ts'), 'utf8');
-    expect(src).toMatch(/from '\.\.\/lexicon\/nouns3'/);
+    expect(src).toMatch(/from '\.\.\/\.\.\/shell\/lexicon\/nouns3'/);
   });
 
   it('the polygon words are IN the declaration vocabulary — one list, composed, not two', () => {

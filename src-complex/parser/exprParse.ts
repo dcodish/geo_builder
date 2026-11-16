@@ -23,7 +23,7 @@ import { fromDegrees, isExactRational } from '../value/angle';
 import { angleDegrees } from './angleText';
 import type { ReservedConstant } from '../model/naming';
 import { one as modOne, fromRational as modFromRational, pow as modPow } from '../value/modulus';
-import { findJuxtaposedNumbers } from '../../shell/juxtaposedNumbers';
+import { findJuxtaposedNumbers } from '../../shell/lexicon/juxtaposedNumbers';
 
 // the value core moved to model/fold.ts (#1818) so the fold can reuse it; the parser keeps calling it
 export { foldConstants } from '../model/fold';
@@ -310,7 +310,7 @@ export function gluedISpelledOut(line: string, scope: ComplexScope = NO_SCOPE): 
  * The detector is the suite's (`shell/juxtaposedNumbers`, #2286 / ADR-AG-397): it moved there from this file and
  * analytic's `engine/expr.ts`, whose two copies a text lock kept equal, when 2-D and 3-D joined the refusal.
  */
-export { findJuxtaposedNumbers, juxtaposedNumbersSpelledOut, type JuxtaposedNumbers } from '../../shell/juxtaposedNumbers';
+export { findJuxtaposedNumbers, juxtaposedNumbersSpelledOut, type JuxtaposedNumbers } from '../../shell/lexicon/juxtaposedNumbers';
 
 function lex(src: string, from: number, to: number, scope: ComplexScope = NO_SCOPE): Tok[] | null {
   // #2247 (ADR-CX-081) — two numbers side by side are ambiguous as written: a refusal here, never a product

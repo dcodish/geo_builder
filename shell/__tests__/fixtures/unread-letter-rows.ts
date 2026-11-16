@@ -8,7 +8,7 @@
  * 2-D and recorded A, B, C in 3-D — the student's three letters replaced by three he never typed, with a
  * green ✓ — while analytic handed the line to the paid model and complex answered "I did not understand".
  *
- * The rule lives once (`shell/inputScript.ts`), but whether each builder CALLS it at its statement seam is
+ * The rule lives once (`shell/lexicon/inputScript.ts`), but whether each builder CALLS it at its statement seam is
  * not visible from `shell/`, which may not import a product. So each tree hands its REAL submit decision
  * over as an {@link UnreadGate} (a thin lock per product), and `input-script-1919.test.ts` proves these
  * checks catch a seam that does not call the rule.

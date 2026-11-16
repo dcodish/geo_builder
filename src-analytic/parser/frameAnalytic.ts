@@ -24,11 +24,11 @@
 import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/shapes';
 import { NUMERAL_ALT, isNumeralName, letterlessCircleName } from '../engine/names';
 import { stripFormatControls } from '../../shell/bidi';
-import { foldConjunctionSpacing } from '../../shell/conjunction';
-import { foldGlyphs } from '../../shell/glyphFold';
-import { foldIndexedName } from '../../shell/indexedName';
+import { foldConjunctionSpacing } from '../../shell/lexicon/conjunction';
+import { foldGlyphs } from '../../shell/lexicon/glyphFold';
+import { foldIndexedName } from '../../shell/lexicon/indexedName';
 import { areaNotation } from '../engine/lengths';
-import { foldPrimes } from '../../shell/primes';
+import { foldPrimes } from '../../shell/lexicon/primes';
 import { POINT_NAME } from '../engine/pointName';
 
 /**
@@ -55,7 +55,7 @@ const SUB_AXIS_LAST = /(?<![A-Za-z0-9_])([A-Z][0-9₀-₉]*\s*_\s*\{?\s*)([XY])(
 /**
  * A POINT'S INDEX IN ANY SPELLING IS THE INDEX THE EXAM PRINTS — `N_2`, `N_{2}` (#2391, ADR-AG-315) and the glued `N2`
  * (#2075, ADR-AG-398) are `N₂`, the subscript glyph `NAME` reads, a digit run included (`X12` → `X₁₂`). The fold is the
- * suite's (`shell/indexedName.foldIndexedName`, `'glyph'`): a CAPITAL base only — a lowercase base (`x_B`, `r_M`, `m_1`,
+ * suite's (`shell/lexicon/indexedName.foldIndexedName`, `'glyph'`): a CAPITAL base only — a lowercase base (`x_B`, `r_M`, `m_1`,
  * `l1`), a letter index (`S_ABC`, the area notation) and the axis forms above are never touched, and the stored line
  * keeps the raw text (ADR-W-111: the typeset row reads either spelling). Operator, 2026-10-13: *"X_1(2,3) or X1 should
  * create a 1 in subscript"*; 2026-11-01: *"2075 re x1 - they are the same"*.
@@ -85,7 +85,7 @@ export function orthography(raw: string): string {
     .replace(SUB_AXIS_LAST, (_m, head: string, ax: string) => `${head}${ax.toLowerCase()}`)
     .replace(/^[\s\S]*$/, (t) => foldIndexedName(t, 'glyph'))
     // LOOK-ALIKE GLYPHS → the symbol they render as — the SHARED table every builder's parser boundary
-    // calls (#1912, [ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329); `shell/glyphFold`). It holds
+    // calls (#1912, [ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329); `shell/lexicon/glyphFold`). It holds
     // the ∢/∡ and ⁰ folds that were spelled here, in the same order, and adds the rows analytic never
     // had: the guarded keyboard `<` ≡ ∠, º/˚ ≡ ° after a digit, «שורש N» ≡ √, and ⟂ ≡ ⊥ (which
     // `REL_PERP_SYM` reads per-rule here, so folding it changes nothing).

@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'vitest';
 import { parse, normalizeUtterance, type ParseContext } from '../parse';
 import { unaccountedLabels } from '../labelAccounting';
-import { LABEL_G, LABEL_WHOLE, labelsOf } from '../lexicon';
+import { LABEL_G, LABEL_WHOLE, labelsOf } from '../../../shell/lexicon/atoms';
 import type { AnyCommand } from '@/engine';
 
 const CIRCLE: ParseContext = { points: ['O'], circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: [] }] };

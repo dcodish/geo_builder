@@ -16,7 +16,7 @@
  * token, and every token is mapped back to the real circle id (or to the centre letter, inside centre geometry).
  * No role word is left in the text for another rule to misread, and no rule reads a role word itself.
  */
-import { CIRCLE_ROLE_REF_EN, CIRCLE_ROLE_REF_HE, circleRole } from './lexicon';
+import { CIRCLE_ROLE_REF_EN, CIRCLE_ROLE_REF_HE, circleRole } from '../../shell/lexicon/atoms';
 import type { AnyCommand, Id } from '@/engine';
 import type { ParseContext, ParseResult } from './parse';
 

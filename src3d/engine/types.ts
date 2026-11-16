@@ -22,7 +22,7 @@ import type { Vec3 } from './vec3';
 // #587: the quad-base vocabulary is defined ONCE, in the base registry — the flat `quad-shape` command
 // names the same seven families the solid lane's bases do. Type-only, so the cycle is erased at compile.
 import type { QuadBase } from './baseShapes';
-import type { ShapeAdj3 } from '../lexicon/shapePhrase3';
+import type { ShapeAdj3 } from '../../shell/lexicon/shapePhrase3';
 import type { NarrowKind } from '../../shell/narrowing';
 
 export type Id = string;

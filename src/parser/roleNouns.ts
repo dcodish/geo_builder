@@ -16,7 +16,7 @@
  *
  * Lexical layer only: no geometry, no context. Pure over the string.
  */
-import { LABEL, ULABEL } from './lexicon';
+import { LABEL, ULABEL } from '../../shell/lexicon/atoms';
 
 /** What a role noun asserts about its pair. Lowered in `parse.ts` (`withRoleClaims`). */
 export type RoleNoun = 'chord' | 'diameter' | 'radius' | 'tangent' | 'leg' | 'base' | 'hypotenuse' | 'diagonal';

@@ -4,7 +4,7 @@
  * docs/23 measured the debt: the point-label fragment inlined 342× in parse.ts / 163× in parse3.ts,
  * the number fragment 31×/24× — and the recurring "proxy-signal" lexical defect family (ADR-3D-068/
  * 069/071, the זוית sweeps, the מאונ[ךכ] trap) is generated exactly by every rule re-deriving token
- * structure from a raw string. The atoms now live in ONE place (`src/parser/lexicon.ts`, a docs/17 §3
+ * structure from a raw string. The atoms now live in ONE place (`shell/lexicon/atoms.ts`, a docs/17 §3
  * registered chokepoint). A full mechanical sweep of the existing sites was deliberately NOT done in
  * one night (blind regex substitution can renumber capture groups); instead this ratchet records the
  * exact current counts and fails on ANY growth — so new rules must compose from the atoms, and every
@@ -13,14 +13,14 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { ANGLE_KW, EN_START, enWord } from '../lexicon';
+import { ANGLE_KW, EN_START, enWord } from '../../../shell/lexicon/atoms';
 
 const root = path.resolve(__dirname, '../../..');
 const parse2 = readFileSync(path.join(root, 'src/parser/parse.ts'), 'utf8');
 const parse3 = readFileSync(path.join(root, 'src3d/parser/parse3.ts'), 'utf8');
 
 const count = (src: string, literal: string): number => src.split(literal).length - 1;
-const lexicon2 = readFileSync(path.join(root, 'src/parser/lexicon.ts'), 'utf8');
+const lexicon2 = readFileSync(path.join(root, 'shell/lexicon/atoms.ts'), 'utf8');
 /** Every 2-D source file but parse.ts (counted on its own) and the lexicon (which holds the atom), as text. */
 function src2Files(dir = path.join(root, 'src')): string[] {
   return readdirSync(dir).flatMap((n) => {
@@ -32,11 +32,11 @@ function src2Files(dir = path.join(root, 'src')): string[] {
 }
 
 // The recorded ceilings (2026-07-24 baselines). LOWER when you sweep; NEVER raise — compose new
-// regexes from src/parser/lexicon.ts atoms instead of inlining a fresh fragment.
+// regexes from shell/lexicon/atoms.ts atoms instead of inlining a fresh fragment.
 const CEILINGS = {
   // #1790 (ADR-595): the inscription rules read their shape through src/parser/shapePhrase.ts and the incircle's
   // circumscribes pattern composes the LABEL atom — lowered to the measured count (342 → 334, earlier drift included).
-  // #1814 (ADR-600): the number gate's subscript blank composes NAME_LETTER (shell/indexedName) — 334 → 333.
+  // #1814 (ADR-600): the number gate's subscript blank composes NAME_LETTER (shell/lexicon/indexedName) — 334 → 333.
   // #2624 (ADR-806): the label atom gained its PRIME, so every inline copy was a reader that could not see «A'» — all
   // swept onto LABEL / ULABEL / LABEL_G / LABEL_WHOLE. What is left of either spelling is prose in comments.
   parse2Label: 5, // '[A-Za-z]\d*' in parse.ts (333 before #2624)
@@ -93,7 +93,7 @@ describe('lexical ratchet — inline fragment counts must not grow (docs/24 S2.1
   });
   it('non-vacuity: the counters actually see the fragments', () => {
     expect(count(lexicon2, String.raw`[A-Za-z]\d*`)).toBeGreaterThan(0); // the atom itself (#2624: parse.ts has none left)
-    expect(count(readFileSync(path.join(root, 'shell/indexedName.ts'), 'utf8'), String.raw`[A-Z]\d*`)).toBeGreaterThan(0); // ULABEL is the shell's GLUED_NAME_ATOM
+    expect(count(readFileSync(path.join(root, 'shell/lexicon/indexedName.ts'), 'utf8'), String.raw`[A-Z]\d*`)).toBeGreaterThan(0); // ULABEL is the shell's GLUED_NAME_ATOM
     expect(src2Files().length).toBeGreaterThan(50);
     expect(count(parse3, String.raw`[A-Z]\d*`)).toBeGreaterThan(50);
   });

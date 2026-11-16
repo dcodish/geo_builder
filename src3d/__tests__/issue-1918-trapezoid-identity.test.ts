@@ -27,7 +27,7 @@ import { firstSatisfyingSeed3, solidFaceCollapsed } from '../engine/evaluate';
 import { QUAD_IMPLIES, quadImplies, quadsDisjoint, trapezoidRingInForce3, type QuadBase } from '../engine/baseShapes';
 import { shapeWarnings3 } from '../engine/notices';
 import { emptyConstruction3, type Construction3 } from '../engine/types';
-import { notCyclic3 } from '../lexicon/shapePhrase3';
+import { notCyclic3 } from '../../shell/lexicon/shapePhrase3';
 import { errorText3 } from '../i18n/errorText3';
 import i18n3d from '../i18n';
 import { cross3, norm3, sub3, v3, type Vec3 } from '../engine/vec3';

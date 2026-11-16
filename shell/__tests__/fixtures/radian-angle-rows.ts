@@ -8,7 +8,7 @@
  * angle mark labelled π and answered the rest `not-understood` (the fallback); analytic recorded each one in
  * DEGREES («∠ABC = π/2» drew 1.57°).
  *
- * The rule lives once (`shell/radianAngle.ts`); whether each builder CALLS it is not visible from `shell/`,
+ * The rule lives once (`shell/lexicon/radianAngle.ts`); whether each builder CALLS it is not visible from `shell/`,
  * so each tree hands its REAL submit decision over as a {@link RadianGate} (`src/app/__tests__/radian-angle-1837.test.ts`,
  * `src3d/__tests__/radian-angle-1837.test.ts`, `src-analytic/__tests__/radian-angle-1837.test.ts`), and
  * `shell/__tests__/radian-angle-meta-1837.test.ts` proves these checks catch a broken gate.

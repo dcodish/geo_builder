@@ -1,5 +1,5 @@
 /**
- * #1912 ([ADR-3D-329](../docs/06b-decisions-3d.md#adr-3d-329)) — THE LOOK-ALIKE GLYPH FOLD, ONE
+ * #1912 ([ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329)) — THE LOOK-ALIKE GLYPH FOLD, ONE
  * SPELLING FOR EVERY BUILDER.
  *
  * A mathematical symbol has several Unicode glyphs that render alike, and which one a student gets is
@@ -39,7 +39,7 @@
  * КМО» is the triangle KMO in every builder — this was 2-D's private `CYRILLIC_TO_LATIN` until #1919
  * ruled, and it is the LAST row for the reason the order note below gives: it is exactly where 2-D has
  * always applied it. A non-Latin letter with NO Latin twin folds to nothing and is refused by name
- * instead — {@link unreadScriptRuns} in `shell/inputScript.ts`, which runs right after this table.
+ * instead — {@link unreadScriptRuns} in `shell/lexicon/inputScript.ts`, which runs right after this table.
  */
 
 /** One fold: the pattern, its replacement, and why the symbol is the same intent. */
@@ -58,14 +58,14 @@ const LOOKALIKE_LETTERS: Record<string, string> = {
 
 /**
  * Fold every look-alike LETTER onto its Latin twin — the letter half of the table, exported on its own
- * because the input-script check (`shell/inputScript.ts`) must fold the twins before it judges a
+ * because the input-script check (`shell/lexicon/inputScript.ts`) must fold the twins before it judges a
  * letter unreadable, and it serves complex too, which deliberately never calls {@link foldGlyphs}.
  */
 export const foldLookalikeLetters = (s: string): string =>
   s.replace(/[АВСЕНКМОРТХ]/g, (ch) => LOOKALIKE_LETTERS[ch]);
 
 /**
- * #2069 ([ADR-W-145](../docs/06w-decisions-workspace.md#adr-w-145)) — THE PARALLEL LOOK-ALIKES, «‖» (U+2016 DOUBLE
+ * #2069 ([ADR-W-145](../../docs/06w-decisions-workspace.md#adr-w-145)) — THE PARALLEL LOOK-ALIKES, «‖» (U+2016 DOUBLE
  * VERTICAL LINE) and two ASCII bars «||», as ∥ (U+2225 PARALLEL TO). Both are also a WRAPPING notation — the norm
  * «‖u‖» and two absolute values «|AB||CD|» — so the fold is INFIX only: an operand directly before it (a label, a
  * line or vector name, a digit, a closing bracket) and an operand directly after it (a letter or «(»), ignoring

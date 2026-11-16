@@ -1,5 +1,5 @@
 /**
- * #1919 ([ADR-626](../docs/06-decisions.md#adr-626), [ADR-3D-328](../docs/06b-decisions-3d.md#adr-3d-328))
+ * #1919 ([ADR-626](../../docs/06-decisions.md#adr-626), [ADR-3D-328](../../docs/06b-decisions-3d.md#adr-3d-328))
  * — THE INPUT-SCRIPT RULE: the tool reads Hebrew and English, and a letter it cannot read is REFUSED BY
  * NAME, never silently replaced.
  *
@@ -22,7 +22,7 @@
  * default names (A, B, C …) are drawn. In 2-D four gates miss it at once (`namesVertices`, the
  * fail-closed `shapeLeftover`, `statedLabelTokens`, the span accountant); in 3-D it is `declLeftover`.
  * Teaching eight tokenizers one script each leaves the ninth to reintroduce it, so the rule lives ONCE,
- * here, and every builder calls it at its statement seam — the `shell/proofTarget` precedent
+ * here, and every builder calls it at its statement seam — the `shell/lexicon/proofTarget` precedent
  * (ADR-W-107): a pure rule in `shell/`, no strings, each builder wording its own refusal.
  *
  * ## What is readable

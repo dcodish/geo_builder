@@ -19,7 +19,7 @@ import { runEditCommit } from '../editPipeline';
 import { groupKey, replay, useGeoStore } from '@/store/geoStore';
 import { COMMAND_CATALOG } from '@/parser/catalog';
 import i18n from '@/i18n';
-import { findRadianAngle } from '../../../shell/radianAngle';
+import { findRadianAngle } from '../../../shell/lexicon/radianAngle';
 import { radianAngleFaults, RADIAN_SENTENCE_EN, RADIAN_SENTENCE_HE, type RadianGate } from '../../../shell/__tests__/fixtures/radian-angle-rows';
 import { createWorkQueue } from '../../../shell/work';
 

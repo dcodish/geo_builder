@@ -1,10 +1,10 @@
 /**
- * #2547 ([ADR-W-161](../docs/06w-decisions-workspace.md#adr-w-161)) — THE INCIDENCE-PHRASE OPENERS, ONE SPELLING OF
+ * #2547 ([ADR-W-161](../../docs/06w-decisions-workspace.md#adr-w-161)) — THE INCIDENCE-PHRASE OPENERS, ONE SPELLING OF
  * "THROUGH" FOR EVERY BUILDER.
  *
  * The words that open an incidence phrase on a carrier: «[ה|ש|ו]עובר דרך/ב X», bare «דרך X», «במרכז …»;
  * "(that) passes / passing / goes / runs through X", bare "through X". Moved here verbatim from 2-D's
- * `src/parser/lexicon.ts` (#2532, [ADR-765](../docs/06-decisions.md#adr-765)), which re-exports them, so 2-D's
+ * `src/parser/lexicon.ts`, now `shell/lexicon/atoms.ts` (#2532, [ADR-765](../../docs/06-decisions.md#adr-765)), which re-exports them, so 2-D's
  * incidence-phrase member (`src/app/unreadThrough.ts`) and analytic's arm 3 of the lost part
  * (`src-analytic/app/lostPart.ts`, ADR-AG-334) read ONE spelling — a third copy is never written (docs/22 §9).
  *

@@ -1,7 +1,7 @@
 /**
  * #1870 ([ADR-CX-083](../../docs/06d-decisions-complex.md#adr-cx-083), ADR-W-107; ruling B14/D3) — complex's
  * thin lock on the shared proof-target rows (`shell/__tests__/fixtures/proof-target-rows.ts`, docs/28 §5c),
- * the fourth caller of `shell/proofTarget`.
+ * the fourth caller of `shell/lexicon/proofTarget`.
  *
  * Measured on `main` b0e9dbea through `submitLine`, on «z1 = 3+4i · z2 = 3-4i · w = z1·z2»: «הוכיחו כי |z1| = 5»,
  * «הוכיחו ש-w ממשי», «הראו ש-arg(z1) > 0» and the exam's mixed line «נתון z1 = 3+4i. הוכיחו כי |z1| = 5» were each
@@ -22,7 +22,7 @@ import { errorText } from '../app/errorText';
 import { complexI18n } from '../i18n';
 import { CATALOG } from '../parser/catalog';
 import { useComplexStore } from '../store/useComplexStore';
-import { findProofTarget } from '../../shell/proofTarget';
+import { findProofTarget } from '../../shell/lexicon/proofTarget';
 import { proofTargetFaults, type ProofGate } from '../../shell/__tests__/fixtures/proof-target-rows';
 import { PANEL_POINTER, PROOF_TARGET_SENTENCE, panelDrawnFaults } from '../../shell/__tests__/fixtures/proof-target-check-2492';
 

@@ -6013,6 +6013,8 @@ the panel and the query lane agreeing on both the symbol and the parametric text
 
 **Status:** Accepted (2026-08-30) · **Ladder:** stage 0 (parse) · **Round:** #826 · **Operator ruling:** 2026-08-19 — *"for #753 - option 1 - the recommended approach"*
 
+> **⚠ Amended (location) by [ADR-W-220](06w-decisions-workspace.md#adr-w-220)** (2026-11-17, #2766): the leaf moved, unchanged, from `src3d/lexicon/` to the shared plane-language home `shell/lexicon/`; its rule (a leaf importing nothing outside itself) is now the home's rule for every builder.
+
 «שטח ABC» answered; **«שטח המשולש ABC» did not.** The point, length and volume heads all took their
 subject noun in #642's sweep and this one could not — the polygon vocabulary («משולש / מרובע / ריבוע /
 מלבן / מקבילית / טרפז / דלתון / מחומש / מצולע», with the adjectival and plural forms a book sentence

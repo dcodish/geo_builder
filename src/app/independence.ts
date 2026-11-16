@@ -39,11 +39,11 @@
  */
 import { CLAUSE_CONNECTIVES, CLAUSE_RELATIVES, distributedClauses, parse } from '@/parser';
 import type { ScopeMatch } from '@/parser';
-import { RESPECTIVELY } from '@/parser/lexicon';
+import { RESPECTIVELY } from '../../shell/lexicon/atoms';
 import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
-import { ULABEL, LABEL_G, LABEL_RUN_G } from '../parser/lexicon';
+import { ULABEL, LABEL_G, LABEL_RUN_G } from '../../shell/lexicon/atoms';
 
 /**
  * Liberal clause separators. NO noun lookahead anywhere — that is the enumeration this issue exists

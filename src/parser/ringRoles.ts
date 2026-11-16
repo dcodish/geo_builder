@@ -24,7 +24,7 @@
  * A span that is the sentence's SUBJECT («המעגל החוסם את … חותך …», «מעגל O חוסם את …») is never touched: its rules own
  * it (ADR-291 Am., the #86 ruling that the cut sentence's circle stays hidden).
  */
-import { RING_CIRCUM_HE, RING_NOUN_EN, RING_NOUN_HE, RING_ROLE_REF_EN, RING_ROLE_REF_HE, ULABEL, ringRelation } from './lexicon';
+import { RING_CIRCUM_HE, RING_NOUN_EN, RING_NOUN_HE, RING_ROLE_REF_EN, RING_ROLE_REF_HE, ULABEL, ringRelation } from '../../shell/lexicon/atoms';
 import { freshTokens } from './pairRoles';
 import type { ParseContext, ParseResult } from './parse';
 

@@ -4,7 +4,7 @@
  * `issue-1785-indexed-name.test.ts`) assert they compose these atoms; this file asserts the atoms themselves.
  */
 import { describe, expect, it } from 'vitest';
-import { INDEXED_NAME_RE, NAME_ATOM, PRIMED, UNGLUED, isPointName, splitPointNames } from '../indexedName';
+import { INDEXED_NAME_RE, NAME_ATOM, PRIMED, UNGLUED, isPointName, splitPointNames } from '../lexicon/indexedName';
 
 /** The probe composes UNGLUED exactly as a reader does: in front of a signed decimal number. */
 const NUM_UNGLUED_PROBE = new RegExp(UNGLUED + String.raw`-?\d+(?:\.\d+)?`);

@@ -35,7 +35,7 @@ import { curveParentOf, curveParentsOf, parentsOf } from './derived';
 import { evalExpr, exprText, literalText, symbolsOf, type Env, type Expr } from './expr';
 import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
 import { UNBOUNDED, circleDefPoints, type Construction, type Domain, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
-import { INDEXED_NAME_RE } from '../../shell/indexedName';
+import { INDEXED_NAME_RE } from '../../shell/lexicon/indexedName';
 import { resolveCurve } from './curves';
 import { toolSymbol } from './names';
 import { ContentCache } from './content';
@@ -96,7 +96,7 @@ export const POINT_TOKEN = /(?<![A-Za-z])[A-Z](?:[0-9₀-₉]+|_\{?\d+\}?)?(?![A
  * has no indexed-name symbol and juxtaposition would read it as letter × index; a value reader that finds its source
  * unreadable tests this to DECLINE (`not-handled`, the LLM fallback's seam) instead of answering `bad-equation` about a
  * name the student spelled correctly. 2-D carries the same class (#1814), so the test now lives ONCE in
- * `shell/indexedName` (ADR-600, the third-copy rule): the shared atom also admits a capital Greek letter («Α1»), and
+ * `shell/lexicon/indexedName` (ADR-600, the third-copy rule): the shared atom also admits a capital Greek letter («Α1»), and
  * a Greek neighbour bounds the name like a Latin one.
  */
 export const INDEXED_TOKEN = INDEXED_NAME_RE;

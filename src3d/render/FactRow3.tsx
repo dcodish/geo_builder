@@ -28,7 +28,7 @@ import React from 'react';
 import { MathText, hasMath } from '../../shell/math';
 import { isolateLtrRuns3, textDir3 } from '../i18n/bidi';
 import { factDisplay3, isVectorFact3, vectorNotation } from './notation';
-import { isVectorMarked3 } from '../lexicon/marks3';
+import { isVectorMarked3 } from '../../shell/lexicon/marks3';
 import { VecMath, tokenizeRow } from './VecMath';
 import type { QueryEcho3 } from '../engine/queries';
 import type { SegmentEquationReading3 } from '../engine/types';

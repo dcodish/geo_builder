@@ -14,7 +14,7 @@
 
 import { knowledgeSamples3, letterIsGaugeLength3, resolve3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3 } from './evaluate';
 import { seedNumber3, type Seed3 } from './components3';
-import { SHAPE_SUBJ } from '../lexicon/nouns3';
+import { SHAPE_SUBJ } from '../../shell/lexicon/nouns3';
 import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, branchAnswer, decompStr, letterSpan3, lineEquationForms3, linePlaneAngleAt, vecDefLetterAt3, paramRows3, parametricFitter3, parametricPlaneForm, pinLetters3, planeEqStr, planeOffsetAnchored3, planeSymbols, type OpenParam3, pointPlaneRow3 } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
@@ -24,7 +24,7 @@ import { angleAskOperands, componentAskOf, foldPrimes3, lineAskOf, membershipQue
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
 import { namedVector3 } from './vecExpr';
-import { foldGlyphs } from '../../shell/glyphFold';
+import { foldGlyphs } from '../../shell/lexicon/glyphFold';
 import type { Construction3, Id, Operand3, Positions3 } from './types';
 
 /** An operand: a declared vector name, or an ordered point pair. */

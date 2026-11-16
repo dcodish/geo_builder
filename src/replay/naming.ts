@@ -11,7 +11,7 @@ import type { AnyCommand, Id, RoleSideBinding } from '@/engine';
 import { commandPointIds } from './core';
 import type { Fact } from './core';
 import type { CevianHost } from '../../shell/cevianHost';
-import { GLUED_NAME_ATOM, GLUED_NAME_G, GLUED_NAME_WHOLE } from '../../shell/indexedName';
+import { GLUED_NAME_ATOM, GLUED_NAME_G, GLUED_NAME_WHOLE } from '../../shell/lexicon/indexedName';
 
 /**
  * Rewrite every WHOLE point label `from`→`to` inside a string — a bare point id ("O"), OR a label EMBEDDED

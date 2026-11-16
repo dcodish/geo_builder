@@ -4,7 +4,7 @@
  *
  * Measured at ebacadd1 through `decideDeterministic2D`, after «משולש ABC»: «AB = 2 3», «∠ABC = 2 3» and «מעגל O
  * ברדיוס 2 3» ESCALATED to the model, which decides on its own what «2 3» means. Now each is refused BEFORE the
- * parser, `guided`, with the suite's sentence (`shell/juxtaposedNumbers`); the model is never asked. The mixed number
+ * parser, `guided`, with the suite's sentence (`shell/lexicon/juxtaposedNumbers`); the model is never asked. The mixed number
  * «2 1/2» is not this shape: it is #2248's.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,7 +18,7 @@ import { runEditCommit } from '../editPipeline';
 import { groupKey, replay, useGeoStore } from '@/store/geoStore';
 import { COMMAND_CATALOG } from '@/parser/catalog';
 import i18n from '@/i18n';
-import { findNumberPair } from '../../../shell/juxtaposedNumbers';
+import { findNumberPair } from '../../../shell/lexicon/juxtaposedNumbers';
 import { createWorkQueue } from '../../../shell/work';
 
 const t = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'he' }) as string;

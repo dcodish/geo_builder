@@ -7,7 +7,7 @@
  * `src3d/__tests__/issue-1912-glyph-fold.test.ts` (folded, #2739) and the parity rows `glyph-*-1912`.
  */
 import { describe, expect, it } from 'vitest';
-import { GLYPH_FOLDS, foldGlyphs } from '../glyphFold';
+import { GLYPH_FOLDS, foldGlyphs } from '../lexicon/glyphFold';
 
 describe('#1912 — every look-alike glyph folds onto its symbol', () => {
   it('the perpendicular twins', () => {

@@ -19,7 +19,7 @@ import { errorText } from '../app/errorText';
 import { analyticI18n } from '../i18n';
 import { derive } from '../engine/derive';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
-import { findRadianAngle } from '../../shell/radianAngle';
+import { findRadianAngle } from '../../shell/lexicon/radianAngle';
 import { radianAngleFaults, RADIAN_SENTENCE_EN, RADIAN_SENTENCE_HE, type RadianGate } from '../../shell/__tests__/fixtures/radian-angle-rows';
 
 type T = (k: string, o?: Record<string, unknown>) => string;

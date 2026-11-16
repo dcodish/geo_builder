@@ -10889,7 +10889,7 @@ three new evidence rows.
 
 ## ADR-501 — A LEXICON ATOM IS LOAD-BEARING OR IT DOES NOT EXIST: four dead atoms adopted or deleted, and a guard (#361)
 
-**Status:** accepted, 2026-09-11 · **Issue:** #361 (debt, P3) · round #992
+**Status:** accepted, 2026-09-11 · **Issue:** #361 (debt, P3) · round #992 · **⚠ Amended (location) by [ADR-W-220](06w-decisions-workspace.md#adr-w-220)** (2026-11-17, #2766): `src/parser/lexicon.ts` moved, unchanged, to `shell/lexicon/atoms.ts`; the guard reads it there.
 **Requirements:** none (internal — no utterance parses differently, measured) · **Design:** [04](04-design.md) §5 — the one vocabulary home; [17](17-design-rules.md) §3 — the chokepoint registry row this makes enforceable
 
 **The finding, re-measured at `2865f2b`.** `src/parser/lexicon.ts` is a registered chokepoint whose rule says

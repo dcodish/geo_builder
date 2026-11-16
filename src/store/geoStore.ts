@@ -38,7 +38,7 @@ import type { CevianHost } from '../../shell/cevianHost';
 import { geoWork, geoValues, isCancelled, isStaleBasis, supersedeStaleSearches, type ViewBasis } from './geoWork';
 import { toggleSegFlag } from '../../shell/frame/segmentDisplay';
 import { pruneDisplayMode, toggleDisplayMode, displayModeFromIndexed, type DisplayModeMap } from '../../shell/displayMode';
-import { GLUED_NAME_G } from '../../shell/indexedName';
+import { GLUED_NAME_G } from '../../shell/lexicon/indexedName';
 
 /**
  * Run the shared detection sweep for `facts` off the main thread and return its verdicts, or null when

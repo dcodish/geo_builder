@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { radianAngleFaults, RADIAN_ROWS, NOT_RADIAN_ROWS, RADIAN_SENTENCE_HE, type RadianGate } from './fixtures/radian-angle-rows';
-import { findRadianAngle } from '../radianAngle';
+import { findRadianAngle } from '../lexicon/radianAngle';
 
 const gateOf = (detect: (line: string) => boolean): RadianGate => (line) =>
   detect(line) ? { radian: true, recorded: false, escalated: false, text: RADIAN_SENTENCE_HE } : { radian: false, recorded: true, escalated: false, text: null };

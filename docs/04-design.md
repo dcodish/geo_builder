@@ -154,12 +154,13 @@ A single boundary: `utterance → command[]`.
   half `ANGLE_EN` spells its case, so a following lowercase letter — «angled» — is refused while a glued uppercase
   label — «angleABC» — is not); its Hebrew half is the singular the rules always spelled inline. The `the` / `of` /
   bisector-word strips are `\b`-bounded. `angleArms` refuses three letters that are not three points («ALL»).
-- **One vocabulary home (#361, ADR-501).** `src/parser/lexicon.ts` holds the keyword and token atoms the grammar
+- **One vocabulary home (#361, ADR-501).** `shell/lexicon/atoms.ts` holds the keyword and token atoms the grammar
   consumes; a rule's alternation (`INTERSECT_KW`, `BISECTOR_KW`) is compiled from it, and
-  `lexicon-consumers.test.ts` fails on an atom nothing composes from. 3-D keeps its own leaf (`src3d/lexicon/nouns3.ts`).
-- **A primed name is one label (#2624, ADR-806, ADR-807).** `LABEL` / `ULABEL` compose `shell/indexedName`'s `PRIMED`
+  `lexicon-consumers.test.ts` fails on an atom nothing composes from. Since #2766 ([ADR-W-220](06w-decisions-workspace.md#adr-w-220)) the atoms live in the
+  shared plane-language tree beside 3-D's nouns (`shell/lexicon/nouns3.ts`) and the spelling readers every builder calls.
+- **A primed name is one label (#2624, ADR-806, ADR-807).** `LABEL` / `ULABEL` compose `shell/lexicon/indexedName`'s `PRIMED`
   after their index, so «A'» is one label and never backs off to «A»; `normalizeUtterance` folds every prime glyph to `'`
-  first (`shell/primes`). The compiled forms `LABEL_G` (tokens), `LABEL_WHOLE` (one label), `LABEL_RUN_G` (a glued run)
+  first (`shell/lexicon/primes`). The compiled forms `LABEL_G` (tokens), `LABEL_WHOLE` (one label), `LABEL_RUN_G` (a glued run)
   and `labelsOf` replace the inline `[A-Z]\d*` copies everywhere in `src/` (engine, replay and store use the shell's
   `GLUED_NAME_G` / `GLUED_NAME_WHOLE`, since they do not import the parser); `lexical-ratchet.test.ts` holds the counts
   at the prose left in comments. A `\b` after a label is spelled `(?!\w)`, which holds after a prime too. The label
@@ -170,7 +171,7 @@ A single boundary: `utterance → command[]`.
   particle, so the digits match unsigned; a hyphen after a space, `=`, `(`, `,` or at line start is a sign.
   The guard is zero-width, so every consumer inherits it.
 - **A name glyph is defined once, and a number never starts inside one (#1814, ADR-600).**
-  `shell/indexedName.ts` holds `NAME_LETTER`, `INDEX` (`_1`, `_{1}`, glued and subscript digits),
+  `shell/lexicon/indexedName.ts` holds `NAME_LETTER`, `INDEX` (`_1`, `_{1}`, glued and subscript digits),
   `INDEXED_NAME`, and `UNGLUED` — the zero-width guard
   "a number never begins glued to a name letter, an `_`, or inside another number". `lexicon.ts` re-exports
   them; analytic's `INDEXED_TOKEN` is the same atom. The angle value reader composes `UNGLUED + num` and
@@ -803,12 +804,12 @@ phrase }`. Because it is `parse`, every seam inherits it: the submit lane (`deci
 edit seam, the scenario harness (`refusedSteps`) and log-triage. The pre-parse guard and the post-failure register
 read the same `RULES` entries.
 
-**Two numbers with only a space between them** («AB = 2 3», #2286, [ADR-AG-397](06c-decisions-analytic.md#adr-ag-397)) are refused in `decidePreParse` beside the radian check — `refuse`, `guided`, log `scope:juxtaposed-numbers`, the suite note `suite.refusal.juxtaposedNumbers*` built by `juxtaposedPairNote` — and in `runEditCommit`. The detector is `shell/juxtaposedNumbers.findNumberPair`; the readings it teaches are read back through `parse` (`teachPair`), so the product is taught as its value. The mixed number «2 1/2» is not this shape (#2248).
+**Two numbers with only a space between them** («AB = 2 3», #2286, [ADR-AG-397](06c-decisions-analytic.md#adr-ag-397)) are refused in `decidePreParse` beside the radian check — `refuse`, `guided`, log `scope:juxtaposed-numbers`, the suite note `suite.refusal.juxtaposedNumbers*` built by `juxtaposedPairNote` — and in `runEditCommit`. The detector is `shell/lexicon/juxtaposedNumbers.findNumberPair`; the readings it teaches are read back through `parse` (`teachPair`), so the product is taught as its value. The mixed number «2 1/2» is not this shape (#2248).
 
-**An angle written in radians** (#1837, [ADR-710](06-decisions.md#adr-710)) takes the same positions: `findRadianAngle` (`shell/radianAngle.ts`, [04w](04w-design-shell.md)) is asked in `decidePreParse` right after the proof target — `refuse`, `guided`, logged `scope:radian-angle`, note `input.scope.radian-angle` — in `runEditCommit`, and at the top of `parseEntry` (`{ ok: false, reason: 'radian-angle', value }`), so no caller of `parse` can draw «∠ABC = pi/2» as 2°.
+**An angle written in radians** (#1837, [ADR-710](06-decisions.md#adr-710)) takes the same positions: `findRadianAngle` (`shell/lexicon/radianAngle.ts`, [04w](04w-design-shell.md)) is asked in `decidePreParse` right after the proof target — `refuse`, `guided`, logged `scope:radian-angle`, note `input.scope.radian-angle` — in `runEditCommit`, and at the top of `parseEntry` (`{ ok: false, reason: 'radian-angle', value }`), so no caller of `parse` can draw «∠ABC = pi/2» as 2°.
 
 **A letter the tool cannot read** (#1919, [ADR-626](06-decisions.md#adr-626)) takes the same two positions.
-`unreadScript` (`shell/inputScript.ts`, the shared rule all four builders call) is asked in
+`unreadScript` (`shell/lexicon/inputScript.ts`, the shared rule all four builders call) is asked in
 `decidePreParse` — refusing with `input.scope.unread-name` or `input.scope.unread-word`, the student's own
 letters quoted, logged `scope:unread-*` — in `runEditCommit`, and at the top of `parseEntry`, which returns
 `{ ok: false, reason: 'unread-script', kind, detail }` so no caller of `parse` can draw them. It runs on the
@@ -1315,7 +1316,7 @@ The clause gate sees only the pieces `clausesOf` cuts, and every token gate coun
 carries it, so «משולש ABC ישר זווית ב-B» and «…בנקודה E שהיא אמצע BD» committed with the part gone. The battery
 member `unreadParts` (`src/app/unreadParts.ts`, in `honestyGateReport`, so both seams) MEASURES the reading:
 
-- **The probe** (`shell/readExtent.ts` `readLabelRuns`): each label run has one letter at a time replaced (a letter of
+- **The probe** (`shell/lexicon/readExtent.ts` `readLabelRuns`): each label run has one letter at a time replaced (a letter of
   the line, else a fresh one on neither the line nor the figure) and the line re-read in the seam's context; a run no substitution
   changes was not read. Exempt: a co-reference (a single letter also read as a single-letter run) and a scene name
   (the run after a polygon or circle noun — `endsWithSceneNoun` — whose letters `referencedContextLabels` reads).
@@ -1387,7 +1388,7 @@ The phrase sibling, `unreadThrough` (`src/app/unreadThrough.ts`, in the battery)
 class, the LABEL-FREE incidence phrase («AB מיתר העובר דרך מרכז המעגל», «…במעגל O העובר דרך O», "through the
 centre"), which no other member sees — its words are circle vocabulary to the accountants, it has no fresh letter for
 the label probe, and a letter it does name is a co-reference. The openers are lexicon atoms (`THROUGH_OPEN_HE/_EN`,
-`THROUGH_VERB_HE/_EN`), homed in `shell/incidencePhrase.ts` and re-exported by `src/parser/lexicon.ts`: one spelling of "through" that analytic's arm 3 of the lost part reads too ([ADR-W-161](06w-decisions-workspace.md#adr-w-161)). Two deletions per occurrence, through `readWords` (ADR-604's rule): the whole phrase (opener
+`THROUGH_VERB_HE/_EN`), homed in `shell/lexicon/incidencePhrase.ts` and re-exported by `shell/lexicon/atoms.ts`: one spelling of "through" that analytic's arm 3 of the lost part reads too ([ADR-W-161](06w-decisions-workspace.md#adr-w-161)). Two deletions per occurrence, through `readWords` (ADR-604's rule): the whole phrase (opener
 to the clause end), and the verb opener alone (never a bare «דרך» / "through", a fronted locative a rule may tolerate).
 The occurrence is unread when EITHER leaves the lowering unchanged — the whole phrase alone misses a phrase whose words
 a rule reads for another reason (a secant's «המעגל»), the verb alone misses a tangent. The verb-only finding is the weaker one: it stands only when the
@@ -1417,7 +1418,7 @@ k = 1 of «שווים» for «שווים ל-1». Two layers now:
 - **The number class of the read-extent probe** (ADR-678): `unreadNumbers` (`src/app/unreadNumbers.ts`, in
   `honestyGateReport`, so both seams) runs only when the accountant found nothing. Each number the gate's own scanner
   sees (`statedNumberOccurrences` — `statedNumberText` blanks counts and name indices, the scan `droppedGivenNumbers`
-  itself uses) is replaced by a same-kind value not in the line (`shell/readExtent.ts` `readNumbers`: the next free
+  itself uses) is replaced by a same-kind value not in the line (`shell/lexicon/readExtent.ts` `readNumbers`: the next free
   integer, a decimal keeping its places) and the line re-read in the seam's context; an occurrence whose replacement
   leaves the lowering identical was not read, and its value joins `droppedNums` — the verdict is the one the same line
   with an unaccounted number gets (`escalate`, `weak: dropped`; the ✎ seam's `steps.editDropped`). It closes the
@@ -1429,7 +1430,7 @@ k = 1 of «שווים» for «שווים ל-1». Two layers now:
 - **Fraction parts** (the 2-D port of ADR-3D-340 §4): the gate's radical-aware pass accounts a `TERM / TERM`
   occurrence by its value, or by its numerator AND denominator together (one of each spent, `okPair`); a lone radical
   (`√2`, `5√2`, `√(2/3)`) by its value only. One part never pays for the whole, and the implied `/1` is no candidate.
-- **The ratio pair atom** `RATIO_SEP` (`src/parser/lexicon.ts`: «:» or «ל-?») has three consumers: the similarity
+- **The ratio pair atom** `RATIO_SEP` (`shell/lexicon/atoms.ts`: «:» or «ל-?») has three consumers: the similarity
   reader (`statedSimilarityRatio`, `RATIO_PQ`, value p/q), the gate's pair pass and the span accountant's colon pass.
   A «ל» pair is claimed whole only when a ratio account pays for it (it is also the "to" of a range); a colon pair is
   claimed always, as before. The divider keeps the colon-only `RATPQ`.
@@ -1565,7 +1566,7 @@ Between the dry run and the refusal, the decision (`app/decideDeterministic.ts`)
 else the letter run could mean, by **rewriting the utterance** and re-parsing it, so no rule grows a second
 convention and the alternative is a sentence the student could type. It keys off the `arc` a construct emits,
 covering the family (`רבע מעגל`, `גזרה`, `חצי מעגל`). Which letter of a 3-run is the centre is ONE reader,
-`arcRunRoles` in `shell/arcRun.ts` (the middle letter, or an O/P/Q letter written first; [ADR-759](06-decisions.md#adr-759)),
+`arcRunRoles` in `shell/lexicon/arcRun.ts` (the middle letter, or an O/P/Q letter written first; [ADR-759](06-decisions.md#adr-759)),
 called by the parser's `quarterCircle`, `semicircle` and `sector` rules and by analytic's `parseSector`; the
 rewrite is its exact inverse, `spellArcRun`, so a re-reading re-parses to the centre it was built for, and a
 reading no bare run can spell (two O/P/Q ends around another centre) is not tried. `roleReadings` returns `null` with no role run; readings are ordered by a

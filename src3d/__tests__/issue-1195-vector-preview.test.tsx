@@ -29,7 +29,7 @@ import { describe, expect, it } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { FactRowText3, inputPreviewNode3 } from '../render/FactRow3';
-import { isVectorMarked3 } from '../lexicon/marks3';
+import { isVectorMarked3 } from '../../shell/lexicon/marks3';
 
 const NO_VECTORS = new Set<string>();
 const COMBINING_ARROW = '⃗';

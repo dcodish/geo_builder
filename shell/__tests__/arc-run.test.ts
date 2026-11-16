@@ -6,7 +6,7 @@
  * not) is kept exactly, so no sector changes.
  */
 import { describe, expect, it } from 'vitest';
-import { arcRunRoles, spellArcRun } from '../arcRun';
+import { arcRunRoles, spellArcRun } from '../lexicon/arcRun';
 
 describe('arcRunRoles — the measured table (issue #2486 §1, "after the change")', () => {
   it.each([

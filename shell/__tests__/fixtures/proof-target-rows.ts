@@ -5,7 +5,7 @@
  * «הוכיחו כי AB ⊥ AC» as a `set-perpendicular` and 3-D recorded it as a driving claim — the figure was made
  * to satisfy what the student had been asked to prove — while analytic refused it (#1618).
  *
- * The rule lives once (`shell/proofTarget.ts`), but whether each builder CALLS it at its submit gate is not
+ * The rule lives once (`shell/lexicon/proofTarget.ts`), but whether each builder CALLS it at its submit gate is not
  * visible from `shell/`, which may not import a product. So each tree hands its REAL submit decision over as
  * a {@link ProofGate} (a thin lock: `src/app/__tests__/proof-target-1666.test.ts`,
  * `src3d/__tests__/proof-target-1666.test.ts`, `src-analytic/__tests__/proof-target-1666.test.ts`, and complex's

@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { proofTargetFaults, PROOF_ROWS, NOT_PROOF_ROWS, type ProofGate } from './fixtures/proof-target-rows';
-import { findProofTarget } from '../proofTarget';
+import { findProofTarget } from '../lexicon/proofTarget';
 
 /** A conforming gate: the shared detector, a refusal quoting its sentence, nothing recorded on a refusal. */
 const gateOf = (detect: (line: string) => { sentence: string } | null): ProofGate => (line) => {

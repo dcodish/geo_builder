@@ -26,7 +26,7 @@ import { runEditCommit } from '../editPipeline';
 import { groupKey, replay, useGeoStore } from '@/store/geoStore';
 import { COMMAND_CATALOG } from '@/parser/catalog';
 import i18n from '@/i18n';
-import { findProofTarget, PROOF_TARGET_KEY } from '../../../shell/proofTarget';
+import { findProofTarget, PROOF_TARGET_KEY } from '../../../shell/lexicon/proofTarget';
 import { proofTargetFaults, type ProofGate } from '../../../shell/__tests__/fixtures/proof-target-rows';
 import { PROOF_TARGET_SENTENCE, RULED_2D_CHECK_HE } from '../../../shell/__tests__/fixtures/proof-target-check-2492';
 import { createWorkQueue } from '../../../shell/work';
