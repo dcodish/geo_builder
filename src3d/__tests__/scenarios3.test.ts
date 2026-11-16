@@ -1046,3 +1046,39 @@ describe('line-ask-by-points-1541 — «משוואת BB\'» answers the line thr
     expect(r).toMatchObject({ answer: 'x = (0, 7, 8) + t·(2, 8, -16)', echo: 'plain' });
   });
 });
+
+// #2894 part 2 C (ADR-3D-495) — stated lengths the metric forbids are refused at once (no solve), with the reason and
+// exactly the rows whose lengths take part (ruling 3, 2026-11-15: "A clearer reason (Recommended)"). Keep-prior.
+describe('lengths-impossible-2894 — the triangle inequality and one length per segment, refused at once', () => {
+  beforeEach(reset);
+  const he = (k: string, o?: Record<string, unknown>) => i18n3d.getFixedT('he')(k, o) as string;
+  const plain = (s: string | null): string => (s ?? '').replace(/[⁦-⁩]/g, '');
+  it.each([
+    [
+      ['משולש ABC', '|AB| = 5', '|BC| = 3', '|AC| = 9'],
+      'הנתונים סותרים זה את זה — «|AC| = 9» לא מתקיים יחד עם «|AB| = 5», «|BC| = 3»: יחד הם קובעים |AC| = 9 ו-|AB| + |BC| = 8, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.',
+    ],
+    [
+      ['ריבוע ABCD', '|AB| = 3', '|AC| = 10'],
+      // ADR-3D-495 Am. 1 (ADR-W-118 B1, 2-D's ADR-835): the square FORCES |AC| = 3√2, so the reason is two lengths
+      'הנתונים סותרים זה את זה — «|AC| = 10» לא מתקיים יחד עם «ריבוע ABCD», «|AB| = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.',
+    ],
+    [
+      ['מלבן ABCD', '|AB| = 3', '|BC| = 4', '|AC| = 7'],
+      'הנתונים סותרים זה את זה — «|AC| = 7» לא מתקיים יחד עם «מלבן ABCD», «|AB| = 3», «|BC| = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7. בדקו איזה מהאורכים האלה לא נכון.',
+    ],
+    [
+      ['ריבוע ABCD', '|AB| = 3', '|BC| = 4'],
+      'הנתונים סותרים זה את זה — «|BC| = 4» לא מתקיים יחד עם «ריבוע ABCD», «|AB| = 3»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.',
+    ],
+  ])('REFUSAL: %j', (lines, text) => {
+    for (const l of lines) submit(l);
+    expect(state().lastError?.code).toBe('lengths-impossible');
+    expect(plain(errorText3(he, state().lastError))).toBe(text);
+    expect(state().facts.map((f) => f.utterance)).toEqual(lines.slice(0, -1));
+  });
+  it('the equality case is the solver’s: «|AC| = 8» flattens the triangle (unchanged wording)', () => {
+    for (const l of ['משולש ABC', '|AB| = 5', '|BC| = 3', '|AC| = 8']) submit(l);
+    expect(state().lastError?.code).toBe('polygon-collapsed');
+  });
+});

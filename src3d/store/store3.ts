@@ -54,14 +54,15 @@ import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
 import { coincidences3, namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
-import { claimPointIds, defaultPlaneDisplay3, scalarPinOrigin3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3, type SolidCommand } from '../engine/types';
+import { claimPointIds, defaultPlaneDisplay3, scalarPinOrigin3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type ScalarPin, type SegmentEquationReading3, type SolidCommand } from '../engine/types';
 import { partsOf3, sameSeed3, seedKey3, seedNumber3, type Seed3 } from '../engine/components3';
 import { ContentTable } from '../engine/content3';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
 import { isBareAltitude3, membershipQuestion3, namesQuadBase3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
-import { dataView, pointPlaneRow3 } from '../engine/dataView';
+import { cleanNum, dataView, pointPlaneRow3 } from '../engine/dataView';
+import { explainLengths3 } from '../engine/metricBounds3';
 
 export interface Fact3 {
   id: string;
@@ -1131,6 +1132,8 @@ function deriveCore3(
   const status: Record<string, FactStatus3> = {};
   const claimOwners: { factId: string; from: number; to: number }[] = [];
   const pinOwnerIds = new Set<string>();
+  /** #2894 part 2 C (ADR-3D-495): the row that added each driving pin, so a closed-form conflict names exactly its rows. */
+  const pinRow = new Map<ScalarPin, string>();
   /** #425: the pins that are COORDINATES (an injected point or vector) — the only pins whose refusal
    *  may speak of «the given coordinates». Tracked apart from the general pin set because the guard
    *  below was deliberately widened to EVERY pin kind while the message it emits stayed the
@@ -1314,7 +1317,11 @@ function deriveCore3(
     if (probe.scalarPins !== before.scalarPins) {
       const had = new Set(before.scalarPins);
       const at = factsIn.findIndex((x) => x.id === f.id);
-      for (const pin of probe.scalarPins) if (!had.has(pin)) scalarPinOrigin3.set(pin, { ...scalarPinOrigin3.get(pin), fact: at });
+      for (const pin of probe.scalarPins) {
+        if (had.has(pin)) continue;
+        scalarPinOrigin3.set(pin, { ...scalarPinOrigin3.get(pin), fact: at });
+        pinRow.set(pin, f.id);
+      }
     }
     c = probe;
     if (c.points.size > pointsBefore) pointAdders.add(f.id); // #1310: the row put a point on the figure
@@ -2090,10 +2097,32 @@ function deriveCore3(
     return ids.join('');
   };
   const blamedPinOwner = [...pinOwnerIds].pop();
+  /**
+   * #2894 part 2 C (ADR-3D-495): the stated lengths break the metric itself (`metricConflict3`: one segment given two
+   * lengths, or three points against the triangle inequality). The pivot refused them without a start; the refusal says
+   * which lengths and why, and names exactly the rows that stated them — the newest among them. Null when the conflict
+   * does not involve the blamed row (the solver's own finding stands, worded as before).
+   */
+  const lengthsConflict = (blamed: string, stated: string): EngineError3 | null => {
+    // the reason chosen as 2-D chooses it (ADR-3D-495 Am. 1): the blamed row's own lengths are tried first
+    const own = new Set(c.scalarPins.flatMap((p, i) => (pinRow.get(p) === blamed ? [i] : [])));
+    const m = explainLengths3(c, own);
+    if (!m) return null;
+    const rows = new Set(m.pins.map((i) => pinRow.get(c.scalarPins[i])).filter((x): x is string => x !== undefined));
+    if (!rows.has(blamed)) return null;
+    const others = namedStatements(rows, blamed);
+    const n = (x: number) => cleanNum(x, 1e-5, true);
+    if (m.kind === 'value') return { code: 'lengths-impossible', stated, others, why: { kind: 'value', seg: m.seg.join(''), a: n(m.forced), b: n(m.stated) } };
+    const [a, b] = [[m.p, m.q], [m.q, m.r], [m.p, m.r]].filter(([x, y]) => !(m.long.includes(x) && m.long.includes(y))).map((s) => s.join(''));
+    return { code: 'lengths-impossible', stated, others, why: { kind: 'triangle', tri: [m.p, m.q, m.r].join(''), long: m.long.join(''), longLen: n(m.longLen), a, b, sum: n(m.sum) } };
+  };
   if (blamedPinOwner !== undefined && status[blamedPinOwner] === 'ok' && resolved.pivot && resolved.pivot.solutions === 0) {
     const f = facts.find((x) => x.id === blamedPinOwner)!;
     const collapse = pivotCollapse;
-    status[blamedPinOwner] = collapse
+    const metric = collapse || coordPinOwnerIds.has(blamedPinOwner) ? null : lengthsConflict(blamedPinOwner, f.utterance);
+    status[blamedPinOwner] =
+      metric ??
+      (collapse
       ? {
           code: 'polygon-collapsed', stated: f.utterance, others: namedStatements(collapseOwnerIds, blamedPinOwner),
           sides: collapse.ring.length, ring: collapse.solid ? solidAsWritten(collapse.ring) : collapse.ring.join(''),
@@ -2103,7 +2132,7 @@ function deriveCore3(
         }
       : coordPinOwnerIds.has(blamedPinOwner)
         ? { code: 'injection-unsatisfiable' }
-        : { code: 'givens-contradict', stated: f.utterance, others: namedStatements(pinOwnerIds, blamedPinOwner) };
+        : { code: 'givens-contradict', stated: f.utterance, others: namedStatements(pinOwnerIds, blamedPinOwner) });
   }
 
   /**

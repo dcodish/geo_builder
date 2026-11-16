@@ -16357,3 +16357,55 @@ Changed tests:
 - [ruled] «המשיכו לחפש» searches the same amount again from where it stopped, and asks again if it still finds nothing. 2026-11-14, question 2: *"Another ~10 s round (Recommended)"*.
 - [ruled] A typed line whose search was stopped stays in the box and is not added; typing something else dismisses the question. 2026-11-14, question 3: *"Stays in the box, not added (Recommended)"*.
 - [ruled] The limit is counted in work, calibrated to about 10 s on the dev PC, the same on every machine. ADR-W-210 invariant 3; *"10s is an ok number"* (2026-11-13).
+
+## ADR-3D-495 — Stated lengths the metric forbids are refused at once, saying why: one length per segment, and the triangle inequality (#2894)
+
+**Status:** built · 2026-11-15 · feature (`P2`) · phase 5, part 2, item C of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (docs/17 §7 rule 2: the failure path is cheaper than the success path) · **Issue:** [#2894](https://github.com/dcodish/geo_builder/issues/2894) · branch `feat/2894-c-fast-refusal-3d`, a feature PR the operator plays.
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-35 (new) · **Design:** [04b](04b-design-3d.md) — "The solver", *Stated lengths the metric forbids are read off the pins* · **LADDER stage:** before the pivot's first start (a closed-form refusal; no solve stage moves)
+**Builds on** [ADR-3D-007](#adr-3d-007) (the pivot), [ADR-3D-462](#adr-3d-462) (the ratio rows) and [ADR-3D-494](#adr-3d-494) (the seed search, which every refused line walks).
+
+**Measured first (docs/17 §9).** The phase 5 ranking (#2894, measured again on `main` @ `63ccbc5a`) found two refusals that cost far more than an accepted line of the same figure:
+
+| sequence · refused line | units (`main`) | dearest accepted line | × | browser-free wall time (`main`) |
+| --- | --- | --- | --- | --- |
+| «משולש ABC» · «\|AB\| = 5» · «\|BC\| = 3» · «\|AC\| = 9» | 395 026 | 10 398 | 38× | 0.80 s |
+| «ריבוע ABCD» · «\|AB\| = 3» · «\|AC\| = 10» | 99 073 | 7 575 | 13× | 0.47 s |
+
+Instrumented, every unit of both is a Levenberg–Marquardt solve that cannot succeed: 256 of them per refused line, all 16 starts of every pivot (2 mirrors × 8 rotations) at the display seed, the claim seeds and the seed search's seeds. The triangle's run 120 iterations each, creeping to an error floor of 1/3; the square's walk λ to its 1e12 bail from a floor of 0.26. The contradiction is in the stated lengths alone: no three points of space have those distances.
+
+**Decision.**
+- **`metricConflict3`** (`engine/metricBounds3.ts`, new) reads the construction's `length` and `length-rel` pins as a weighted union–find over segments: every segment whose length the pins fix, with the pins that fix it. It reports the first of two conflicts:
+  - `value`: one segment given two lengths («ריבוע ABCD» · «|AB| = 3» · «|BC| = 4»);
+  - `triangle`: three points whose fixed sides break the triangle inequality (the triangle above; the square's diagonal, since |BC| = |AB| by the square).
+  A ratio cycle with no stated length is no conflict (all lengths zero satisfy it).
+- **The margin.** A conflict counts only when it exceeds `CONFLICT_MARGIN` = 1e-3 of the lengths involved and 1e-3 absolutely. The pivot accepts a candidate whose squared primary residual is under 1e-10, so a length row may be off by 1e-5 and a ratio row by 2e-5 of its lengths: a conflict past the margin is one no candidate could have met. The equality case (|AC| = |AB| + |BC|, a flat triangle) and anything nearer are the solver's, as before.
+- **The pivot** (`solvePivot`) returns an empty pool for such a pin set before its first start (a probe call excepted). Every caller already reads an empty pool as "no placement", and no exact candidate existed, so no collapse, off-host or frozen-dims finding is lost: the verdict is the one the multi-start reached, reached at once. The seed search's seeds cost nothing either.
+- **The refusal says why** (ruling 3). The store's no-placement refusal (`deriveCore3`) asks `metricConflict3` too; when the conflict involves the blamed row, the refusal is `lengths-impossible`, naming exactly the rows whose pins take part (`pinRow`: the row that added each pin), and the reason with the numbers (`cleanNum`). Otherwise the solver's finding is worded as before. The text is new, recorded with `judgments.mjs chose` (ADR-W-174):
+  - triangle: «הנתונים סותרים זה את זה — «|AC| = 10» לא מתקיים יחד עם «ריבוע ABCD», «|AB| = 3»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 6, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.»
+  - value: «… יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.»
+  - a row that alone carries the conflict: «הנתונים ב«…» סותרים זה את זה: …».
+- **Not done: an early stop in `leastSquares` when its error has stalled above zero** (the plan's other half of C). Measured after the closed form: on the refusals the closed form does not decide (the flat triangle «|AC| = 8», 36 756 units), a stop after 8 accepted steps that improve the error by less than 0.1 % saves 2 % (36 033 units), because their failing starts creep at about 2e-4 by 0.5 % per five steps, not stall. The stall that costs is on the success path, the anchors' creep of an accepted solve (item A of #2894), and stopping it there moved values between known and withheld in a probe, so it is not done here.
+
+**Before → after.**
+
+| sequence · refused line | units | wall time (vite-node) | message |
+| --- | --- | --- | --- |
+| x-tri-ineq «\|AC\| = 9» | 395 026 → **0** | 0.80 s → 0.003 s | `givens-contradict` → `lengths-impossible` (triangle) |
+| x-square-diag «\|AC\| = 10» | 99 073 → **0** | 0.47 s → 0.003 s | `givens-contradict` → `lengths-impossible` (triangle) |
+| «ריבוע ABCD» · «\|AB\| = 3» · «\|BC\| = 4» | — → **0** | — | `givens-contradict` → `lengths-impossible` (value) |
+| x-tri-eq «\|AC\| = 8», x-cube-face-diag, x-pyramid-apex | unchanged | unchanged | unchanged (the solver's, a claim, an accepted line) |
+
+**Proof that nothing else changed (ruling 3 covers only the reason).** A transcript of every action of every 3-D fixture, the slow corpus and the refusal walk, walked as the work-meter gate walks them (the worker's heap isolated), recorded after each action: the facts, seed, error and notice on screen, the page's derivation (every position to its 64 bits, statuses, notices, warnings, coincidences), the free-DOF count, the values panel and every saved question's answer. `origin/main` @ `63ccbc5a` against this branch: **5 828 lines over the 176 fixtures and 468 over the 14 slow-corpus sequences, 0 differences**; on the 8-sequence refusal walk, exactly the three refused lines (and the press after each, which shows the same refusal) differ, `givens-contradict` → `lengths-impossible`. No drawing changed.
+
+**The gates.** `npm run work:check -- 3d` passes (178) and `--slow` passes (15): no recorded action's count moved (no fixture or slow-corpus line states a forbidden length), so nothing was re-recorded. The falls are on the refusal walk (table above). `npm run test:run:3d`: 399 files, 8 968 tests passed; `npx tsc -b` clean; `npm run test:docs` green; sibling-safety PASS. The stability regression holds by construction (no drawing changed in the compare) and its tests are in the slice.
+
+**The test-suite corpus** (every sequence the 3-D tests state, the #1394 parity goldens, re-recorded with `UPDATE_PARITY_GOLDEN=1`): besides the new sequences of this ADR, exactly these refusals changed, all to `lengths-impossible` (`value`), all refused as before with keep-prior:
+- «משולש ABC» · «AB = 3» · «AB = 4» and «… · «BA = 4»» (`known-line-2341.test.ts`, which now asserts the new reason): «…יחד הם נותנים לקטע AB שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.»;
+- «וקטור AB» · «אורך AB = 5» · «אורך AB = 7» (golden shard 3): the same sentence with 5 ו-7.
+
+**Tests.** `src3d/__tests__/metric-bounds3.test.ts` (new): both conflicts, a side carried by a ratio, the ratio cycle, the margin and the equality case. `message-floor-2028.test.ts`: the four forms of the new message. **Regression scenario (rule 4):** `scenarios3.test.ts` «lengths-impossible-2894»: the operator's two sequences and the square's two lengths, refused word for word with keep-prior, and the flat triangle still the solver's.
+
+**Amendment 1 (2026-11-15) — the reason is chosen as 2-D chooses it** (ADR-W-118 B1: one plane-geometry sentence, one verdict; 2-D's [ADR-835](06-decisions.md#adr-835), PR #2906, is the reference; analytic's ADR-AG-483 Am. 1 is the same change). The first build gave the triangle-inequality reason for «ריבוע ABCD» · «|AB| = 3» · «|AC| = 10», where 2-D says the square FORCES |AC| = 3√2. `metricBounds3.ts` now closes the lengths the pins force (`closeLengths3`): the `length` and `length-rel` pins and every angle a pin fixes at a vertex (`vangle`, or a `cos-angle` between two point pairs sharing a point — the square's right angle at B), through the law of cosines. The reason (`explainLengths3`) follows 2-D's `explainLengthConflict` order: each stated length in turn, the blamed row's own first, then the newest first, with the closure of the others; "two lengths" (the forced value first) when the others fix that segment, else the triangle inequality on it. `solvePivot` refuses every such conflict before its first start (`lengthsImpossible3`), so the rectangle's diagonal «|AC| = 7» (forced 5), which the first build left to the solver (`givens-contradict`), is now refused at once with its reason. The three parity rows `lengths-forced-*-2894` are added, as in 2-D's branch, and pass. 3-D now prints, for the square: «הנתונים סותרים זה את זה — «|AC| = 10» לא מתקיים יחד עם «ריבוע ABCD», «|AB| = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.»; for «משולש ABC» · «|AB| = 3» · «|BC| = 4» · «|AC| = 10»: «הנתונים סותרים זה את זה — «|AC| = 10» לא מתקיים יחד עם «|AB| = 3», «|BC| = 4»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 7, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.» Transcript vs `main` (the 3-D transcript: every fixture, the slow corpus, and the refusal walk with the rectangle added): 0 differences in the fixtures (8 742 records) and the slow corpus (702); in the refusal walk only the refused lines' error (and the same error still shown after the next press): x-tri-ineq, x-square-diag, x-square-34 and x-rect-diag, `givens-contradict` → `lengths-impossible`. Locks: `scenarios3` `lengths-impossible-2894` (the square now 3√2; the rectangle 5 ו-7), `metric-bounds3.test.ts` (the forced diagonal; no angle, the triangle).
+
+## What the student will see
+- [ruled] Stated lengths that no figure can have (one segment given two lengths, or |AC| longer than |AB| + |BC|) are refused at once, with a reason that names the lengths and exactly the lines that stated them. Operator, 2026-11-15, ruling 3 on #2894: *"A clearer reason (Recommended)"*.

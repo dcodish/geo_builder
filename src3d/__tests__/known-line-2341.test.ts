@@ -106,7 +106,8 @@ describe('#2341 — a length restated, [judged] q21 2026-11-05 (2-D\'s noop)', (
   it.each(['BA = 4', 'AB = 4'])('«AB = 3» + «%s» is still refused', (line) => {
     build(['משולש ABC', 'AB = 3']);
     st().submit(line);
-    expect(st().lastError?.code).toBe('givens-contradict');
+    // #2894 part 2 C (ADR-3D-495, ruling 3): refused at once, saying the segment was given two lengths (was `givens-contradict`)
+    expect(st().lastError).toMatchObject({ code: 'lengths-impossible', stated: line, others: ['AB = 3'], why: { kind: 'value', seg: expect.stringMatching(/^(AB|BA)$/), a: '3', b: '4' } });
     expect(st().facts).toHaveLength(2);
   });
 

@@ -4365,6 +4365,16 @@
       "chosen": true,
       "at": "2026-11-15T15:26:32.746Z",
       "status": "pending"
+    },
+    {
+      "id": "text-2894-3d-lengths-impossible",
+      "kind": "text",
+      "issue": "#2894",
+      "what": "3-D: the clearer refusal when stated lengths break the metric (ruling 3, 2026-11-15) — the triangle inequality, and one segment given two lengths; names exactly the rows whose lengths take part, and gives a next step",
+      "choice": "«הנתונים סותרים זה את זה — «|AC| = 10» לא מתקיים יחד עם «ריבוע ABCD», «|AB| = 3»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 6, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.» / «…: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.» (en: \"…together they make |AC| = 10 and |AB| + |BC| = 6, but by the triangle inequality in ABC, always |AC| ≤ |AB| + |BC|. Check which of these lengths is wrong.\" / \"…together they give the segment BC two different lengths, 3 and 4. Check which of these lengths is wrong.\")",
+      "chosen": true,
+      "at": "2026-11-15T10:28:28.022Z",
+      "status": "pending"
     }
   ],
   "demoted": {
