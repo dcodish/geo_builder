@@ -1,0 +1,49 @@
+{
+  "name": "fix-2907-3d",
+  "title": "#2907 — 3-D: a point with two possible places is shown with both, never one of them as a fact (PR, port 5202)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5202",
+      "path": "/3d.html",
+      "title": "3-D: the 2019 exam cube with the cube row deleted — A′ can stand in two places, and the values panel shows both",
+      "lines": [
+        "קובייה ABCD",
+        "B(0,0,0)",
+        "A(6,0,0)",
+        "C(0,6,0)",
+        "שיעור ה-z של B' חיובי",
+        "הזווית בין A'C לבין BC' היא 90",
+        "הישר A'C חותך את המישור BC'D בנקודה K",
+        "K = (2, 4, 2)",
+        "A'K : A'C = 2 : 3"
+      ],
+      "after": [
+        {
+          "click": "מחיקה"
+        }
+      ],
+      "expectRows": [
+        "B(0,0,0)",
+        "A(6,0,0)",
+        "C(0,6,0)",
+        "שיעור ה-z של B' חיובי",
+        "הזווית בין A'C לבין BC' היא 90",
+        "הישר A'C חותך את המישור BC'D בנקודה K",
+        "K = (2, 4, 2)",
+        "A'K : A'C = 2 : 3"
+      ],
+      "expect": [
+        "A'(6, 0, 6) או (6/5, 24/5, 6/5)",
+        "K(2, 4, 2)"
+      ],
+      "lookFor": "Type the nine lines, then press ✕ (מחיקה) on the first row, «קובייה ABCD». Eight rows stay. In the values panel: «A'(6, 0, 6) או (6/5, 24/5, 6/5)» and «K(2, 4, 2)»; no length of A′C is shown. Ask «A'» in the question box: the answer reads the same two options. The drawing still shows A′ at (6, 0, 6), and «הציגו תצורה אחרת» behaves as before.",
+      "before": "On prod the panel shows no row for A′ at all (the two places were never both found; it was hidden only because the solver's samples disagreed in the 6th decimal).",
+      "asks": [
+        "A'"
+      ]
+    }
+  ]
+}

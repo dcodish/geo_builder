@@ -43,7 +43,7 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
-import { configurationOrder3 } from './configs3';
+import { configurationOrder3, samePointConfig3 } from './configs3';
 import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3, type CanonicalEval3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
@@ -592,7 +592,7 @@ export interface Resolved3 {
    *  the pool holds more than one solution, since that is the only case where a coordinate can be a
    *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
    *  branch pick reads seed-stable and prints as fact. */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this, through {@link scalarConsumed3}). #2890 (ADR-3D-492): a plain cell, never a closure. */ scalarConsumed?: Lazy3<{ dims: number; block: number }>; /** #2795 (ADR-3D-483): lazy — the scalar pins the chosen solution holds without driving them, by their PLACE in `c.scalarPins` (`resolveHeld3` reads this, on the figure it has just solved). */ heldPins?: Lazy3<readonly number[]>; /** #1815 (ADR-3D-309): no solution because every one collapsed a flat ring that only a rider's incidence forced. */ collapse?: InventedCollapse3; /** #2368 (ADR-3D-375): lazy — the applied placement's LEFTOVER rigid freedom, measured under every placement given (the read-back sampler reads this, through {@link placementFreedom3}). */ placementFreedom?: Lazy3<PlacementFreedom3> } | null;
+  pivot: { solutions: number; chosen: number; err: number; /** #2907 (ADR-3D-498): how many admissible configurations OTHER than the drawn one this pool holds — the knowledge sampler resolves each ({@link Resolve3Opts.configuration}). */ others?: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this, through {@link scalarConsumed3}). #2890 (ADR-3D-492): a plain cell, never a closure. */ scalarConsumed?: Lazy3<{ dims: number; block: number }>; /** #2795 (ADR-3D-483): lazy — the scalar pins the chosen solution holds without driving them, by their PLACE in `c.scalarPins` (`resolveHeld3` reads this, on the figure it has just solved). */ heldPins?: Lazy3<readonly number[]>; /** #1815 (ADR-3D-309): no solution because every one collapsed a flat ring that only a rider's incidence forced. */ collapse?: InventedCollapse3; /** #2368 (ADR-3D-375): lazy — the applied placement's LEFTOVER rigid freedom, measured under every placement given (the read-back sampler reads this, through {@link placementFreedom3}). */ placementFreedom?: Lazy3<PlacementFreedom3> } | null;
   /** #930 (ADR-3D-236) — each vec-def RATIO symbol's solved value («SN = k·SC» → k), so a consumer can
    *  read what the branch pick actually chose. The sign verifier needs it: without it a correctly
    *  honoured «k חיובי» reported `sign-unsatisfiable`, because the verifier knew how to read a figure
@@ -2505,7 +2505,7 @@ export function resolve3(figure: Construction3, seedIn: Seed3, opts: Resolve3Opt
     const reached = ringReachValue3(c, seed);
     if (reached !== null) return resolve3(figure, seed, { ...opts, paramValue: reached });
   }
-  const base = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '');
+  const base = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '') + (opts.configuration ? `|cfg${opts.configuration}` : '');
   const own = ownResolves3(figure);
   /**
    * #2630 (ADR-3D-400 §3): ONE solve per configuration, in the solved frame — the knowledge gates read it as is, and
@@ -2530,7 +2530,7 @@ export function resolve3(figure: Construction3, seedIn: Seed3, opts: Resolve3Opt
  */
 function resolveParts3(figure: Construction3, c: Construction3, parts: readonly Part3[], seed: Seed3, opts: Resolve3Opts): Resolved3 {
   const at = parts.map((p) => seedOfPart3(seed, p.key));
-  const base = `parts:${at.join(',')}` + (opts.placementImage ? '|img' : '');
+  const base = `parts:${at.join(',')}` + (opts.placementImage ? '|img' : '') + (opts.configuration ? `|cfg${opts.configuration}` : '');
   const own = ownResolves3(figure);
   const solvedKey = `${base}|raw`;
   const home = (): ResolvedHome3 => ({ c, key: solvedKey, seed, opts, parts: true });
@@ -2582,6 +2582,7 @@ function joinParts3(c: Construction3, rs: readonly Resolved3[], seed: Seed3): Re
     const symRoots = merged((p) => p.symRoots);
     const pointRoots = merged((p) => p.pointRoots);
     const riderTs = merged((p) => p.riderTs);
+    const others = Math.max(0, ...pivots.map((p) => p.others ?? 0));
     const collapse = pivots.find((p) => p.collapse)?.collapse;
     const scalarConsumed = pivots.some((p) => p.scalarConsumed)
       ? lazy3(() =>
@@ -2613,6 +2614,7 @@ function joinParts3(c: Construction3, rs: readonly Resolved3[], seed: Seed3): Re
       ...(symRoots ? { symRoots } : {}),
       ...(pointRoots ? { pointRoots } : {}),
       ...(riderTs ? { riderTs } : {}),
+      ...(others > 0 ? { others } : {}),
       ...(collapse ? { collapse } : {}),
       ...(scalarConsumed ? { scalarConsumed } : {}),
       ...(placementFreedom ? { placementFreedom } : {}),
@@ -2709,6 +2711,12 @@ export interface Resolve3Opts {
    * its own key; a placement with no leftover freedom resolves exactly as the plain configuration.
    */
   placementImage?: boolean;
+  /**
+   * #2907 (ADR-3D-498): the k-th (from 1) admissible configuration OTHER than the one the seed draws, standing in for the
+   * pick wherever a pool holds that many (`pivot.others`). For the knowledge gates only (`knowledgeSamples3({ readback:
+   * true })`), never for a drawing: the pools are replayed from the plain configuration, so only the pick moves.
+   */
+  configuration?: number;
   /**
    * #2630 (ADR-3D-400): the configuration as SOLVED, before the gauge normalisation turns it onto the floor. The
    * normalisation is a drawing convention: it makes a placement-only number (the components of a vector on a figure
@@ -2838,7 +2846,7 @@ function matrixRank3(cols: number[][]): number {
 }
 
 function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): Resolved3 {
-  if (opts.placementImage) resolveStats3.images++;
+  if (opts.placementImage || opts.configuration) resolveStats3.images++;
   else resolveStats3.uncached++;
   const pos: Positions3 = new Map<Id, Vec3>();
 
@@ -3091,7 +3099,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
      * image READS the record; a plain resolve only writes it, so the drawing's path is unchanged.
      */
     const baseKey = opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`;
-    const replay = opts.placementImage ? pivotStageMemo3.get(c)?.get(baseKey) : undefined;
+    const replay = opts.placementImage || opts.configuration ? pivotStageMemo3.get(c)?.get(baseKey) : undefined;
     const record: PivotPool[] = [];
     const solveStage = (run: () => PivotPool): PivotPool => {
       const n = record.length;
@@ -3150,8 +3158,13 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           return g.positive ? val > 1e-9 : val < -1e-9;
         });
       };
-      const satisfying = solutions.filter(satisfiesSigns);
-      const solverOrder = satisfying.length > 0 ? satisfying : solutions;
+      const satisfyingAll = solutions.filter(satisfiesSigns);
+      const satisfying = satisfyingAll.filter((s) => !s.reach);
+      // #2907 (ADR-3D-498): the branch fan's configurations are ADMISSIBLE (they join every record below) but never drawn,
+      // and never stand in for a pool the drawing would otherwise read as empty or unsigned
+      const drawable = solutions.filter((s) => !s.reach);
+      const solverOrder = satisfying.length > 0 ? satisfying : drawable;
+      const reached = satisfying.length > 0 ? satisfyingAll.filter((s) => s.reach) : [];
       /**
        * #2814 (ADR-3D-461, extends ADR-3D-168 Am. 1's interleave) — THE PICK IS OVER DISTINCT CONFIGURATIONS, in an
        * order the configurations alone decide (`configurationOrder3`). `pool[seed % pool.length]` over the raw pool
@@ -3163,14 +3176,42 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       const order = frames ? configurationOrder3(solverOrder.map((sol, i) => ({ pos: frames[i], pinSymbols: sol.pinSymbols }))) : solverOrder.map((_, i) => i);
       const pool = order.map((i) => solverOrder[i]);
       const poolFrames = frames ? order.map((i) => frames[i]) : null;
+      // #2907 (ADR-3D-498): the ADMISSIBLE set the records describe — the drawn pool, then what only the fan reached
+      const admissible = [...pool, ...reached];
       if (pool.length > 0) {
-        const chosen = pool[seed % pool.length];
+        const drawnAt = seed % pool.length;
+        /**
+         * #2907 (ADR-3D-498) — THE ROOTS THIS SEED DOES NOT DRAW: for each point the branch fan reached a root of (a point the givens
+         * determine — the fan's own test), one admissible configuration per other position of that point, in admissible order. A
+         * knowledge image (`opts.configuration = k`) stands on the k-th; a drawing never does. Entries are told apart by
+         * the fanned point ALONE: the pool also holds the scatter of a continuum (every cold start's creep stops at its
+         * own point of it), which is no second configuration and would cost a resolve each.
+         */
+        const allFrames: Positions3[] | null = admissible.length > 1 ? [...(poolFrames ?? [finalFrameOf(pool[0])]), ...reached.map(finalFrameOf)] : null;
+        const others: number[] = [];
+        if (allFrames) {
+          // every position a fanned point takes in the admissible set, other than where this seed draws it — the pool's
+          // own entries included (a cold start may have found the root the drawing skips), judged on that point alone
+          const stand: { id: Id; at: Vec3 }[] = [];
+          for (const id of new Set(reached.map((sol) => sol.reach!))) {
+            const drawnP = allFrames[drawnAt].get(id);
+            if (drawnP) stand.push({ id, at: drawnP });
+            allFrames.forEach((frame, i) => {
+              const at = frame.get(id);
+              if (!at || stand.some((q) => q.id === id && samePointConfig3(q.at, at))) return;
+              stand.push({ id, at });
+              if (!others.includes(i)) others.push(i);
+            });
+          }
+        }
+        const pickAt = opts.configuration && opts.configuration <= others.length ? others[opts.configuration - 1] : drawnAt;
+        const chosen = admissible[pickAt];
         // #797 (ADR-3D-168 Am. 1): the ADMISSIBLE pool's distinct values per pin symbol —
         // post sign-filtering, so a sign given that narrows to one root makes it determined.
         // The panel prints a value only when this set is a singleton at every sampled seed:
         // «k = 1» while k ∈ {1,2} was a branch choice masquerading as knowledge.
         const symRoots: Record<string, number[]> = {};
-        for (const sol of pool) {
+        for (const sol of admissible) {
           for (const [s, v] of Object.entries(sol.pinSymbols ?? {})) {
             const list = (symRoots[s] ??= []);
             if (!list.some((r) => Math.abs(r - v) <= 1e-3 * Math.max(1, Math.abs(r)))) list.push(v);
@@ -3193,8 +3234,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
          * no branch to miss, and this is the solver's hot path.
          */
         const pointRoots: Record<string, Vec3[]> = {};
-        if (pool.length > 1 && poolFrames) {
-          for (const frame of poolFrames) {
+        if (allFrames) {
+          for (const frame of allFrames) {
             // the same lane rule the chosen solution below uses (`finalFrameOf`) — an equation-plane point is
             // Lane-A absolute and must NOT be transformed, or every branch would look distinct; a mixed point is
             // re-derived in the solution's own frame (#2798)
@@ -3210,15 +3251,17 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         // #2814 (ADR-3D-461): the drive's warm start stays the SOLVER-order entry — measured, warming from the new pick
         // moved stage 4's drive start and the #1769 prism's drive lost its k = −1 root. The drawing changes; the
         // drive's search does not.
-        const warmFrom = solverOrder[seed % solverOrder.length];
+        // #2907 (ADR-3D-498): a knowledge image warms its later stages from the configuration it stands on
+        const warmFrom = pickAt === drawnAt ? solverOrder[seed % solverOrder.length] : chosen;
         warm.x = [...warmFrom.x];
         warm.mirror = warmFrom.mirror;
         // the figure lane rides the chosen similarity, the fixed lane stays verbatim, and a mixed point is re-derived
         // from its own definition in the final frame (#2798, ADR-3D-456)
-        for (const [id, q] of poolFrames ? poolFrames[seed % pool.length] : finalFrameOf(chosen)) pos.set(id, q);
+        for (const [id, q] of allFrames ? allFrames[pickAt] : poolFrames ? poolFrames[drawnAt] : finalFrameOf(chosen)) pos.set(id, q);
         const heldOf = chosen.heldPins;
         pivot = {
-          solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols,
+          solutions: pool.length, chosen: pickAt, err: chosen.err, pinSymbols: chosen.pinSymbols,
+          ...(others.length > 0 ? { others: others.length } : {}),
           ...(chosen.riderTs ? { riderTs: chosen.riderTs } : {}),
           ...(chosen.scalarConsumed ? { scalarConsumed: lazy3(chosen.scalarConsumed) } : {}), // #990: lazy, display-path only
           ...(heldOf ? { heldPins: lazy3(keepMaps(() => heldOf().map((p) => c.scalarPins.indexOf(p)))) } : {}), // #2795 (ADR-3D-483): lazy, read by `resolveHeld3`
@@ -3536,7 +3579,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       }
     }
 
-    if (!opts.placementImage) {
+    if (!opts.placementImage && !opts.configuration) {
       let per = pivotStageMemo3.get(c);
       if (!per) pivotStageMemo3.set(c, (per = new Map()));
       per.set(baseKey, record);
@@ -4490,11 +4533,14 @@ export function knowledgeSamples3(c: Construction3, baseSeeds: readonly number[]
     // freedom, its exact IMAGE along it — agreement can only see what is varied, and the multi-start never
     // varies that freedom. The image's one-entry pool keeps the «או» rows and `branchAgrees` honest (a
     // moved point is not a second configuration). Claims and narrowing stay on the plain samples.
-    return confs.flatMap(({ r, paramValue }) =>
-      (placementFreedom3(r)?.dim ?? 0) > 0
-        ? [r, resolve3(c, s, { ...RAW, ...(paramValue !== undefined ? { paramValue } : {}), placementImage: true })]
-        : [r],
-    );
+    // #2907 (ADR-3D-498): READ-BACK also stands on every OTHER admissible configuration of the configuration's pool — the
+    // seeds sample the gauge and `pool[seed % n]` reaches the rest only by arithmetic (the #1474 lesson, one lane over),
+    // so a value that differs on a configuration no seed draws read as fact
+    return confs.flatMap(({ r, paramValue }) => {
+      const at = paramValue !== undefined ? { paramValue } : {};
+      const others = Array.from({ length: r.pivot?.others ?? 0 }, (_, k) => resolve3(c, s, { ...RAW, ...at, configuration: k + 1 }));
+      return (placementFreedom3(r)?.dim ?? 0) > 0 ? [r, resolve3(c, s, { ...RAW, ...at, placementImage: true }), ...others] : [r, ...others];
+    });
   });
 }
 

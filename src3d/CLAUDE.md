@@ -63,7 +63,7 @@ Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
   exception: computed coordinates while the data panel is open (ADR-3D-014 Am. 3, ADR-W-118 B7). A number
   drawn must also be seed-invariant knowledge — one drawing's values are not a given. Agreement only sees
   what the resolver varies: the read-back samples the placement's MEASURED leftover rigid freedom
-  (`knowledgeSamples3({ readback: true })`, [ADR-3D-375](../docs/06b-decisions-3d.md#adr-3d-375)); an anchored figure's leftover turn and size are also counted by the cue and drawn sampled ([ADR-3D-379](../docs/06b-decisions-3d.md#adr-3d-379)).
+  (`knowledgeSamples3({ readback: true })`, [ADR-3D-375](../docs/06b-decisions-3d.md#adr-3d-375)), and every fanned root ([ADR-3D-498](../docs/06b-decisions-3d.md#adr-3d-498)); an anchored figure's leftover turn and size are also counted by the cue and drawn sampled ([ADR-3D-379](../docs/06b-decisions-3d.md#adr-3d-379)).
 - **Under-determination is welcome.** An unstated dimension stays a free, resampled DOF while the pinned
   parts stand still.
 
