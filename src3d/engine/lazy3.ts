@@ -16,6 +16,8 @@
  * Nothing here knows a figure, a construction or a memo.
  */
 
+import { currentSampleNames3, withSampleNames3 } from './rng';
+
 /** A figure's marker for a value of type `T` that is computed on the first ask. Plain data; it holds no value. */
 export interface Lazy3<T> {
   readonly lazy: true;
@@ -29,7 +31,9 @@ const held = new WeakMap<Lazy3<unknown>, unknown>();
 /** A cell whose value THIS heap can compute, on the first ask. */
 export function lazy3<T>(compute: () => T): Lazy3<T> {
   const cell: Lazy3<T> = { lazy: true };
-  computers.set(cell, compute);
+  // #2894 part 2 B (ADR-3D-497): computed later, under the sampling names of the solve that made it
+  const names = currentSampleNames3();
+  computers.set(cell, names ? () => withSampleNames3(names, compute) : compute);
   return cell;
 }
 

@@ -1064,6 +1064,17 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   («…יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 7, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|.»), each followed by «בדקו איזה מהאורכים האלה לא נכון.» A case at the edge (the three points collinear, |AC| = |AB| + |BC|) is judged by the solver as
   before.
   - Sources: ADR-3D-495; #2894.
+
+- **FR-SP-36 (Must)** — **A rename or a swap keeps the drawing in place and changes only the letters** (#2894;
+  operator 2026-11-15, *"Keep the drawing (Recommended)"*, *"Yes, store the first name (Recommended)"*). Renaming a
+  point («שנה שם A ל-Q», the letter popover) or swapping two («החלף בין B ל-C») re-letters every row, question and
+  plane toggle that names it, and the figure stays exactly where it was: every point at the same place, under its new
+  letter, at every configuration «הציגו תצורה אחרת» then draws. Every status, notice, value and answer reads as it did
+  under the old letters. One undo restores the old letters. A saved file and a share link keep the renamed figure's
+  drawing; a file or link made before this opens and draws as it always did. A new point given a letter a rename freed
+  is a new point, drawn on its own. The letters the tool itself chose for a shape typed without letters are chosen
+  again after a rename and are not kept.
+  - Sources: ADR-3D-497; ADR-3D-211; #2894.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

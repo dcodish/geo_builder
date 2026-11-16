@@ -565,6 +565,7 @@
  "suite:[\"קובייה ABCD\",\"AB = 2\",\"E על AB\",\"AE = 1\",\"AC = 10\"]": "d0cbcf4bff1fbe9d",
  "suite:[\"קובייה ABCD\",\"AB = 2\",\"E על AB\",\"M אמצע AE\",\"AM = 0.25\"]": "11bb2f7f41f91715",
  "suite:[\"קובייה ABCD\",\"AB = 2\",\"E על AB\",\"AE = 3\"]": "b809af20cbf387a0",
+ "suite:[\"קובייה ABCD\",\"E על AB\"]": "97742da6b1c6a209",
  "fixture:cube-rider-length-reversed-1782.geo3.json": "22fb2fae497f8972",
  "suite:[\"קובייה ABCD\",\"E על AB\",\"AE = 1\",\"AB = 2\"]": "22fb2fae497f8972",
  "suite:[\"קובייה ABCD\",\"E על AB\",\"M אמצע AE\"]": "a2dcd16a6e1b6e4a",

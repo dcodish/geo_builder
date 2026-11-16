@@ -12,7 +12,7 @@
  * Samples are keyed by object identity (ids), never insertion order — the stability rule.
  */
 
-import { sample } from './rng';
+import { sample, withSampleNames3 } from './rng';
 import { chargeHit3, chargedWork3, costed3 } from './workLedger3';
 import { limitReached, withWorkLimit } from '../../shell/workLimit';
 import { notDecided, type NotDecided } from '../../shell/notDecided';
@@ -2496,6 +2496,10 @@ const pivotStageMemo3 = new WeakMap<Construction3, Map<string, PivotPool[]>>();
  * of one part takes the path below, at its part's seed.
  */
 export function resolve3(figure: Construction3, seedIn: Seed3, opts: Resolve3Opts = {}): Resolved3 {
+  // #2894 part 2 B (ADR-3D-497): a figure is solved under the names its points were first given — a rename keeps its samples
+  return withSampleNames3(figure.sampleNames, () => resolveNamed3(figure, seedIn, opts));
+}
+function resolveNamed3(figure: Construction3, seedIn: Seed3, opts: Resolve3Opts): Resolved3 {
   const c = figureContent3.of(figure); // #2888: the construction's content, whichever object carries it
   const parts = partsOf3(c);
   if (parts.length > 1) return resolveParts3(figure, c, parts, seedIn, opts);

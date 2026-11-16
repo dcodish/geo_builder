@@ -2,8 +2,10 @@
  * RENAME A POINT LETTER (#578, ADR-3D-211) — the pure fact-list core.
  *
  * A rename is a **rewrite of history**, not a fact and not a parser command: the ordered fact list stays
- * the source of truth, and every id the student ever typed is replaced wherever it occurs, so replay is
- * byte-for-byte what it would have been had they typed the new letter from the start. This mirrors the
+ * the source of truth, and every id the student ever typed is replaced wherever it occurs, so every row reads as if
+ * they had typed the new letter from the start. #2894 part 2 B (ADR-3D-497): the DRAWING does not move — each rewritten
+ * row records the first name of each letter it moved (`Fact3.as`, {@link sampleNames3}), and the figure is sampled
+ * under those names, so a rename or a swap changes only the letters. This mirrors the
  * 2-D mechanism (`renameFacts`, #539) — the PATTERN is copied, never imported: docs/20 §12, and
  * `BOUNDARIES.json` forbids the import outright.
  *
@@ -149,14 +151,84 @@ export function renameFacts3(
   if (!all.has(F)) return { ok: false, reason: 'no-source' };
   // #1631: the refusal names WHO holds the letter, so the popover can quote it and offer the swap.
   if (all.has(T)) return { ok: false, reason: 'target-taken', holder: letterHolder3(facts, T) };
+  const first = firstNameOf3(facts);
   return {
     ok: true,
-    facts: facts.map((f) => ({
-      ...f,
-      cmds: f.cmds.map((c) => renameInCommand3(c, F, T)),
-      utterance: relabelTokens3(f.utterance, F, T),
-    })),
+    facts: facts.map((f) =>
+      withFirstNames3(
+        f,
+        {
+          ...f,
+          cmds: f.cmds.map((c) => renameInCommand3(c, F, T)),
+          utterance: relabelTokens3(f.utterance, F, T),
+        },
+        [[F, T, first(F)]],
+      ),
+    ),
   };
+}
+
+/**
+ * #2894 part 2 B ([ADR-3D-497](../../docs/06b-decisions-3d.md#adr-3d-497)) — THE NAMES A FIGURE IS SAMPLED UNDER, read
+ * from its rows: each letter a rename or swap gave a new name → the name its point was first given (the rows' `as`,
+ * the first row in list order that names the letter and records it), so the seeded samples (`rng.ts`) are the ones it
+ * had before, and the drawing stays where it was.
+ *
+ * The names are a one-to-one map, so two points never share a sample: a letter no rename touched whose own name is a
+ * renamed point's first name (A renamed to D, then a new point A) is sampled under a name of its own, `A~` (another `~`
+ * while that is taken too), in the order the rows first name the letters. `extra` are letters the figure holds that no
+ * row names (the points the mint pass creates). `undefined` when no letter was ever renamed: the list keys as it always
+ * did.
+ */
+export function sampleNames3(facts: readonly Fact3[], extra: readonly string[] = []): Record<string, string> | undefined {
+  if (!facts.some((f) => f.as)) return undefined;
+  const firstOf = new Map<string, string>();
+  const letters = new Set<string>();
+  for (const f of facts) {
+    const own = pointLabels3(f.cmds);
+    for (const l of own) letters.add(l);
+    if (f.as) for (const [l, n] of Object.entries(f.as)) if (own.has(l) && !firstOf.has(l)) firstOf.set(l, n);
+  }
+  for (const l of extra) letters.add(l);
+  const out: Record<string, string> = {};
+  const taken = new Set<string>();
+  for (const [l, n] of firstOf) {
+    taken.add(n);
+    if (n !== l) out[l] = n;
+  }
+  for (const l of letters) {
+    if (firstOf.has(l) || !taken.has(l)) continue;
+    let n = `${l}~`;
+    while (taken.has(n) || letters.has(n)) n += '~';
+    taken.add(n);
+    out[l] = n;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** The sampling name of each letter of the list as it stands (its own letter when it has none). */
+function firstNameOf3(facts: readonly Fact3[]): (letter: string) => string {
+  const names = sampleNames3(facts);
+  return (l) => names?.[l] ?? l;
+}
+
+/**
+ * A rewritten row with its first names carried over: for each `[from, to, firstName]` the letter `to` now names the point
+ * that `from` named, so a row that names `to` records `to → firstName` (dropped when the point is back on its first
+ * name). The entries of the letters the rewrite moved are replaced; every other entry is kept. A row that ends with no
+ * entry has no `as`, so a rename undone by renaming back leaves the row as it was typed.
+ */
+function withFirstNames3(before: Fact3, after: Fact3, moves: readonly (readonly [from: string, to: string, first: string])[]): Fact3 {
+  const own = pointLabels3(after.cmds);
+  const as: Record<string, string> = {};
+  for (const [l, n] of Object.entries(before.as ?? {})) if (!moves.some(([from]) => from === l)) as[l] = n;
+  for (const [, to, first] of moves) {
+    delete as[to];
+    if (own.has(to) && first !== to) as[to] = first;
+  }
+  const { as: _old, ...rest } = after;
+  void _old;
+  return Object.keys(as).length > 0 ? { ...rest, as } : rest;
 }
 
 /** Upper-case a typed letter and keep a legal label; null when it is not one. */
@@ -211,9 +283,12 @@ export function swapSession3(
   for (const f of st.facts) for (const l of pointLabels3(f.cmds)) all.add(l);
   if (!all.has(A) || !all.has(B)) return { ok: false, reason: 'no-source' }; // both must exist — else it is a rename
   const swapCmd = (c: Command3): Command3 => renameInCommand3(renameInCommand3(renameInCommand3(c, A, SENTINEL), B, A), SENTINEL, B);
+  // #2894 part 2 B (ADR-3D-497): the point that was A is now B and keeps its first name, and the other way round
+  const first = firstNameOf3(st.facts);
+  const moves = [[A, B, first(A)], [B, A, first(B)]] as const;
   return {
     ok: true,
-    facts: st.facts.map((f) => ({ ...f, cmds: f.cmds.map(swapCmd), utterance: triple(f.utterance, A, B) })),
+    facts: st.facts.map((f) => withFirstNames3(f, { ...f, cmds: f.cmds.map(swapCmd), utterance: triple(f.utterance, A, B) }, moves)),
     queries: st.queries.map((q) => triple(q, A, B)),
     planeDisplay: renamePlaneDisplay3(renamePlaneDisplay3(renamePlaneDisplay3(st.planeDisplay, A, SENTINEL), B, A), SENTINEL, B),
   };

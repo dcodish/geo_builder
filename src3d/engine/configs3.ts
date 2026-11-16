@@ -19,6 +19,7 @@
  */
 import type { Id } from './types';
 import type { Vec3 } from './vec3';
+import { bySampleName3 } from './rng';
 
 /**
  * #1506 (ADR-3D-289) — the dedup tolerance for "are these two pool entries the SAME configuration?". Wider than the
@@ -57,11 +58,11 @@ export function sameConfiguration3(a: PoolConfig3, b: PoolConfig3): boolean {
 }
 
 /**
- * The configuration's discrete root: every point (ids in sorted order) in the right-handed frame of its first three
+ * The configuration's discrete root: every point (ids in sorted order, by the names the figure is sampled under) in the right-handed frame of its first three
  * non-collinear points, then the pin-symbol values (names sorted). Invariant under a proper rigid motion.
  */
 export function intrinsicShape3(cfg: PoolConfig3): number[] {
-  const ids = [...cfg.pos.keys()].sort();
+  const ids = [...cfg.pos.keys()].sort(bySampleName3); // #2894 B (ADR-3D-497): by first name, so a rename keeps the pick
   const P = ids.map((id) => cfg.pos.get(id)!);
   const syms = Object.keys(cfg.pinSymbols ?? {}).sort().map((k) => cfg.pinSymbols![k]);
   if (P.length === 0) return syms;
