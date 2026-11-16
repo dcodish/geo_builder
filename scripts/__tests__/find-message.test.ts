@@ -52,8 +52,9 @@ describe('#2201 phase 4 — find-message', { timeout: 30_000 }, () => {
 
   it('a 2-D engine refusal is found by its CODE, with the keys it renders and their sentences', async () => {
     const { rows, codes } = await find('metric-impossible');
-    expect(codes).toContainEqual({ code: 'metric-impossible', keys: ['errors.metricImpossibleTriangle', 'errors.metricImpossiblePath'] });
-    expect(rows.some((r) => r.file === 'src/i18n/locales/he.json' && r.key === 'errors.metricImpossibleTriangle')).toBe(true);
+    // #2894 (ADR-835 Am. 1): a triangle's length conflict renders the shared clearer sentence; a longer path keeps its own.
+    expect(codes).toContainEqual({ code: 'metric-impossible', keys: ['errors.lengthsImpossibleTriangle', 'errors.metricImpossiblePath'] });
+    expect(rows.some((r) => r.file === 'src/i18n/locales/he.json' && r.key === 'errors.lengthsImpossibleTriangle')).toBe(true);
 
     // and the reverse: a 2-D key names the code that renders it
     expect((await find('errors.sameSpot')).codes.map((c) => c.code)).toContain('same-spot');

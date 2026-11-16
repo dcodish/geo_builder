@@ -367,7 +367,7 @@ export function wordingOf(e: EngineError): Worded | null {
         return one('lengthsTriangle', { params: { tri: [e.a, v, e.b].sort().join(''), long, longLen: e.value, a: a!, b: b!, sum: e.sum } });
       }
       const via = joined(e.via);
-      return one('metric', { key: e.via.length > 1 ? 'errors.metricImpossiblePath' : 'errors.metricImpossibleTriangle', params: { seg: `${e.a}${e.b}`, value: e.value, sum: e.sum, a: e.a, b: e.b, via, sides: `|${e.a}${via}| + |${via}${e.b}|` } });
+      return one('metric', { key: 'errors.metricImpossiblePath', params: { seg: `${e.a}${e.b}`, value: e.value, sum: e.sum, a: e.a, b: e.b, via, sides: `|${e.a}${via}| + |${via}${e.b}|` } });
     }
     case 'angle-sum-impossible':
       return one('angleSum', { key: e.bound === '180°' ? 'errors.angleSumImpossibleTriangle' : 'errors.angleSumImpossiblePolygon', params: { poly: e.polygon, sum: e.sum, bound: e.bound, angles: e.angles } });
