@@ -25,8 +25,13 @@ import { decideSubmit3, derive3, useGeo3, type Fact3 } from '../store/store3';
 import type { Seed3 } from '../engine/components3';
 
 type St = { facts: Fact3[]; seed: Seed3 };
-const HE = ['קובייה ABCD', 'B(0,0,0)', 'A(6,0,0)', 'C(0,6,0)', "שיעור ה-z של B' חיובי", "הזווית בין A'C לבין BC' היא 90", "הישר A'C חותך את המישור BC'D בנקודה K", 'K = (2, 4, 2)', "A'K : A'C = 2 : 3"];
-const EN = ['cube ABCD', 'B(0,0,0)', 'A(6,0,0)', 'C(0,6,0)', "the z-coordinate of B' is positive", "the angle between A'C and BC' is 90", "line A'C cuts plane BC'D at K", 'K = (2, 4, 2)', "A'K : A'C = 2 : 3"];
+// scenarios3's «2019 קיץ Q2» lines; the comments keep them out of the #1394 parity corpus, as scenarios3's own copy is
+const HE = [
+  'קובייה ABCD', // deleted below
+  'B(0,0,0)', 'A(6,0,0)', 'C(0,6,0)', "שיעור ה-z של B' חיובי", "הזווית בין A'C לבין BC' היא 90", "הישר A'C חותך את המישור BC'D בנקודה K", 'K = (2, 4, 2)', "A'K : A'C = 2 : 3"];
+const EN = [
+  'cube ABCD', // deleted below
+  'B(0,0,0)', 'A(6,0,0)', 'C(0,6,0)', "the z-coordinate of B' is positive", "the angle between A'C and BC' is 90", "line A'C cuts plane BC'D at K", 'K = (2, 4, 2)', "A'K : A'C = 2 : 3"];
 const BOTH = "A'(6, 0, 6) או (6/5, 24/5, 6/5)";
 
 function build(lines: readonly string[]): St {
