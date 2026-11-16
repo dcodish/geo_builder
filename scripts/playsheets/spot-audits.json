@@ -572,6 +572,25 @@
         "AB = 6"
       ],
       "lookFor": "«AB = 6» is refused naming «AB קוטר במעגל», segment AB, 4 and 6."
+    },
+    {
+      "sheet": "feat-2894-a2-3d",
+      "id": "T5",
+      "kind": "3d:assertion",
+      "queued": "2026-11-16",
+      "product": "3d",
+      "base": "http://localhost:5204",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCD",
+        "נסמן: AB = u, AD = v, AA' = w",
+        "D(0,0,0)",
+        "C(4,3,0)",
+        "A(3,n,p)",
+        "שיעור ה-z של C' חיובי",
+        "A = (3, -4, 0)"
+      ],
+      "lookFor": "Every line builds; «A = (3, -4, 0)» is accepted as its own row."
     }
   ],
   "results": [

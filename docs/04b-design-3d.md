@@ -1001,6 +1001,40 @@ its rows, so the pin set is one no start could meet. `solvePivot` returns an emp
 asks the same function and, when the conflict involves the blamed row, words it as `lengths-impossible` with the
 reason, naming the rows that added the pins taking part (`pinRow`, recorded where each row's pins are added).
 
+**The cold sweep's creep stop and the anchored settle (#2894, [ADR-3D-499](06b-decisions-3d.md#adr-3d-499)).** The
+pivot's cold sweep (the 16 starts, their polish, and the dims widening) passes `leastSquares` a fresh `creepStop()`, asked
+every 8th accepted step with the error. It stops the solve when the point is drawn at a point and exact (ADR-3D-464), or
+when the givens' rows are exact to two orders under the acceptance (`primaryErr < ACCEPT·1e-2`) and the full error fell
+less than 10 % (`CREEP_GAIN`) over those 8 steps. What is left then is the anchors' 1e-4 pull, which used to creep along
+the curved solution set to the 120-iteration bail, and three polish restarts after it, without arriving. A solve the
+creep stop ended goes to `settleAnchored`, which reaches the creep's destination directly. Each round takes the
+Gauss–Newton step of the anchor rows with the givens' rows held (weight `SETTLE_HOLD` = 1e8), projects back onto the
+givens' solution set with a solve of the givens' rows alone, and keeps the point only while the full error falls. It ends
+on a negligible step, when the step's predicted gain (the Gauss–Newton model's g·d) is under `SETTLE_STALL` = 1e-3 of the
+error, or after `SETTLE_ROUNDS` = 12 rounds, and every residual it evaluates is metered. Only unknowns that
+some row reads take part (`SETTLE_LIVE`): an undriven dim's column is zero, and the #518 park places it after the sweep.
+
+The settle has three guards, and each falls back to the solve exactly as before the creep stop (`leastSquares(fSeed, x0,
+120, exactAtPoint)`):
+- **Regular points only** (`regularOnSet`). One minimum-norm Gauss–Newton step of the givens' rows, solved in their row
+  space, must cut their error by `SETTLE_REGULAR` = 1e-4 at least. It does at a regular point of the solution set
+  (quadratic convergence), and never at a tangential one: the exam cube's «A(3,n,p)» forces p² = 0, where a residual of
+  1e-12 leaves p at 1e-3 and the step cuts the error by 16.
+- **Defined trial points.** A trial point where the residuals cannot be evaluated (a rider plane through three collinear
+  points) ends the settle.
+- **The creep's own basin.** A settled point that is degenerate (a collapsed solid, a point off its host) from one that
+  was not is refused.
+
+**Every admitted candidate on the givens' set** (`onSet`, in `collect` only). The full objective's minimum is not on the
+set: the anchors' pull holds the givens' rows at a residual of about 1e-12, so a coordinate the givens fix comes out a few
+1e-7 off, differently at each knowledge sample, and the samples' comparison withheld it or not by chance. Each candidate
+`collect` is offered is projected onto the set by one certifying Gauss–Newton step of the givens' rows, at a certified
+regular point only. The shift is of that order, so the drawing does not move visibly. A quantity the givens fix then agrees
+across the samples, and the panel, the asks and the claims read it as fixed (FR-EQ-4); a free one still differs at its own
+scale. **The search path is never projected:** the sweep's results, and the polish restarts from them, run exactly as LM
+leaves them. Projected there, the restarts fell into other basins and reached fewer of a figure's discrete placements, and
+exact samples turned that into a claimed value (#2368's control read «A'(0, 0, 2)» at 9 of 24 seeds).
+
 **The configuration search is bounded in work (#2893, [ADR-3D-494](06b-decisions-3d.md#adr-3d-494); ADR-W-210 invariant 3).**
 `searchSeed3` (`engine/evaluate.ts`) walks the search's window, `SEARCH_SEEDS3` = 200 seeds from its start, until one
 meets the requirements, under `withWorkLimit` (`shell/workLimit`) of `SEED_SEARCH_LIMIT3` units, checked before each
