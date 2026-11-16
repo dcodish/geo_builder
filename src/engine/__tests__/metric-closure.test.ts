@@ -131,3 +131,88 @@ describe('explainLengthConflict — which lengths, and why (#2894, ADR-835)', ()
     expect(explainLengthConflict(square(3, [d('A', 'C', 3 * Math.SQRT2)]))).toBeNull();
   });
 });
+
+/**
+ * #2601 (ADR-837) — a triangle circumscribed about a circle: every side is longer than the diameter. The two shapes the
+ * engine builds an incircle in, as it builds them (read off `replay` at cd8bab8e).
+ */
+const ord = (...points: string[]): Constraint => ({ type: 'collinear-order', points });
+/** «מעגל O ברדיוס r» · «משולש ABC חוסם את מעגל O»: three tangents at free touch points, the vertices their crossings. */
+const tangentRing = (r: number, extra: Constraint[] = [], orders: [boolean, boolean, boolean] = [true, true, true]): Construction => {
+  const t = ['@t-O-ABC-0', '@t-O-ABC-1', '@t-O-ABC-2'];
+  const order = [ord('A', t[1]!, 'B'), ord('B', t[2]!, 'C'), ord('C', t[0]!, 'A')].filter((_, i) => orders[i]);
+  return fig(
+    [
+      fp('O', 0, 0),
+      { kind: 'circle', id: 'circle-O', center: 'O', radius: { via: 'length', value: r } } as GeoObject,
+      ...t.map((id, i) => ({ kind: 'on-circle', id, circle: 'circle-O', theta: 0.4 + (i * 2 * Math.PI) / 3, free: true }) as GeoObject),
+      ...t.map((at) => ({ kind: 'line', id: `tan-${at}`, spec: { via: 'tangent', circle: 'circle-O', at } }) as GeoObject),
+      { kind: 'line-intersection', id: 'A', line1: `tan-${t[0]}`, line2: `tan-${t[1]}` } as GeoObject,
+      { kind: 'line-intersection', id: 'B', line1: `tan-${t[1]}`, line2: `tan-${t[2]}` } as GeoObject,
+      { kind: 'line-intersection', id: 'C', line1: `tan-${t[2]}`, line2: `tan-${t[0]}` } as GeoObject,
+    ],
+    [...extra, ...order],
+  );
+};
+/** «משולש ABC» · «מעגל O חסום במשולש ABC»: O the crossing of two internal bisectors, the feet on the sides the touches. */
+const incentre = (extra: Constraint[] = []): Construction =>
+  fig(
+    [
+      fp('A', 2, 3.6),
+      fp('B', 6, 0),
+      fp('C', 0, 0),
+      { kind: 'line', id: 'bis-CAB', spec: { via: 'bisector', vertex: 'A', p: 'C', q: 'B' } } as GeoObject,
+      { kind: 'line', id: 'bis-ABC', spec: { via: 'bisector', vertex: 'B', p: 'A', q: 'C' } } as GeoObject,
+      { kind: 'line-intersection', id: 'O', line1: 'bis-CAB', line2: 'bis-ABC' } as GeoObject,
+      { kind: 'foot', id: '@f-AB', from: 'O', a: 'A', b: 'B' } as GeoObject,
+      { kind: 'circle', id: 'circle-O', center: 'O', radius: { via: 'through', point: '@f-AB' } } as GeoObject,
+      { kind: 'foot', id: '@f-BC', from: 'O', a: 'B', b: 'C' } as GeoObject,
+      { kind: 'foot', id: '@f-CA', from: 'O', a: 'C', b: 'A' } as GeoObject,
+    ],
+    [...extra, ord('A', '@f-AB', 'B'), ord('B', '@f-BC', 'C'), ord('C', '@f-CA', 'A')],
+  );
+
+describe('metricClosureImpossibility — a triangle circumscribed about a circle (#2601, ADR-837)', () => {
+  it('the report: «מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «AB = 4» is proven; every side gets the floor', () => {
+    const m = metricClosureImpossibility(tangentRing(3, [d('A', 'B', 4)]));
+    expect(m).not.toBeNull();
+    expect([m!.a, m!.b].sort()).toEqual(['A', 'B']);
+    expect(m!.lo).toBeGreaterThan(6); // 2r·√(1 + ρ) = 6.06…
+    expect(metricClosureImpossibility(tangentRing(3, [d('B', 'C', 4)]))).not.toBeNull();
+    expect(metricClosureImpossibility(tangentRing(3, [d('C', 'A', 1)]))).not.toBeNull();
+  });
+
+  it('the boundary: a side EQUAL to the diameter is proven (strict); a side just past what the solver draws is not', () => {
+    expect(metricClosureImpossibility(tangentRing(3, [d('A', 'B', 6)]))).not.toBeNull();
+    expect(metricClosureImpossibility(tangentRing(3, [d('A', 'B', 6.05)]))).not.toBeNull();
+    // measured through the whole pipeline at cd8bab8e: 6.15 builds (the order's 2 % margin puts the least drawable
+    // side near 2r·√(1 + 2ρ) = 6.12); the closure must never exclude it, nor the sides above it
+    for (const ab of [6.15, 6.2, 6.5, 40]) expect(metricClosureImpossibility(tangentRing(3, [d('A', 'B', ab)])), `AB = ${ab}`).toBeNull();
+  });
+
+  it('the radius from the side: «AB = 4» first, then a radius over 2 is proven, a radius under it is not', () => {
+    const free = (r: number) => {
+      const c = tangentRing(1, [d('A', 'B', 4), d('O', '@t-O-ABC-1', r)]);
+      return fig(c.objects.map((o) => (o.kind === 'circle' ? ({ ...o, radius: { via: 'through', point: '@t-O-ABC-0' } } as GeoObject) : o)), c.constraints);
+    };
+    expect(metricClosureImpossibility(free(2.5))).not.toBeNull();
+    expect(metricClosureImpossibility(free(1.9))).toBeNull();
+  });
+
+  it('two orders already make the circle the incircle (a drop-one fold); one order, or none, is an excircle too: no floor', () => {
+    expect(metricClosureImpossibility(tangentRing(3, [d('A', 'B', 4)], [true, false, true]))).not.toBeNull();
+    expect(metricClosureImpossibility(tangentRing(3, [d('A', 'B', 4)], [false, true, true]))).not.toBeNull();
+    expect(metricClosureImpossibility(tangentRing(3, [d('A', 'B', 4)], [false, false, true]))).toBeNull();
+    expect(metricClosureImpossibility(tangentRing(3, [d('A', 'B', 4)], [false, false, false]))).toBeNull();
+  });
+
+  it('the incentre shape: a side under the diameter is proven, a longer one is not', () => {
+    expect(metricClosureImpossibility(incentre([d('O', '@f-AB', 3), d('A', 'B', 4)]))).not.toBeNull();
+    expect(metricClosureImpossibility(incentre([d('O', '@f-AB', 3), d('B', 'C', 5.9)]))).not.toBeNull();
+    expect(metricClosureImpossibility(incentre([d('O', '@f-AB', 3), d('A', 'B', 7)]))).toBeNull();
+  });
+
+  it('the floor gives no explanation of its own: the refusal keeps the plain sentence', () => {
+    expect(explainLengthConflict(tangentRing(3, [d('A', 'B', 4)]))).toBeNull();
+  });
+});

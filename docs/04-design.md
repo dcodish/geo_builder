@@ -1909,6 +1909,18 @@ refusal (stage 2e⁰) is asked BEFORE the primary solve in the main, M1 and coup
 its own reading (`explainLengthConflict`) and the step is not a composition with a mirror: the primary would fail and
 the ladder's first act is the same proof and the same sentence. The rider re-reads after a main refusal still run.
 
+**A side of a triangle circumscribed about a circle is longer than the diameter ([ADR-837](06-decisions.md#adr-837),
+#2601).** The metric closure reads a third kind of relation beside the ratio and the angle wedge: a one-sided FLOOR
+`|side| ≥ k·r`, which raises the side's lower bound and lowers the radius's upper bound and bounds nothing else. It is
+read from every triangle whose circle touches the sides within them, in the two shapes the engine builds an incircle
+in (`incircleTriangles`): the tangent ring (three tangents of one circle at points on it, crossing pairwise at the
+vertices) and the incentre (two internal bisectors' crossing, with its feet on the sides), each needing at least two
+sides' `collinear-order` [vertex, touch, vertex] obligations, which make the circle the incircle and not an excircle.
+k = 2·√(1 + ρ), ρ = f/(1 − f) with f the order's acceptance fraction (`ORDER_LEN_MIN_FRAC`): the incircle's tangent
+lengths obey z(xy − r²) = r²(x + y), and one accepted order beside the side gives xy > r²(1 + ρ). The floor has no
+reading of its own (it bounds, never fixes), so `explainLengthConflict` adds nothing and the refusal is the climb's
+plain one, asked at the ladder's entry (stage 2e⁰), in every fold that reaches the step, the drop-one search's included.
+
 **A view that fails at every seed is tried at one ([ADR-834](06-decisions.md#adr-834), #2894).** A seed enters a replay
 only in its tail (the sample and one evaluate); the fold is the fact list's alone. So a view whose fold failed (its build
 error, a row it filed as failed) or whose construction has nothing to sample fails at every seed, and the configuration

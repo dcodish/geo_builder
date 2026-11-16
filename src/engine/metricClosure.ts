@@ -21,6 +21,8 @@
  *       corners (|BC| = |AB| and a right angle at B), a parallelogram's fourth vertex (opposite sides equal), a
  *       perpendicular offset at an end of its base (a right angle), a midpoint (half the segment), a point on a circle
  *       (its radius: the stated length, or one free radius shared by all its points), an antipode (the diameter);
+ *     · a triangle circumscribed about a circle (#2601, ADR-837): every side longer than the diameter, a ONE-SIDED
+ *       floor |side| ≥ k·r ({@link INCIRCLE_SIDE_FLOOR}; it bounds the side below and the radius above);
  *  - a stated or structural angle at V between P and Q bounds |PQ| by the law of cosines (it holds with a zero arm
  *    too, so a degenerate configuration is never excluded);
  *  - every three points obey the triangle inequality (both bounds), so a chain of pinned lengths bounds its ends
@@ -34,7 +36,7 @@
  */
 import { pinnedAngleWedges } from './metricFeasibility';
 import { drivenConstraintsOf } from './evaluate';
-import type { Construction, Constraint, GeoObject, Id } from './types';
+import { ORDER_LEN_MIN_FRAC, type Construction, type Constraint, type GeoObject, type Id } from './types';
 
 export interface MetricClosureProof {
   /** the two points whose distance no configuration can take */
@@ -60,7 +62,26 @@ const MAX_SWEEPS = 40;
 /** Past this many points the O(n³) triangle sweep is skipped (the other relations still run). */
 const MAX_TRIANGLE_POINTS = 48;
 
+/**
+ * #2601 ([ADR-837](../../docs/06-decisions.md#adr-837)) — the side of a triangle circumscribed about a circle of radius
+ * r, against r. With x, y, z the tangent lengths from the three vertices (x = r·cot(A/2), …) the half-angles sum to
+ * 90°, which is z·(x·y − r²) = r²·(x + y), and the side between the x and y vertices is x + y. Exactly: x·y > r², so
+ * every side exceeds 2r (cot(A/2) + cot(B/2) > 2 when A/2 + B/2 < 90°), approached only as the third angle closes.
+ * Every accepted figure also holds the sides' `collinear-order` [vertex, touch, vertex] (the incircle's own
+ * statement, ADR-763), accepted only when the touch sits at least `ORDER_LEN_MIN_FRAC` = f of the side from either
+ * end. On the side between the x and z vertices that is x ≥ f·(x + z), so z ≤ x/ρ with ρ = f/(1 − f); then
+ * r²(x + y) = z(x·y − r²) ≤ (x/ρ)(x·y − r²), i.e. x·y ≥ r²(1 + ρ(x + y)/x) > r²(1 + ρ), and x + y ≥ 2√(x·y) >
+ * 2r·√(1 + ρ) (2.0203·r for f = 0.02). One ordered side beside the side read is enough; two ordered sides already
+ * make the circle the incircle (a touch within a side puts both arcs beside it under 180°, and two touches cover all
+ * three arcs), which is why a fold that has dropped one of the three orders is still read. The floor keeps 1e-6 of
+ * the bound for floating point; the stated side's own margin (`LEN_REL`) is the closure's as everywhere, so a side
+ * the solver can draw is never excluded (radius 3: measured, 6.15 builds; 6.05 and below are proven).
+ */
+const ORDER_RHO = ORDER_LEN_MIN_FRAC / (1 - ORDER_LEN_MIN_FRAC);
+const INCIRCLE_SIDE_FLOOR = 2 * Math.sqrt(1 + ORDER_RHO) * (1 - 1e-6);
+
 interface Ratio { p: number; q: number; k1: number; k2: number; abs: number; src: number } // |p| ∈ [k1, k2]·|q| ± abs (pair indices)
+interface Floor { p: number; q: number; k: number; src: number } // |p| ≥ k·|q| (pair indices; one-sided)
 interface Wedge { v: number; p: number; q: number; t1: number; t2: number; src: number } // angle at v between p and q ∈ [t1, t2]°
 /** #2894 (ADR-835): what a relation was read from — an obligation, or the objects whose definition it is. */
 type Source = { con: Constraint } | { objs: Id[] };
@@ -148,6 +169,11 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
     if (a === b || c2 === d || !(k > 0) || !Number.isFinite(k)) return;
     ratios.push({ p: pair(a, b), q: pair(c2, d), k1: k * (1 - rel), k2: k * (1 + rel), abs: rel > EXACT_REL ? lenAbs : 0, src });
   };
+  const floors: Floor[] = [];
+  const floor = (a: Id, b: Id, c2: Id, d: Id, k: number): void => {
+    if (a === b || c2 === d || !(k > 0) || !Number.isFinite(k)) return;
+    floors.push({ p: pair(a, b), q: pair(c2, d), k, src });
+  };
   const wedge = (v: Id, p: Id, q: Id, deg: number, margin: number): void => {
     if (v === p || v === q || p === q || !Number.isFinite(deg) || deg <= 0 || deg >= 180) return;
     pair(v, p);
@@ -233,6 +259,12 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
     from({ objs: [o.id, o.circle] });
     ratio(o.of, o.id, circ.center, o.of, 2, EXACT_REL); // |of → antipode| = 2·|centre → of|
   }
+  // #2601 (ADR-837): a triangle circumscribed about a circle has every side longer than the diameter.
+  for (const t of incircleTriangles(c, obligations)) {
+    from({ objs: t.objs });
+    for (let s = 1; s < 3; s++) ratio(t.centre, t.touch[s]!, t.centre, t.touch[0]!, 1, EXACT_REL); // every touch is a radius away
+    for (let s = 0; s < 3; s++) floor(t.tri[s]!, t.tri[(s + 1) % 3]!, t.centre, t.touch[s]!, INCIRCLE_SIDE_FLOOR);
+  }
   const interval = (a: Id, b: Id): [number, number] | null => {
     const i = ptIndex.get(a);
     const j = ptIndex.get(b);
@@ -300,6 +332,11 @@ function closeLengths(c: Construction, skip?: Constraint, exact = false): Closed
     for (const r of ratios) {
       moved = narrow(r.p, r.k1 * lo[r.q]! - r.abs, r.k2 * hi[r.q]! + r.abs, () => union(loSup[r.q]!, r.src), () => union(hiSup[r.q]!, r.src)) || moved;
       moved = narrow(r.q, (lo[r.p]! - r.abs) / r.k2, (hi[r.p]! + r.abs) / r.k1, () => union(loSup[r.p]!, r.src), () => union(hiSup[r.p]!, r.src)) || moved;
+    }
+    for (const f of floors) {
+      // |p| ≥ k·|q|: a lower bound on p, an upper bound on q (one-sided: nothing bounds p above or q below)
+      moved = narrow(f.p, f.k * lo[f.q]!, Infinity, () => union(loSup[f.q]!, f.src), () => hiSup[f.p]!) || moved;
+      moved = narrow(f.q, 0, hi[f.p]! / f.k, () => loSup[f.q]!, () => union(hiSup[f.p]!, f.src)) || moved;
     }
     for (const w of wedges) {
       const x = idx(w.v, w.p)!;
@@ -416,6 +453,99 @@ export function explainLengthConflict(c: Construction, prefer: readonly Constrai
     }
   }
   return null;
+}
+
+/** A triangle with its incircle: the vertices, the touch point on each side (side s runs tri[s] → tri[s+1]), the centre. */
+interface IncircleTriangle {
+  tri: [Id, Id, Id];
+  touch: [Id, Id, Id];
+  centre: Id;
+  objs: Id[];
+}
+
+/**
+ * #2601 ([ADR-837](../../docs/06-decisions.md#adr-837)) — every triangle of `c` whose circle touches each side WITHIN
+ * it, read from the two shapes the engine builds an incircle in (no other is read; reading fewer only loses proofs):
+ *  - the TANGENT ring («משולש ABC חוסם את מעגל O» on an existing circle, ADR-115/ADR-763): three tangent lines of one
+ *    circle at points on it, each pair crossing at a vertex;
+ *  - the INCENTRE («מעגל O חסום במשולש ABC» on an existing triangle): the crossing of two internal bisectors of the
+ *    triangle's angles, with the feet of its perpendiculars on the three sides — the touch points.
+ * At least two sides' `collinear-order` [vertex, touch, vertex] must be obligations: they make the circle the INCIRCLE
+ * (a touch outside a side is an excircle, whose sides can be short), and the floor reads their acceptance margin.
+ */
+function incircleTriangles(c: Construction, obligations: readonly Constraint[]): IncircleTriangle[] {
+  const orders = new Set<string>();
+  for (const k of obligations) if (k.type === 'collinear-order' && k.points.length === 3) orders.add(k.points.join('|'));
+  const within = (p: Id, t: Id, q: Id): boolean => orders.has(`${p}|${t}|${q}`) || orders.has(`${q}|${t}|${p}`);
+  const byId = new Map<Id, GeoObject>(c.objects.map((o) => [o.id, o] as const));
+  const distinct = (...ids: Id[]): boolean => new Set(ids).size === ids.length;
+  const out: IncircleTriangle[] = [];
+
+  // the tangent ring
+  const onCircle = (circle: Id, p: Id): boolean => {
+    const o = byId.get(p);
+    if (o && (o.kind === 'on-circle' || o.kind === 'antipode') && o.circle === circle) return true;
+    const circ = byId.get(circle);
+    return !!circ && circ.kind === 'circle' && circ.radius.via === 'through' && circ.radius.point === p;
+  };
+  const tangentsOf = new Map<Id, { line: Id; at: Id }[]>();
+  for (const o of c.objects) {
+    if (o.kind !== 'line' || o.spec.via !== 'tangent' || !onCircle(o.spec.circle, o.spec.at)) continue;
+    const list = tangentsOf.get(o.spec.circle) ?? [];
+    list.push({ line: o.id, at: o.spec.at });
+    tangentsOf.set(o.spec.circle, list);
+  }
+  const crossing = new Map<string, Id>();
+  const lineKey = (l1: Id, l2: Id): string => (l1 < l2 ? `${l1}|${l2}` : `${l2}|${l1}`);
+  for (const o of c.objects) if (o.kind === 'line-intersection' && o.line1 !== o.line2) crossing.set(lineKey(o.line1, o.line2), o.id);
+  for (const [circleId, tans] of tangentsOf) {
+    const circ = byId.get(circleId);
+    if (!circ || circ.kind !== 'circle' || tans.length < 3) continue;
+    for (let i = 0; i < tans.length; i++)
+      for (let j = i + 1; j < tans.length; j++)
+        for (let k = j + 1; k < tans.length; k++) {
+          const [li, lj, lk] = [tans[i]!, tans[j]!, tans[k]!];
+          const xij = crossing.get(lineKey(li.line, lj.line));
+          const xjk = crossing.get(lineKey(lj.line, lk.line));
+          const xki = crossing.get(lineKey(lk.line, li.line));
+          if (!xij || !xjk || !xki || !distinct(xij, xjk, xki, li.at, lj.at, lk.at)) continue;
+          // side xij–xjk lies on lj, xjk–xki on lk, xki–xij on li
+          if ([within(xij, lj.at, xjk), within(xjk, lk.at, xki), within(xki, li.at, xij)].filter(Boolean).length < 2) continue;
+          out.push({ tri: [xij, xjk, xki], touch: [lj.at, lk.at, li.at], centre: circ.center, objs: [circleId, li.line, lj.line, lk.line, xij, xjk, xki] });
+        }
+  }
+
+  // the incentre
+  const internalBisector = (id: Id): { vertex: Id; p: Id; q: Id } | null => {
+    const o = byId.get(id);
+    return o && o.kind === 'line' && o.spec.via === 'bisector' ? o.spec : null;
+  };
+  const feet = new Map<string, Id>(); // `${from}|${a}|${b}` (both orders) → foot
+  for (const o of c.objects)
+    if (o.kind === 'foot') {
+      feet.set(`${o.from}|${o.a}|${o.b}`, o.id);
+      feet.set(`${o.from}|${o.b}|${o.a}`, o.id);
+    }
+  for (const o of c.objects) {
+    if (o.kind !== 'line-intersection') continue;
+    const b1 = internalBisector(o.line1);
+    const b2 = internalBisector(o.line2);
+    if (!b1 || !b2 || b1.vertex === b2.vertex) continue;
+    const t1 = [b1.vertex, b1.p, b1.q];
+    if (!distinct(...t1) || !distinct(b2.vertex, b2.p, b2.q) || ![b2.vertex, b2.p, b2.q].every((x) => t1.includes(x))) continue;
+    const tri = t1 as [Id, Id, Id];
+    const touch: Id[] = [];
+    let ordered = 0;
+    for (let s = 0; s < 3; s++) {
+      const f = feet.get(`${o.id}|${tri[s]}|${tri[(s + 1) % 3]}`);
+      if (f === undefined) break;
+      touch.push(f);
+      if (within(tri[s]!, f, tri[(s + 1) % 3]!)) ordered++;
+    }
+    if (touch.length !== 3 || ordered < 2) continue;
+    out.push({ tri, touch: touch as [Id, Id, Id], centre: o.id, objs: [o.id, o.line1, o.line2, ...touch] });
+  }
+  return out;
 }
 
 /** min over x ∈ [xl, xh], y ∈ [yl, yh] of x² + y² − 2·c·x·y (convex: on the box's edges; no infinite edge). */

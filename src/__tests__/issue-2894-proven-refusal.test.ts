@@ -63,3 +63,26 @@ describe('#2894 — a proven refusal reads exactly as the climbed one', () => {
     }, 120_000);
   }
 });
+
+/**
+ * #2601 ([ADR-837](../../docs/06-decisions.md#adr-837)) — a triangle circumscribed about a circle has every side longer
+ * than the diameter. The closure gives no reading of its own (the side is not FIXED, only bounded), so the refusal is the
+ * climb's word for word, the reason clause included: compared whole. A side the solver can draw still builds.
+ */
+describe('#2601 — a side of a circumscribed triangle under the diameter is refused at once, in the same words', () => {
+  const ring = ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O'];
+  for (const side of ['AB = 4', 'AB = 6']) {
+    it(`«${[...ring, side].join(' · ')}» reads exactly as the climb, for a fraction of its work`, () => {
+      const proven = fold([...ring, side]);
+      ladderProofConfig.exit = false;
+      const climbed = fold([...ring, side]);
+      expect(proven.rows).toEqual(climbed.rows);
+      expect(proven.rows[proven.rows.length - 1]![1]).toBe(`over-constrained: |AB| = ${side.slice(5)} cannot hold [vs #1]`);
+      expect(proven.units, 'the proof answered, not the climb').toBeLessThan(climbed.units / 2);
+    }, 180_000);
+  }
+  it('«AB = 6.15» (just past the least side the solver draws) still builds', () => {
+    const { rows } = fold([...ring, 'AB = 6.15']);
+    for (const [u, st] of rows) expect(st, `«${u}»`).toBe('ok');
+  }, 120_000);
+});
