@@ -416,6 +416,22 @@
       "lookFor": "The press moves C to another place."
     },
     {
+      "sheet": "feat-2894-c-lengths-analytic",
+      "id": "T5",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5198",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "AB = 3",
+        "BC = 4",
+        "AC = 6"
+      ],
+      "lookFor": "Four rows; the triangle drawn."
+    },
+    {
       "sheet": "feat-2894-e-2d",
       "id": "T2",
       "kind": "2d:assertion",

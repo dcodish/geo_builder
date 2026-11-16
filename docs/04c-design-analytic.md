@@ -1750,6 +1750,9 @@ loop and skips lines already in `faults`. A collapse the givens force is `polygo
 `collapsedByGivens` and its pair twin `pairsMetByGivens` read **the walk's own window** (`walkWindow`: the requested
 configuration, then each later seed at reach 1 with the request's `wide`), so on the refusal path every figure they read
 is one `drawableAt` already evaluated ([ADR-AG-481](06c-decisions-analytic.md#adr-ag-481)).
+Stated lengths no figure can have (`metricBounds.ts`, 3-D's `metricBounds3`: one segment given two lengths, or the
+triangle inequality broken by three fixed sides) skip the solve in `evaluate` and are refused `lengths-impossible` on the
+newest of their rows, naming the others, before the drop-one probe ([ADR-AG-483](06c-decisions-analytic.md#adr-ag-483)).
 
 **The vacancy arm reads the OBJECT's freedom, and a stated collinearity is a proof** ([ADR-AG-296](06c-decisions-analytic.md#adr-ag-296), #1963).
 A `vacant` object is refused `does-not-exist` when `Figure.freedomOfRead` over its inputs (`inputsOf`, `carriers.ts`:

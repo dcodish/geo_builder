@@ -17,6 +17,7 @@ import { cleanSegDisplay, toggleSegFlag, type SegDisplayMap } from '../../shell/
 import type { RefKind } from '../engine/names';
 import type { TangentsExhausted } from '../engine/apply';
 import { canonicalSeed, sameSeed, type PartConfiguration, type Seed } from '../engine/evaluate';
+import type { LengthsWhy } from '../engine/metricBounds';
 import { cleanAnnotations, type AnnotationMap } from '../app/annotations';
 import { ALL_SHOWN, cleanCanvasDisplay, displayForSave, type CanvasDisplay } from '../render/canvasDisplay';
 import { isPointName } from '../engine/pointName';
@@ -265,6 +266,8 @@ export type InputError =
   | { key: 'name-taken'; detail: string; holder?: string; nameOf?: string; nameKind?: 'angle' | 'length'; declared?: string }
   /** #2061 (ADR-AG-277) — the same letter with another coefficient: 2-D's reason clause and the earlier line. */
   | { key: 'measure-contradicts'; detail: string; what?: string; declared?: string }
+  /** #2894 (ADR-AG-483) — stated lengths no figure can have (3-D's ADR-3D-495 sentence): the other lines, and why. */
+  | { key: 'lengths-impossible'; detail: string; others?: string[]; why?: LengthsWhy }
   /** #2119 (ADR-684) — a second, different radius for a circle: the line that sized it. */
   | { key: 'radius-contradicts'; detail: string; declared?: string }
   /** #2388 (ADR-AG-307): R is a point and the radius parameter — `holder` the letter, `reading` the first, `declared` its line. */

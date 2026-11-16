@@ -35,6 +35,7 @@ import { followObjects } from './roles';
 import { ContentCache, contentOf } from './content';
 import { offInkExtensions } from '../../shell/offInk';
 import { isLimitSignal } from './workLimitAn';
+import { lengthsImpossible } from './metricBounds';
 import { curveByName, inDomain, isFree, isPositional, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
 export interface FigurePoint {
@@ -4078,6 +4079,13 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * and the knowledge gate still see one truth.
    */
   const c: Construction = resolvedAt(raw, seed, choiceSeed);
+  /**
+   * STATED LENGTHS NO FIGURE CAN HAVE (#2894 part 2 C, [ADR-AG-483](../../docs/06c-decisions-analytic.md#adr-ag-483)): one segment
+   * given two lengths, or three points against the triangle inequality, read off the rows in closed form. No start can meet
+   * them, so none is paid: the fits and the solve are skipped, and the check below reports the rows unmet at the seed's own
+   * figure. 3-D's pivot does the same (ADR-3D-495); `derive` names the rows and the reason.
+   */
+  const metricallyImpossible = lengthsImpossible(c.constraints);
   // `paramReach`, never `reach`: this body has locals of that name (a span), and the parameter must not be shadowed
   let env = foldSignSelectors(c, sampleEnv(c, seed, paramReach, wide));
   // #2380 (ADR-AG-303): a parameter a given pins starts AT one of its roots — found by scan, chosen by the seed.
@@ -4551,10 +4559,10 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   }
 
   // The figure as it stood, then what each line added: every line's new points start fitted to it (#1687, ADR-AG-348).
-  fitLineByLine(c, env, seeded, hashed, seed);
+  if (!metricallyImpossible) fitLineByLine(c, env, seeded, hashed, seed);
 
   // A circle the tool created starts fitted to the figure it joins (#1647) — a start, never a verdict.
-  const fitted = fitCreatedShapes(raw, c, env, seeded, seed, choiceSeed, paramReach, wide);
+  const fitted = metricallyImpossible ? null : fitCreatedShapes(raw, c, env, seeded, seed, choiceSeed, paramReach, wide);
   if (fitted) {
     env = fitted.env;
     for (const [id, p] of fitted.seeded) seeded.set(id, p);
@@ -4720,7 +4728,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     return swapped ? [system.toVec(m, env0)] : [];
   };
 
-  if ((ids.length > 0 || sys.syms.length > 0) && c.constraints.length > 0 && !fitted?.dead) {
+  if ((ids.length > 0 || sys.syms.length > 0) && c.constraints.length > 0 && !fitted?.dead && !metricallyImpossible) {
     // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
     const solved = sys;
     /**
