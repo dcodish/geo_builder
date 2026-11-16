@@ -637,6 +637,10 @@ const SEEDED: SeededCorpus = {
   // #1829 (ADR-3D-471): the operator's rectangle, saved with his «AE» ask (before: «AE⃗ — לא נקבע על ידי הנתונים»; now
   // «u + t·v»). The answers, the shared t and the panel parity are asserted in queries.test.ts; this is the build + drift net.
   'vector-answer-in-parameter-1829.geo3.json': ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'AB=1', '|AD|=√7', 'DF→ = t*DC→', 'BE→ = t*BC→'],
+  // #2829 (ADR-3D-525): the issue's four lines — the circle rider closes the quadrilateral declared after it (before: ABCD
+  // drawn crossed at 14 of 24 seeds). Simple at every seed, A, B, C unmoved and the pentagon twin are asserted in
+  // engine3.test.ts; this is the build + drift + load net.
+  'ring-circle-rider-simple-2829.geo3.json': ['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

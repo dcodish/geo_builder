@@ -15594,7 +15594,7 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 3. **ADR-3D-327's pass** reads every declared ring of four or more (`declaredRings3`: pentagons, bound bases); a letter set is convex when a ring over it is `convexWhenSimple` **or** the set is `statedConcyclic3`. When the circle is the proof (no ring's noun is), the facts holding a command that states it (`commandStatesCircle3`: the circle, the cyclic fix, the rider, the right pyramid) join the blame, and a quad pyramid declares its base ring; the latest such line is refused (ADR-3D-322's rule). It still needs two orders over one letter set, so one ring and its circle (C4) never fires.
 4. **The verifier** (claims.ts `concyclic`) is in-order concyclicity: the diagonals AC and BD must cross (else refuted), and the residual is the larger of |cos∠BAD + cos∠BCD| and the normalised volume of ABCD. Each term is first order in the error. *Deviation from the plan,* which asked for Ptolemy's in-order defect: that defect is second order (it touches zero, ADR-3D-006's lesson), so a tolerance on it accepts a point √tol off the circle; and Ptolemy's equality in space already implies coplanarity, so the plan's extra coplanarity term would have been redundant there. The solver pin keeps its sign-crossing form.
 
-**The plan's "measure at pickup" items.** The rider case is covered by the reader (row "rider"). No green circle row draws a non-cyclic figure at seeds 0–5 after steps 1–3 (measured over every row above; locked by the scenario's control rows), so the pin needs no second component. Found, not fixed (a different chokepoint): «משולש ABC» · «מעגל חוסם את ABC» · «D על המעגל» · «מרובע ABCD» draws ABCD itself **crossed** at 5/6 seeds — the rider's seat on the circle ignores the declared ring (FR-RD-7's "drawn simple"); commented on #2810.
+**The plan's "measure at pickup" items.** The rider case is covered by the reader (row "rider"). No green circle row draws a non-cyclic figure at seeds 0–5 after steps 1–3 (measured over every row above; locked by the scenario's control rows), so the pin needs no second component. Found, not fixed (a different chokepoint): «משולש ABC» · «מעגל חוסם את ABC» · «D על המעגל» · «מרובע ABCD» draws ABCD itself **crossed** at 5/6 seeds — the rider's seat on the circle ignores the declared ring (FR-RD-7's "drawn simple"); commented on #2810. **Fixed by [ADR-3D-525](#adr-3d-525)** (#2829, 2026-11-16).
 
 **Perf** (docs/17 §7). R1's last line 137 → 82 ms; R8's 966 → 48 ms; R10's 7.1 s → 174 ms: the structural pass refuses before the claim-sample search. `statedConcyclic3` is O(statements) and runs only for a reordered ring in the seat and once per letter group in the pass.
 
@@ -16545,3 +16545,41 @@ The reason: projected starts change which basins the restarts fall into, so the 
 ## What the student will see
 - [ruled] 3-D heavy figures are drawn sooner; another valid drawing may come first (the #863 prism draws its seed-1 configuration first). Operator, 2026-11-15 (#2894), ruling 1: *"Yes if verdicts equal (Recommended)"*.
 - [ruled] Values the givens fix, which 3-D withheld, are shown, with the answers that read them (the table above). Operator, 2026-11-15 (#2894): *"Ship, list them as fixes (Recommended)"*.
+
+## ADR-3D-525 — A point stated on a circle that closes a declared ring is seated where the ring is simple (#2829)
+
+**Status:** accepted · 2026-11-16 · bug (P2, 3d, wrong-answer) · fix round #2914, stream C · branch `fix/2829-rider-seat-ring` from `main` @ `3f6132c2` · closes the "Found, not fixed" of [ADR-3D-467](#adr-3d-467) · amends [ADR-3D-410](#adr-3d-410) (the circle rider's seat)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-7, unchanged ("a ring with a free vertex is drawn simple by choice of configuration, never refused"): this makes it true for a circle rider · **Design:** [04b](04b-design-3d.md) — "The circle rider" · **LADDER stage:** none: the point pass's sampled seat (stage 1, the constructive evaluation); no solve, no search
+
+**Rulings.** ADR-616 / [ADR-3D-327](#adr-3d-327) (a declared ring is never offered self-crossing), 02b FR-RD-7, and the operator's *"search first, refuse last"* (#1927, 2026-10-09). The #1935 ruling, *"only the free vertex moves"*: A, B and C are bit-identical with and without the ring line.
+
+**Measured at pickup** (`3f6132c2`, `decideSubmit3` line by line, `derive3` at seeds 0–23, `ringSelfCrossing3` per declared ring):
+
+| # | lines | before | after |
+|---|---|---|---|
+| R1 | «משולש ABC» · «מעגל חוסם את ABC» · «D על המעגל» · «מרובע ABCD» (the report) | green, ABCD crossed at **14 / 24** | green, simple at 24 / 24 |
+| R2 | … · «D על המעגל» · «E על המעגל» · «מחומש ABCDE» | green, crossed at **23 / 24** | green, simple at 24 / 24 |
+| R3 | … · «D על המעגל» · «מרובע ABDC» / «מרובע ACBD» | green, crossed at 19 / 24 (ABDC) and 15 / 24 (ACBD) | simple at 24 / 24 |
+| F1 | … · «D על המעגל» · «מרובע ABCD» · «מרובע ABDC» | last line `ring-crossed` (ADR-3D-467) | unchanged |
+| N1 | «משולש ABC» · «מעגל חוסם את ABC» · «מרובע ABCD» · «D על המעגל» | last line `not-on-circle` | unchanged: a different chokepoint (the membership arm on a placed vertex), split out as #2915 |
+
+**2-D, the reference (ADR-W-118), measured at `3f6132c2`** (`driveThroughGate`, `replay` and `meetsRequirements` at seeds 0–23): R1 and R2 replay crossed at 19 and 23 seeds, but no crossed seed meets the requirements (ADR-616's simple floor), so 2-D never shows them crossed; N1 is accepted in 2-D. 3-D now agrees on R1 and R2 by a different mechanism (the seat, not the view search); N1 is the split-out sibling.
+
+**Root cause / class (docs/17 §1).** *A free corner that closes a declared ring is seated without regard to the ring's order.* `seatOnCircleRider3` drew the rider's angle from `oncircle-th-<id>` and re-drew it only to keep it clear of other points. Nothing asked the declared rings the rider is a corner of. The store's crossed-ring pass (ADR-3D-322) skips a ring with a free vertex by design, and `declaredRingCrossed3` (the seed search, ADR-3D-418) judges only rings of solid and coordinate vertices, because a different seed would move A, B, C. So a ring declared after the rider was crossed whenever the angle landed on the wrong arc. #2300 is the on-plane member of the class (`seatOnPlaneRider`); the predicate below is built for both seats.
+
+**Decision** (`src3d/engine/evaluate.ts`).
+1. **`ringSimpleWith3(c, pos, id, unseated)`**: the declared rings (`declaredRings3`, the store's one enumeration) that hold `id`, as a test of a candidate position with `ringSelfCrossing3`, the store's own predicate. A corner not seated yet is left out of the ring, so several riders of one ring (R2) are seated in point order, each judged against the corners before it. For a circle rider, the later riders of the same circle count as unseated in every pass (`laterRidersOf3`), so the late and the re-seat passes judge alike. A ring with fewer than four judged corners is not judged; no judged ring means the old seat, untouched.
+2. **The seat** walks the same keys in the same order: draw 0 first, then up to 23 re-draws for a ring-closing rider (11 for any other). The pick is the clearest SIMPLE draw, stopping at the first simple one clear of the placed points (a ring order is a given, general position a preference). A ring already simple and clear at draw 0 is byte-identical.
+3. **The arc seat** (`ringArcSeat3`), when no draw is simple and every other corner of the ring lies on the rider's circle: the open arc between the rider's two ring neighbours that holds no other corner. The first key's angle, as a fraction of the turn, is mapped into the arc's middle 80 %. The seat never misses, still varies with the seed (ADR-052), and stays clear of both neighbours.
+4. **Never a veto.** A rider whose rings no seat can make simple (two orders of one letter set, F1) keeps the old general-position seat, and the store's ring pass keeps its verdict. A driven rider (`riderTOverride`) turns from the new seat as it turned from the old one.
+
+**Stability (M4).** Adding «מרובע ABCD» moves D at the seeds where it sat on the wrong arc: that is the stated ring taking effect. A, B and C never move (the engine test asserts it at 24 seeds).
+
+**Perf.** The seat runs `ringSelfCrossing3` on one 4- or 5-ring per draw, at most 24 draws, only for a rider in a declared ring: microseconds. The work meter records the new fixture; no existing fixture's work changed.
+
+**Locks.** `src3d/engine/__tests__/engine3.test.ts` (#2829 block): R1, R2 and the ABDC / ACBD orders simple at seeds 0–23; A, B, C bit-identical with and without the ring line; D on the circle and varying (more than 12 distinct seats); draw 0 kept where the ring was already simple; a rider in no ring and a rider whose two rings cannot both be simple keep the old seat. Fixture `fixtures3/ring-circle-rider-simple-2829.geo3.json` (R1, the build, drift and load net).
+
+**Found, split out.** N1 (the ring first, the membership last) is refused `not-on-circle`; 2-D accepts it. A different chokepoint (the `point-on-circle3` arm on a vertex a shape placed), filed as [#2915](https://github.com/dcodish/geo_builder/issues/2915).
+
+## What the student will see
+- [ruled] «משולש ABC» · «מעגל חוסם את ABC» · «D על המעגל» · «מרובע ABCD» draws ABCD simple (D on the arc between C and A) at every «הציגו תצורה אחרת»; the same for a pentagon through two such points. ADR-616 / ADR-3D-327, 02b FR-RD-7, and the operator's "search first, refuse last" (#1927, 2026-10-09).

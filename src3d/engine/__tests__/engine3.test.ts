@@ -674,6 +674,70 @@ describe('#2810 — letters a stated circle passes through have one simple order
     expect(statedConcyclic3(c, ['A', 'B', 'C', 'E'])).toBe(false);
   });
 
+  describe('#2829 (ADR-3D-525): a circle rider that closes a declared ring is seated where the ring is simple', () => {
+    const SEEDS = Array.from({ length: 24 }, (_, s) => s);
+    const tri = (): Command3[] => [
+      { type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] },
+      { type: 'circle3', id: 'circle-ABC', def: { kind: 'circum', ring: ['A', 'B', 'C'] } },
+    ];
+    const rider = (p: string): Command3 => ({ type: 'point-on-circle3', point: p, circle: 'circle-ABC' });
+    const ring = (ids: string[]): Command3 => ({ type: 'solid', kind: ids.length === 4 ? 'polygon4' : 'polygon5', ids } as Command3);
+    const crossed = (pos: Map<string, ReturnType<typeof v3>>, ids: string[]) => ringSelfCrossing3(ids.map((q) => pos.get(q)!));
+    const onCircle = (pos: Map<string, ReturnType<typeof v3>>, p: string) => {
+      const [A, B, C, P] = ['A', 'B', 'C', p].map((q) => pos.get(q)!);
+      // P is concyclic with A, B, C: the circumcentre is equidistant (coplanarity and radius, scale-free)
+      const n = cross3(sub3(B, A), sub3(C, A));
+      return Math.abs(dot3(sub3(P, A), n)) / norm3(n) < 1e-9;
+    };
+
+    it('the quadrilateral ABCD after «D על המעגל» is simple at every seed; A, B, C never move; D still varies', () => {
+      const bare = build(...tri(), rider('D'));
+      const quad4 = build(...tri(), rider('D'), ring(['A', 'B', 'C', 'D']));
+      const ds = new Set<string>();
+      let crossedBefore = 0;
+      for (const s of SEEDS) {
+        const p0 = evaluate3(bare, s);
+        const p1 = evaluate3(quad4, s);
+        if (crossed(p0, ['A', 'B', 'C', 'D'])) crossedBefore++;
+        expect(crossed(p1, ['A', 'B', 'C', 'D']), `seed ${s}`).toBe(false);
+        for (const q of ['A', 'B', 'C']) expect(p1.get(q)).toEqual(p0.get(q)); // only the free corner moves (#1935)
+        expect(onCircle(p1, 'D')).toBe(true);
+        // a ring already simple at the first draw keeps it: byte-identical
+        if (!crossed(p0, ['A', 'B', 'C', 'D'])) expect(p1.get('D')).toEqual(p0.get('D'));
+        ds.add(JSON.stringify(p1.get('D')));
+      }
+      expect(crossedBefore).toBeGreaterThan(0); // the seat without the ring does cross: the test is not vacuous
+      expect(ds.size).toBeGreaterThan(12); // ADR-052: the angle is still a free DOF
+    });
+
+    it('two riders of one pentagon are seated in point order, each against the corners before it: simple at every seed', () => {
+      const c = build(...tri(), rider('D'), rider('E'), ring(['A', 'B', 'C', 'D', 'E']));
+      for (const s of SEEDS) {
+        const p = evaluate3(c, s);
+        expect(crossed(p, ['A', 'B', 'C', 'D', 'E']), `seed ${s}`).toBe(false);
+        expect(onCircle(p, 'D') && onCircle(p, 'E')).toBe(true);
+      }
+    });
+
+    it('any order the circle can draw is honoured: ABDC and ACBD are simple at every seed', () => {
+      for (const ids of [['A', 'B', 'D', 'C'], ['A', 'C', 'B', 'D']]) {
+        const c = build(...tri(), rider('D'), ring(ids));
+        for (const s of SEEDS) expect(crossed(evaluate3(c, s), ids), `${ids.join('')} seed ${s}`).toBe(false);
+      }
+    });
+
+    it('a rider in no declared ring, and one whose two rings no seat can satisfy, keep the general-position seat', () => {
+      const bare = build(...tri(), rider('D'));
+      const triOnly = build(...tri(), rider('D'), { type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'D'] });
+      const both = build(...tri(), rider('D'), ring(['A', 'B', 'C', 'D']), ring(['A', 'B', 'D', 'C']));
+      for (const s of SEEDS) {
+        const p0 = evaluate3(bare, s);
+        expect(evaluate3(triOnly, s).get('D')).toEqual(p0.get('D'));
+        expect(evaluate3(both, s).get('D')).toEqual(p0.get('D')); // never a veto: the store's ring pass keeps its verdict
+      }
+    });
+  });
+
   it('concaveSeatVertices3 yields to a stated circle (flat ring and kite alike); no circle keeps the seat', () => {
     expect(concaveSeatVertices3(two(), ['A', 'B', 'D', 'C'])).not.toBeNull(); // C1: no circle, the seat stays
     expect(concaveSeatVertices3(two({ type: 'circle3', id: 'circle-ABCD', def: { kind: 'circum', ring: ['A', 'B', 'C', 'D'] } }), ['A', 'B', 'D', 'C'])).toBeNull();
