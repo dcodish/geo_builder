@@ -65,15 +65,16 @@ describe('#420 — end to end', () => {
     const ms = Date.now() - t0;
     const last = Object.entries(fig.status).slice(-1)[0]!;
     expect(last[1], 'the last step is refused').not.toBe('ok');
-    expect(String(last[1]), 'and refused as IMPOSSIBLE, naming the bound').toMatch(/^impossible: \|AC\| = 9 exceeds 8/);
+    // #2894 (ADR-835 Am. 1, ruling 2026-11-15 «The clearer reason everywhere»): the one length-conflict sentence
+    expect(String(last[1]), 'and refused as IMPOSSIBLE, naming the bound').toMatch(/^over-constrained: \|AC\| = 9 but \|AB\| \+ \|BC\| = 8 in triangle ABC /);
     // the whole 6-step sequence, cold — the pre-solve gate replaces the ladder for this class
     expect(ms, `whole sequence took ${ms} ms`).toBeLessThan(8000);
   }, 120_000);
 
-  it('the TRIANGLE case states the curriculum rule, naming the two sides', () => {
+  it('the TRIANGLE case states the triangle inequality, naming the two sides', () => {
     const msg = humanizeError('impossible: |AC| = 9 exceeds 8, the distance from A to C via B', t);
-    // the operator's own sentence (2026-07-29) — the phrasing a student is taught
-    expect(msg).toContain('סכום שתי צלעות תמיד גדול מהצלע השלישית');
+    // #2894 (ADR-835 Am. 1, ruling 2026-11-15 «The clearer reason everywhere»): 3-D's sentence replaces the 2026-07-29 one
+    expect(msg).toContain('אי־שוויון המשולש');
     expect(msg, 'the two sides that fall short are named').toContain('|AB| + |BC|');
     expect(msg).toContain('8');
     expect(msg).not.toMatch(/[a-z]{2,}/); // #413's property: no English word survives

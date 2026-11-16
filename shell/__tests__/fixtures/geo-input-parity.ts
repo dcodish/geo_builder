@@ -862,6 +862,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'flat-polygon-1849-538', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', note: '5 + 3 = 8: only a flat triangle' },
   { id: 'flat-polygon-1849-538-rev', family: 'lengths', steps: ['משולש ABC', 'AC = 8', 'BC = 3', 'AB = 5'], expect: 'refused' },
   { id: 'flat-polygon-1849-448', family: 'lengths', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused' },
+  // ── #2894 (ADR-835, ADR-3D-495): a length the rest of the figure already forces, stated otherwise — refused at once, with
+  // the reason in one sentence across builders («הנתונים סותרים זה את זה — … נותנים לקטע AC שני אורכים שונים …»)
+  { id: 'lengths-forced-square-diag-2894', family: 'lengths', steps: ['ריבוע ABCD', 'AB = 3', 'AC = 10'], expect: 'refused', note: 'the square forces |AC| = 3√2' },
+  { id: 'lengths-forced-rect-diag-2894', family: 'lengths', steps: ['מלבן ABCD', 'AB = 3', 'BC = 4', 'AC = 7'], expect: 'refused', note: 'the right angle at B forces |AC| = 5' },
+  { id: 'lengths-forced-equilateral-2894', family: 'lengths', steps: ['משולש שווה צלעות ABC', 'AB = 3', 'BC = 5'], expect: 'refused', note: 'the equal sides force |BC| = 3' },
+  { id: 'lengths-triangle-plain-2894', family: 'lengths', steps: ['משולש ABC', 'AB = 3', 'BC = 4', 'AC = 10'], expect: 'refused', note: 'the triangle inequality: |AB| + |BC| = 7 < 10 — the same sentence in every builder (ADR-835 Am. 1)' },
   { id: 'flat-polygon-1849-coincide', family: 'polygons', steps: ['מרובע ABCD', 'AB מתלכד עם CD'], expect: 'refused', exception: 'X7', note: 'two sides of one quadrilateral on one line (T31); «מתלכד» is 3-D vocabulary (X7)' },
   { id: 'flat-polygon-1849-thin-control', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9'], expect: 'builds', note: 'thin but a real triangle — the control' },
   // #2292 / #2344 (ADR-W-146; 3-D ADR-3D-372) — givens that hold only in the LIMIT where a declared polygon collapses

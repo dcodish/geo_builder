@@ -254,7 +254,7 @@ export const WORDINGS = {
   reservedRadius: { key: 'errors.reservedRadiusAmbiguous', keys: ['errors.reservedRadiusAmbiguousSized', 'errors.reservedRadiusAmbiguous'], saysSubject: true, nextStep: true, circleParams: ['next'], circleListParams: ['circles'] },
   // metricFeasibility.ts (#420, ADR-417): TWO wordings — the curriculum's triangle sentence («סכום שתי צלעות תמיד גדול
   // מהצלע השלישית», operator 2026-07-29) for one intermediate point, the straight-segment principle for a longer cycle.
-  metric: { key: 'errors.metricImpossible', keys: ['errors.metricImpossibleTriangle', 'errors.metricImpossiblePath'] },
+  metric: { key: 'errors.metricImpossiblePath' }, // #2894 (ADR-835 Am. 1): the triangle case is `lengthsTriangle`
   // metricFeasibility.ts (#1329, ADR-538): the triangle's 180° sentence, or a longer ring's own bound.
   angleSum: { key: 'errors.angleSumImpossible', keys: ['errors.angleSumImpossibleTriangle', 'errors.angleSumImpossiblePolygon'] },
   // metricFeasibility.ts (#1712, ADR-587): a stated measure outside its range — the statement is the student's own.
@@ -290,6 +290,9 @@ export const WORDINGS = {
   restatedSize: { key: 'errors.restatedSize', saysSubject: true, namesOther: true, circleParams: ['circle'] },
   // evaluate.ts — `over-constrained: |AC| = 9 cannot hold`, with the fold's optional `[vs #i]` (#943 half B)
   overConstrained: { key: 'errors.overConstrained', saysSubject: true, namesOther: true, withoutReason: 'overConstrainedBare' },
+  // #2894 (ADR-835): the metric closure's reason — 3-D's `lengths-impossible` sentences (ADR-3D-495), one wording across builders
+  lengthsValue: { key: 'errors.lengthsImpossibleValue', saysSubject: true, namesOther: true, nextStep: true },
+  lengthsTriangle: { key: 'errors.lengthsImpossibleTriangle', saysSubject: true, namesOther: true, nextStep: true },
   // #2591 (ADR-778): the over-constrained frame with NO reason clause — the ruled `restatedSize_said` / `_said_vs` sentences
   // (2026-10-15), which name only the student's statements. Reached by a bare `over-constrained` (no constraint named) and
   // by an over-constrained reason the provenance check refuses to show; never without the student's sentence.
@@ -354,6 +357,15 @@ export function wordingOf(e: EngineError): Worded | null {
     case 'reserved-radius-ambiguous':
       return one('reservedRadius', { key: e.sized ? 'errors.reservedRadiusAmbiguousSized' : 'errors.reservedRadiusAmbiguous', params: { letter: e.letter, circles: joined(e.circles), next: e.circles[e.circles.length - 1] } });
     case 'metric-impossible': {
+      // #2894 (ADR-835 Am. 1, ruling 2026-11-15 «The clearer reason everywhere»): a triangle's inequality is the ONE
+      // length-conflict sentence (3-D's), whoever proved it; a longer path no triangle states keeps its own.
+      if (e.via.length === 1) {
+        const v = e.via[0]!;
+        const seg = (x: string, y: string) => (x <= y ? x + y : y + x);
+        const long = seg(e.a, e.b);
+        const [a, b] = [seg(e.a, v), seg(v, e.b)].sort((s1, s2) => Number(!s1.includes(long[0]!)) - Number(!s2.includes(long[0]!)));
+        return one('lengthsTriangle', { params: { tri: [e.a, v, e.b].sort().join(''), long, longLen: e.value, a: a!, b: b!, sum: e.sum } });
+      }
       const via = joined(e.via);
       return one('metric', { key: e.via.length > 1 ? 'errors.metricImpossiblePath' : 'errors.metricImpossibleTriangle', params: { seg: `${e.a}${e.b}`, value: e.value, sum: e.sum, a: e.a, b: e.b, via, sides: `|${e.a}${via}| + |${via}${e.b}|` } });
     }
@@ -407,6 +419,10 @@ export function wordingOf(e: EngineError): Worded | null {
       return one('tangentsExhausted', { key: tangentsExhaustedKey(e.kind, e.position) });
     case 'restated-size':
       return one('restatedSize', { params: { circle: e.circle, value: e.value } });
+    case 'lengths-value':
+      return one('lengthsValue', { params: { seg: e.seg, a: e.forced, b: e.stated } });
+    case 'lengths-triangle':
+      return one('lengthsTriangle', { params: { tri: e.tri, long: e.long, longLen: e.longLen, a: e.a, b: e.b, sum: e.sum } });
     case 'over-constrained':
       return one('overConstrained', { params: { what: e.what } });
     case 'over-constrained-unnamed':

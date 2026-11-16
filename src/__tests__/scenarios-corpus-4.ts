@@ -1828,7 +1828,8 @@ export const SCENARIOS_4: Scenario[] = [
     check: (fig) => {
       const entries = Object.entries(fig.status);
       const last = entries[entries.length - 1]!;
-      expect(String(last[1]), 'refused as impossible, naming the bound').toMatch(/^impossible: \|AC\| = 9 exceeds 8/);
+      // #2894 (ADR-835 Am. 1, ruling 2026-11-15): the one length-conflict sentence, the triangle's three lengths
+      expect(String(last[1]), 'refused as impossible, naming the bound').toMatch(/^over-constrained: \|AC\| = 9 but \|AB\| \+ \|BC\| = 8 in triangle ABC /);
       expect(fig.pending, 'a proven contradiction is never a pending info state').toBe(false);
       // keep-prior: the 4-4 triangle the student did build is still there
       const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));
@@ -6835,6 +6836,35 @@ export const SCENARIOS_4: Scenario[] = [
       clearReplayCaches();
       const cold = figures.map((facts) => shown(JSON.parse(JSON.stringify(facts)) as Fact[]));
       expect(warm).toEqual(cold);
+    },
+  },
+  {
+    id: 'lengths-clearer-reason-2894',
+    title: '#2894 (ADR-835): a length the rest of the figure already forces, stated otherwise, is refused with 3-D\'s reason — which segment, and its two lengths — naming the statement it contradicts',
+    guards:
+      'Operator ruling 2026-11-15 on #2894 («The clearer reason everywhere (Recommended)»): a length conflict the metric closure decides is refused in the sentence 3-D gives (ADR-3D-495, its lengths-impossible keys), word for word, replacing 2-D\'s «לא ניתן: … סותר את … הסיבה: |AC| = 10». The fold\'s drop-one search still names the earlier statement. Measured on the combined C+E branch through the submit gate. The closure, its explanation and the round trip are src/engine/__tests__/metric-closure.test.ts and engine-error-total.test.ts.',
+    // The refused line never becomes a fact, so each line is driven through the submit gate in `check`.
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const cases: [string[], string, string][] = [
+        [['משולש ABC', 'AB = 3', 'BC = 4'], 'AC = 10', 'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «AB = 3», «BC = 4»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 7, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['ריבוע ABCD', 'AB = 3'], 'AC = 10', 'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מלבן ABCD', 'AB = 3', 'BC = 4'], 'AC = 7', 'הנתונים סותרים זה את זה — «AC = 7» לא מתקיים יחד עם «מלבן ABCD», «AB = 3», «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['משולש שווה צלעות ABC', 'AB = 3'], 'BC = 5', 'הנתונים סותרים זה את זה — «BC = 5» לא מתקיים יחד עם «משולש שווה צלעות ABC», «AB = 3»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-5. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מעגל O ברדיוס 2', 'AB קוטר במעגל'], 'AB = 6', 'הנתונים סותרים זה את זה — «AB = 6» לא מתקיים יחד עם «מעגל O ברדיוס 2», «AB קוטר במעגל»: יחד הם נותנים לקטע AB שני אורכים שונים, 4 ו-6. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מרובע ABCD', 'AB = 3', 'BC = 4'], 'ABCD ריבוע', 'הנתונים סותרים זה את זה — «ABCD ריבוע» לא מתקיים יחד עם «AB = 3», «BC = 4»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.'],
+      ];
+      for (const [prior, line, words] of cases) {
+        const facts = factsOf(prior);
+        const v = gateVerdict(facts, line);
+        expect(v.kind === 'refused' && v.reason, `«${line}» after «${prior.join(' · ')}» is refused before it becomes a fact`).toBe('error');
+        const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+        expect(humanizeError(detail, he, line, otherUtteranceForError(facts, detail)).replace(/[\u2066-\u2069]/g, ''), `«${line}»: 3-D's words, naming both statements`).toBe(words);
+      }
+      // the control: the diagonal the square forces still commits
+      expect(gateVerdict(factsOf(['ריבוע ABCD']), 'AC = 10').kind, 'a square with only its diagonal stated commits').toBe('commit');
     },
   },
 ];

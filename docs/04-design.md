@@ -1888,7 +1888,9 @@ a hit whose charge would cross one is run instead, so it is cut where a run is. 
 with the metric closure (`engine/metricClosure.ts`): an interval reading of every length the construction speaks
 about, from its obligations and its objects' parameter-free structure, closed under the law of cosines and the
 triangle inequality; an empty interval proves that no rung can succeed, and the ladder returns its own last refusal
-at once (docs/LADDER.md stage 2e⁰).
+at once (docs/LADDER.md stage 2e⁰). Since [ADR-835](06-decisions.md#adr-835) that refusal gives the reason: `explainLengthConflict` leaves
+each stated length out in turn and reads, exactly, what the others force on its segment (or two lengths against the
+triangle inequality), and the error bank carries it as `lengths-value` / `lengths-triangle` in the over-constrained frame.
 
 **A view that fails at every seed is tried at one ([ADR-834](06-decisions.md#adr-834), #2894).** A seed enters a replay
 only in its tail (the sample and one evaluate); the fold is the fact list's alone. So a view whose fold failed (its build

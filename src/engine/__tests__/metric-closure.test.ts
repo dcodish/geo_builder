@@ -6,7 +6,7 @@
  * take (the exact value, the flat limit, a value inside the reach) proves nothing.
  */
 import { describe, expect, it } from 'vitest';
-import { metricClosureImpossibility } from '../metricClosure';
+import { explainLengthConflict, metricClosureImpossibility } from '../metricClosure';
 import type { Constraint, Construction, GeoObject } from '../types';
 
 const fp = (id: string, x: number, y: number, solve?: Constraint): GeoObject => ({ kind: 'free-point', id, x, y, ...(solve ? { solve: { constraint: solve, branch: 0 } } : {}) }) as GeoObject;
@@ -106,5 +106,28 @@ describe('metricClosureImpossibility — the closure over a construction’s len
 
   it('a figure with no length relation proves nothing', () => {
     expect(metricClosureImpossibility(fig([fp('A', 0, 0), fp('B', 1, 0)]))).toBeNull();
+  });
+});
+
+describe('explainLengthConflict — which lengths, and why (#2894, ADR-835)', () => {
+  it('one stated length against the one the rest forces on that segment', () => {
+    const sq = explainLengthConflict(square(3, [d('A', 'C', 10)]), [d('A', 'C', 10)]);
+    expect(sq).toMatchObject({ kind: 'value', seg: ['A', 'C'], stated: 10 });
+    expect((sq as { forced: number }).forced).toBeCloseTo(3 * Math.SQRT2, 6);
+    const rect = explainLengthConflict(rectangle([d('A', 'C', 7)]), [d('A', 'C', 7)]);
+    expect(rect).toMatchObject({ kind: 'value', seg: ['A', 'C'], stated: 7 });
+    expect((rect as { forced: number }).forced).toBeCloseTo(5, 6);
+    const diam = explainLengthConflict(circle2(true, [d('A', 'B', 6)]), [d('A', 'B', 6)]);
+    expect(diam).toMatchObject({ kind: 'value', seg: ['A', 'B'], stated: 6 });
+    expect((diam as { forced: number }).forced).toBeCloseTo(4, 6);
+  });
+
+  it('a stated length against two the rest forces: the triangle inequality, in the triangle they make', () => {
+    const w = explainLengthConflict(circle2(false, [d('A', 'B', 6)]), [d('A', 'B', 6)]);
+    expect(w).toMatchObject({ kind: 'triangle', tri: ['A', 'B', 'O'], long: ['A', 'B'], longLen: 6, a: ['A', 'O'], b: ['B', 'O'], sum: 4 });
+  });
+
+  it('nothing to explain on a figure whose lengths hold', () => {
+    expect(explainLengthConflict(square(3, [d('A', 'C', 3 * Math.SQRT2)]))).toBeNull();
   });
 });

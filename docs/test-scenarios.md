@@ -2364,3 +2364,7 @@ over all four (ADR-041).
 ### `same-facts-same-figure-whatever-was-built-before-2444` — three right-triangle figures built in one session: each shows what it shows from nothing (#2444, merged into #2370, ADR-828)
 
 **Guards against:** a replay that depends on what was built earlier in the session: after «משולש ישר זווית ABC», then «משולש ABC · ABC משולש ישר זווית», then «משולש ABC · משולש ישר זווית ABC חסום במעגל», the held fold of «משולש ABC» carried a driven C, and figures resumed from it showed a right angle nothing stated. **Asserts** the exact sequence: after the three figures, each of them and «משולש ABC» alone replays at seeds 0–3 to the positions and row statuses of a session that built nothing (caches cleared, a JSON clone of the rows); the held «משולש ABC» has no driven vertex and no right angle.
+
+### `lengths-clearer-reason-2894` — a length the figure already forces, stated otherwise, is refused with 3-D's reason, naming the statement it contradicts (#2894, ADR-835)
+
+**Guards against:** the 2-D refusal of a length conflict the metric closure decides drifting from 3-D's sentence (ADR-3D-495) or losing the earlier statement it names: «ריבוע ABCD · AB = 3 · AC = 10», a rectangle's diagonal, an equilateral side, a diameter longer than 2r, «ABCD ריבוע» over two unequal sides — each driven through the submit gate and read word for word; the control (a square with only its diagonal) commits.
