@@ -16988,6 +16988,8 @@ The lines named beside the refused one are the rows whose lengths take part (3-D
 
 **Measured after** (same door). p2-15: presses 1 and 2 draw 7.65/8.00 and 4.18/8.00. Presses 3–6 are the mirror images (the book's ellipse with A at (−4, 6) and with l at y = −6, and the second ellipse's two mirrors). Press 7 comes back to the first drawing. The first press costs ~0.55 s (the 24 configurations, once); later presses cost ~0.1 s. «M(a,0) · N(13,0) · MN = 9» still alternates a = 4 / 22: a different letter value is a different solution, although the drawing is a mirror. «x² + y² = 25 · A על המעגל · x_A = 3» still reaches A = (3, 4) from (3, −4): a figure whose only alternative is a mirror still reaches it. The parabola's p = 18 is still press 1.
 
+**Work meter (landed after [ADR-AG-478](#adr-ag-478), 2026-11-16 integration; docs/17 §7).** The first press now gathers the determined figure's configurations, so three recorded `another#1` actions rose and nothing else moved: `issue-2733-crossing-on-p` 36 → 212 units, `corpus471.json#4/4` 960 → 1,148, `operator-letters-on-side-2691` 6,255 → 6,998. The first is accepted in the baseline (`work:record --accept-rise`); the other two are not yet. **Open, found landing it:** the cycle's memo serves a later walk's press without charging the work it saved — `issue-2733-crossing-on-p` counts 212 cold and 36 warm, so the gate's reproducibility check fails (the counter must be warmth-independent, ADR-831 / ADR-W-210 invariant 5). The memo must charge its hits before these numbers are final.
+
 **Locks.**
 - Unit: `src-analytic/__tests__/issue-1622-e5-another-never-repeats.test.ts`, #2831 blocks:
   - `sameSolution`: x mirror, y mirror, another ellipse, a letter value, identity;
