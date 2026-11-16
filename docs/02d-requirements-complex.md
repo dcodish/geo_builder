@@ -205,8 +205,11 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   claim about it is decided, as for the literal. The data
   panel's «נקודות» substitutes every letter whose value the givens force. A glued
   `i` whose other letter is a complex number («zi») is ambiguous and is refused with the explicit
-  product offered («z*i»); `pi` is never read as p·i.
-  - Sources: [ADR-CX-058](06d-decisions-complex.md#adr-cx-058), #1365 (operator ruling), #1410, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W8, #1862), [ADR-CX-082](06d-decisions-complex.md#adr-cx-082) (#1818)
+  product offered («z*i»); `pi` is never read as p·i. The same canvas rule holds for a number typed in
+  POLAR form with a letter in its modulus («z = r·cis(30°)», «z = r(cos30° + i sin30°)»,
+  «|z| = 9r» · «arg z = 30°»): «z = r·cis30°» / «z = 9r·cis30°» in both views while the letter is left;
+  after «r = 2» the canvas reads the number and the «r = 2» row carries the letter/value chip.
+  - Sources: [ADR-CX-058](06d-decisions-complex.md#adr-cx-058), #1365 (operator ruling), #1410, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W8, #1862), [ADR-CX-082](06d-decisions-complex.md#adr-cx-082) (#1818), [ADR-CX-103](06d-decisions-complex.md#adr-cx-103) (#2002)
 - **FR-CN-11 (Must)** — **The trigonometric form is the same number as cis.** «z1 = 2(cos45 + i sin45)»,
   «z1 = √2(cos45 + i·sin45)», «z1 = cos45 + i sin45» (r omitted is 1), with `i·sin`, `i*sin`,
   `sin45·i`, the `°` or without it, a signed or parenthesised angle, and a symbolic one
@@ -286,8 +289,12 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   in the view's own form (D1), including one fixed by its own stated modulus and argument («|z| = 2» ·
   «arg z = 30°» reads «z = 2·cis30°» / «z = √3+i», W7). That is its own spelling, not a re-spelling of its value:
   «z = 0.5+1.25i» reads «z = 0.5+1.25i», «z = √8cis45» reads «z = √8·cis45°», and a decimal reads at most two
-  decimals (FR-SU-30). An accepted given never leaves nothing on screen.
-  - Sources: [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389, #1390, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W7, #1862), [ADR-W-179](06w-decisions-workspace.md#adr-w-179) (#1497)
+  decimals (FR-SU-30). An accepted given never leaves nothing on screen. A number typed in polar form
+  with a letter in its modulus reads as typed in both views while the letter is left: «z = r·cis(30°)»
+  reads «z = r·cis30°», «z = (r+1)·cis(30°)» reads «z = (r+1)·cis30°», «|z| = 9r» · «arg z = 30°» reads
+  «z = 9r·cis30°» — never the drawn sample, and never a value the tool solved for the letter (after
+  «|z| = 4» it still reads «z = r·cis30°»; the value is in the panel).
+  - Sources: [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389, #1390, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W7, #1862), [ADR-W-179](06w-decisions-workspace.md#adr-w-179) (#1497), [ADR-CX-103](06d-decisions-complex.md#adr-cx-103) (#2002)
 - **FR-KN-6 (Should)** — **The exported question prints the givens, never the claims.** «הורידו שאלה»
   (02w FR-EX-2) lists every active line as typed, in entry order, and leaves out a line that only states a
   claim (✓/✗) — a claim is the student's answer, and a question sheet does not print its answers. A line

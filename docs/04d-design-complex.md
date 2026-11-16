@@ -229,6 +229,14 @@ never as a contradiction or a refutation.
   that appears in a typed form; `deriveLines` takes the letter-mode lines (`letterLines`), mapped by
   the App from the store's `display` map (keyed by store line index, shifted on removal, in the undo
   slice and the save file).
+  **A typed POLAR form whose modulus holds a letter** (`z = r·cis(30°)`, `z = (r+1)·cis30°`, the trig
+  form, or the W7 pair `|z| = 9r` · `arg z = 30°`) has no Gaussian-affine definition, so the polar
+  reader beside it answers (`polarDefinitionOf`, `model/polarForm.ts`;
+  [ADR-CX-103](06d-decisions-complex.md#adr-cx-103)): the modulus as a ℚ-affine form in parameters,
+  its terms in the order typed, and the argument as an exact angle, read off the constraint shapes. The
+  same substitution applies (only the letters whose chip shows the value); a letter left → «z = r·cis30°»
+  in BOTH views, `=` and never a sample, the angle spelled as the closed polar reading spells it;
+  closed → the reading, as before. A valued letter in the modulus is reported in `paramChips`.
 - **A radical is a token, and a radical LITERAL is a value** ([ADR-CX-056](06d-decisions-complex.md#adr-cx-056)).
   «√» / «∛» / «∜» / «ⁿ√» / «sqrt(» lex as one root token; a root of a rational literal becomes an exact
   value on the modulus exponent vector (so «√2cis45» stays a tier-1 literal), and any other radicand is

@@ -82,6 +82,25 @@ describe('saved-session fixtures net', () => {
         expect(d.emptiedBy).toBeNull();
         expect(d.points.length).toBeGreaterThan(0);
       });
+
+      /**
+       * #2002 (ADR-CX-103), the class net: a canvas label that still holds one of the figure's letters is the student's
+       * typed form, so it reads the same in both views (W8) and prints no guess — no «≈», no `|letter|`, no decimal.
+       */
+      it('a canvas label holding a letter is the typed form: both views alike, no guess', () => {
+        expect(hydrateSession(JSON.parse(text))).toBe(true);
+        const d = deriveLines(store().lines, store().seed, store().seed, store().queries);
+        const letters = d.params.map((r) => r.name);
+        const holds = (label: string) => {
+          const right = label.split(/[=≈]/).slice(1).join('=');
+          return letters.some((n) => new RegExp(`(?<![A-Za-z])${n}(?![A-Za-z])`).test(right));
+        };
+        for (const p of d.points) {
+          if (!holds(p.canvas) && !holds(p.canvasCart)) continue;
+          expect(p.canvasCart, `${p.name}'s two views`).toBe(p.canvas);
+          expect(p.canvas, `${p.name}'s canvas label`).not.toMatch(/≈|\||\d\.\d/);
+        }
+      });
     });
   }
 });

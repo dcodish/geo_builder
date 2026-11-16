@@ -30,7 +30,8 @@ import { typedCartesian, typedDecimalReadings, typedPolar } from './typedSpellin
 import { valueOptionsOf, type ValueOptions } from '../../shell/valueOptions';
 import type { Cx } from '../value/value';
 import { cArgDeg, cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
-import { closedParts, definitionOf, statedAs, substituteKnown, symbolicParts, typedLineOf, valuedParamOf } from '../model/cartesianForm';
+import { type StatedAs, closedParts, definitionOf, statedAs, substituteKnown, symbolicParts, typedLineOf, valuedParamOf } from '../model/cartesianForm';
+import { type PolarDefinition, polarDefinitionOf, polarFormText, polarHoldsLetter, substitutePolar } from '../model/polarForm';
 import { type Rat, rat, toNumber, add as ratAdd, sub as ratSub, mul as ratMul, div as ratDiv, neg as ratNeg, isZero as ratIsZero, sqrtExact } from '../value/rational';
 import { composeCartesian, gaussianRationalParts, numericPart, ratPart, readableCartesianParts } from '../value/cartesian';
 import { type ExpVec, eq as modEq, evaluate as evalMod, format as fmtMod, fromRational as modFromRational, pow as modPow, isOne as modIsOne, isParametric } from '../value/modulus';
@@ -2151,6 +2152,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
    *   student valued («a = 3») replaced, and only while the chip shows values. Closed → the number in
    *   the view's own form; still holding a letter → the typed form in BOTH views (W8: its polar form
    *   depends on the letter's sign, which nothing states). A letter the TOOL solved stays a letter.
+   * - typed in POLAR form with a letter in the modulus («z = r·cis30°», «z = (r+1)·cis30°», or the W7 pair
+   *   «|z| = 9r» · «arg z = 30°»; #2002, ADR-CX-103) → the same rule through the polar reader
+   *   (`model/polarForm.ts`): a letter left → the typed polar form in BOTH views; closed → as before.
    */
   const studentValued = new Set(valuedBy ? valuedBy.keys() : given.map(valuedParamOf).filter((p): p is string => p !== null));
   const shownValues = new Map([...rationalParams].filter(([p]) => studentValued.has(p) && !letterParams.has(p)));
@@ -2158,11 +2162,25 @@ export function foldConstraints(input: FoldInput): Derived2 {
   const statedList = stated ?? given;
   const aliasOf = new Map<string, string>([...aliases, ...selectionAliases]);
   const competing = new Set<string>();
+  /** #2002 — the first polar definition among a number's names, for a number stated as typed or as its W7 pair */
+  const polarDefinitionIn = (names: readonly string[], how: readonly StatedAs[]): PolarDefinition | null =>
+    how.some((h) => h !== 'computed') ? (names.map((n) => polarDefinitionOf(n, statedList)).find((d) => d !== null) ?? null) : null;
   const canvasPoints: DerivedPoint[] = shownPoints.map((p) => {
     const names = [p.name, ...(aliasOf.has(p.name) ? [aliasOf.get(p.name)!] : [])];
     const how = names.map((n) => statedAs(n, statedList, setMembers));
     if (how.every((h) => h === 'computed')) return { ...p, canvas: p.display, canvasCart: p.display };
     const def = how.includes('typed') ? names.map((n) => definitionOf(n, statedList)).find((d) => d !== null) ?? null : null;
+    // #2002 (ADR-CX-103): a typed polar form — or the W7 pair — whose modulus holds a letter («z = r·cis30°»,
+    // «|z| = 9r» · «arg z = 30°») reads as typed in BOTH views while a letter is left (W8); closed, it falls through
+    const polar = def ? null : polarDefinitionIn(names, how);
+    if (polar) {
+      for (const k of polar.mod.terms.keys()) if (studentValued.has(k) && rationalParams.has(k)) competing.add(k);
+      const shown = substitutePolar(polar, shownValues);
+      if (polarHoldsLetter(shown)) {
+        const typed = `${p.display} = ${polarFormText(shown)}`;
+        return { ...p, canvas: typed, canvasCart: typed };
+      }
+    }
     if (!def) {
       // #1497 (ADR-W-179): a number typed with no parameter, as typed, in the view it was typed in (D1)
       const line = how.includes('typed') ? names.map((n) => typedLineOf(n, statedList)).find((c) => c !== null) ?? null : null;
