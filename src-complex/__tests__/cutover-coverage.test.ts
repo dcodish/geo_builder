@@ -18,6 +18,8 @@
  * test that reaches past it is a test of a path the product does not ship (#686, and the eight green
  * tests that turned out to describe the retiring bridge).
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { deriveLines } from '../app/deriveLines';
@@ -265,5 +267,31 @@ describe('save / load, through the real hydration path', () => {
     expect(hydrateSession('garbage')).toBe(false);
     expect(hydrateSession(null)).toBe(false);
     expect(store().lines).toEqual(['z1 = 3+4i']);
+  });
+});
+
+/**
+ * #2831 — «הציגו תצורה אחרת» shows every NEW solution before another placement of one already shown. Operator ruling
+ * 2026-11-12 "2831 - A": a mirror image (another placement of the drawing) is the SAME solution; new solutions first
+ * (ADR-W-206). Complex needed no code change: measured at c82d767c, no fixture's configuration list holds two entries
+ * equal up to a renaming of letters, and `nextConfig` from seed 0 visits every configuration before repeating one.
+ * This block locks that walk on a two-configuration fixture, through the real hydration path and the real press.
+ */
+describe('#2831 — new solutions first: a press visits every configuration before repeating one', () => {
+  const drawing = (): string =>
+    figure().points.map((p) => `${p.name}=${p.z.re.toFixed(6)},${p.z.im.toFixed(6)}`).sort().join(' ');
+
+  it('knowledge-roots-shared-1427 (two configurations): presses 0 and 1 are the two, press 2 returns to the first', () => {
+    const text = readFileSync(join(__dirname, 'fixtures', 'knowledge-roots-shared-1427.complex.json'), 'utf8');
+    expect(hydrateSession(JSON.parse(text))).toBe(true);
+    expect(store().seed).toBe(0);
+    expect(figure().configCount).toBe(2);
+    const walk = [drawing()];
+    for (let p = 0; p < 2; p++) {
+      store().nextConfig();
+      walk.push(drawing());
+    }
+    expect(walk[0]).not.toBe(walk[1]);
+    expect(walk[2]).toBe(walk[0]);
   });
 });

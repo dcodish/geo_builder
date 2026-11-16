@@ -105,7 +105,9 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   enumerates a real solution set, and "show another configuration" walks that set — so a question asking
   for *all* possibilities can be seen, not just described. **A numeric equation's roots are
   configurations too**: `z1² − 4z1 + 13 = 0` (one NUMBER z₁ that is a root) is two drawings, and the
-  button walks both. The fresh-letter `z² − 4z + 13 = 0` is a solution set instead (FR-CN-6).
+  button walks both. The fresh-letter `z² − 4z + 13 = 0` is a solution set instead (FR-CN-6). Each press shows a
+  solution not yet shown before repeating one ([ADR-W-206](06w-decisions-workspace.md#adr-w-206), operator 2026-11-12):
+  every configuration is its own value set, and a conjugate is a different value, not a placement.
   - Sources: [ADR-CX-049](06d-decisions-complex.md#adr-cx-049), [ADR-CX-050](06d-decisions-complex.md#adr-cx-050)
 - **FR-CN-4 (Must)** — **A default is a starting value, never a fixed one.** An unstated magnitude is a
   free degree of freedom: it must move on "another configuration" or when a later given forces it. Free
