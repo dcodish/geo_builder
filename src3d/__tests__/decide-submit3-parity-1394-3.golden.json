@@ -92,6 +92,8 @@
  "suite:[\"פירמידה ABCDS\"]": "0323c20154afdbfc",
  "fixture:guide-needs-height-1566.geo3.json": "6bd8dd553515b3bf",
  "suite:[\"פירמידה ABCDS\",\"גובה הפירמידה\"]": "6bd8dd553515b3bf",
+ "fixture:pyramid-volume-beside-plane-2792.geo3.json": "e3b349ab65afe99e",
+ "suite:[\"פירמידה ABCDS\",\"נפח הפירמידה ABCDS = 12\",\"x+y+z=1\"]": "e3b349ab65afe99e",
  "suite:[\"פירמידה ABCDS\",\"∠BAS = 40\",\"∠DAS = 50\"]": "a8b442bff37e76f4",
  "suite:[\"פירמידה ABCDS\",\"P(1,2,3)\",\"M אמצע SP\"]": "0f61cdb6e27a604d",
  "suite:[\"פירמידה ABCDS\",\"נפח הפירמידה ABCDS = 11\"]": "dbefa78b07ea5c70",

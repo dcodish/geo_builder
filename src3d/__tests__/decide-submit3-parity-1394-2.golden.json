@@ -309,6 +309,8 @@
  "suite:[\"קובייה ABCDA'B'C'D'\",\"P(1,2,3)\",\"M אמצע AP\"]": "9de7f1593a547e4a",
  "suite:[\"קובייה ABCDA'B'C'D'\",\"P(1,2,3)\",\"M אמצע AP\",\"M(2,2,2)\"]": "3560d6545ac5b601",
  "suite:[\"קובייה ABCDA'B'C'D'\",\"P(1,2,3)\",\"Q נמצא על ציר ה-x\",\"M אמצע AP\",\"N אמצע PQ\",\"K אמצע MB\",\"L אמצע AB\"]": "a292a186a4a74c1d",
+ "fixture:cube-size-beside-point-2792.geo3.json": "c46264969faa0ad8",
+ "suite:[\"קובייה ABCDA'B'C'D'\",\"אורך AB = 4\",\"P(1,2,3)\"]": "c46264969faa0ad8",
  "fixture:cube-size-free-plane-2746.geo3.json": "acf801cb372a49ce",
  "suite:[\"קובייה ABCDA'B'C'D'\",\"P נמצא על החלק החיובי של ציר ה-x\"]": "3bcddb55fef5bbd5",
  "fixture:cube-size-half-axis-2789.geo3.json": "2034085781f1b617",
