@@ -18,6 +18,7 @@
  * - otherwise `null`: the line's own parse stands — ADR-642's right angle in a single triangle, or the parser's
  *   `cevian-redefines-vertex` refusal where the only reading would move a vertex.
  */
+import type { Seed } from '@/engine';
 import { cevianPairReadings, parse, type ParseContext } from '@/parser';
 import { dryRunOutcome, type Fact } from '@/store/geoStore';
 import { withWorkBudget } from '@/engine/solveBudget';
@@ -25,7 +26,7 @@ import { withWorkBudget } from '@/engine/solveBudget';
 /** `implied` carries the bare reading of each named segment that already holds — #2790 (ADR-822): the line commits it as its own row. */
 export type VertexPairVerdict = { readonly kind: 'implied'; readonly readings: readonly string[] } | { readonly kind: 'adopt'; readonly reading: string };
 
-export function vertexPairVerdict(utterance: string, ctx: ParseContext, facts: Fact[], seed: number, cap: number): VertexPairVerdict | null {
+export function vertexPairVerdict(utterance: string, ctx: ParseContext, facts: Fact[], seed: Seed, cap: number): VertexPairVerdict | null {
   const vp = cevianPairReadings(utterance, ctx);
   if (!vp) return null;
   const held: number[] = [];

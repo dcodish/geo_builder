@@ -43,7 +43,7 @@ import { expect } from 'vitest';
 import { replay, useGeoStore, groupKey } from '@/store/geoStore';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { isGeoPoint, freeDofCount, detectRelations, detectShapes, ringSimple, circleRefs, crossingUtterance } from '@/engine';
-import type { AnyCommand, Id, Vec } from '@/engine';
+import type { AnyCommand, Id, Seed, Vec } from '@/engine';
 
 import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
@@ -3668,7 +3668,7 @@ export const SCENARIOS_4: Scenario[] = [
       }
       expect([...apexes].sort(), 'the three apexes each get their own base').toEqual(['A', 'B', 'C']);
       // and the button itself: two presses, every view shown keeps the median on the base
-      let cur = { facts, seed: firstSatisfyingSeed(facts) };
+      let cur: { facts: Fact[]; seed: Seed } = { facts, seed: firstSatisfyingSeed(facts) };
       medianOnBase(replay(cur.facts, cur.seed));
       for (let k = 0; k < 2; k++) {
         const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);
@@ -6169,7 +6169,7 @@ export const SCENARIOS_4: Scenario[] = [
       allStepsOk(fig);
       const facts = factsOf(['מעגל O', 'משולש ABC חוסם את מעגל O', 'ABC משולש שווה צלעות']);
       const before = replay(factsOf(['מעגל O', 'משולש ABC חוסם את מעגל O'])).circles.get('circle-O')!;
-      let cur = { facts, seed: 0 };
+      let cur: { facts: Fact[]; seed: Seed } = { facts, seed: 0 };
       for (let k = 0; k < 4; k++) {
         const f = replay(cur.facts, cur.seed);
         expect(ringEnclosesCircle(f, ['A', 'B', 'C']), `view ${k} (seed ${cur.seed}): O inside ABC, every touch within its side`).toBe(true);
@@ -6631,7 +6631,7 @@ export const SCENARIOS_4: Scenario[] = [
         return cases[((v % 3) + 3) % 3];
       };
       // the student's button, 12 presses: every view is its variant's case, and all three are shown
-      let cur = { facts: factsOf(['שני מעגלים']), seed: 0 };
+      let cur: { facts: Fact[]; seed: Seed } = { facts: factsOf(['שני מעגלים']), seed: 0 };
       const seen = new Set<string>();
       for (let k = 0; k <= 12; k++) {
         if (k > 0) {
@@ -7055,7 +7055,7 @@ function configsShown(facts: Fact[]): number {
 }
 /** #1600: the default view plus `presses` presses of «הציגו תצורה אחרת» — every view shown meets the givens. */
 function pressAll(facts: Fact[], presses: number) {
-  let cur = { facts, seed: firstSatisfyingSeed(facts) };
+  let cur: { facts: Fact[]; seed: Seed } = { facts, seed: firstSatisfyingSeed(facts) };
   const out = [replay(cur.facts, cur.seed)];
   for (let k = 0; k < presses; k++) {
     const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);

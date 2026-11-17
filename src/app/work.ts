@@ -13,6 +13,7 @@
  * an unclassified action, on a free action that writes the basis, and on a component that reaches a job
  * action through the store instead of through {@link act} or {@link jobStore}.
  */
+import type { Seed } from '@/engine';
 import { INTERACTIVE, createWorkQueue, queuedActions, watchBasis } from '../../shell/work';
 import { useGeoStore, type Fact } from '@/store/geoStore';
 import { actInWorker, ensureSettled } from './workerJobs';
@@ -23,7 +24,7 @@ export const BASIS_FIELDS = ['facts', 'seed'] as const;
 /** What a job is started for: the fact list and the configuration on screen at the action. */
 export interface Basis2D {
   facts: Fact[];
-  seed: number;
+  seed: Seed;
 }
 
 /**

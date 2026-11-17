@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { applyStep, emptyConstruction, allDrivableAncestors } from '../step';
-import { constraintComponents, componentOf } from '../components';
+import { constraintComponents, componentOf, partsOf, canonicalSeed, cleanSeed, seedKey, seedNumber, seedOfPart, seedPartsOf, sameSeed, withPartSeed } from '../components';
 import { evaluate } from '../evaluate';
 import type { Command, Construction } from '../types';
 
@@ -103,5 +103,85 @@ describe('stage (b) — joint-first with the ladder as fallback', () => {
     })();
     expect(r.ok).toBe(false);
     expect(r.ladder?.[r.ladder.length - 1]).toMatch(/refuse$/);
+  });
+});
+
+/**
+ * #2796 (ADR-853) — THE INDEPENDENT PARTS OF A FIGURE. A part is solved, sampled and judged on its own; a figure of one
+ * part is the construction itself, so every connected figure takes the path it always took.
+ */
+describe('#2796 — the independent parts (partsOf)', () => {
+  const quads: Command[] = (['ABCD', 'EFGH', 'IJKL'] as const).map((n) => ({ type: 'square', ids: [...n] as [string, string, string, string] }));
+
+  it('three separate squares are three parts, each holding its own vertices and keyed by its first object', () => {
+    const parts = partsOf(run(quads));
+    expect(parts.length).toBe(3);
+    expect(parts.map((p) => ['A', 'E', 'I'].filter((v) => p.ids.has(v)))).toEqual([['A'], ['E'], ['I']]);
+    for (const p of parts) expect(p.key).toBe(p.construction.objects[0].id);
+  });
+
+  it('a constraint that names two shapes joins them into one part («AB ∥ EF»: operator 2026-11-09, both may move)', () => {
+    const c = run([...quads.slice(0, 2), { type: 'set-parallel', a: 'A', b: 'B', c: 'E', d: 'F' }]);
+    expect(partsOf(c).length).toBe(1);
+  });
+
+  it('one part is the construction itself (bit-identical path), and a point on a side joins its shape', () => {
+    const c = run([quads[0], { type: 'point-on-segment', id: 'P', a: 'A', b: 'B' }]);
+    const parts = partsOf(c);
+    expect(parts.length).toBe(1);
+    expect(parts[0].construction).toBe(c);
+  });
+
+  it('a typed line that names two shapes links them, though nothing in the construction records it («שני מעגלים», ADR-815)', () => {
+    const c = run(quads.slice(0, 2));
+    expect(partsOf(c).length).toBe(2);
+    expect(partsOf(c, [['A', 'B', 'C', 'D'], ['E', 'F', 'G', 'H']]).length).toBe(2);
+    expect(partsOf(c, [['A', 'E']]).length).toBe(1);
+  });
+
+  it('a loose point rides with the first shape (it has nothing the configuration shapes on its own)', () => {
+    const c = run([quads[0], { type: 'free-point', id: 'P', x: 9, y: 9 } as Command, quads[1]]);
+    const parts = partsOf(c);
+    expect(parts.length).toBe(2);
+    expect(parts[0].ids.has('P')).toBe(true);
+  });
+
+  it('each part is solved on its own: adding a separate shape leaves an earlier part’s solve unchanged', () => {
+    const two = run([{ type: 'trapezoid', ids: ['A', 'B', 'C', 'D'] } as Command, { type: 'set-distance', a: 'A', b: 'D', value: 3 }]);
+    const e0 = evaluate(two);
+    const more = run([{ type: 'trapezoid', ids: ['A', 'B', 'C', 'D'] } as Command, { type: 'set-distance', a: 'A', b: 'D', value: 3 }, { type: 'square', ids: ['E', 'F', 'G', 'H'] }, { type: 'set-distance', a: 'E', b: 'F', value: 2 }]);
+    const e1 = evaluate(more);
+    expect(e0.ok && e1.ok).toBe(true);
+    if (!e0.ok || !e1.ok) return;
+    for (const id of ['A', 'B', 'C', 'D']) {
+      const p = e0.positions.get(id)!, q = e1.positions.get(id)!;
+      expect(Math.hypot(p.x - q.x, p.y - q.y), id).toBeLessThanOrEqual(1e-9);
+    }
+  });
+});
+
+describe('#2796 — the per-part configuration (Seed)', () => {
+  it('a plain number is every part at that number; an entry moves one part', () => {
+    expect(seedOfPart(5, 'A')).toBe(5);
+    const s = withPartSeed(5, 'E', 9);
+    expect(s).toEqual({ seed: 5, parts: { E: 9 } });
+    expect(seedOfPart(s, 'E')).toBe(9);
+    expect(seedOfPart(s, 'A')).toBe(5);
+    expect(seedNumber(s)).toBe(5);
+  });
+  it('canonical: an entry equal to the base is dropped, and none left is the plain number', () => {
+    expect(canonicalSeed(5, { E: 5 })).toBe(5);
+    expect(withPartSeed({ seed: 5, parts: { E: 9 } }, 'E', 5)).toBe(5);
+    expect(seedKey(5)).toBe('5');
+    expect(seedKey({ seed: 5, parts: { I: 2, E: 9 } })).toBe('5{E:9,I:2}');
+    expect(sameSeed({ seed: 5, parts: { E: 9, I: 5 } }, { seed: 5, parts: { E: 9 } })).toBe(true);
+  });
+  it('read from outside: a malformed entry is dropped, never refused; seedParts round-trips', () => {
+    expect(cleanSeed(3, { E: 'x', I: 2, '': 4, J: -1, K: 1.5 })).toEqual({ seed: 3, parts: { I: 2 } });
+    expect(cleanSeed(3, [1, 2])).toBe(3);
+    expect(cleanSeed(3, undefined)).toBe(3);
+    const s = { seed: 3, parts: { I: 2 } };
+    expect(cleanSeed(seedNumber(s), seedPartsOf(s))).toEqual(s);
+    expect(seedPartsOf(3)).toBeUndefined();
   });
 });

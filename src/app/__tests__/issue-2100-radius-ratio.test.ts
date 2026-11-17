@@ -7,6 +7,7 @@
  * «כבר קיים» no-op. `setRadius` read the factor as O's radius. Operator ruling 2026-10-14: it holds r_O = 2·r_P,
  * both sizes otherwise free; «קטן פי 2» gives half; over «מעגל O ברדיוס 4» it sizes P to 2.
  */
+import type { Seed } from '@/engine';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const llmParseMock = vi.fn();
@@ -14,7 +15,7 @@ vi.mock('@/parser/llm', () => ({ llmParse: (...a: unknown[]) => llmParseMock(...
 
 import { decideDeterministic2D } from '../decideDeterministic';
 import { replay, useGeoStore } from '@/store/geoStore';
-import { firstSatisfyingSeed, searchAnotherView } from '@/replay/core';
+import { firstSatisfyingSeed, searchAnotherView, type Fact } from '@/replay/core';
 import { driveThroughGate } from '../../__tests__/submit-gate';
 
 /** The real pre-LLM decision for `line` after `prefix` has been committed through the gate. */
@@ -66,7 +67,7 @@ describe('#2100 — «רדיוס מעגל O גדול פי 2 מרדיוס מעג�
 
   it('both sizes stay free: «הציגו תצורה אחרת» changes them and keeps the ratio (ADR-052)', () => {
     const { facts, rO } = build([...TWO, 'רדיוס מעגל O גדול פי 2 מרדיוס מעגל P']);
-    let cur = { facts, seed: firstSatisfyingSeed(facts) };
+    let cur: { facts: Fact[]; seed: Seed } = { facts, seed: firstSatisfyingSeed(facts) };
     const sizes = new Set<string>([rO.toFixed(3)]);
     for (let i = 0; i < 3; i++) {
       const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);

@@ -13,6 +13,7 @@
  * new shape: re-read with that polygon out of the reference set, so the rule mints the next free letters, exactly as it
  * does when no polygon of that size exists.
  */
+import type { Seed } from '@/engine';
 import { parse, type ParseContext, type ParseResult } from '@/parser';
 import { withLadderSpent } from '@/engine';
 import { dryRunOutcome, getFoldFor, replay, trialFacts, type Fact } from './geoStore';
@@ -28,7 +29,7 @@ import { dryRunOutcome, getFoldFor, replay, trialFacts, type Fact } from './geoS
  * resumes cleanly as a prefix: a fold whose creating fact landed on a retry pass is re-folded whole by the trial, and
  * then the ladder may be the figure's own (ADR-577), so the probe runs unbudgeted as before.
  */
-export function restatesExistingShape(facts: Fact[], commands: readonly unknown[], seed: number): boolean {
+export function restatesExistingShape(facts: Fact[], commands: readonly unknown[], seed: Seed): boolean {
   const cmds = commands as Parameters<typeof trialFacts>[1];
   const before = replay(facts, seed);
   const node = getFoldFor(facts);
@@ -41,7 +42,7 @@ export function restatesExistingShape(facts: Fact[], commands: readonly unknown[
 }
 
 /** The reading of `utterance` an indefinite shape noun calls for: `r` itself, or the new-shape re-read. */
-export function indefiniteShapeReading(r: ParseResult, utterance: string, ctx: ParseContext, facts: Fact[], seed: number): ParseResult {
+export function indefiniteShapeReading(r: ParseResult, utterance: string, ctx: ParseContext, facts: Fact[], seed: Seed): ParseResult {
   if (!r.ok || !r.indefiniteShape) return r;
   if (restatesExistingShape(facts, r.commands, seed)) return r;
   const key = r.indefiniteShape.join(',');

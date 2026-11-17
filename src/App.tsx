@@ -31,13 +31,13 @@ import { ToolButton } from '../shell/frame/ToolButton';
 // #1376: the row's ORDER is a shared contract — a product supplies actions by id, never by position.
 import { orderToolActions } from '../shell/frame/toolRow';
 import registry from '../products.json';
-import { freeDofs, freeDofCount, isGeoPoint, unstatedChoices } from '@/engine';
+import { freeDofs, freeDofCount, isGeoPoint, seedKey, unstatedChoices } from '@/engine';
 import { unstatedChoiceText } from '@/ui/unstatedChoice';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, stepLabel } from '@/parser';
 import { Figure } from '@/render';
 import { circleRefs, crossingCommands, crossingUtterance } from '@/engine';
 import { independentConstructs } from '@/app/independence';
-import type { Crossing } from '@/engine';
+import type { Crossing, Seed } from '@/engine';
 import { MathText, hasMath } from '../shell/math';
 import { inputPreviewNode } from '@/render/inputPreviewNode';
 import { MathValues } from '@/render/MathValue';
@@ -124,7 +124,7 @@ interface NotDecidedAt {
   where: 'another' | 'resolve' | 'audit';
   round: number;
   facts: Fact[];
-  seed: number;
+  seed: Seed;
 }
 
 export default function App() {
@@ -1156,12 +1156,12 @@ export default function App() {
       if (isNotDecided(found)) {
         setAltNote('');
         setNotDecidedAt({ where: 'another', round: found.resume.round, facts: st.facts, seed: st.seed });
-        logDebug({ kind: 'action', action: 'show-another', detail: `seed=${st.seed} round=${round}`, result: 'not-decided' });
+        logDebug({ kind: 'action', action: 'show-another', detail: `seed=${seedKey(st.seed)} round=${round}`, result: 'not-decided' });
         return;
       }
       const changed = found !== null;
       if (changed) jobStore().applyView(found!);
-      logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found!.seed : st.seed}`, result: changed ? 'changed' : 'only-config' }); // #84
+      logDebug({ kind: 'action', action: 'show-another', detail: `seed=${seedKey(changed ? found!.seed : st.seed)}`, result: changed ? 'changed' : 'only-config' }); // #84
       // A press that found another view says nothing: the redrawn figure speaks for itself (#1866,
       // ADR-734 — the operator removed ADR-517's varied/kept note).
       if (!changed) {

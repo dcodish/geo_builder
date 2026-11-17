@@ -21,7 +21,7 @@ import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
 import type { QueryInput, QueryRow, ValuesPanelResult } from '@/engine/valuesPanel';
 import type { AnyCommand, Id, RelationsResult, ShapesResult, StatedShapeEquality } from '@/engine';
-import { branchCount, cyclableVariant, variantCountOf, withVariant } from '@/engine';
+import { branchCount, cyclableVariant, sameSeed, variantCountOf, withVariant, type Seed } from '@/engine';
 import { parseValueQuery } from '@/parser/valueQuery';
 import type { FigureFile } from './figureFile';
 
@@ -129,8 +129,10 @@ export interface GeoState {
   /** The fact currently selected for inspection (highlighted on the canvas); UI-only, not undoable. */
   selectedId: string | null;
   /** Sampling seed for the figure's residual freedom (ADR-018); 0 = canonical. IN the undo history
-   *  (E5/STO-5): undo restores the view the student actually saw, not the reverted facts at a later seed. */
-  seed: number;
+   *  (E5/STO-5): undo restores the view the student actually saw, not the reverted facts at a later seed.
+   *  #2796 ([ADR-853](../../docs/06-decisions.md#adr-853)): a figure of independent parts may hold one number per
+   *  part (`Seed`), so the configuration search can move one part and leave the others where they are. */
+  seed: Seed;
   /**
    * #948 / [ADR-W-047](../../docs/06w-decisions-workspace.md#adr-w-047) — per-VALUING-ROW choice of
    * which form of a parameter the figure shows. Keyed by the fact id of the row that valued the letter
@@ -265,7 +267,7 @@ export interface GeoState {
    *  #2757 ([ADR-812](../../docs/06-decisions.md#adr-812)): a compare-and-set on `(facts, seed)`. The
    *  view applies only while the store still holds the `basis` it was searched on; a result that
    *  arrives after an undo, redo, clear, edit or new line is dropped. Returns whether it applied. */
-  applyView: (patch: { facts?: Fact[]; seed: number; basis: ViewBasis }) => boolean;
+  applyView: (patch: { facts?: Fact[]; seed: Seed; basis: ViewBasis }) => boolean;
   /**
    * #2890 ([ADR-830](docs/06-decisions.md#adr-830)) — THE ONE SINK of an action decided in the geometry worker: the
    * store fields the worker changed, put in as ONE transition (one undo entry), only while the store still holds the
@@ -920,7 +922,7 @@ export const useGeoStore = create<GeoState>()(
       // the overrides instead — a per-drag slider value must not flood the history).
       partialize: (s) => ({ facts: s.facts, seed: s.seed, displayMode: s.displayMode }) as GeoState,
       // Skip history entries when neither changed (e.g. selecting a fact only sets selectedId).
-      equality: (a, b) => a.facts === b.facts && a.seed === b.seed && a.displayMode === b.displayMode,
+      equality: (a, b) => a.facts === b.facts && sameSeed(a.seed, b.seed) && a.displayMode === b.displayMode, // #2796: a per-part seed compares by value
       limit: 100,
     },
   ),

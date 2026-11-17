@@ -15,6 +15,7 @@
  * The shape itself needed no new geometry: a dart satisfies the very same kite relations, so convex vs
  * concave is a configuration BRANCH of the existing constraint set.
  */
+import type { Seed } from '@/engine';
 import { describe, expect, it } from 'vitest';
 import { parse } from '@/parser';
 import { findValidConfig, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
@@ -33,7 +34,7 @@ function build(utterance: string) {
   return { commands: r.commands, state: () => useGeoStore.getState() };
 }
 
-function ringAt(utteranceState: ReturnType<typeof build>, seed: number, ids: string[]) {
+function ringAt(utteranceState: ReturnType<typeof build>, seed: Seed, ids: string[]) {
   const st = utteranceState.state();
   const d = replay(st.facts, seed);
   const pts = ids.map((i) => d.positions.get(i)) as P[];
@@ -54,9 +55,9 @@ const isConvex = (p: P[]) => {
  *  gate ("show another configuration" only ever offers those). Asserting over this set — rather than
  *  over arbitrary seeds — is the honest property, since the reflection mask lives in the seed's HIGH
  *  bits and a raw low seed is simply a different (rejected) configuration. */
-function validConfigs(b: ReturnType<typeof build>, extra = 80): number[] {
+function validConfigs(b: ReturnType<typeof build>, extra = 80): Seed[] {
   const st = b.state();
-  const out = [st.seed];
+  const out: Seed[] = [st.seed];
   for (let s = 0; s < extra; s++) if (meetsRequirements(st.facts, s)) out.push(s);
   return out;
 }
