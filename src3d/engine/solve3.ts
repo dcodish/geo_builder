@@ -16,12 +16,14 @@
  * (`שיעור ה-z של C' חיובי`) select among the surviving solutions, else the seed.
  */
 
+import { boundHolds3, boundReflect3, signBound3, type Bound3 } from './bound3';
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3, detachedPinLetters3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { congruentShapes3 } from './configs3';
 import { lengthsImpossible3 } from './metricBounds3';
 import { evalAffine, openPinSymsOf, pinSymAnchor3, pinSymsOf, scalarPinOrigin3, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
+import { hasLetters3, vecEqLetters3 } from './vecExpr';
 import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { meterWork } from '../../shell/workMeter';
@@ -876,6 +878,21 @@ export function scalarPinRows3(
       // #1183: a VECTOR equation drives — three SIGNED component residuals, so the descent crosses
       // zero instead of touching it (the ADR-3D-006 lesson `concyclic` records below). `exprAt`
       // already evaluates a `VecExpr`, so a named vector and a point pair reach this by one path.
+      // #1551 (ADR-3D-472): a LETTER in a coefficient is solved at this drawing by least squares, so the residual is
+      // the part no letter can absorb — the shape moves until the relation can hold, and no new pivot unknown exists.
+      // Over the atoms' size like the numeric row (#2806): scale-free, so a shrinking figure cannot zero it.
+      if (hasLetters3(pin.lhs) || hasLetters3(pin.rhs)) {
+        // #1551 + #2785 (ADR-3D-472 Am. 1): a letter a coordinate also carries is the pivot's own unknown (`symAt`), so
+        // the relation and the coordinate read one value; a letter only coefficients carry is solved here
+        const sol = vecEqLetters3(pin.lhs, pin.rhs, dirOf, (sym) => env.symAt(sym) ?? symbolValueOf(c, sym));
+        if (!sol) {
+          out.push(10, 10, 10);
+          continue;
+        }
+        const den = env.gaugeFrozen ? 1 : Math.max(sol.scale, REL_DIFF_FLOOR);
+        out.push(sol.residual.x / den, sol.residual.y / den, sol.residual.z / den);
+        continue;
+      }
       const l = exprAt(pin.lhs);
       const r = exprAt(pin.rhs);
       if (!l || !r) {
@@ -1334,7 +1351,7 @@ export function solvePivot(
   // panel would print an invented `t = 6/5`). Each open symbol gets a SEED-DEPENDENT soft
   // anchor (the dims0 mechanism), sign-aware so a stated «t חיובי» parks on the stated side;
   // a genuinely determining given overrides the 1e-4 pull exactly like it overrides dims0.
-  const symAnchorTargets = pinSyms.map((sym) => pinSymAnchor3(c, seed, sym)); // #2563: the one sampler, shared
+  const symAnchorTargets = pinSyms.map((sym) => pinSymAnchor3(c, seed, sym)); // #2563: the one sampler, shared (#1524: range-aware)
 
   // When EVERY pin is similarity-INVARIANT (angles, ⟂/∥-to-plane — no coordinate,
   // length or dot given anywhere), the gauge is pure null-space: solving it invites
@@ -2570,11 +2587,12 @@ export function solvePivot(
   // #818: the stated SIGNS, as conditions over a candidate — a coordinate sign given on a point and a
   // sign on a named free component (#814) are one kind here, exactly as `applySolutions`' filter treats
   // them. A `partial` point is absolute and sign-honoured at sample time (ADR-3D-094): not a condition.
-  const signConds: { positive: boolean; value: (at: (id: Id) => Vec3 | undefined) => number | undefined }[] = [
+  // #1524 (ADR-3D-477): a named component's condition may be a RANGE; a coordinate sign is its interval.
+  const signConds: { bound: Bound3; value: (at: (id: Id) => Vec3 | undefined) => number | undefined }[] = [
     ...c.signGivens
       .filter((g) => c.points.get(g.id)?.kind !== 'partial')
-      .map((g) => ({ positive: g.positive, value: (at: (id: Id) => Vec3 | undefined) => at(g.id)?.[g.axis] })),
-    ...positionalComponentSigns3(c).map((g) => ({ positive: g.positive, value: (at: (id: Id) => Vec3 | undefined) => componentValue(c, g.target, g.axis, at) })),
+      .map((g) => ({ bound: signBound3(g.positive), value: (at: (id: Id) => Vec3 | undefined) => at(g.id)?.[g.axis] })),
+    ...positionalComponentSigns3(c).map((g) => ({ bound: g.bound, value: (at: (id: Id) => Vec3 | undefined) => componentValue(c, g.target, g.axis, at) })),
   ];
   /** A candidate's FINAL positions (gauge applied to gauge points; absolute points verbatim). */
   const atFor = (mirror: boolean, x: number[]): ((id: Id) => Vec3 | undefined) => {
@@ -2763,11 +2781,17 @@ export function solvePivot(
         if (v0 === undefined || v1 === undefined) continue;
         const d = v1 - v0;
         if (Math.abs(d) < 1e-9) {
-          if (sc.positive ? !(v0 > 1e-9) : !(v0 < -1e-9)) feasible = false;
+          if (!boundHolds3(sc.bound, v0)) feasible = false;
           continue;
         }
-        if ((d > 0) === sc.positive) lo = Math.max(lo, -v0 / d);
-        else hi = Math.min(hi, -v0 / d);
+        // #1524 (ADR-3D-477): each stated END of the condition's interval (a sign's 0, a range's lo/hi) bounds the step:
+        // v0 + d·s past `end` on the interval's side. A sign gives exactly the old −v0/d cut.
+        for (const [end, below] of [[sc.bound.lo, false], [sc.bound.hi, true]] as const) {
+          if (end === null) continue;
+          const cut = (end - v0) / d;
+          if ((d > 0) !== below) lo = Math.max(lo, cut);
+          else hi = Math.min(hi, cut);
+        }
       }
       if (feasible && lo < hi) {
         const m = Math.min(0.25 * unit, (hi - lo) / 4);
@@ -3250,7 +3274,7 @@ export function solvePivot(
         const at = atFor(mirror, x);
         return signConds.every((cd) => {
           const v = cd.value(at);
-          return v === undefined ? true : cd.positive ? v > 1e-9 : v < -1e-9;
+          return v === undefined ? true : boundHolds3(cd.bound, v); // #1524: a sign is a range — the selector's own test
         });
       };
       const mine = results.filter((r) => r.mirror === mirror && !r.reach);
@@ -3456,7 +3480,7 @@ export function solvePivot(
         const at = atFor(mirror, x);
         return signConds.every((cd) => {
           const v = cd.value(at);
-          return v === undefined ? true : cd.positive ? v > 1e-9 : v < -1e-9;
+          return v === undefined ? true : boundHolds3(cd.bound, v);
         });
       };
       const mine = results.filter((r) => r.mirror === mirror);
@@ -3465,8 +3489,8 @@ export function solvePivot(
           const at = atFor(mirror, sol.x);
           for (const cd of signConds) {
             const v = cd.value(at);
-            if (v === undefined || (cd.positive ? v > 1e-9 : v < -1e-9)) continue; // this sign already holds
-            const target = -v;
+            if (v === undefined || boundHolds3(cd.bound, v)) continue; // this sign already holds
+            const target = boundReflect3(cd.bound, v); // a sign's −v; a range's reflection about its violated end
             const fPin = (y: number[]) => [...fPrimary(y), 1e3 * ((cd.value(atFor(mirror, y)) ?? 0) - target)];
             const rp = leastSquares(fPin, [...sol.x], 40);
             collect(leastSquares(fFor(symAnchorTargets), rp.x));

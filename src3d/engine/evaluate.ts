@@ -1165,7 +1165,8 @@ import { memberHolds3, onLineHolds3 } from './operands';
 // #814's `componentValue` / `componentSignsHold` live in operands.ts (#818: the pivot's sign-axis
 // continuation reads them too, and solve3 must never import evaluate) — re-exported for the store.
 export { componentValue, componentSignsHold } from './operands';
-import { componentSignsHold, positionalComponentSigns3 } from './operands';
+import { boundHolds3, boundWindow3, symBound3 } from './bound3';
+import { componentSignsHold, componentValue, positionalComponentSigns3 } from './operands';
 
 
 /**
@@ -1192,7 +1193,10 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number, param
   // difference structural. Sign givens are applied HERE for the first time: they were honoured on the
   // paramGivens path (`pinParam`) but silently ignored on this one, so `k הוא פרמטר חיובי` plus a ⟂
   // given could draw the negative root — a figure contradicting a stated given.
-  const signed = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+  // #1524 (ADR-3D-477): the parameter's OWN stated range (a sign or a range), folded — a range stated on another
+  // letter never filters this one's roots.
+  const own = symBound3(c, c.param);
+  const signed = own ? roots.filter((t) => boundHolds3(own, t)) : roots;
   const pool = signed.length > 0 ? signed : roots; // an unsatisfiable sign is refused downstream, not here
   const pick = (branches: number[], value: number) => ({ value, roots, branches });
 
@@ -1223,8 +1227,8 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number, param
 /** The half-line an UNPINNED parameter is sampled on — a stated sign narrows it (ADR-3D-032). `reach` (#1986,
  *  ADR-3D-418, analytic's ADR-AG-256) widens the window's OPEN side(s) only; 1 is the default window, bit-identical. */
 function openParamRange3(c: Construction3, reach = 1): [number, number] {
-  const sign = c.paramSigns.find(() => true);
-  return sign ? (sign.positive ? [0.3, 3 * reach] : [-3 * reach, -0.3]) : [-3 * reach, 3 * reach];
+  // #1524 (ADR-3D-477): a stated range narrows the window the way a sign did — a sign gives the same half-windows
+  return boundWindow3(symBound3(c, c.param), -3 * reach, 3 * reach, 0.3);
 }
 
 /**
@@ -1488,7 +1492,7 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
 type VecDef = Construction3['vecDefs'][number];
 
 /** Solve the relation for its unknown point at a fixed symbol value; null when degenerate. */
-function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>): Vec3 | null {
+function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>, letterVal?: (sym: string) => number): Vec3 | null {
   const evalR = (P: Vec3): Vec3 | null => {
     const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
     const from = get(vd.from);
@@ -1511,7 +1515,8 @@ function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: numb
         vvec = a && b ? sub3(b, a) : null;
       }
       if (!vvec) return null;
-      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * kValue));
+      // #1551 (ADR-3D-472): a term naming its own letter (a definition with several) reads that letter's number
+      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * (t.sym !== undefined && letterVal ? letterVal(t.sym) : kValue)));
     }
     return acc;
   };
@@ -1638,8 +1643,8 @@ function firstNonDegenerateRoot(
   // Filtered by `sym` deliberately. The other sign consumers in this file apply `paramSigns.every`
   // to every root regardless of which symbol each sign names — sound while a figure has one symbol,
   // and not something to copy: here a second vec-def's sign must not constrain this one's branch.
-  const signs = c.paramSigns.filter((g) => g.sym === vd.symbol);
-  const eligible = signs.length ? roots.filter((k) => signs.every((g) => (g.positive ? k > 1e-9 : k < -1e-9))) : roots;
+  const own = symBound3(c, vd.symbol); // #1524: a sign or a range, folded
+  const eligible = own ? roots.filter((k) => boundHolds3(own, k)) : roots;
   for (const k of eligible) if (pinDrivenSegLen(c, pin, vd, pos, k) > tol) return k;
   // No root honours the sign: return nothing, so the point stays UNPLACED and the store's existing
   // vec-rel check refuses honestly. A sign that cannot be satisfied must never fall back to a root
@@ -2970,7 +2975,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       // snapped first, so the value the verifier's own predicate judges is the value drawn (ADR-3D-286 §3)
       roots = snapAndDedupe(candidates).filter(holdsAll);
     }
-    const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+    const ownBound = symBound3(c, c.param); // #1524 (ADR-3D-477): the parameter's own sign or range
+    const pool0 = ownBound ? roots.filter((t) => boundHolds3(ownBound, t)) : roots;
     const pool = pool0.length > 0 ? pool0 : roots;
     if (pool.length > 0) {
       const value = opts.paramValue !== undefined ? nearestBranch(pool, opts.paramValue) : pool[seed % pool.length]; // #1474
@@ -3145,7 +3151,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         // among pivot solutions, exactly like a coordinate sign given
         const symsOk = c.paramSigns.every((s) => {
           const v = sol.pinSymbols?.[s.sym];
-          return v === undefined ? true : s.positive ? v > 1e-9 : v < -1e-9;
+          const b = symBound3(c, s.sym); // #1524: the letter's folded sign or range
+          return v === undefined || !b ? true : boundHolds3(b, v);
         });
         if (!symsOk) return false;
         // #814: the same selection for a letter that NAMES a free component («p חיובי» after
@@ -4527,24 +4534,58 @@ export function paramConfigValues3(c: Construction3, seed: number, r: Resolved3 
 const RAW: Resolve3Opts = { solvedFrame: true };
 
 export function knowledgeSamples3(c: Construction3, baseSeeds: readonly number[], opts: { readback?: boolean } = {}): Resolved3[] {
-  return baseSeeds.flatMap((s) => {
-    const r0 = resolve3(c, s, RAW);
-    const vals = paramConfigValues3(c, s, r0);
-    const confs: { r: Resolved3; paramValue?: number }[] =
-      vals.length <= 1 ? [{ r: r0 }] : vals.map((v) => (v === r0.param!.value ? { r: r0 } : { r: resolve3(c, s, { ...RAW, paramValue: v }), paramValue: v }));
-    if (!opts.readback) return confs.map((k) => k.r);
-    // #2368 (ADR-3D-375): READ-BACK adds, per configuration whose placement keeps a measured leftover rigid
-    // freedom, its exact IMAGE along it — agreement can only see what is varied, and the multi-start never
-    // varies that freedom. The image's one-entry pool keeps the «או» rows and `branchAgrees` honest (a
-    // moved point is not a second configuration). Claims and narrowing stay on the plain samples.
-    // #2907 (ADR-3D-498): READ-BACK also stands on every OTHER admissible configuration of the configuration's pool — the
-    // seeds sample the gauge and `pool[seed % n]` reaches the rest only by arithmetic (the #1474 lesson, one lane over),
-    // so a value that differs on a configuration no seed draws read as fact
-    return confs.flatMap(({ r, paramValue }) => {
-      const at = paramValue !== undefined ? { paramValue } : {};
-      const others = Array.from({ length: r.pivot?.others ?? 0 }, (_, k) => resolve3(c, s, { ...RAW, ...at, configuration: k + 1 }));
-      return (placementFreedom3(r)?.dim ?? 0) > 0 ? [r, resolve3(c, s, { ...RAW, ...at, placementImage: true }), ...others] : [r, ...others];
-    });
+  const all = (s: number): Resolved3[] => samplesAtSeed3(c, s, opts);
+  if (!hasStatedSelectors3(c)) return baseSeeds.flatMap(all);
+  /**
+   * #2916 ([ADR-3D-533](../../docs/06b-decisions-3d.md#adr-3d-533)) — ONLY ADMITTED CONFIGURATIONS ARE EVIDENCE. A sample that
+   * breaks a stated selector ({@link admittedConfiguration3}) is dropped; a base seed left with none is replaced by the
+   * next seed of its reserve walk (s + k·{@link RESERVE_STEP3}), at most one reserve seed per base seed in all, so the
+   * gauge keeps as many witnesses as it was given (one picture always agrees with itself — analytic's #1642) and the work
+   * stays bounded. Nothing admitted anywhere: the figure itself breaks a given, and its own line already says so (the
+   * store's verifier) — the plain samples stand, as before, rather than an empty set that every gate would read as agreement.
+   */
+  const out: Resolved3[] = [];
+  let spare = baseSeeds.length;
+  for (const s of baseSeeds) {
+    let got = all(s).filter((r) => admittedConfiguration3(c, r));
+    for (let k = 1; got.length === 0 && spare > 0; k++, spare--) got = all(s + k * RESERVE_STEP3).filter((r) => admittedConfiguration3(c, r));
+    out.push(...got);
+  }
+  return out.length > 0 ? out : baseSeeds.flatMap(all);
+}
+
+/** #2916: the reserve walk's stride — clear of every lane's base offsets (1013, 2027, 3041, 4057). */
+const RESERVE_STEP3 = 6089;
+
+/** #2916: does the figure state anything {@link admittedConfiguration3} judges? None: every sample is admitted, at no cost. */
+function hasStatedSelectors3(c: Construction3): boolean {
+  return (
+    c.signGivens.length > 0 ||
+    c.componentSigns.length > 0 ||
+    c.paramSigns.length > 0 ||
+    c.memberships.some((m) => m.side !== undefined) ||
+    c.requirements.some((req) => req.kind !== 'quad-general')
+  );
+}
+
+/** One base seed's knowledge samples: every configuration of the parameter, and with `readback` the image and the fanned roots. */
+function samplesAtSeed3(c: Construction3, s: number, opts: { readback?: boolean }): Resolved3[] {
+  const r0 = resolve3(c, s, RAW);
+  const vals = paramConfigValues3(c, s, r0);
+  const confs: { r: Resolved3; paramValue?: number }[] =
+    vals.length <= 1 ? [{ r: r0 }] : vals.map((v) => (v === r0.param!.value ? { r: r0 } : { r: resolve3(c, s, { ...RAW, paramValue: v }), paramValue: v }));
+  if (!opts.readback) return confs.map((k) => k.r);
+  // #2368 (ADR-3D-375): READ-BACK adds, per configuration whose placement keeps a measured leftover rigid
+  // freedom, its exact IMAGE along it — agreement can only see what is varied, and the multi-start never
+  // varies that freedom. The image's one-entry pool keeps the «או» rows and `branchAgrees` honest (a
+  // moved point is not a second configuration). Claims and narrowing stay on the plain samples.
+  // #2907 (ADR-3D-498): READ-BACK also stands on every OTHER admissible configuration of the configuration's pool — the
+  // seeds sample the gauge and `pool[seed % n]` reaches the rest only by arithmetic (the #1474 lesson, one lane over),
+  // so a value that differs on a configuration no seed draws read as fact
+  return confs.flatMap(({ r, paramValue }) => {
+    const at = paramValue !== undefined ? { paramValue } : {};
+    const others = Array.from({ length: r.pivot?.others ?? 0 }, (_, k) => resolve3(c, s, { ...RAW, ...at, configuration: k + 1 }));
+    return (placementFreedom3(r)?.dim ?? 0) > 0 ? [r, resolve3(c, s, { ...RAW, ...at, placementImage: true }), ...others] : [r, ...others];
   });
 }
 
@@ -4827,22 +4868,38 @@ function evaluateSolidsAndPoints(
           // and «k שלילי» falsely `sign-unsatisfiable`: the figure can perfectly well put N beyond S on
           // the SC line, the sampler just never looked there. A default that survives a contradicting
           // statement is asserting a given the student never gave (ADR-052), so the range follows the sign.
-          const neg = c.paramSigns.some((g) => g.sym === vd.symbol && !g.positive);
+          // #1524 (ADR-3D-477): ...and a stated RANGE is the student choosing which part of it; a sign gives the
+          // same windows as before ((0.2, 0.8) / (−0.8, −0.2)).
           // #1829 (ADR-3D-471): ONE LETTER, ONE NUMBER — the draw is keyed by the letter's FIRST definition, so
           // «DF = t·DC» and «BE = t·BC» place F and E at the same t (keyed per point, they drew two different t's).
           // A letter with one definition keeps its key, so its drawing is unchanged.
           const keyPt = c.vecDefs.find((d) => d.symbol === vd.symbol)?.unknown ?? vd.unknown;
-          k = neg
-            ? sample(seed, `sym-${vd.symbol}-${keyPt}`, -0.8, -0.2)
-            : sample(seed, `sym-${vd.symbol}-${keyPt}`, 0.2, 0.8);
+          const [k0, k1] = boundWindow3(symBound3(c, vd.symbol), 0.2, 0.8, 0.2);
+          k = sample(seed, `sym-${vd.symbol}-${keyPt}`, k0, k1);
         }
       }
       // #930 (ADR-3D-236): record the value ACTUALLY used, on every path — the pinned root pick above
       // and the sampled free DOF alike. Recording per-branch missed the sampled case, and the sign
       // verifier then reported `sign-unsatisfiable` on a figure whose k was a perfectly positive sample.
       if (vd.symbol) ratioSymbols?.set(vd.symbol, k);
+      /**
+       * #1551 (ADR-3D-472): a definition with SEVERAL letters («EN = a·EA + b·EC») — each letter a free number, given its
+       * stated value or sampled like a one-letter ratio (one letter, one number: keyed by its first definition, the sign
+       * given choosing the side). No relation drives these letters; a point placed by them has one free DOF per letter.
+       */
+      const letterVals = new Map<string, number>();
+      for (const sym of vd.symbols ?? []) {
+        const given = symbolValueOf(c, sym);
+        const keyPt = c.vecDefs.find((d) => d.symbols?.includes(sym) || d.symbol === sym)?.unknown ?? vd.unknown;
+        // #1524 (ADR-3D-477): the letter's stated sign or range, as the one-letter ratio above reads it (a sign gives the
+        // half-windows [0.2, 0.8] / [−0.8, −0.2] bit for bit)
+        const [w0, w1] = boundWindow3(symBound3(c, sym), 0.2, 0.8, 0.2);
+        const v = given ?? sample(seed, `sym-${sym}-${keyPt}`, w0, w1);
+        letterVals.set(sym, v);
+        ratioSymbols?.set(sym, v);
+      }
       // #1188 step 2: a definition over a free vector reads its pure value (apply admits only pure, symbol-free ones)
-      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined);
+      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined, (sym) => letterVals.get(sym) ?? 0);
       if (P) pos.set(id, P);
     } else if (def.kind === 'vec-pair') {
       // the cevian intersection: each relation traces an affine line in its own symbol
@@ -5662,7 +5719,11 @@ export function meetsRequirements3(c: Construction3, seed: Seed3): boolean {
 
 /** {@link meetsRequirements3}'s judgement of one seed (the figure resolved there). */
 function requirementsMetAt3(c: Construction3, seed: Seed3, hard: readonly Exclude<Requirement3, { kind: 'quad-general' }>[]): boolean {
-  const r = resolve3(c, seed);
+  return requirementsHoldOn3(c, resolve3(c, seed), hard);
+}
+
+/** The stated requirements judged on one resolved configuration — the seed search's predicate and the knowledge admission's. */
+function requirementsHoldOn3(c: Construction3, r: Resolved3, hard: readonly Exclude<Requirement3, { kind: 'quad-general' }>[]): boolean {
   return hard.every((req) => {
     if (req.kind === 'mutual') {
       // S4 (#378): the drawn configuration must actually SHOW the stated position. For `skew` this
@@ -5683,6 +5744,59 @@ function requirementsMetAt3(c: Construction3, seed: Seed3, hard: readonly Exclud
     const deg = (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2) / (n1 * n2)))) * 180) / Math.PI;
     return (req.min === undefined || deg > req.min) && (req.max === undefined || deg < req.max);
   });
+}
+
+/**
+ * THE VALUE A STATED LETTER TAKES IN ONE CONFIGURATION — the one reader of «k חיובי»'s k (#2916 moved it here from the store's
+ * verifier, so the knowledge admission and the verifier cannot read a letter two ways). A letter is the figure parameter, a
+ * pivot pin symbol (#325), a vec-def ratio symbol (#930), a free-vector system's letter (#2684) or the NAME of a free
+ * component (#814, #1188). `undefined` when the letter names nothing in this configuration.
+ */
+export function statedLetterValue3(c: Construction3, r: Resolved3, sym: string): number | undefined {
+  if (r.param?.name === sym) return r.param.value;
+  const bound = c.partialNames.find((b) => b.sym === sym);
+  return (
+    r.pivot?.pinSymbols?.[sym] ??
+    r.ratioSymbols?.[sym] ??
+    r.freeSyms.get(sym) ??
+    (bound ? componentValue(c, bound.target, bound.axis, (id) => r.positions.get(id), r.freeVectors) : undefined)
+  );
+}
+
+/**
+ * #2916 ([ADR-3D-533](../../docs/06b-decisions-3d.md#adr-3d-533)) — IS THIS CONFIGURATION ADMITTED AS KNOWLEDGE? Every stated
+ * selector holds on it: each coordinate sign («שיעור ה-y של A שלילי»), each named component's sign (#814), each letter's
+ * sign («k חיובי»), each side of a plane («מעל המישור»), and each stated requirement (an angle bound, a mutual position).
+ *
+ * The selectors determine nothing — the sampler resolves a configuration and the pivot's sign walk usually lands on the
+ * honouring root, but nothing guaranteed it (seed + 3041 on the ADR-3D-032 exam box put A at y > 0). A configuration that
+ * breaks a given is not one the givens allow, so a value read off it is no evidence either way: 2-D's and analytic's rule
+ * (every printed value is witnessed by an ADMITTED configuration). The predicates are the verifier's own, at its tolerances.
+ */
+export function admittedConfiguration3(c: Construction3, r: Resolved3): boolean {
+  const at = (id: Id): Vec3 | undefined => r.positions.get(id);
+  for (const g of c.signGivens) {
+    const v = at(g.id)?.[g.axis];
+    if (!(v !== undefined && (g.positive ? v > 1e-9 : v < -1e-9))) return false;
+  }
+  if (!componentSignsHold(c, at)) return false;
+  for (const g of c.paramSigns) {
+    const v = statedLetterValue3(c, r, g.sym);
+    // #1524 (ADR-3D-477): a stated sign is a range — the verifier's own test (`boundHolds3`), so a stated range admits too
+    if (v !== undefined && Number.isFinite(v) && !boundHolds3(g.bound, v)) return false;
+  }
+  for (const m of c.memberships) {
+    if (!m.side || m.plane === 'any') continue;
+    const p = at(m.id);
+    const pl = r.planes.get(m.plane);
+    if (!p || !pl) continue; // unresolvable: the verifier's own refusal, never this gate's
+    const nz = pl.n.z / norm3(pl.n);
+    if (Math.abs(nz) <= 1e-9) continue;
+    const signed = ((dot3(pl.n, p) + pl.d) / norm3(pl.n)) * (nz < 0 ? -1 : 1);
+    if (signed * (m.side === 'above' ? 1 : -1) <= 1e-9) return false;
+  }
+  const hard = c.requirements.filter((req): req is Exclude<Requirement3, { kind: 'quad-general' }> => req.kind !== 'quad-general');
+  return hard.length === 0 || requirementsHoldOn3(c, r, hard);
 }
 
 /**

@@ -19,6 +19,7 @@
  */
 
 import type { Vec3 } from './vec3';
+import { boundAnchor3, symBound3, type Bound3 } from './bound3';
 // #587: the quad-base vocabulary is defined ONCE, in the base registry — the flat `quad-shape` command
 // names the same seven families the solid lane's bases do. Type-only, so the cycle is erased at compile.
 import type { QuadBase } from './baseShapes';
@@ -62,6 +63,11 @@ export interface VecTerm {
   /** #1497 (ADR-3D-426): the coefficient as typed, for DISPLAY only. Nothing solves from it. */
   src?: string;
   atom: VecAtom;
+  /**
+   * #1551 (ADR-3D-472): a LETTER in the coefficient — the coefficient is `coeff + letter.p · letter.sym`, the letter an
+   * unknown of the equation («EM = a·EA + b·EC»). Absent on every numeric term, so a saved file is unchanged.
+   */
+  letter?: { sym: string; p: number };
 }
 
 /**
@@ -81,7 +87,18 @@ export interface SymTerm {
   /** #1497 (ADR-3D-426): a numeric coefficient as typed, for DISPLAY only. */
   src?: string;
   atom: VecAtom;
+  /**
+   * #1551 (ADR-3D-472): the letter `coeff.p` multiplies, when the expression carries SEVERAL letters
+   * («a·EA + b·EC»). Absent: the expression's one `symbol` — every one-letter command and saved file is unchanged.
+   */
+  sym?: string;
 }
+
+/** #1551 (ADR-3D-472): the letter a term's `coeff.p` multiplies — its own, else the expression's one letter. */
+export const termLetter3 = (t: SymTerm, symbol: string | undefined): string | undefined => t.sym ?? symbol;
+
+/** #1551: every letter an expression carries, in first-written order — the one letter, or the several. */
+export const exprLetters3 = (x: { symbol?: string; symbols?: string[] }): string[] => x.symbols ?? (x.symbol !== undefined ? [x.symbol] : []);
 
 export type Claim3 =
   | { type: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number; given?: true } // |a1b1| = c·|a2b2|
@@ -137,7 +154,7 @@ export type Claim3 =
   // as opposed to the student's ANSWER («K = (-3,4,6)»): only the given defers to the pivot's
   // no-placement verdict; an answer keeps its verify-your-answer register (ADR-3D-075).
   // #2785 (ADR-3D-488): `sym` holds the components written with letters («B(2t, t, k)»), judged at the letters' resolved
-  // values (`pinLettersAt3`); a component is numeric (x/y/z) or symbolic (sym[i]) or neither, never both.
+  // values (`lettersAt3`); a component is numeric (x/y/z) or symbolic (sym[i]) or neither, never both.
   | { type: 'coords-eq'; id: Id; x: number | null; y: number | null; z: number | null; sym?: [SymComp | null, SymComp | null, SymComp | null]; given?: true } // A = (2, 0, -10)
   | { type: 'never-parallel'; line: string; plane: string } // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
   | { type: 'plane-eq'; ids: Id[]; cx: number; cy: number; cz: number; d: number } // המישור KBC: x+2y+3z-26=0
@@ -845,6 +862,18 @@ export interface ParamSignCommand {
   positive: boolean;
 }
 
+/** #1524 (ADR-3D-477) — a RANGE stated on a letter: «t ≥ 0», «k ≤ 3», «2 ≤ k ≤ 5», «k גדול מ-2». The sign's
+ *  sibling with any end and either strictness (a strict end at 0 alone is still lowered as `param-sign`); it shares
+ *  the sign's owner gate, the sign's branch selection, and narrows a free letter's sampled window. */
+export interface ParamBoundCommand {
+  type: 'param-bound';
+  sym: string;
+  lo: number | null;
+  hi: number | null;
+  loStrict: boolean;
+  hiStrict: boolean;
+}
+
 /** #1451 — the UNSIGNED declaration «t הוא פרמטר» / «t פרמטר» / "t is a parameter": an
  *  acknowledgment sharing param-sign's owner gate — idempotent ok for a letter the figure carries,
  *  the honest `unknown-symbol` for one it does not. */
@@ -932,6 +961,8 @@ export interface VecRelCommand {
   to: Id;
   terms: SymTerm[];
   symbol?: string;
+  /** #1551 (ADR-3D-472): two or more letters («EM = a·EA + b·EC»); then `symbol` is absent and each term names its own. */
+  symbols?: string[];
   /**
    * #1183 — the student wrote the VECTOR marking explicitly (`⃗`/`→`/`⟶`, or the «וקטור»/`vector`
    * word), so this relation is not the two-reading sentence {@link segmentEquationReading} asks about.
@@ -1276,6 +1307,7 @@ export type Command3 =
   // it PINS THE SCALE — a free-dim figure is driven to it, a determined one verifies (M1).
   | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number }
   | ParamSignCommand
+  | ParamBoundCommand
   | ParamDeclCommand
   | Plane3Command
   | FreePlaneCommand
@@ -1626,7 +1658,7 @@ export interface Construction3 {
    *  coordinate sign given (`signGivens`) one lane wider: the same branch selection, keyed on the
    *  component the letter names rather than on a point+axis, so the vector and pair lanes are not a
    *  second mechanism. Evaluated by `componentValue`. */
-  componentSigns: { target: ComponentTarget; axis: 'x' | 'y' | 'z'; positive: boolean }[];
+  componentSigns: { target: ComponentTarget; axis: 'x' | 'y' | 'z'; bound: Bound3 }[];
   /** V4 — planes through points, name → ids (resolved from positions after the pivot). */
   pointPlanes: Map<string, Id[]>;
   /** #1485 (ADR-3D-278): point-run planes whose FIRST mention called them a face or a base — they draw
@@ -1644,7 +1676,7 @@ export interface Construction3 {
   /** #253 (ADR-3D-419): the PLACED points stated on a free circle. Each pins it; a rider is defined by it instead. */
   circleMembers3: { point: Id; circle: string }[];
   /** V7 — vector definitions: `X⃗Y = Σ terms`, solving `unknown` (affine; `symbol` = the free coefficient). */
-  vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string }[];
+  vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string; /** #1551 (ADR-3D-472): two or more letters (then no `symbol`) */ symbols?: string[] }[];
   /**
    * V7 — conditions that PIN a figure SYMBOL. #902 (ADR-3D-219): keyed by the symbol's NAME, never by
    * the vec-def that introduced it. A letter is owned by whichever mechanism carries it — a vec-def's
@@ -1714,7 +1746,7 @@ export interface Construction3 {
   determinations: Determination3[];
   /** ADR-3D-032 — sign givens on the figure parameter (`k הוא פרמטר חיובי`): select
    *  among the root branches. #325: also on a pin symbol (selects among pivot solutions). */
-  paramSigns: ParamSignCommand[];
+  paramSigns: { sym: string; bound: Bound3 }[]; // #1524 (ADR-3D-477): a sign is the interval (0,∞)/(−∞,0); a range any interval
   /** #324 (ADR-3D-079) — a named ring's relation to a COORDINATE plane/axis, as pivot
    *  residuals (absolute-frame, like injections): `share` = the ring shares its `axis`
    *  coordinate (∥ the coordinate plane ⟂ axis / ⟂ that axis), `zero` = that coordinate is 0
@@ -1900,8 +1932,9 @@ export const emptyConstruction3 = (): Construction3 => ({
  */
 export function figureSymbolsOf(c: Construction3): string[] {
   const out = new Set<string>();
-  for (const vd of c.vecDefs) if (vd.symbol) out.add(vd.symbol);
+  for (const vd of c.vecDefs) for (const s of exprLetters3(vd)) out.add(s); // #1551: every letter of a definition
   for (const s of pinSymsOf(c)) out.add(s);
+  for (const s of vecEqLettersOf3(c)) out.add(s); // #1551: a vector equation's letters
   if (c.param) out.add(c.param);
   // The three kinds the address registry knew and the panel did not price (#939).
   for (const b of c.partialNames) out.add(b.sym);
@@ -2082,15 +2115,15 @@ export const openPinSymsOf = (c: Construction3): string[] => pinSymsOf(c).filter
 /**
  * #325 (ADR-3D-079 Am. 2), lifted here by #2563 (ADR-3D-489) — AN OPEN PIN SYMBOL'S SEED ANCHOR: where an undetermined
  * letter sits at this seed (it must VARY with the seed, ADR-052), sign-aware so a stated «k חיובי» parks on its side.
+ * #1524 (ADR-3D-477): range-aware — a stated range («2 ≤ k ≤ 5», «t ≥ 0») parks the anchor inside it; a sign parks it
+ * at ±(0.4 + |raw|), as before (`boundAnchor3`).
  * The pivot's soft anchor and the no-pivot placement of a `sym-coord` point read this one sampler (M3).
  */
 export function pinSymAnchor3(c: Construction3, seed: number, sym: string): number {
   const i = openPinSymsOf(c).indexOf(sym);
   const frac = (Math.abs(Math.sin((seed + 1) * 12.9898 + (i + 1) * 78.233)) * 43758.5453) % 1;
   const raw = -1.6 + 3.2 * frac;
-  const sgn = c.paramSigns.find((ps) => ps.sym === sym);
-  if (!sgn) return raw;
-  return sgn.positive ? 0.4 + Math.abs(raw) : -(0.4 + Math.abs(raw));
+  return boundAnchor3(symBound3(c, sym), raw, 1.6, 0.4);
 }
 
 /** #902 — the vec-def whose ratio symbol is `sym`, or −1. Derived where a vec-def is genuinely needed
@@ -2129,7 +2162,20 @@ export type SymbolOwner =
   | { kind: 'rider'; id: Id; fromB: boolean }
   /** #1188 step 2 (ADR-3D-390): a letter in an AFFINE component of a free vector («u = (k-1, 2, k)») — an unknown of
    *  the free-vector system, solved there and never by the pivot */
-  | { kind: 'free-sym' };
+  | { kind: 'free-sym' }
+  /** #1551 (ADR-3D-472): a letter of a vector equation over placed points («EM = a·EA + b·EC») — read off the drawing by
+   *  least squares (`vecEqLetters3`), never a pivot unknown */
+  | { kind: 'vec-letter' };
+
+/** #1551 (ADR-3D-472): the letters the vector equations over placed points carry, in first-written order. */
+export function vecEqLettersOf3(c: Pick<Construction3, 'claims'>): string[] {
+  const out: string[] = [];
+  for (const k of c.claims) {
+    if (k.type !== 'vec-eq') continue;
+    for (const t of [...k.lhs, ...k.rhs]) if (t.letter && !out.includes(t.letter.sym)) out.push(t.letter.sym);
+  }
+  return out;
+}
 
 /** #1188 step 2 (ADR-3D-390): the letters the free vectors' affine components name, in first-written order. */
 export function freeVecSymsOf(c: Pick<Construction3, 'freeVectors'> & Partial<Pick<Construction3, 'freeVecMetrics'>>): string[] {
@@ -2142,8 +2188,9 @@ export function freeVecSymsOf(c: Pick<Construction3, 'freeVectors'> & Partial<Pi
 export function symbolOwnersOf(c: Construction3, sym: string): SymbolOwner[] {
   const out: SymbolOwner[] = [];
   c.vecDefs.forEach((vd, def) => {
-    if (vd.symbol === sym) out.push({ kind: 'vec-def', def });
+    if (vd.symbol === sym || vd.symbols?.includes(sym)) out.push({ kind: 'vec-def', def });
   });
+  if (vecEqLettersOf3(c).includes(sym)) out.push({ kind: 'vec-letter' }); // #1551
   if (pinSymsOf(c).includes(sym)) out.push({ kind: 'pin-sym' });
   if (c.param === sym) out.push({ kind: 'param' });
   const marks = c.angleMarks.filter((m) => m.label === sym);
@@ -2384,6 +2431,9 @@ export type EngineError3 =
    * never heard of a letter it had just been given — a refusal naming a cause the figure contradicts.
    */
   | { code: 'sign-not-selectable'; id: string }
+  /** #1524 (ADR-3D-477): `sign-unsatisfiable` / `sign-not-selectable` for a stated RANGE («k ≥ 2»), worded for a range. */
+  | { code: 'param-bound-unsatisfiable'; id: string }
+  | { code: 'param-bound-not-selectable'; id: string }
   | { code: 'ambiguous-angle'; id: Id } // #251: a single-vertex angle whose arms cannot be resolved (≠2 edges at the vertex)
   | { code: 'no-prism-to-make-right' } // #289: `המנסרה ישרה` but the figure has no prism-like solid to make right
   | { code: 'ambiguous-prism' } // #289: `המנסרה ישרה` with more than one oblique prism — "the prism" is ambiguous

@@ -1999,6 +1999,18 @@ press); `admissibleRewrites` enumerates every axis but `variant` (sampled by `va
 test) tries the `variant` and `side` axes, fewest changes first; `App.tsx` enables the button when any axis or free
 DOF exists.
 
+**The solution cycle ([ADR-824](06-decisions.md#adr-824), #2831).** On a figure with no shape freedom left
+(`freeDofCount` 0; its placement may still be sampled), `searchAnotherView` first calls `solutionCycleStep`: it gathers
+every axis assignment (counted from the all-default one, at most 64) that meets every requirement at the seed of the press that began
+gathering (the shape is determined, so the seed only places it; the cycle keeps that seed), groups them by `shapeFingerprint` within `SAME_SHAPE_TOL` (one solution up to a turn, shift, scale or mirror),
+puts #942's separated drawings first within a group, and interleaves the groups round-robin in order of first
+appearance. The press returns the successor of the assignment on the screen. A cycle with nothing but the drawing on
+the screen, or one the deadline cut, falls through to the odometer below, unchanged; so does every figure with shape
+freedom. The cycle is memoised per facts with every axis digit zeroed, the last 8 figures, so only the first press pays
+for the gathering. The gathering gets half the press's remaining budget; one the deadline cuts keeps what it found and
+the next press resumes it while the odometer answers, and an assignment whose solve the clock cuts twice is not
+offered, as the odometer treats a candidate its deadline cuts.
+
 The seat is **pinned** by the student's own right angle, read from one set, `explicitRightAngleVerts` (ADR-445), that the ADR-163 reseat pre-scan, `cyclableSeat` and `unpinnedSeats` all consult: a 90° `set-angle`, and since [ADR-658](06-decisions.md#adr-658) (#2082) a `set-perpendicular` whose two segments meet at one vertex V of an enabled right triangle with their other ends its other two vertices (every ⟂ spelling and every height that lowers to one; structure only, never positions). The set is in fact order, so of two right angles stated on one right triangle the earlier keeps the seat, and the later line meets the angle-sum prover's `no-room` verdict (LADDER stage 0f) and is refused at the door, naming the earlier statement through the fold's drop-one search ([ADR-508](06-decisions.md#adr-508)). A noun's default seat (`seat: true` ⟂ or perp-offset knee) is never read as a stated angle by that prover.
 
 **The crossing count is evaluate's own selection:** `crossingChoice` (`engine/evaluate.ts`) returns the roots and
@@ -2082,6 +2094,17 @@ The engine leaves an unstated choice free (ADR-052) and cyclable (ADR-138); this
 - **Render:** on the fact's row, plus one cue beside «הציגו תצורה אחרת» (ADR-502 Am. 1, #996).
 
 ## Render and marks
+
+### A hidden segment takes what exists only for it ([ADR-825](06-decisions.md#adr-825), [ADR-W-207](06w-decisions-workspace.md#adr-w-207), #2852)
+
+`Figure.tsx` reads its scene into the shared decision `hiddenWith` (`shell/frame/segmentDisplay.ts`) before it builds
+the scene: the segments split by `segStyle`, the length labels, the right-angle marks, the declared equal classes,
+and the points every other mark touches. The scene is built from what it leaves — `buildScene`'s `suppress` drops the
+lone points, so their extensions go too. Which points may go is the facts' question, answered in
+`src/app/hideOwnership.ts` (`lonePoints`: never typed, at most one row names it, nothing but a segment or polygon built
+from it) and handed in as the `lonePoints` prop; `hiddenRowGroups` gives the rows that show «מוסתר».
+
+*Identifiers:* `hiddenWith` · `lonePoints` · `hiddenRowGroups` · `suppress` · `FactRow.hidden`
 
 ### An off-ink construction point's dashed extension ([ADR-612](06-decisions.md#adr-612), [ADR-W-124](06w-decisions-workspace.md#adr-w-124), #1971, #1937)
 

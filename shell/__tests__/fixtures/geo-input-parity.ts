@@ -134,7 +134,9 @@ export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
     products: ['analytic', '3d'],
     mustRefuse: ['2d'],
     topic: true,
-    patterns: [/פרמטר/, /^\s*[a-z]\s*[<>]/, /^\s*[a-z]\s*=\s*[\d/]+\s*$/, /^\s*\d+\s*<\s*[a-z]\s*</],
+    // #1524 (ADR-3D-477): a ONE-sided bound in its other spellings — «t ≥ 0», «k ≤ 3», «t גדול מ-2», «k לפחות 2» — is
+    // the sign's sibling, so it joins the sign's family; a two-sided one stays a parity row (letter-bound-closed-1524)
+    patterns: [/פרמטר/, /^\s*[a-z]\s*[<>≤≥]/, /^\s*[a-z]\s+(?:גדול|קטן|לפחות|לכל היותר)/, /^\s*[a-z]\s*=\s*[\d/]+\s*$/, /^\s*\d+\s*<\s*[a-z]\s*</],
   },
   X6: {
     title: 'coordinate components and distance notation',
@@ -901,6 +903,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'proof-target-show-1666', family: 'frame', steps: ['משולש ABC', 'הראו כי AB = AC'], expect: 'refused' },
   // #1658 / ADR-562 — a bound on a letter is recorded as waiting in 2-D, as analytic records it
   { id: 'letter-bound-1658', family: 'lengths', steps: ['משולש ABC', '0 < k < 6'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  // #1524 (ADR-3D-477): 3-D's catalog now advertises the closed two-sided bound; on a figure with no such letter 3-D
+  // still refuses it as an unknown letter, the same gap as the open bound above
+  { id: 'letter-bound-closed-1524', family: 'lengths', steps: ['משולש ABC', '2 ≤ t ≤ 5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
 
   // ── 3-D's plane sentences on a solid's letters: 2-D and analytic type the letters free, 3-D types its pyramid ──
   { id: 'pyr-equal-lengths', family: 'lengths', steps: ['מרובע ABCD', 'נקודה S', 'אורך AS שווה לאורך AB'], contextFor: { '3d': ['פירמידה SABCD שבסיסה ריבוע'] }, expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }] },

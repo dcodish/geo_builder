@@ -31,6 +31,7 @@ import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/
 import { INITIAL_VIEW, centreOf, panned, toWorld, viewAfterChange, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtAnalytic } from './format';
+import { hiddenRowLines, lonePoints } from './app/hideOwnership';
 import { curveDetailsKey, curveParts, namedRow } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
@@ -609,6 +610,8 @@ export function App() {
   const [pick, setPick] = useState<{ items: Measurable[]; letter: string | null; segment?: { key: string; name: string }; curve?: CurveMenuTarget; x: number; y: number; seq: number } | null>(null);
   /** #1598: a clicked unnamed circle CENTRE — the offer it is, and where (viewport px) to open the letter popover. */
   const [centrePick, setCentrePick] = useState<{ offerId: string; x: number; y: number; seq: number } | null>(null);
+  /** #2851 (ADR-AG-465): the shown focus whose letter popover is open — the offer id and the book letter it opens on. */
+  const [focusPick, setFocusPick] = useState<{ offerId: string; letter: string; x: number; y: number; seq: number } | null>(null);
   /** The input zone — «שנה אות» focuses its box after filling it (the shared InputArea takes no ref). */
   const inputZoneRef = useRef<HTMLDivElement | null>(null);
 
@@ -1278,6 +1281,8 @@ export function App() {
       segStyle,
       // #2238 — the student's per-curve display choices (hidden / dashed)
       curveStyle,
+      // #2852 (ADR-AG-474) — the tool's letters that may go with a hidden segment (no other line uses them)
+      lonePoints: lonePoints(d.construction, d.minted),
       // #1714 — what the student STATED about a length, angle, area or arc, written on the figure
       stated: d.stated,
       // #1863 — the conic role marks the chips asked for (ADR-AG-376), and the ellipses that are circles (ADR-AG-377)
@@ -1290,6 +1295,11 @@ export function App() {
     });
   }, [d, view, canvasSize, answers, segStyle, curveStyle, roleMarks, display, coincidences]);
 
+  // #2852 (ADR-AG-474): the rows a hidden segment touches (by active line), each with the keys its «מוסתר» shows again
+  const hiddenRows = useMemo(
+    () => hiddenRowLines(d.construction, new Set(Object.entries(segStyle).filter(([, v]) => v.hidden).map(([k]) => k))),
+    [d, segStyle],
+  );
   const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 
   // The DOF cue (02c P4 — an under-determined figure is drawn, and its openness is VISIBLE).
@@ -1471,19 +1481,20 @@ export function App() {
       await figureOfStore();
       return { ok: v.kind === 'apply' };
     },
-    /** #1598 — the centre offer's popover: the letter typed records the sentence the typed path would; #2890: decided in the worker. */
-    centreOps: (offerId: string) => {
+    /** #1598 — the centre offer's popover: the letter typed records the sentence the typed path would; #2890: decided in the worker.
+     *  #2851 (ADR-AG-465): a shown focus's popover is the same two operations on the focus's sentence. */
+    centreOps: (offerId: string, offer: 'centre' | 'focus' = 'centre') => {
       const actions = { record: (v: Parameters<typeof commitRecord>[0]) => commitRecord(v, jobStoreAn().recordLine, t), applySwap: jobStoreAn().applySwap, setError };
       return {
         onRename: async (_from: string, to: string, round = 1): Promise<LetterRenameResult> => {
-          const r = await letterInWorker({ kind: 'centreName', offerId, to }, sessionOf(useAnalyticStore.getState()), round);
+          const r = await letterInWorker({ kind: offer === 'centre' ? 'centreName' : 'focusName', offerId, to }, sessionOf(useAnalyticStore.getState()), round);
           if (isNotDecided(r)) return renameStopped(r);
           const out = r.kind === 'centreName' ? applyCentreName(r.verdict, actions) : { ok: false as const, reason: 'rename-bad-name' };
           await figureOfStore();
           return out;
         },
         onSwap: async (_a: string, b: string, round = 1): Promise<LetterSwapResult> => {
-          const r = await letterInWorker({ kind: 'centreSwap', offerId, taken: b }, sessionOf(useAnalyticStore.getState()), round);
+          const r = await letterInWorker({ kind: offer === 'centre' ? 'centreSwap' : 'focusSwap', offerId, taken: b }, sessionOf(useAnalyticStore.getState()), round);
           if (isNotDecided(r)) return swapStopped(r);
           const out = r.kind === 'centreSwap' ? applyCentreSwap(r.verdict, actions) : { ok: false as const };
           await figureOfStore();
@@ -1831,6 +1842,13 @@ export function App() {
                 text: line,
                 // #1973 (ADR-AG-430): the shape the row's cevian was drawn in, BESIDE the student's words — 2-D's tag (ADR-797)
                 tag: hostTag(d.hosts.find((h) => rows[h.index] === i)?.host, t),
+                // #2852 (ADR-AG-474, ADR-W-207): a row whose segment is hidden on the canvas says so; its click shows it again
+                ...([...hiddenRows.keys()].some((l) => rows[l] === i)
+                  ? (() => {
+                      const keys = [...hiddenRows].filter(([l]) => rows[l] === i).flatMap(([, ks]) => ks);
+                      return { hidden: { text: t('suite.hiddenRow.mark'), title: t('suite.hiddenRow.title'), onShow: () => keys.forEach((k) => toggleSegHidden(k)) } };
+                    })()
+                  : {}),
                 // #1864 (ADR-AG-267): the tool's choice for this row's unstated given, said under it (2-D's `role="note"`).
                 ...(unstatedNotes.some((n) => rows[n.line] === i)
                   ? {
@@ -2014,6 +2032,8 @@ export function App() {
               }}
               /* #1598 — an unnamed circle's centre opens the letter popover: the student picks the letter. */
               onCentre={(offerId, screen) => setCentrePick({ offerId, x: screen.x, y: screen.y, seq: Date.now() })}
+              /* #2851 — a shown focus opens the same popover, on the book's letter: the student nails it as a point. */
+              onFocus={(offer, screen) => setFocusPick({ offerId: offer.id, letter: offer.letter, x: screen.x, y: screen.y, seq: Date.now() })}
               onCrossing={(sentence) => {
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
                 // and what the student is told. This only asks whether jumping the configuration
@@ -2709,6 +2729,47 @@ export function App() {
               }}
               onClose={() => setCentrePick(null)}
               testId="centre-popover"
+            />
+          </div>
+        );
+      })()}
+
+      {/*
+        NAME A SHOWN FOCUS (#2851, ADR-AG-465) — the centre's popover on a focus mark, opened on the book's letter. The
+        letter confirmed records the sentence a student could type («F1 מוקד ימני של האליפסה», `focusSentenceOf`); a taken
+        letter quotes its holder and offers the swap, as the centre's does (`label` is the letter the holder would take).
+      */}
+      {focusPick && (() => {
+        // decided in the worker on the latest render, as the centre's (#2890, #2874)
+        const offerId = focusPick.offerId;
+        const ops = {
+          onRename: (from: string, to: string, round?: number) => workAn.run(() => live.current.centreOps(offerId, 'focus').onRename(from, to, round)),
+          onSwap: (a: string, b: string, round?: number) => workAn.run(() => live.current.centreOps(offerId, 'focus').onSwap(a, b, round)),
+        };
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
+            <LetterPopover
+              key={focusPick.seq}
+              x={focusPick.x}
+              y={focusPick.y}
+              bounds={{ width: window.innerWidth, height: window.innerHeight }}
+              title={t('focusTitle')}
+              label={centreLabelOf(d)}
+              initialValue={focusPick.letter}
+              onRename={ops.onRename}
+              onSwap={ops.onSwap}
+              strings={{
+                placeholder: t('letterPlaceholder'),
+                apply: t('letterApply'),
+                taken: t('letterTaken'),
+                bad: t('letterBad'),
+                takenBy: t('letterTakenBy'),
+                swapLetters: t('letterSwap'),
+                notDecided: t('suite.notDecided.message'),
+                keepSearching: t('suite.notDecided.continue'),
+              }}
+              onClose={() => setFocusPick(null)}
+              testId="focus-popover"
             />
           </div>
         );

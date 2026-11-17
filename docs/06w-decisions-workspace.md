@@ -1697,6 +1697,17 @@ a 2-D slice sees both others as siblings; every registered product is a usable v
 whole tree; `productOf` resolves by longest prefix, not list order; an unknown viewpoint THROWS rather
 than silently classifying everything as sibling; and the partition is total under every viewpoint.
 
+**Amendment 1 (2026-11-16) — a PR is measured against its base BRANCH, never a frozen base sha.** Found landing PR #2828
+(a 3-D-only change): every lane's guard failed listing `src/`, `src-analytic/`, `shell/` and `server/` files the PR never
+touched, and the `changes` job ran all four lanes. Cause: CI passed `--base github.event.pull_request.base.sha`. On a
+`pull_request` run HEAD is GitHub's test merge of the PR into the base's CURRENT tip, while that sha was frozen at an
+earlier event (here `19da6b89`, many `main` commits back), so `base...HEAD` counted every commit `main` gained since as the
+PR's own change — the PR's real diff from its merge-base with `main` is 19 `src3d/` files, 1 `fixtures3/`, 3 docs.
+Decision: the four sibling steps pass `--base origin/<base_ref>` (a push still passes `github.event.before`), and the
+`changes` job classifies from `git merge-base origin/<base_ref> HEAD` (no usable base still runs every lane). The guard
+itself is unchanged: `base...HEAD` from the base branch is exactly the PR's net change, and an unreachable base still
+stops the run. **Requirements:** none (internal: CI) · **Design:** none (internal) · LADDER stage: none.
+
 ### ADR-W-037 — the tier artifact carries shared state and nothing else (#812)
 
 **What happened.** Every parallel PR in a fix round conflicted against `main` on exactly one file —
@@ -5165,7 +5176,7 @@ That makes two copies of one surface, with a third on the way. ADR-W-016 rule 1 
 
 ## ADR-W-107 — A claim to prove is refused in every builder, by one shared rule (#1666)
 
-**⚠ Amended by [ADR-W-194](#adr-w-194) (2026-11-08):** the builders no longer word their own refusal: it is one suite sentence, `suite.refusal.proofTarget`, followed by where the claim can be checked (2-D its relations button; analytic and complex their data panel; 3-D pending the operator, #2492).
+**⚠ Amended by [ADR-W-194](#adr-w-194) (2026-11-08):** the builders no longer word their own refusal: it is one suite sentence, `suite.refusal.proofTarget`, followed by where the claim can be checked (2-D its relations button; analytic and complex their data panel; 3-D what its data panel can check, [ADR-W-205](#adr-w-205)).
 
 **Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*. **Extends** [ADR-W-016](#adr-w-016) (a new `shell/` decision) and applies [ADR-W-071](#adr-w-071) (docs/28 §5c). Product sides: [ADR-561](06-decisions.md#adr-561) (2-D), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295) (3-D); analytic's first copy was ADR-AG-187 (#1618).
 
@@ -5679,6 +5690,8 @@ The precedent, for every later parity case: **B1 asks for one verdict per plane-
 **ADR-W-118 Amendment 3 (2026-10-17): a right angle stated at a NAMED point is a value (#1946, #2103).** The operator's ruling of 2026-10-10 on #1946 (option C): *"a stated ⟂ whose right angle sits at a NAMED point is a VALUE, so the knee is drawn at rest, in both 2-D and 3-D"*; follow-up: *"A single knee at D, on the DC side — the right angle is stated once, so it is marked once."* B2 now reads: **A stated relation (AB = AC, ∥, a ⟂ whose right angle sits at no named point) is in the givens list and drawn only in an opt-in relations layer, never as a mark at rest, in every tool. A stated right angle whose vertex is a named point — a shared endpoint, an endpoint the figure puts on the other segment («D על BC» · «AD ⟂ BC», «AD גובה»), or a point stated as the crossing («O נקודת חיתוך האלכסונים» · «AC ⟂ BD») — is a value: it is marked at rest, once, in the corner the statement names (toward the other segment's second-named letter; at a crossing, toward each segment's second-named letter — rulings of 2026-10-14 and 2026-10-15), and that corner never changes when the figure is cycled.** Realised by [ADR-731](06-decisions.md#adr-731) (2-D) and [ADR-3D-366](06b-decisions-3d.md#adr-3d-366) (3-D); analytic's display of it is #2320. **Requirements:** [02](02-requirements.md) FR-RN-7, [02b](02b-requirements-3d.md) FR-RD-16 · **Design:** none (a rule; the mechanisms are the two product ADRs').
 
 **ADR-W-118 Amendment 4 (2026-11-03): B7's conic line follows the 2026-10-14 ruling (#1863, #1218).** The operator, 2026-10-14 (card `d14-1218-focus`): *"the 9 October four-state control wins"* over the 2026-10-07 "always marked" line. So analytic marks a parabola's focus and directrix, and an ellipse's foci and both directrices, **only when the student presses the curve's chip** (nothing → directrix → focus → both), writing their values when the givens determine them. The circle-centre exception is unchanged. Realised by [ADR-AG-376](06c-decisions-analytic.md#adr-ag-376). **Requirements:** [02c](02c-requirements-analytic.md) R20, R221, R222 · **Design:** none (a ruling transcribed; the mechanism is ADR-AG-376's).
+
+**ADR-W-118 Amendment 5 (2026-11-12): a value the student HID stays readable in the givens row (#2852).** B2 adds: *a value the student hid stays readable in the givens row, which shows «מוסתר»; a hidden value is the student's choice, never the tool's.* Hiding a segment takes its value, its marks and a point the tool named only for it ([ADR-W-207](#adr-w-207)). **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-14 · **Design:** none (a rule; the mechanism is ADR-W-207's).
 
 ## ADR-W-119 — The C4 documentation guards: a superseded ADR says so, requirement ids are unique, a cited ladder lists its ADR, instruction files point at live docs, a parity gap names open work or is parked, MEMORY.md has a ceiling (#1861)
 
@@ -7208,6 +7221,8 @@ Each crash also reset the daily AI cap, the concurrency cap and the per-IP limit
 
 ## ADR-W-194 — The proof-target refusal is one suite sentence, and it says where the claim can be checked: 2-D its relations button, analytic and complex their data panel (#2492)
 
+**⚠ Amended by [ADR-W-205](#adr-w-205) (2026-11-12):** decision 4 is replaced. 3-D's refusal ends with a line of its own naming what its panel can check (operator 2026-11-10, option (b)).
+
 **Status:** accepted · 2026-11-08 · feature (P2, all four builders) · fix round #2745, stream G · branch `feat/2492-proof-target-check` · **Operator:** 2026-10-24, playing round #2466 T12: *"For all cases of הוכיחו we should add to the message that they can check if its true using the data panel. ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות וזוויות שוות."*; his ruling the same day (ballot e19, answer B with a note that wins over the card): *"Other tools have the data panel and there is a ask button there that might be able to answer such questions so for non-2d tools, we tell them to check the claim in the data panel"* · plan of 2026-10-24 (#2492), armed `auto-ok` on that ruling · **Amends** [ADR-W-107](#adr-w-107) (each builder no longer words its own refusal) · **Extends** [ADR-W-148](#adr-w-148) (two suite keys) · per-product notes on [ADR-561](06-decisions.md#adr-561), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295), [ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)
 **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 and its parity row *A proof target «הוכיחו כי»*; [02](02-requirements.md) FR-RV-1 (the refusal names the control); [02c](02c-requirements-analytic.md) *Out of the language*; [02d](02d-requirements-complex.md) FR-KN-2 · **Design:** [04w](04w-design-shell.md) § *Suite-wide text* and § *Proof targets*; [04d](04d-design-complex.md) (the complex wording site)
 
@@ -8045,3 +8060,59 @@ Each limit is counted so that the same input stops at the same unit cold or warm
 - [ruled] 2-D's limit is raised so every corpus search but the kite's decides in one round. *"2 b"* (2026-11-15). ADR-831.
 - [ruled] 2-D: the typed line stays added when its search stops, as built. *"3 a"* (2026-11-15). The submit gates, the variant settle and the load's refresh ask at their limit, built when a figure first reaches one ([#2896](https://github.com/dcodish/geo_builder/issues/2896)). *"4 yes"* (2026-11-15).
 - [ruled] Analytic: a figure's values have no limit. *"5 yes"* (2026-11-15). ADR-AG-479.
+
+## ADR-W-205 — 3-D's proof-target refusal names what its own data panel can check: an angle, a perpendicular or a parallel (#2492)
+
+**Status:** accepted · 2026-11-12 · feature (P2, 3-D) · fix round #2855, stream H · branch `feat/2492-prove-refusal-check-pointer` · **Operator:** 2026-11-10, Rulings Inbox, on the 3-D arm escalated in #2492: chose **(b)** *"A 3-D line naming what its panel can check"*, with the example «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «נתונים»: שאלו שם על הזווית ולחצו «שאלו» — למשל ∠(AB, CD).»; the exact text is the session's (ADR-W-174), recorded with `judgments.mjs chose` (`text-2492-3d-proof-target-check`) · **Amends** [ADR-W-194](#adr-w-194) decision 4 · per-product note on [ADR-3D-295](06b-decisions-3d.md#adr-3d-295) · LADDER stage: **none** (a refusal's wording)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 and its parity row *A proof target «הוכיחו כי»* · **Design:** [04w](04w-design-shell.md) § *Proof targets* (the per-builder table)
+
+**Context, measured at pickup (`caf619a5`).** PR #2747 (ADR-W-194) is merged: 2-D, analytic and complex end the refusal with their line; 3-D reads the suite sentence alone. 3-D's ask box (`answerQuery` on `derive3`'s construction, the real submit path) answers the claims the line names: «מקבילית ABCD» `∠(AB, CD)` → «180°»; «תיבה ABCDA'B'C'D'» `∠(AB, D'C')` → «0°», `∠(AA', AB)` → «90°»; «פירמידה SABCD שבסיסה ריבוע · SA מאונך למישור ABCD» `∠SBC` → «90°», `∠(SA, BC)` → «90°». An equal-lengths claim on a figure with no stated size still has no answer there (ADR-W-194's table), which is why the line does not name lengths.
+
+**Decision.**
+1. **A 3-D product key**, `err.proofTargetCheck`: «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «$t(dataPanel.title)»: שאלו שם על הזווית ולחצו «$t(query.add)» — למשל ∠(AB, CD).» / "You can check a claim about an angle, a perpendicular or a parallel in the «$t(dataPanel.title)» panel: ask there for the angle and press «$t(query.add)» — for example ∠(AB, CD)." It renders as the ruling's example byte for byte. Not a suite key: no other builder says it (ADR-W-148's rule).
+2. **The names are nested** from the keys App3 draws the panel heading and the ask button with (`dataPanel.title`, `query.add`), never retyped.
+3. **`errorText3`** composes the refusal: the suite sentence quoting the claim, then the line. It is 3-D's one wording site, so the empty-canvas refusal is the same.
+
+**Locks.** `src3d/__tests__/proof-target-1666.test.ts`: «הוכיחו ש-AB = AC» after «משולש ABC», Hebrew and English, renders the suite sentence then the line, in full; the empty canvas reads the same; the locale nests both names and App3 draws `<DataPanel title={t('dataPanel.title')}>` and `<AskLane addLabel={t('query.add')}>` (`panelDrawnFaults`); the pointer is true: the ask box answers the line's example (180°), a box's parallel edges (0°) and a perpendicular (90°). `suite-vocabulary.test.ts`'s rule that no table outside 2-D names «הצג צלעות וזוויות שוות» still holds.
+
+**Behaviour change for a student:** in 3-D, a «הוכיחו…» line is refused as before, and the message now ends: «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «נתונים»: שאלו שם על הזווית ולחצו «שאלו» — למשל ∠(AB, CD).»
+
+## ADR-W-206 — «הציגו תצורה אחרת» shows each new solution before another placement of one already shown, in every builder; a mirror image is the same solution placed differently (#2831)
+
+**Status:** accepted · 2026-11-12 · feature, all four builders · fix round #2855, PR branch `feat/2831-mirror-same-solution` · **built in** 2-D ([ADR-824](06-decisions.md#adr-824)) and analytic ([ADR-AG-473](06c-decisions-analytic.md#adr-ag-473)); 3-D ([ADR-3D-461](06b-decisions-3d.md#adr-3d-461)) and complex already hold it, measured · LADDER stage: **none** (the button's search)
+**Requirements:** [02](02-requirements.md) FR-ALT-2, [02c](02c-requirements-analytic.md) P7, [02b](02b-requirements-3d.md) (the two-configuration requirement, #2814), [02d](02d-requirements-complex.md) FR-CN-3 — the same sentence · **Design:** [04](04-design.md) § the configuration axes (the solution cycle), [04c](04c-design-analytic.md) § "The configuration search"
+**Operator:** 2026-11-10, Rulings Inbox Q-2731c (b): *"New solutions first, in every builder"*; 2026-11-12 on #2831: *"2831 - A"* — a mirror image of a drawing is the SAME solution placed differently, so on the book's p2-15 all three ellipses appear within the first presses.
+
+**The rule.**
+1. **One solution** is a drawing up to a rigid motion of the figure, a mirror image included, with every letter the student declared at the same value and every curve the same shape. This is 3-D's ADR-3D-461 key (built under Q-2814a/b: SSA's two mirrors are one group), stated for every builder.
+2. **The order.** On a figure with finitely many configurations (no shape freedom left), the button walks a cycle:
+   - the configurations, exact repeats dropped;
+   - grouped by solution;
+   - groups in order of first appearance from the first drawing;
+   - interleaved round-robin: g0#0, g1#0, g2#0, …, g0#1, g1#1, ….
+   A press moves to the successor of the drawing on the screen. So every new solution comes before another placement of one already shown, a figure whose only alternatives are placements still reaches them, the first drawing never changes, and nothing new is stored.
+3. **A figure with freedom left** has infinitely many solutions, and every press already draws a new shape, so its walk is unchanged.
+
+**Per builder, measured at `c82d767c`.**
+- **2-D:** `searchAnotherView`'s odometer turned a placement axis faster than a solution axis. ADR-824 adds the cycle.
+- **Analytic:** the seed walk had no grouping (p2-15's third ellipse came on press 13). ADR-AG-473 adds the cycle.
+- **3-D:** `configurationOrder3` (ADR-3D-461) already interleaves its groups. Every one of the 11 fixed figures with more than one group reaches all G groups within G−1 presses through `resample`, so there is no code change, only a press-walk lock.
+- **Complex:** each configuration is its own value set. A conjugate is a different value, not a placement, and the complex plane has no rigid-motion gauge. None of the 6 multi-configuration fixtures holds a relabelled copy, and pressing from 0 visits every configuration before repeating, so there is no code change, only a lock.
+
+**Behaviour change for a student:** when the givens fix a figure with several different solutions, «הציגו תצורה אחרת» shows each of them before showing a mirror image or other placement of one already shown.
+
+## ADR-W-207 — A hidden segment takes what exists only for it; a value the student hid stays readable in the givens row (#2852)
+
+**Status:** accepted · 2026-11-12 · round #2855 · **amends** [ADR-W-118](#adr-w-118) B2 and [ADR-W-106](#adr-w-106) · **built by** [ADR-825](06-decisions.md#adr-825) (2-D) and [ADR-AG-474](06c-decisions-analytic.md#adr-ag-474) (analytic) · LADDER stage: **none** (display)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-14 · **Design:** [04w](04w-design-shell.md) § *The segment menu* — `hiddenWith`, the row's `hidden` mark, the suite keys `suite.hiddenRow.*`
+
+**The operator's report and ruling** (2026-11-12, #2852). Analytic, «מעוין שצלעו 5» · «גובה המעוין 4.8» · «אלכסוני המעוין על הצירים», the height hidden: *"i wanted to say that the height is 4.8 just so the shape is shown correctly but without showing it on the screen. So i pressed the line and hid it, but the 4.8 was still there and H and the knee are still there."* Asked about hiding AB in triangle ABC, the ruling: *"in that case, we can go with the original proposal"*.
+
+**Decision.**
+1. **What goes with a hidden segment**, in every builder with segment hide: its value (a length written on it), its marks (a right-angle knee with an arm along it, an equal-length tick on it), and an endpoint that exists only for it: a point the TOOL named that no other drawn segment, kept mark or value, curve, circle, line or other point uses, and that no other active line names. A point the student named never goes, nor one anything else uses: hiding AB in «משולש ABC» takes AB and its value only.
+2. **One decision**, `hiddenWith` in `shell/frame/segmentDisplay.ts` beside `segInk`, over point ids. Each product reads its scene into it and decides `lone` (who named a point, which lines use it) over its own record; both canvases paint from what it leaves.
+3. **Display only.** The constraint, the row, every answer, the undo slice and the stability rule are untouched. Clicking the ghost (or the row's mark) shows it all again. The export serialises the canvas, so it draws none of it.
+4. **B2, amended:** *a value the student HID stays readable in the givens row, which shows «מוסתר» (hidden); a hidden value is the student's choice, never the tool's.* The row that drew the segment as its own line or stated its length carries the mark (`FactRow.hidden`, `suite.hiddenRow.mark` / `.title`); clicking it shows the segment again.
+5. **3-D** has no segment hide (FR-SU-14 promises it only where a student can click a segment), so there is nothing to port; this arrives with 3-D's segment menu. No parity cell: the parity table holds sentences, and this is a display rule.
+
+**Behaviour change for a student:** hiding a line (2-D and analytic) also hides its number, its right-angle mark and a point the tool named only for it; the row in the list keeps the value and shows «מוסתר», and clicking the faint line or the mark brings everything back.

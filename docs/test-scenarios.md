@@ -2372,3 +2372,7 @@ over all four (ADR-041).
 ### `unreachable-length-refused-2572` — a chord or an inscribed side past the diameter, a side of a triangle around a circle under it: refused naming the line that bounds it (#2572, ADR-859)
 
 **Guards against:** a length the figure can never reach parked as «waiting for givens» (ADR-104's deferral) though the metric closure proves it impossible: «AB = 6» on a radius-2 chord, «AB = 8» inscribed in radius 3, «AB = 4» around radius 3 (#2538's X1), «AB = 10» for two points on radius 3 (#2272). **Asserts** each is refused by the submit gate before it becomes a fact, in the closure's words naming the circle's line; the controls (a chord of 3 and of 4 in radius 2, a side of 8 around radius 3) commit.
+
+### `new-solutions-first-tangent-right-triangle-2831` — «משיק מ-A בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6»: the three triangles come on presses 0, 1 and 2 (#2831, ADR-824)
+
+**Guards against:** «הציגו תצורה אחרת» showing a mirror image of the drawing on the screen before a solution not yet shown (the odometer turned the tangent-point and side axes, both mirrors, faster than the right-angle seat: the triangles came on presses 0, 2 and 4). **Asserts** presses 0–2 are three different shapes, there is no fourth, and presses 3–5 repeat them in order, as other placements.

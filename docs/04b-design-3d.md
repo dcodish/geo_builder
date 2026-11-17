@@ -176,8 +176,12 @@ every pin family that can land elsewhere records its claim: `coords-eq` for the 
 letter written for the first time names a free component (ADR-3D-175); written a second time (`coordLetterShared3`: a pin
 symbol, the figure parameter, or a named point component) it is lowered to 1·k (`coordLetterExprs3`) and the earlier
 statement's named component is promoted to the same pin symbol (`promoteNamedComponents3`). The `coords-eq` claim carries
-the symbolic components (`sym`), read at `pinLettersAt3`: the pivot's `pinSymbols`, or, where the pivot does not run, a
-least-squares read of the letters off the placed points over every point pin (`readPinLetters3`, `evaluate.ts`).
+the symbolic components (`sym`), read at `lettersAt3` — the ONE letter reader ([ADR-3D-472](06b-decisions-3d.md#adr-3d-472) Am. 1): the pivot's
+`pinSymbols`, or, where the pivot does not run, a least-squares read of the letters off the placed points over every
+point pin (`readPinLetters3`, `evaluate.ts`); then every remaining vector-coefficient letter, read jointly over every lettered `vec-eq` (`vecEqSystem3`,
+`solveNormal3`) with the coordinate letters as numbers. A letter a coordinate and a vector relation both carry is one
+pin symbol: `coordLetterShared3` counts a `vec-letter` owner, the vector relation's lowering promotes a named point
+component (`promoteNamedComponents3`), and the `vec-eq` pin reads it at the pivot's `symAt`.
 A NEW point written with letters (#2563, [ADR-3D-489](06b-decisions-3d.md#adr-3d-489)) is a `sym-coord` point unless it is
 ADR-3D-032's one-letter coord-sym: components over the same pool, absolute, own DOF 0, placed from the pivot's pin symbols
 (the override `solvePivot`/`resolve3` thread to `evaluateSolidsAndPoints`) or, where the pivot does not run, from
@@ -574,6 +578,28 @@ over the unflagged pool (the drawing, `solutions`, «הציגו תצורה אח�
 `{ readback: true }`, `knowledgeSamples3` adds `resolve3(c, s, { configuration: k })` for each, which replays the plain
 pools (`pivotStageMemo3`) and stands the pick on the k-th reached root. Claims, narrowing and the drawing keep the plain
 samples.
+
+### A letter's range is one interval (#1524, [ADR-3D-477](06b-decisions-3d.md#adr-3d-477))
+
+A sign («k חיובי», `t > 0`) and a range (`t ≥ 0`, `2 ≤ k ≤ 5`, «k לפחות 2») are one statement: an interval on a letter
+(`engine/bound3.ts`, `Bound3`). `param-sign` lowers to (0, ∞) / (−∞, 0) at apply and `param-bound` to its own ends; both
+land in `paramSigns` (or `componentSigns`, for a letter naming a free component) through the sign's owner gate. Every
+reader asks `bound3`: `boundHolds3` for the root filters, the pivot's pin-symbol filter, the free-vector check, the
+component check and the store's verifier; `boundWindow3` for a free value's sampled window (the coordinate parameter,
+the vec-def ratio, the free-vector sampler); `boundAnchor3` for an open letter's seed anchor (through the one sampler `pinSymAnchor3`, #2563: the pivot's soft anchor and the no-pivot `sym-coord` placement); `boundReflect3` for the sign
+walk. A letter's statements fold in the order stated (`foldBounds3`), skipping one that would empty the range, so the
+verifier refuses the newer statement. A root filter reads only its own letter's range (`symBound3`). A new reader of a
+stated sign reads the interval, never a boolean.
+
+**Only admitted configurations are knowledge** (#2916, [ADR-3D-533](06b-decisions-3d.md#adr-3d-533)). `knowledgeSamples3`
+keeps a sample only when `admittedConfiguration3` holds on it: every coordinate sign (`signGivens`), named-component sign
+(`componentSignsHold`), letter sign (`paramSigns`, read by `statedLetterValue3`, the store verifier's own reader), plane side
+(`memberships[].side`) and hard requirement (`requirementsHoldOn3`, the seed search's own judgement), at the verifier's
+tolerances. A base seed left with no admitted sample is replaced by its reserve walk (s + k·6089), at most one reserve seed
+per base seed in all, so the gauge keeps its witnesses and the work is bounded. A figure that states no selector
+(`hasStatedSelectors3`) is sampled as before at no cost; one with no admitted sample anywhere breaks a given at its own
+drawing (its row is red), and its plain samples stand. Every lane reads the admitted set: ask, panel, claims, narrowing,
+preferences.
 
 ### Who may introduce a point (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253); #1310, [ADR-3D-397](06b-decisions-3d.md#adr-3d-397))
 
@@ -1553,6 +1579,21 @@ flat-polygon arm, in the mixed run when a known corner is itself free, and in `q
 ring with exactly ONE placeholder corner first yields it to ARM 2 (the family's own corner: closed form for the
 parallelogram family and the kite, a plane rider otherwise), keeping the point's original slot in the order
 (`keepPointSlot3`) so its dependents still follow it.
+
+### Letters in a vector equation over placed points (#1551, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472))
+
+A `vec-eq` given may carry lettered coefficients (`VecTerm.letter`: coefficient = `coeff + p·sym`). Its letters are
+never pivot unknowns. At any drawing the equation is `R = Σₛ s·Dₛ` with numbers R and Dₛ, so `vecEqLetters3`
+(`vecExpr.ts`) solves the letters by linear least squares and returns the residual no letter can absorb. That residual
+is the pin's three rows in the pivot (the free shape moves until the relation can hold; scale-covariant like the
+numeric `vec-eq`, so the `invariantOnly` lane and the rank probe need no change, and the probe charges the box only
+for the residual's rank), the drive's measure. The verifier, the panel's `vec-letter` owner and the claims' number reader read the letters
+through `lettersAt3` (ADR-3D-472 Am. 1): jointly over every lettered equation, so one letter has one value in every
+relation that writes it; the `vec-eq` claim is judged at those values (the span residual for a letter the drawing
+leaves open). A value given to a letter («a = 1/2») substitutes; dependent letter
+directions leave the letters undetermined (`a = ?`). A definition with several letters (`vecDefs[].symbols`, each term
+naming its letter in `SymTerm.sym`) samples each letter as a one-letter ratio is sampled, and `vecDefLetterAt3` reads
+the letters back through the same least squares.
 
 ### Claims
 

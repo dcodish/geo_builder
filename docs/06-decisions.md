@@ -21513,3 +21513,58 @@ Wall time of the same actions through `scripts/perf/2d/driver.mjs` on the same m
 **What the student will see.**
 - [asked] ("2572 - A", 2026-10-28): a stated length the figure can never reach (a chord longer than the diameter, an inscribed side longer than the diameter, a side of a triangle around a circle shorter than its minimum) is refused with the conflict message naming the line that bounds it, instead of amber.
 - [asked] (same; #2538's D7 gate, 2026-10-27): «AB = 4» around a radius-3 circle is refused within 2 s.
+
+## ADR-824 — «הציגו תצורה אחרת» on a determined shape walks its solutions first: the axis assignments grouped by shape, round-robin (#2831)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2831](https://github.com/dcodish/geo_builder/issues/2831) (feature, `P2`, all four builders) · fix round #2855, PR branch `feat/2831-mirror-same-solution` · **builds** [ADR-W-206](06w-decisions-workspace.md#adr-w-206) in 2-D · **amends** [ADR-593](#adr-593)'s odometer order (on a determined shape only) · **LADDER stage:** none (the button's search, not a solve)
+**Requirements:** [02](02-requirements.md) FR-ALT-2 — new solutions first · **Design:** [04](04-design.md) § the configuration axes — the solution cycle
+**Operator:** 2026-11-10, Rulings Inbox Q-2731c (b): *"New solutions first, in every builder"*; 2026-11-12 on #2831: *"2831 - A"* — a mirror image of a drawing is the SAME solution placed differently.
+
+**Measured at pickup** (`c82d767c`, `searchAnotherView` deadline-free, the shape fingerprint of each drawing).
+- Every one of the 171 saved fixtures has `freeDofs` > 0, because 2-D samples the placement. So the plan's `!hasDofs` arm is reached by no figure, and the cycle keys on `freeDofCount` 0 (no SHAPE freedom), the choice the plan left to pickup (#2846's interlock comment).
+- No fixture's press order shows a mirror before a new solution. Of the two `freeDofCount`-0 fixtures with axes, one has only mirror alternatives (2022-summer-a) and the other has no other configuration (issue-1771).
+- Found by probe, through the real parse path:
+  - «נתון מעגל O שרדיוסו 5 · מנקודה A הוציאו משיק למעגל בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6» has axes branch2 (the tangent point, a mirror) × side2 (a mirror) × seat3 (the solution). Its press order by shape was 0,0,1,1,2,2: the three triangles came on presses 0, 2 and 4.
+  - «… · C על הקטע OA · BC = 4.8» went 0,0,1,1.
+  - Press times were about 250 ms, with a ~30 s press whenever the odometer stepped onto a seat the givens forbid.
+
+**Root cause.** `searchAnotherView`'s odometer turns the first axis fastest. An axis that only PLACES the figure (a mirror tangent point, a mirror side) therefore turns faster than one that changes the answer, and every new solution waited one press per such axis.
+
+**Decision.** On a figure with `freeDofCount` 0 and more than one axis assignment, `searchAnotherView` first calls `solutionCycleStep`:
+1. Every assignment, counted from the all-default one (at most 64), that meets every requirement at the seed of the press that began gathering. The shape is determined, so the seed only places it, and the cycle keeps that seed.
+2. They are grouped by `shapeFingerprint` within `SAME_SHAPE_TOL` (1e-3): one solution up to a turn, shift, scale or mirror. #942's separated drawings come first within a group.
+3. The groups are interleaved round-robin in order of first appearance. A press returns the successor of the assignment on the screen; a non-member starts the cycle at the anchor.
+4. The cycle is memoised per facts with every axis digit zeroed, for the last 8 figures, so only the first press pays for it. The gathering gets half the press's remaining budget, so a cut press still has the odometer's half to answer with. A cut gathering keeps what it found and the next press resumes it. An assignment whose solve the limit cuts on two presses running is not offered, which is how the odometer treats a candidate its limit cuts. In tests (no deadline) the cycle is fully deterministic. In the app, on a figure whose forbidden choices solve slowly, the limit decides when the cycle takes over. **Landed after [ADR-831](#adr-831) (2026-11-16 integration):** the press is bounded in work, not seconds (ADR-W-210 invariant 3), so "half the press's remaining budget" is half the press's work units left (`unitsLeft() / 2`), the gathering runs under its own `withSearchLimit(…, 'solutionCycle')`, and every clock check is `limitReached()`: the same figure takes the cycle over on the same press on every machine. **Work meter (docs/17 §7):** one recorded action rose — `issue-572-load-collapse.geo.json` `another#1`, 129,661 → 305,160 `evaluateCore` units (+135.4 %), the first press on a determined shape now gathering its cycle (point 4: paid once, every later press served from the memo); every other 2-D action is unchanged. Accepted with `npm run work:record -- 2d --only issue-572-load-collapse --accept-rise`. **Found landing it, fixed:** `solutionCycleMemo` served a later press the cycle without charging the work it saved, so a warm heap counted less than a cold one (ADR-831 / ADR-W-210 invariant 5; the analytic twin is ADR-AG-473's). Each press's gathering now runs in a ledger cell (`computeWithCell`), and every press is first charged the cells earlier presses filled (`chargeHit`): a press counts what it would from empty caches, a resumed gathering included, and a charge its limit cannot afford is a cut. The memo also joins `clearReplayCaches`.
+5. A cycle with nothing but the drawing on the screen, and every figure with shape freedom, keep the odometer and the seed resample unchanged.
+
+**Measured after.**
+- The tangent and right-triangle figure goes 0,1,2,0,1,2. The first press gathers the cycle once: ~33 s with no deadline, under the round's load, because the four forbidden-seat assignments fail slowly, as on the odometer's own two ~30 s presses in ten. Every later press costs ~0 ms. Under the worker's 12 s budget the gathering takes half of each press and resumes on the next, with the odometer answering meanwhile.
+- «C על הקטע OA» goes 0,1,0,1.
+- Unchanged: the mirror-only tangent (every press is the other tangent point), «משולש ישר זווית ABC · AB = 6 · BC = 8» (alternates its two seats), and «sin∢ACB = 3/4 · AC = 5 · BC = 7» (alternates its two roots).
+
+**Locks.**
+- Unit: `src/replay/__tests__/issue-1005-fingerprint-extents.test.ts` › #2831: the placement-before-solution figure, a mirror-only figure still reaching its mirror, and the two-seat control.
+- Scenario `new-solutions-first-tangent-right-triangle-2831` (`scenarios-corpus-4.ts`): presses 0–2 are three shapes, no fourth, and presses 3–5 repeat them.
+
+**Behaviour change for a student:** on a figure the givens fix with several different solutions, «הציגו תצורה אחרת» shows each of them before a mirror image of one already shown. The figure keeps its placement while the button cycles, where it used to also resample the placement on every press.
+
+## ADR-825 — Hiding a segment hides its length, its knee and a foot the tool named for it (#2852)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2852](https://github.com/dcodish/geo_builder/issues/2852) (feature, `P2`, `2d`/`analytic`) · round #2855
+**Requirements:** [02](02-requirements.md) — FR-RN-10 (a hidden segment takes its value, its marks and a point the tool named only for it) · **Design:** [04](04-design.md) § *A hidden segment takes what exists only for it* · **LADDER stage:** none (display)
+**Builds** [ADR-W-207](06w-decisions-workspace.md#adr-w-207) for 2-D · **amends** [ADR-072](#adr-072) (its 2026-06-21 segment hide/dash amendment: a hidden segment's endpoints were "unaffected") · sibling [ADR-AG-474](06c-decisions-analytic.md#adr-ag-474)
+
+**Measured at pickup** (`c82d767c`, `Figure` static markup): «משולש ABC» · «AB = 5», AB hidden → the ghost AB, «5» still drawn. «CH גובה לצלע AB», CH hidden → the knee at H still drawn. «גובה מ-C לצלע AB» (the tool names the foot F), CF hidden → F still drawn. `Figure.tsx` consulted `segStyle` for the segment's own ink only.
+
+**Class.** *A display element that exists only for a hidden segment is drawn as if the segment were not hidden.* The same in analytic (ADR-AG-474).
+
+**Decision.**
+1. `Figure.tsx` reads its scene into `hiddenWith` (`shell/frame/segmentDisplay`): the construction's segments split hidden / drawn by `segStyle`, `labels.lengths` as the values, the right `angleMarks` as the knees, the declared equal classes (`statedEqual`) as the ticks, and every angle, area and arc label's points as marked. It builds the scene from what is left: the lengths and knees filtered, `buildScene`'s new `suppress` set drops the lone points (and so their dashed extensions). A hovered relations class draws no tick on a hidden segment; the class itself is unchanged.
+2. **Lone points** — `src/app/hideOwnership.ts` `lonePoints(facts, construction)`: a point whose letter no active row TYPED (`typedLabels`, the reader the submit seams use), that at most one row names, and that nothing but a segment or a polygon is built from. App passes it as `lonePoints`.
+3. **The row mark** — `hiddenRowGroups(facts, hidden)`: a row whose `segment` or `set-distance` command is on a hidden segment shows «מוסתר» (`FactRow.hidden`); its click toggles those segments back.
+
+**Locks.** Unit: `shell/__tests__/segment-display-meta-1653.test.ts` (#2852 block — `hiddenWith` over the rhombus, the triangle, a student's point, a held point). Render: `src/__tests__/segment-display-1653.test.tsx` (#2852 block — the triangle's «5» and the row mark, a tool-named foot gone and back, a student-named foot kept with its knee gone, a foot another row uses kept).
+
+**Behaviour change for a student:** in 2-D, hiding a segment also hides the length written on it, the right-angle mark along it, and a point the tool named only for it (the foot F of «גובה מ-C לצלע AB»); the row that stated it shows «מוסתר», and clicking the faint line or the mark brings it all back.
+
+**Amendment 1 (2026-11-12, operator ruling on PR #2863, question 1 option a): a rename makes the point the student's — NOT YET BUILT in 2-D.** 2-D's rename (`renameFacts`) rewrites the commands and relabels the utterance, but a tool-chosen letter (the foot F) never appears in the utterance, so after F → K nothing in the facts says the student chose K. The ruling needs a record 2-D does not keep; the mechanism is with the orchestrator (PR #2863). Until then a renamed tool letter in 2-D still goes with a hidden segment that is its only user.

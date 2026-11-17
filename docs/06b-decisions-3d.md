@@ -11706,6 +11706,8 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 
 **⚠ Amended by [ADR-W-194](06w-decisions-workspace.md#adr-w-194) (2026-11-08, #2492):** `errorText3` reads the suite sentence `suite.refusal.proofTarget`; `err.proofTarget` is deleted and the text is unchanged. The «where to check the claim» line the operator ruled for 3-D is with him on #2492: 3-D's ask box shows no length on a figure with no stated size.
 
+**⚠ Amended by [ADR-W-205](06w-decisions-workspace.md#adr-w-205) (2026-11-12, #2492):** the refusal ends with 3-D's own line, `err.proofTargetCheck`: «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «נתונים»: שאלו שם על הזווית ולחצו «שאלו» — למשל ∠(AB, CD).» (operator 2026-11-10, option (b)).
+
 **Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*. **Withdraws** [ADR-3D-002](#adr-3d-002) decision 1's last clause ("optional proof-verb prefixes … accepted and ignored"). **Shares** the rule with 2-D and analytic through `shell/` ([ADR-W-107](06w-decisions-workspace.md#adr-w-107)).
 
 **Requirements:** docs/02w FR-SU-15 (new — the workspace promise, realised here for 3-D) · **Design:** docs/04w — "Proof targets"; none beyond it here (internal)
@@ -15476,6 +15478,45 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 
 **Behaviour change for a student:** none beyond ADR-3D-454's.
 
+## ADR-3D-477 — A letter's stated range is the sign's sibling: one interval every sign reader reads (#1524)
+
+**Status:** accepted · 2026-11-10 · feature (P2, 3d) · fix round #2822, stream G5 · PR from `feat/1524-nonstrict-ranges` (base `15a8f5af`) · arm 1 of the operator's option (C) ruling, the plan's first PR (arms 1 + 4); extends [ADR-3D-032](#adr-3d-032) (the sign), [ADR-3D-079](#adr-3d-079) (pin symbols), [ADR-3D-175](#adr-3d-175) (named components), [ADR-3D-236](#adr-3d-236) (vec-def ratios), [ADR-3D-390](#adr-3d-390) (free vectors)
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2g (new) · **Design:** [04b](04b-design-3d.md) § *A letter's range is one interval* · **Ladder:** none: a selection among roots and a narrowing of the sampled window, the stages the sign already used
+
+**Rulings.** Operator 2026-09-29 on #1524: *"we need all. so option C"* (parameter, magnitude and angle bounds; each refused when the givens make it false, naming the statement, and restricting what «הציגו תצורה אחרת» samples) and *"1524 is approved"* (one PR per arm: parameters + palette first). Every *What the student will see* line on the issue is `[asked]` or `[ruled]`.
+
+**Measured at pickup** (`15a8f5af`, `parse3`): `t < 0` / `t > 0` read as `param-sign`; `t ≥ 0`, `t >= 0`, `k ≤ 3`, `2 ≤ k ≤ 5`, `k > 2`, «M(k,1,3), k ≥ 0» were all `not-handled`. The two-sided chain and the Hebrew words had no grammar at all.
+
+**Class.** *A statement about where a letter lies was a boolean.* `ParamSignCommand.positive` fed ten readers (the coordinate parameter's root filter in two lanes, its sampled half-window, the vec-def root pick and its window, the pivot's pin-symbol filter and soft anchor, the free-vector sampler and its check, the named-component check and the store's verifier), each with its own `v > 1e-9` and its own half-window. A range is the same statement with a different end, so adding it at the parser alone would have needed ten more branches.
+
+**Decision.**
+1. **One interval** (`engine/bound3.ts`, `Bound3 = {lo, hi, loStrict, hiStrict}`). `boundHolds3` (the sign's tolerance: a strict end must be cleared by 1e-9, a closed end may be missed by it), `foldBounds3` (every statement on one letter intersected in the order stated; a statement that would empty the range is left out, so the figure is drawn under the earlier ones and the verifier refuses the newer one), `boundWindow3` (a reader's default window narrowed to the range and kept clear of its ends; beside the stated end when the range leaves the default window), `boundAnchor3` (the pivot's soft anchor) and `boundReflect3` (the sign walk's target). A sign is the interval (0, ∞) / (−∞, 0) and gives each reader's old half-window; the free-vector draw keeps its mirrored negative draw.
+2. **`Construction3.paramSigns` and `componentSigns` carry a `Bound3`**, never a boolean. `param-sign` lowers to its interval at apply; the new `param-bound` command (`{sym, lo, hi, loStrict, hiStrict}`) to its own. Both share the sign's owner gate (`symbolOwnersOf`): a letter no mechanism owns is `unknown-symbol`; a rider's parameter is `param-bound-not-selectable` (the sign's `sign-not-selectable`, worded for a range).
+3. **The root filters read the letter's OWN range.** The coordinate parameter's two root filters applied every stated sign to its roots, whatever letter the sign named (sound while a figure has one letter, as the vec-def reader's comment already warned). They now read `symBound3(c, c.param)`; a range on another letter never filters these roots.
+4. **The verifier** (`store3`) checks a `param-bound` fact against its own interval: `param-bound-unsatisfiable` («הנתונים אינם משאירים ל-k ערך בתחום שנקבע…»), the sign's `sign-unsatisfiable` in a range's words.
+5. **The grammar** (`parse3` `paramBound`, at the sign's slot; also the point-list tail and the appositive clause of `coordPoint`): `k ≥ 2`, `k >= 2`, `2 < k`, `2 ≤ k ≤ 5`, `5 > k > 2`, «k גדול מ-2», «k גדול או שווה ל-2», «k קטן (או שווה ל)-3», «k לפחות 2», «k לכל היותר 3», «הפרמטר k הוא מספר …», "k is greater than / less than (or equal to) / at least / at most", over one comparison vocabulary (`readCmp3`). A strict end at 0 alone lowers to `param-sign`, so «k גדול מ-0» and `k > 0` are one command. The letter is `[a-w]`, so `AB > 3` and `x > 0` are not taken (arms 2/3 and the component sign).
+
+**Landed after [ADR-3D-489](#adr-3d-489) and [ADR-3D-498](#adr-3d-498) (2026-11-16 integration).** The pin-symbol anchor moved meanwhile into the one shared sampler `pinSymAnchor3` (#2563); the range lives there now (`boundAnchor3(symBound3(c, sym), …)`), so the pivot's soft anchor and the no-pivot `sym-coord` placement both park inside a stated range. The branch fan `freeLaneFan` (#2907) picks its base root by `boundHolds3`, the root selector's own test.
+
+**Not in this PR (the ruling's arms 2 and 3, own PRs under #1524).** Magnitude bounds («|AB| ≤ 5», «המרחק … גדול מ-4») and angle bounds stated in words or between lines and planes. A component compared with a number other than zero («x_B ≥ 1») is also unread, as it was.
+
+**Measured after.** On the ADR-3D-032 exam base with `M(k,1,3)`: «k ≥ 2» draws M.x in [2.33, 2.65] over seeds 0–4, «k ≥ 5» in [5.57, 8.29], «k ≤ −4» in [−10.03, −7.31]; «k > 0» is unchanged (0.42–1.65, the old window). With the 60° angle, «k ≥ 0» takes +2√15 and «k ≤ 0» −2√15 at every seed; «k ≥ 8» is refused `param-bound-unsatisfiable`; «k ≥ 2 · k ≤ 1» refuses the second. «B(2t,t,1) · t ≥ 3» anchors t in [3.49, 4.53].
+
+**Locks.** Unit: `src3d/engine/__tests__/bound3.test.ts` (the sign windows bit for bit, the fold, the windows inside their range, the anchor and the walk). Parse + figure: `src3d/__tests__/adr-3d-032.test.ts` § #1524 (21 spellings, the sign normalisation, no theft, sampling at four ranges, root selection both ways, three refusals, the pin-symbol anchor). Message floor: `message-floor-2028.test.ts` (the two codes). Regression: `fixtures3/param-range-1524.geo3.json`.
+
+**Behaviour change for a student:** a range on a letter now reads, draws inside itself and is refused when the givens leave it no room; «t ≥ 0» is the sign that allows zero.
+
+## ADR-3D-478 — The 3-D palette offers `>`, `≤`, `≥` beside `<` (#1524)
+
+**Status:** accepted · 2026-11-10 · feature (P2, 3d) · fix round #2822, stream G5 · with [ADR-3D-477](#adr-3d-477) · arm 4 of the #1524 ruling; amends [ADR-W-095](06w-decisions-workspace.md#adr-w-095)'s "3-D gains none"
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-12 (unchanged: the face is the payload) · **Design:** none (internal): `ui/symbols3.ts` and the bidi core · **Ladder:** none
+
+**Decision.** ADR-W-095 gave 3-D no `≥`/`≤` because its grammar had no comparison for them to type (#511: a button never offers a glyph its grammar refuses). ADR-3D-477 is that grammar, so `SYMBOL_PALETTE_3` gains `>`, `≤`, `≥` beside `<`, each inserting its own glyph (the shared `palette-faces` check). They join `<` in 3-D's bidi `CORE` (the #482 lock requires every palette character there). A typed `>=` / `<=` is already folded to the glyph at the store boundary (ADR-W-095) and the grammar reads both.
+
+**Locks.** `bidi3.test.ts` § #1524 (each of the four comparison buttons is offered and its insert builds a range), the #482 drift lock, `palette-faces-1348.test.ts`.
+
+**Behaviour change for a student:** three new symbol buttons in 3-D.
+
 ## ADR-3D-471 — An answer may be stated in the figure's free letters: one list of open letters, an affine read-off with a held-out check (#1829)
 
 **Status:** accepted · 2026-11-10 · feature (P2, 3d) · fix round #2822, stream G3 · branch `feat/1829-answers-keep-t` from `main` @ `86768862` · amends [ADR-3D-065](#adr-3d-065) («depends on α»: name the dependency, never state the relation) and [ADR-3D-067](#adr-3d-067) (the single-parameter `parametricDecomp`)
@@ -15505,6 +15546,55 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 **Locks.** Unit: `src3d/__tests__/queries.test.ts` (#1829 block: the operator's asks in He and En, precedence, «|AE|» depends on t, the shared t at five seeds, two letters with both in one coefficient, the bilinear s·t refusal to a linear form, the panel row equal to the ask); `src3d/__tests__/determined-symbol.test.ts` (two roaming letters answer in both, re-based from ADR-3D-067's null per the ruling; a determined letter's row reads «t = 1/2»). Regression: `fixtures3/vector-answer-in-parameter-1829.geo3.json` (the operator's seven lines; build + drift).
 
 **Behaviour change for a student:** asking for a vector that depends on a free letter answers it in that letter («AE = u + t·v», «s» and «t» together when it takes two), a length that depends on one answers «תלוי ב-t» instead of «לא נקבע», the data panel's vector rows print the same forms, a letter the givens determine shows its value in the panel, and two points placed by the same letter are drawn at the same value of it.
+
+## ADR-3D-472 — A vector relation may carry several letters: over placed points they are solved per drawing by least squares, over a new point each is a free number (#1551)
+
+**Status:** accepted · 2026-11-10 · feature (P2, 3d) · fix round #2822, stream G3 · branch `feat/1551-two-params` stacked on `feat/1829-answers-keep-t` (ADR-3D-471) · replaces the 2026-10-05 refusal ruling (never shipped) and reopens #301
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2 (rewritten) · **Design:** [04b](04b-design-3d.md) § *Letters in a vector equation over placed points* · **Ladder:** apply (the M1 claim-vs-drive fork gains the lettered lowering) → solve (`solvePivot`: no new family, no new unknown; the `vec-eq` pin's residual reads its letters)
+
+**Rulings.** The principle is [ADR-W-182](06w-decisions-workspace.md#adr-w-182) (#2006: never reject a statement for what the figure has not settled). Operator 2026-09-29 (*"a and b can be calculated from this so data panel should show their value"*, *"EM should be calculated with a and b if there is no way to find a or b"*); 2026-08-16 (#301: *"a bagrut question can have 2 params"*; degree 1, no CAS); 2026-10-13 ruling B (*"the box takes a shape for which it holds. The remaining freedom stays free and is re-sampled"*; a relation that holds for no shape is refused naming the sentence). Every *What the student will see* line on the issue is `[asked]` or `[ruled]`.
+
+**Measured at pickup** (`86768862`, `useGeo3.submit`; box prefix «תיבה ABCDA'B'C'D'» · «AD=u» · «AB=v» · «AA'=w» · «E אמצע BB'»): the plan's table reproduced row for row — `EM=a*EA+b*EC`, `EM = a·EA + b·EC`, `EM=aEA+bEC`, `EM = αEA + βEC` → `not-understood`; `EM = aEA + 1/6EC` → `no-solution` M; the numeric twin of the exam and the two numeric mixed sequences record; `EM = aEA + bEC` on the mixed figure → `not-understood`; `EB' = 1/2EA + 1/2EC` → `claim-refuted`.
+
+**Class.** *The coefficients of a vector equation are numbers the statement leaves unknown, but only one letter, of one alphabet, had a reader, and over placed points it had no lowering at all.* `parseSymExpr` refused a second letter and `SYM_TERM` admitted `[a-w]` only; `case 'vec-rel'` over placed points had only the cevian sub-arm and otherwise answered `no-solution`. One statement had two semantics by whether its coefficients were numbers or letters.
+
+**Decision.**
+1. **Parser.** `parseSymExpr` reads one letter per term, any number of terms, Latin or Greek (`SYM_TERM` admits `α-ω`; `vecEqClaim` no longer hands every Greek line to the span rule). One letter keeps the old shape exactly (`symbol`, no per-term letter), so every one-letter command and saved file is byte-identical; two or more give `symbols` and each term its `sym`. Degree 2 («ab·EA», «a²EA») has nowhere to live and stays refused.
+2. **Over placed points (arm B).** When every point exists and the letters are fresh (no other lane owns them), and the cevian pair does not claim the line, it lowers to the existing `vec-eq` given (#1183: pin + claim, the numeric twin's path) with lettered coefficients (`VecTerm.letter`). **Mechanism, a deviation from the plan:** the plan made the letters pivot unknowns (`pinSymsOf`, a dimensionless class in the `invariantOnly` lane, extra rank-probe columns). Here they are never unknowns: at any drawing the equation is `R = Σ s·Dₛ`, so `vecEqLetters3` solves them by linear least squares and returns the residual no letter can absorb. That residual is the pin's rows (the free shape and riders move until the relation can hold), the verifier's measure, and the letters' reading for the panel (`vec-letter` owner), the ask and the claims' number reader (`vecEqLetterAt3`). It is scale-covariant like the numeric pin, so `invariantOnly`, the gauge path and the rank probe are untouched, and the DOF cue charges the box exactly the residual's rank (0 for the exam's identity, 1 for the measured mixed case). Same outcomes, no change to the lane every similarity-invariant figure passes through.
+3. **Outcomes.** Holds for every shape → seed-stable letters, the panel prints «a = 2/3», «b = 1/6». Holds for some shapes → the pivot reshapes the box (measured: AD² + AA'² = 3·AB² at 24 seeds, one dim still free). Holds for none → the verifier fails after the drive, and the store answers the contradiction register naming the sentence (`givens-contradict`, `stated`), never «בדקו את החישוב»: there is no student calculation to check (`lettersCannotHold3`).
+4. **A line that names a new letter is never «already stated».** The exam's relation holds already when it arrives (M is placed affinely), so the store's `impliedByPrior3` dropped it as known. A line that adds a letter states what the letter is, so it records. *(Measured landing it on `main`, 2026-11-16 integration: the rule reads every letter the figure prices (`figureSymbolsOf`), so it also reaches a coordinate restatement — «A(0,0,0)» · «B(2,1,-8)» · «B(2t,t,k)» built a row WITH the `already-held` notice on `main` and now builds it without one, t = 1 and k = −8 read off B. The #1394 golden records that drift; flagged to the operator with the merge.)*
+5. **Over a new point (arm A).** `vecDefs[].symbols` carries the letters; each is sampled like a one-letter ratio (keyed by its first definition, the sign given choosing the side, a value given substituting) and recorded in `ratioSymbols`; `vecDefLetterAt3` reads them back through the same least squares, so the params rows read «a = ?», «b = ?» and #1829's read-off writes EN in a and b.
+6. **Display.** The stated row composes the letter (`EM⃗ = aEA⃗ + bEC⃗`). The LLM prompt gains a two-letter few-shot; the catalog gains the line (He + En).
+
+**Scope kept out.** A letter another lane already owns (a ratio t, a coordinate k) in a relation over placed points keeps the old path (one letter, one number); a driving relation on a two-letter point («EN ⊥ AB») is a two-unknown root-find and is not built. Neither was asked.
+
+**Measured after.** Every row of the pickup table: the four spellings record with a = 2/3, b = 1/6; `EM = aEA + 1/6EC` → a = 2/3; with «מישור AEC» the panel's mutual rows hold «EM contained AEC»; after «|w| = 4» · «BM ⊥ AEC» the box is 2/1/4; the mixed figure reshapes as above with a = b = 1/4; the rider lands at BM:MD' = 1:3; `EB' = a·EA + b·EC` → `givens-contradict` naming it. Per-line submit on the exam as typed in prod: 21 · 32 · 24 · 15 · 3 · 4 · **27** · 13 · 123 · 56 ms; the mixed figure's relation line 120 ms. A figure with no lettered relation runs no new code on the pivot path.
+
+**Sibling audit.** 2-D and analytic have no vector-coefficient letters; complex has none. No cross-builder row is owed (not a plane-geometry sentence, ADR-W-108).
+
+**Locks.** Unit: `src3d/engine/__tests__/vecExpr3.test.ts` (`vecEqLetters3`: two letters, the off-span residual, a given value, dependent directions); `src3d/__tests__/paren-coefficient.test.ts` (the parser: three spellings, Greek, the one-letter shape unchanged, degree 2 refused; the V7 boundary test re-based). Class: `src3d/__tests__/issue-1551-two-letter-vec-rel.test.ts` (a)–(j) of the plan. Regression: `fixtures3/bagrut-03572-q2-1551.geo3.json` (the exam as typed in prod).
+
+**Behaviour change for a student:** «EM = a·EA + b·EC» (and «aEA + bEC», Greek letters, one letter beside a number) builds; the data panel shows the letters' values when the givens fix them, the box takes a shape for which the relation holds when only some shapes do, a relation no shape satisfies is refused naming it, and a new point defined with two letters lies free in their plane.
+
+**Amendment 1 (2026-11-12, fix round #2855, stream E) — one letter reader with [ADR-3D-488](#adr-3d-488).** Rebasing this PR on `main` met #2785's shared coordinate letter. Both state one rule (*a letter is one unknown wherever it is written*), but each had its own reader: `pinLettersAt3` for coordinates and `vecEqLetterAt3` (the first equation alone) for coefficients. The coefficient arbiter also solved each `vec-eq` for its own letters.
+- **Measured before** (`58368d26`, this PR on `main`, `useGeo3.submit`):
+  - On the exam, «EM = a·EA + b·EC» then «EM = b·EA + a·EC» was accepted as a held row. Each equation held at its own a and b, but the panel printed a = 2/3, so the second line's a was a different 1/6.
+  - «פירמידה SABCD» · «AC = a·AB + b·AD» · «B(a,1,2)» drew B.x = −0.976 beside a = 1, so one letter had two values.
+  - «פירמידה SABCD» · «B(k,1,2)» · «AC = k·AB + b·AD» was refused `claim-refuted`, because a coordinate letter was not "fresh".
+- **Decision.**
+  - **One reader.** `lettersAt3` (claims.ts) reads every letter in one configuration. It takes the coordinate letters as ADR-3D-488 read them, then every remaining coefficient letter jointly over every lettered `vec-eq` (`vecEqSystem3` assembles each equation, `solveNormal3` solves them together).
+  - **Its readers.** The `vec-eq` claim is judged at those values; a letter the drawing leaves open falls back to the span residual. The panel, the ask and `letterNumbersAt3` read the same function. `pinLettersAt3` and `vecEqLetterAt3` are gone.
+  - **One pool.** `coordLetterShared3` counts a `vec-letter` owner. The vector relation's lowering (arm B) admits a letter a coordinate carries: a pin symbol, or a named point component, promoted by `promoteNamedComponents3` as a second coordinate use promotes it. The `vec-eq` pin reads such a letter at the pivot's own `symAt`, so the drive and the arbiter see one unknown.
+- **Measured after.**
+  - The exam rows and the play case are unchanged (a = 2/3, b = 1/6; the restated «EM = a·EA + 1/6EC» is still a held row).
+  - The swapped relation is refused `givens-contradict` naming it.
+  - «… · B(a,1,2)» draws B.x = 1 = a.
+  - «B(k,1,2)» · «AC = k·AB + b·AD» builds with k = 1, b = 1.
+  - «a = 2» on that figure is refused `givens-contradict` naming the two lines that fix a. Before, it was refused `injection-unsatisfiable`.
+- **Not changed.** A letter in a NEW point's coordinates («M(k,1,0)») is the figure parameter (another lane), and ADR-3D-488 does not pool it either. «M(k,1,0)» · «AM = k·AB + b·AC» stays refused `claim-refuted`; «AM = a·AB + b·AC» · «N(a,3,0)» keeps N.x free.
+- **Locks.** `src3d/engine/__tests__/vecExpr3.test.ts` (`solveNormal3` over two equations; `vecEqSystem3`). `src3d/__tests__/issue-1551-two-letter-vec-rel.test.ts` (the swapped relation refused; the coordinate letter shared in either order; the exam unchanged).
+- **Requirements:** [02b](02b-requirements-3d.md) FR-VC-2 · **Design:** [04b](04b-design-3d.md) § the coordinate letter, § letters in a vector equation.
+- **Behaviour change for a student:** a letter written in two vector relations, or in a vector relation and a placed point's coordinates, has one value. Two relations that give it two values are refused naming the second.
 
 ## ADR-3D-468 — A right pyramid over an existing ring fits the ring to its cyclic member with the ring's own DOF (#2490)
 
@@ -16545,6 +16635,31 @@ The reason: projected starts change which basins the restarts fall into, so the 
 ## What the student will see
 - [ruled] 3-D heavy figures are drawn sooner; another valid drawing may come first (the #863 prism draws its seed-1 configuration first). Operator, 2026-11-15 (#2894), ruling 1: *"Yes if verdicts equal (Recommended)"*.
 - [ruled] Values the givens fix, which 3-D withheld, are shown, with the answers that read them (the table above). Operator, 2026-11-15 (#2894): *"Ship, list them as fixes (Recommended)"*.
+
+## ADR-3D-533 — Only configurations that keep every stated given are knowledge: the knowledge sampler admits a sample only when every stated sign, side and requirement holds on it (#2916)
+
+**Status:** built · 2026-11-17 · bug (`P2`, 3d) · **Issue:** [#2916](https://github.com/dcodish/geo_builder/issues/2916) · branch `fix/2916-knowledge-admission`, merged into the 2026-11-16 PR integration branch (it unblocks #2832's fixture on the #2367 sweep)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-4 (only configurations that keep every stated given are evidence) · **Design:** [04b](04b-design-3d.md) — "Only admitted configurations are knowledge" · **LADDER stage:** none (no solve stage moves; the knowledge sampler filters what the solves return)
+**Builds on** [ADR-3D-283](#adr-3d-283) (one knowledge sampler), [ADR-3D-375](#adr-3d-375) / [ADR-3D-498](#adr-3d-498) (the read-back), [ADR-3D-376](#adr-3d-376) (one seam, two surfaces), [ADR-3D-053](#adr-3d-053) (requirements gate which configuration may be shown), [ADR-3D-179](#adr-3d-179) (the pivot's sign walk).
+
+**The class.** *A configuration that breaks a stated given is used as evidence for knowledge.* A stated selector — a coordinate sign, a named component's sign, a letter's sign, a side of a plane, an angle bound or a mutual position — determines nothing, so no residual reaches it: the pivot's sign walk and the drawing's seed search honour it, but nothing guaranteed that a KNOWLEDGE sample did. On the ADR-3D-032 exam box («שיעור ה-y של הקודקוד A שלילי», «M(k,1,3), k חיובי», the 60° angle), the ask lane's sample at seed + 3041 found no sign-honouring root and fell back to the drawable pool (`applySolutions`), putting A at (0, 17, 11). A′ and M moved with it, the ask lane read A′ as not stable, and «מישור A'B'C'D'» was written from the intercept (142, 0, 0) while the panel wrote it from A′ (2, 5, −15): the same plane, two forms, ADR-3D-376 broken. Any value that agrees across the admitted samples could equally have been outvoted.
+
+**Measured first (docs/17 §9).** The failing-seed probe (every `fixtures3/` figure and the exam figure, base seeds 0–23, every sample judged by the verifier's own predicates; a scratch harness, never committed): 177 figures, 18 state a selector; read-back samples (ask, panel) **2 of 2 112** break a given, both on the exam figure (base 0 → seed 3041, and base 23); plain samples (claims, narrowing, preferences) **0 of 1 728**.
+
+**Decision.** Candidate (a) of the issue, the rule 2-D and analytic already apply (2-D's knowledge pool admits only samples that pass its filter ladder, `src/replay/core.ts` at `3f6132c2`; analytic's `admittedOf`, #1642: "every printed value is witnessed by an ADMITTED configuration").
+1. **`admittedConfiguration3(c, r)`** (engine/evaluate.ts): every `signGivens` sign, `componentSignsHold`, every `paramSigns` letter (read by **`statedLetterValue3`**, moved here from the store's verifier, which now calls it: one reader of «k»), every stated plane side (the verifier's signed distance), and the hard requirements (**`requirementsHoldOn3`**, split out of `meetsRequirements3`'s per-seed judgement). The verifier's tolerances throughout.
+2. **`knowledgeSamples3`** keeps only admitted samples. A base seed left with none is replaced by its reserve walk (s + k·6089, clear of every lane's offsets), at most one reserve seed per base seed in all: the gauge keeps as many witnesses as it was given (one picture always agrees with itself, #1642) and the work stays bounded. A figure that states no selector is sampled exactly as before at no extra cost. If no sample is admitted anywhere, the figure's own drawing breaks a given (its row is already red) and the plain samples stand, never an empty set that every `.every` gate would read as agreement.
+3. Every lane reads the admitted set — ask, panel, claims, narrowing, shape preferences — since a configuration the givens forbid is evidence for none of them; the probe shows the plain lanes never met one in the corpus.
+
+Candidate (b) (the sign walk reaches the honouring root at every seed) is not taken: it would close this seed, not the class, and the admission holds whatever the solver returns.
+
+**Tests.** `src3d/engine/__tests__/engine3.test.ts`: the predicate refuses the exam figure's configuration with A's y flipped and admits the drawn one, and reads «k» through the verifier's reader; every read-back sample at the ask seeds of bases 0 and 23 keeps A.y < 0, is admitted, and the set keeps ≥ 4 witnesses; a figure with no selector keeps one sample per seed. **Regression lock (rule 4):** the exam figure as `fixtures3/exam-box-sign-2916.geo3.json` (the issue's sequence), which the #2367 property sweep (`plane-two-forms-2367.test.ts`) asserts ask = panel on.
+
+**Landed with the 2026-11-16 batch.** #2832 ([ADR-3D-477](#adr-3d-477)) made a letter's sign an interval (`paramSigns[].bound`), so the admission reads a letter's statement with `boundHolds3`, the verifier's own test (a stated range such as «2 ≤ k ≤ 9» admits too), and the store verifier keeps #2916's shared reader `statedLetterValue3` with #2832's range check. Point-coordinate signs (`signGivens`) stay boolean. **One verdict moved, measured on the #1394 goldens:** «AB מתלכד עם CD» / "AB coincides with CD" on an empty figure was refused `point-not-determined` (A) on `main` and now builds, A, B, C, D drawn on one line (C and D within 2e-8 of line AB), its row green; the same on #2916's branch alone, so it is this ADR's admission (the claim's samples are admitted ones), not the batch.
+
+## What the student will see
+- [ruled] On the exam box, asking «מישור A'B'C'D'» prints the same parametric row as the values panel, from A′ (2, 5, −15), not from the intercept (142, 0, 0). ADR-3D-376 "one seam, two surfaces" (#2367, operator rulings 2026-10-20).
+- [2-D] No answer in the ask box or the values panel is outvoted by a configuration that breaks a stated given — 2-D's and analytic's admission rule, measured at `3f6132c2`.
 
 ## ADR-3D-525 — A point stated on a circle that closes a declared ring is seated where the ring is simple (#2829)
 

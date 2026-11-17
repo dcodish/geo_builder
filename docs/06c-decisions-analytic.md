@@ -14828,6 +14828,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 
 ## ADR-AG-375 — One annotation channel for what a student asks to see on the figure (#1863, #1218; for #1211, #1121, #1752)
 
+> **⚠ Amended by [ADR-AG-465](#adr-ag-465)** (2026-11-12, operator ruling on #2851): §5's #1752 line is built — a shown focus is clickable and records the typed sentence through `decideSubmit`. It is not a facet: the click states a sentence, so nothing is added to the map.
+
 **Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic), branch `feat/1863-conic-annotations`, one PR with [ADR-AG-376](#adr-ag-376) and [ADR-AG-377](#adr-ag-377). LADDER stage: none (display state; no fold, solve or sampling change).
 
 **Requirements:** [02c](02c-requirements-analytic.md) R221 (new), R20 (its ⚠ line rewritten). · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip".
@@ -14855,6 +14857,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 **Behaviour change for a student:** none by itself; its first surface is ADR-AG-376.
 
 ## ADR-AG-376 — The conic chip: nothing → directrix → focus → both, values only when the givens determine them (#1863, #1218)
+
+> **⚠ Amended by [ADR-AG-465](#adr-ag-465)** (2026-11-12, #2851): a shown focus mark no student point stands on is an offer — a click names it as a point. The marks are otherwise unchanged; without a click nothing changes.
 
 **Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic), branch `feat/1863-conic-annotations`. **Amends** [ADR-AG-353](#adr-ag-353) (the unlettered focus it left undrawn is now drawn on request). LADDER stage: none.
 
@@ -16918,3 +16922,97 @@ The lines named beside the refused one are the rows whose lengths take part (3-D
 
 **What the student will see.**
 - [ruled] A line whose stated lengths cannot hold together is refused at once with the reason and the other lines named, in 3-D's sentence (it said «לא נמצאה תצורה שבה מתקיים: «…»» after a search). Operator, 2026-11-15: *"A clearer reason (Recommended)"* and *"The clearer reason everywhere (Recommended)"*. Text recorded with `judgments.mjs chose` (`text-2894-analytic-lengths-impossible`).
+
+## ADR-AG-467 — A bare «אליפסה» / «פרבולה» is a free conic: every letter free, and the parabola's direction a discrete axis (#2853)
+
+**Date:** 2026-11-12 · **Status:** accepted · feature (P2, analytic, reported) · fix round #2855 stream C, branch `feat/2853-bare-conic-free` · operator rulings 2026-11-12 on #2853: *"It should be a free ellipse"* (option B), and for the parabola *"2853 - A"* (vertex and p free, any of the four directions, «הציגו תצורה אחרת» cycling them). Amends [ADR-AG-354](#adr-ag-354). LADDER stage: none (parser + M1; the direction is an ordinary discrete axis of the odometer, ADR-AG-302).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R203 (amended: a bare noun is a free conic) and R174 (its "a noun with no equation" sentence) · **Design:** [04c](04c-design-analytic.md) § "A free conic's direction".
+
+**Measured before** (`caf619a5`, `decideSubmit`, no model): «אליפסה», «נתונה אליפסה», "an ellipse", «פרבולה», «נתונה פרבולה» and "a parabola" were `not-handled`. «אליפסה קנונית» recorded x²/a² + y²/b² = 1. ADR-AG-354 read a bare «נתונה אליפסה» only together with the major-axis clause. R174's sentence "a noun with no equation («נתונה פרבולה») is still the canonical curve" described nothing the code did.
+
+**Decision.** (1) `parseCanonicalConic` reads a bare noun with no clause (`freeConic`). The ellipse is `(x-h)^2/a^2+(y-k)^2/b^2=1` and the parabola `(y-k)^2=2p(x-h)`, both `fresh` (M1 renames a letter the figure already uses), so each letter is a free parameter: a and b positive (R191), and h, k, p unbounded and signed. (2) The parabola's fact carries a `turn`, the same curve opening along y, `(x-h)^2=2p(y-k)`. M1 keeps it on the object (`CurveTurn`) and opens a region `choice` of two `opens-along` selectors, x first. `resolvedAt` puts the turn in the curve's place, its equation and its text, when the configuration took y (`turnedObjects`). So the direction is one more digit of the odometer: the first drawing opens along x, «הציגו תצורה אחרת» turns it, and the sign of p gives the direction along the axis. Seeds 0–7 reach all four. Every role reader works on the free curve without new code, because it reads the resolved curve through `conicFrame`. The letters (h, k for the centre or vertex) are the session's choice, reviewed after (ADR-W-174). «אליפסה קנונית», the major-axis clause and «פרבולה קנונית» (#2842, still unread) are unchanged.
+
+**The named equation (operator ruling 2026-11-12, Rulings Inbox, (c) *"only when the line names it"*).** At pickup, a typed equation after «אליפסה» drew a second ellipse, and so did one after «אליפסה קנונית». Now «משוואת האליפסה היא …» / «משוואת הפרבולה היא …» is about THE conic: the circle's contextual reading (`CONTEXTUAL_CIRCLE_EQ_HE`, ADR-AG-196) widened to the two conic nouns and lowered to `the-conic`. At M1 the definite noun binds the figure's one conic of that kind; with two it asks (`ambiguous-shape`), and with none it draws the conic, as the line always did. A conic whose letters are the tool's (`toolLetters`: a bare or canonical noun) takes the stated equation under the same id, so its points and roles keep their referent. Its letters, its `turn` and its `opens-along` choice leave the figure (the `circle-eq` treatment of a circle the tool drew, ADR-AG-204). A conic the student gave by its equation is that equation: the same one is `known`, and another is `conflicting-restatement`, as the circle's is. Before, the same line drew a second conic. A bare equation line is still a new curve.
+
+**Locks.** Unit: `parser.test.ts` (#2853 block). Bespoke: `issue-2853-bare-conic-free.test.ts` (`pipeline-lock:`). It checks the four spellings, the free h, k, a, b moving across seeds, the canonical one unchanged, the fresh rename, four points pinning the ellipse, its foci and a diameter on it, the parabola's four directions and moving vertex, the givens text following the direction, its focus and a chord, and #2625's refusal on it. Fixtures: `issue-2853-bare-ellipse.analytic.json`, `issue-2853-bare-parabola.analytic.json`. Catalog: «נתונה אליפסה», «נתונה פרבולה» (not featured).
+
+**Ports (ADR-W-157).** 2-D and 3-D have no conics (X2), so there is nothing to port.
+
+**Behaviour change for a student:** «משוואת האליפסה היא (x-2)^2/25+(y+1)^2/9=1» after «אליפסה» fixes that ellipse, and «משוואת הפרבולה היא …» after «פרבולה» fixes that parabola; with two ellipses the tool asks which. «אליפסה», «נתונה אליפסה» and "an ellipse" draw an ellipse whose centre and both semi-axes are free, and «הציגו תצורה אחרת» moves and reshapes it. «פרבולה», «נתונה פרבולה» and "a parabola" draw a parabola whose vertex and size are free and which opens right, left, up or down, and «הציגו תצורה אחרת» moves and turns it. Before, each went to the AI.
+
+## ADR-AG-465 — A shown focus is clickable: the click names it with the sentence a student could type (#2851)
+
+**Date:** 2026-11-12 · **Status:** accepted · feature (P2, analytic), fix round #2855 stream B, branch `feat/2851-clickable-foci`. **Amends** [ADR-AG-375](#adr-ag-375) §5 (the #1752 line, built) and [ADR-AG-376](#adr-ag-376) (a lettered focus mark is an offer). LADDER stage: none (a canvas offer; the sentence it records goes through the existing `focus-of` lowering).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R221 (a shown focus is clickable) · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip" (the focus offer).
+
+**Operator report (2026-11-12):** *"I'm trying to create a triangle where the base is F1 and F2. drawing the ellipse and pressing show מוקדים shows where F1 and F2 are but when i try to write the triangle using F1 and F2 it doesnt recognize these points."* **Ruling, the same day:** *"I think that when a users wants to show the focus, we should make the focus points clickable so he can nail them on the diagram. if he doesnt, the behavior is like today."*
+
+**Measured at pickup** (`caf619a5`, `decideSubmit` → `derive`): `7x^2+9y^2=63` with the chip on «focus» draws F₁(√2, 0), F₂(−√2, 0) inside `analytic-roles`, which is `pointerEvents="none"`; «משולש F1F2D» then builds on two new free points. The typed «F1 מוקד ימני של האליפסה» · «F2 מוקד שמאלי של האליפסה» records and lands on the foci, as do «…עליון/תחתון…» on `9x^2+7y^2=63` and «F מוקד הפרבולה» on `y^2=8x`.
+
+**Class.** Every letter the chip shows (an ellipse's F₁/F₂, a parabola's F) was decoration: nothing joined the mark to a point a later sentence can use. Analytic only: 2-D and 3-D have no conic chip (exception family X2).
+
+**Decision.**
+1. **The offer** (`app/conicMarks.ts`). A shown focus mark that no student point stands on gets `offer: { id, letter, title }`: `id` = `focus:<k>:<curve>` (k in `ellipseFoci`'s order, 0 the right / upper end), `letter` the book letter in plain digits («F1», as typed), `title` the sentence a click records with it (the hover, as a centre ring's `<title>`). When the book letter is held by a student's point elsewhere, the mark still writes no letter (sr-07) but is offered all the same: the popover opens on that letter and offers the swap (3).
+2. **One composer** (`focusSentenceOf(d, offerId, letter)`, the focus's `centreSentenceOf`): «<letter> מוקד הפרבולה», or «<letter> מוקד <side> של האליפסה» with the side the focus sits on (`ימני`/`שמאלי` on an x-major ellipse, `עליון`/`תחתון` on a y-major one, read against the centre, so a translated ellipse (ADR-AG-455) is right too). The words are `parser/conicRoleWords.ts`'s. Null on a stale offer, or when the figure holds two curves of that kind: the grammar names THE parabola / THE ellipse, so such a figure offers nothing rather than a click that is always refused.
+3. **One path with typing** (`app/centreName.ts`): `decideFocusName` / `focusPopoverOps` are the centre's decision with the focus's composer — `normalizePointName`, `nameInUse` (a taken letter answered with its holder quoted), then `decideSubmit`, recorded by `commitRecord`. **A taken letter offers the swap** (operator ruling 2026-11-12 on PR #2856, answering the session's question; after his 2026-09-18 «always allow switching names of nodes»): `decideFocusSwap` is the centre's swap (`decideOfferSwap`, one function for both offers) — the focus is recorded under the automatic letter, then `decideSwap` exchanges it with the asked-for letter, one commit, one «בטל». The popover's `label` is that automatic letter, as the centre's is. **Landed after [ADR-AG-478](#adr-ag-478) (2026-11-16 integration):** the decision runs in the analytic worker exactly as the centre's — `focusName` / `focusSwap` letter requests (`opsAn.letter`), applied by `applyCentreName` / `applyCentreSwap` — so the page never solves for a focus either; `focusPopoverOps` stays the in-process pair the locks drive.
+4. **The canvas.** `scene.roles.foci` carries the offer; `Figure.tsx` draws the offer ring around each offered focus — the crossing / centre offer's dashed ring, one `OFFER_RING` constant for every offer (operator 2026-11-12, playing T30: *"we should make the focuses round like we have for points that we want users to click. its not clear from the gui that they are clickable"*) in `analytic-focus-offers` (`data-noexport`, before the points, only when `onFocus` is given); the mark itself stays in the decoration layer. `App.tsx` opens the shared `LetterPopover` (title «מוקד»), which takes a new optional `initialValue` (shell, product-free): it opens on «F1», selected.
+5. **After the click** the focus is the student's point: the mark yields (sr-07, unchanged), the row is the typed sentence, hiding the chip does not move it, and «משולש F1F2D» uses it. Without a click nothing changes.
+6. **Found in round #2855 (same path): a letter TYPED «F1» could not be renamed or swapped.** `app/rename.ts`'s token pattern matched an indexed id in its glyph spelling (`F₁`) only, so «F1(1,1)» held no occurrence of `F₁`, the faithfulness proof failed and every swap or rename of it answered `swap-unsafe` — the swap this ADR offers among them. The pattern now matches every spelling the grammar reads as that one name (`F₁`, `F1`, `F_1`, `F_{1}`, ADR-AG-398) and keys each occurrence back to the id; a bare `F` beside `F1` is still its own token. The rewrite writes the id's glyph («F₁»), as every rename already did. Unit: `issue-1631-analytic-swap.test.ts` (#2851 block).
+
+**Locks.** `src-analytic/__tests__/issue-2851-focus-offer.test.ts` (pipeline-lock: the click path — the operator's sequence through the scene, the rendered hit targets, the popover callback over the real store; y-major; parabola; another letter; a taken letter; the book letter held by «F1(1,1)» → the swap, the rows re-typed in order, one undo; two ellipses). Unit: `round-2678-conic-display.test.tsx` (`focusSentenceOf`), `shell/__tests__/letter-popover-1631.test.tsx` (`initialValue`). Fixture `ellipse-foci-triangle-2851` (the rows the clicks record).
+
+**Behaviour change for a student:** in analytic, with a conic's foci shown, clicking a focus opens the letter box on «F1» / «F2» / «F»; confirming adds the row «F1 מוקד ימני של האליפסה» (or «F מוקד הפרבולה») and the focus becomes a point later lines can use. A letter already in use offers to swap the two letters. Without a click, nothing changes.
+
+## ADR-AG-473 — «הציגו תצורה אחרת» on a determined figure walks its solutions first: a mirror image is the same solution placed differently (#2831)
+
+**Date:** 2026-11-12 · **Status:** accepted · feature (all four builders, P2) · fix round #2855, PR branch `feat/2831-mirror-same-solution` · **builds** [ADR-W-206](06w-decisions-workspace.md#adr-w-206) in analytic · **amends** the #1084 walk ([ADR-AG-379](#adr-ag-379)) and [ADR-AG-451](#adr-ag-451)'s "reached by seed" note on p2-15 · **LADDER stage:** none (the button's search, not a solve)
+**Requirements:** [02c](02c-requirements-analytic.md) P7 — new solutions first · **Design:** [04c](04c-design-analytic.md) § "The configuration search" — the solution cycle
+**Operator:** 2026-11-10, Rulings Inbox Q-2731c (b): *"New solutions first, in every builder"*; 2026-11-12 on #2831: *"2831 - A"* — a mirror image of a drawing is the SAME solution placed differently.
+
+**Measured at pickup** (`c82d767c`, the fixture `ellipse-book-p2-15-2621` recorded through `decideSubmit`, `anotherConfiguration` pressed from seed 0). Ellipses by press: 8.00/6.93 (the book's), the y-axis mirror, **7.65/8.00** (press 2), then ten mirror images or exact repeats of the first two, and **4.18/8.00** on press 13.
+
+**Root cause.** `anotherConfiguration` moved to the next seed whose picture differs from the one on the screen. It had no idea which configurations are one solution, and no memory of what was shown, so a root that one seed in 24 draws arrived whenever that seed came up.
+
+**Decision.**
+1. **`sameSolution(a, b)`** (`engine/evaluate.ts`, beside `looksTheSame`): the named points, and each curve's characteristic points (circle: centre and radius; parabola: vertex and focus; ellipse: its four vertices as a set; line: the foot from the origin and its direction), read in the figure's own frame. That frame has its origin at the first named point and its first axis toward the first point apart from it. The second axis is signed by the first point off that line, which is what folds a mirror. Every used letter's value must also agree; the tool's own `θ_` symbols are skipped, as in the signature. The coordinate axes are not part of the frame. With fewer than two apart points, the answer is `sameConfiguration`.
+2. **The cycle** (`app/another.ts` `solutionCycleStep`): runs when the drawing on the screen has `carrierDof` 0.
+   - It gathers the configurations `derive(lines, s)` draws for `s < TRIES` (24). They are drawn from the one folded construction (`drawingConstructionOf`, new in `derive.ts`), so the lines fold once.
+   - Only admitted configurations count, and a picture already gathered is dropped.
+   - It groups them by `sameSolution` and interleaves the groups round-robin in order of first appearance.
+   - A press moves to the successor of the drawing on the screen. A drawing outside the cycle starts it.
+   - Any admitted configuration with freedom left, or a cycle of one, keeps the seed walk, unchanged (`found: false` stays honest).
+   - The cycle is memoised per (lines, seed names, pins) for the last 8 figures.
+3. The first drawing never changes, and nothing new is stored: the press returns a canonical seed, as before.
+
+**Measured after** (same door). p2-15: presses 1 and 2 draw 7.65/8.00 and 4.18/8.00. Presses 3–6 are the mirror images (the book's ellipse with A at (−4, 6) and with l at y = −6, and the second ellipse's two mirrors). Press 7 comes back to the first drawing. The first press costs ~0.55 s (the 24 configurations, once); later presses cost ~0.1 s. «M(a,0) · N(13,0) · MN = 9» still alternates a = 4 / 22: a different letter value is a different solution, although the drawing is a mirror. «x² + y² = 25 · A על המעגל · x_A = 3» still reaches A = (3, 4) from (3, −4): a figure whose only alternative is a mirror still reaches it. The parabola's p = 18 is still press 1.
+
+**Work meter (landed after [ADR-AG-478](#adr-ag-478), 2026-11-16 integration; docs/17 §7).** The first press now gathers the determined figure's configurations, so three recorded `another#1` actions rose and nothing else moved: `issue-2733-crossing-on-p` 36 → 212 units, `corpus471.json#4/4` 960 → 1,148, `operator-letters-on-side-2691` 6,255 → 6,998. Each is the first press gathering the cycle (`gatherCycle`'s seeds 0…tries−1): `issue-2733-crossing-on-p` the crossing figure's configurations, `corpus471.json#4/4` the exam figure's, `operator-letters-on-side-2691` the lettered side's, and `operator-textbook-print-2688` (the same lines, 6,255 → 6,998, prePaint 102 → 4,771) the same gathering, counted once the memo was cleared with its session (below; before, it was served the cycle the previous figure's walk had left). Accepted with `npm run work:record -- analytic --only <figure> --accept-rise`. **Found landing it, fixed:** the cycle's memo was a bare `Map`, so it outlived the session clear every analytic memo is registered with; a later walk's press was served it uncounted (`issue-2733-crossing-on-p` 212 cold, 36 warm — the gate's reproducibility check). It is now a `BoundedStore` (bounded by 8, registered with `clearContentCaches`), the convention of every analytic store that outlives an action.
+
+**Locks.**
+- Unit: `src-analytic/__tests__/issue-1622-e5-another-never-repeats.test.ts`, #2831 blocks:
+  - `sameSolution`: x mirror, y mirror, another ellipse, a letter value, identity;
+  - the cycle: the mirror-only figure, the two-solution alternation, a press from outside the cycle, a free triangle's walk unchanged.
+- Bespoke: `issue-2731-determined-roots.test.ts` › p2-15, tightened from "all three within 20 presses" to "the three ellipses on presses 0, 1 and 2, then their mirror images, every press another drawing".
+
+**Behaviour change for a student:** on a figure the givens fix with several solutions, «הציגו תצורה אחרת» shows every different solution before a mirror image of one already shown. On the book's p2-15 the three ellipses are the first drawing and the first two presses, where the third used to come on press 13.
+
+## ADR-AG-474 — Hiding a segment hides its value, its knee and a point the tool named for it, by 2-D's rule (#2852)
+
+**Status:** accepted, 2026-11-12 · **Issue:** [#2852](https://github.com/dcodish/geo_builder/issues/2852) (feature, `P2`, `2d`/`analytic`) · round #2855
+**Requirements:** [02c](02c-requirements-analytic.md) R138 · **Design:** [04c](04c-design-analytic.md) § *The canvas's click menus* · **LADDER stage:** none (display)
+**Builds** [ADR-W-207](06w-decisions-workspace.md#adr-w-207) for analytic, the port of [ADR-825](06-decisions.md#adr-825) in the same item (ADR-W-157) · **amends** [ADR-AG-201](#adr-ag-201) ("a hidden segment is still in the figure; only its ink goes")
+
+**Measured at pickup** (`c82d767c`, store → `derive` → `buildScene`): the operator's «מעוין שצלעו 5» · «גובה המעוין 4.8» · «אלכסוני המעוין על הצירים», DH hidden → `seg-DH` ghost, but its «4.8» label, the knee at H (`stated.rights` v = H) and the minted H all drawn.
+
+**Decision.**
+1. `buildScene` reads the scene into `hiddenWith`: the segments split by `ink === 'ghost'`, `stated.lengths` as the values, `stated.rights` (arms `a`, `b`, `alt`) as the knees, `stated.equalLengths` as the ticks, and every stated angle, equal angle, area, arc and side equation's points as marked. A ghost segment carries no label; the stated layer is drawn from what is left; a lone point is not drawn, and neither is a dashed extension to it.
+2. **Lone points** — `app/hideOwnership.ts` `lonePoints(construction, minted)`: a letter the tool chose (`Derivation.minted`), that no object other than a segment or polygon is built from (`objectDeps`) and that no other active line uses (`objectLine`, `rowLine` over `constraintRefs`). App hands it as `knows.lonePoints`.
+3. **The row mark** — `hiddenRowLines(construction, hidden)`: the line that drew a hidden segment as a segment of its own, or stated its length (`length-eq` on its two points), shows «מוסתר»; its click toggles those segments back.
+
+**Locks.** `src-analytic/__tests__/segment-display-1653.test.tsx` (#2852 block, through the real store, `derive`, `buildScene` and `Figure` markup): the operator's rhombus with DH hidden — no H, no knee, no «4.8», the «5» kept, the rhombus's sides unmoved, line 1 marked, everything back on show; hiding AB in triangle ABC keeps A, B and C; a tool-named H another line uses («M אמצע DH») stays.
+
+**Behaviour change for a student:** in the analytic builder, hiding a line also hides its number, its right-angle mark and a point the tool named only for it (H in «גובה המעוין 4.8»); the rhombus stays as the givens make it, the row keeps the value and shows «מוסתר», and clicking the faint line or the mark brings it all back.
+
+**Amendment 1 (2026-11-12, operator ruling on PR #2863, question 1 option a): a rename makes the point the student's.** A tool-named point the student renamed stays when its only line is hidden. Analytic already holds it through the record the rename writes: `decideRename` materializes the tool's letter into its sentence («גובה מנקודה A במשולש ABC פוגש את הצלע בנקודה K»), so the renamed letter is no longer `minted` and `lonePoints` never offers it — no new reader. Lock: `segment-display-1653.test.tsx`, the triangle's height H renamed K, AK hidden → K stays. The operator's rhombus cannot carry it: «גובה המעוין 4.8» has no naming form, so renaming its H is refused today (`rename-not-typed`), a separate gap.
