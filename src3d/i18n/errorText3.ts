@@ -3,7 +3,7 @@
  * test can drive it: every message must name only what the student wrote, `shell/studentText`).
  */
 import { MAX_FIGURE_STATEMENTS } from '../../shell/save';
-import { PROOF_TARGET_KEY } from '../../shell/proofTarget';
+import { PROOF_TARGET_KEY } from '../../shell/lexicon/proofTarget';
 import type { StoreError3 } from '../store/store3';
 
 /** ADR-3D-318: an engine id's student-facing letters — `circle-ABCD` → `ABCD`; a bare label is itself.

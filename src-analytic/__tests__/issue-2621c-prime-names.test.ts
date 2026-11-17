@@ -2,7 +2,7 @@
  * PRIME POINT NAMES, «A'» (#2621 C, [ADR-AG-395](../../docs/06c-decisions-analytic.md#adr-ag-395)). Operator, 2026-10-30: *"now we
  * need to build all capabilities"* (the ellipse book, p10-9 ב: «A ו-A' הן נקודות החיתוך של האליפסה …», «AA' = 8», «A'P = √45»).
  * The point-name atom had no prime and was spelled inline in every reader; it is now ONE atom (`engine/pointName.ts`), every
- * prime glyph folds to `'` at the boundary (the shared `shell/primes`), and a primed name is its own point, drawn A′.
+ * prime glyph folds to `'` at the boundary (the shared `shell/lexicon/primes`), and a primed name is its own point, drawn A′.
  */
 import { describe, expect, it } from 'vitest';
 import { decideSubmit } from '../app/submit';
@@ -10,7 +10,7 @@ import { ask, askSettled } from '../app/ask';
 import { decideRename, normalizePointName, type RenameState } from '../app/rename';
 import { derive } from '../engine/derive';
 import { POINT_NAME, displayPointName, isPointName, splitPointNames } from '../engine/pointName';
-import { NAME_ATOM } from '../../shell/indexedName';
+import { NAME_ATOM } from '../../shell/lexicon/indexedName';
 import { buildScene } from '../render/scene';
 import { fmtAnalytic } from '../format';
 import p109 from './fixtures/prime-names-p10-9b-2621.analytic.json';

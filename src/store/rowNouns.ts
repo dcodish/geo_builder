@@ -21,7 +21,7 @@ import type { Fact } from '@/replay/core';
 import type { RowNouns, RowNoun } from '@/replay/narrowing';
 import { narrowImplies, NARROW_KINDS, type NarrowKind } from '../../shell/narrowing';
 import { readShapePhrase, type ShapeKind } from '@/parser/shapePhrase';
-import { GLUED_NAME_ATOM } from '../../shell/indexedName';
+import { GLUED_NAME_ATOM } from '../../shell/lexicon/indexedName';
 
 const KIND: Readonly<Record<ShapeKind, NarrowKind>> = {
   triangle: 'triangle',

@@ -22,7 +22,7 @@
  * `25k²` and `2ax` are all products in the exam's notation, and a student typing `2a` means the
  * same thing. Two atoms in a row multiply.
  */
-import { findJuxtaposedNumbers } from '../../shell/juxtaposedNumbers';
+import { findJuxtaposedNumbers } from '../../shell/lexicon/juxtaposedNumbers';
 import { fmtNum } from '../../shell/format';
 import { readLiteral } from '../../shell/literal';
 
@@ -77,12 +77,12 @@ export function normalizeMath(src: string): string {
  * user used a symbol of 1/2 so yes - it should be 5.5. otherwise we should reject a 5 1/2 syntax and teach to either
  * use decimal or 5+1/2 or 5*1/2"* — the glyph «5½» keeps its reading (`frameAnalytic.orthography` spells it 5.5) —
  * and 2026-11-03 (#2286) *"Refuse it, naming the line, in every builder"*. The detector is the suite's
- * (`shell/juxtaposedNumbers`, one copy for all four builders): the tokenizer refuses either shape (so no reader of a
+ * (`shell/lexicon/juxtaposedNumbers`, one copy for all four builders): the tokenizer refuses either shape (so no reader of a
  * value can multiply it, whichever rule or route reaches `parseExpr`), and `parseLine` asks it before every rule and
  * before the model, so the student gets one teaching sentence instead of each rule's own verdict. Number-then-symbol
  * juxtaposition («2x», «1/2x», «2 x», «2 √3») is untouched.
  */
-export { findMixedNumber, findJuxtaposedNumbers, type MixedNumber, type NumberPair } from '../../shell/juxtaposedNumbers';
+export { findMixedNumber, findJuxtaposedNumbers, type MixedNumber, type NumberPair } from '../../shell/lexicon/juxtaposedNumbers';
 
 // ---------------------------------------------------------------------------
 // Tokenizer

@@ -12,14 +12,14 @@
  * same gate maintained in two files, each copy fixed alone while the other silently stayed behind.
  * A fifth spelling added here reaches the grammar and the display together, or not at all.
  *
- * **It imports nothing but the shared `shell/primes` set**, which is the property that lets `parser/`, `engine/` and `render/` all depend
+ * **It imports nothing but the shared `shell/lexicon/primes` set**, which is the property that lets `parser/`, `engine/` and `render/` all depend
  * on it without depending on each other. Nothing here decides what a marking MEANS — that the vector
  * reading is honoured is `apply`'s business (ADR-3D-250). This module knows only how it is SPELLED.
  *
  * Sibling of `nouns3.ts`, deliberately not folded into it: that module is emphatic about being the
  * vocabulary of words that NAME SHAPES, and a notation mark is a different kind of thing.
  */
-import { PRIME_GLYPHS, foldPrimes } from '../../shell/primes';
+import { PRIME_GLYPHS, foldPrimes } from './primes';
 
 /**
  * THE COMBINING ARROW, `U+20D7` — the one that renders OVER the preceding letters, and the one a

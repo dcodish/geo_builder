@@ -44,7 +44,7 @@ describe('#1947 — the right angle’s vertex with further givens is taught as 
     // a further given of another kind: an angle, a coordinate (the trailing-angle row is held here, not by parity: #2106)
     ['משולש ABC ישר זווית ב-A ו-∠ABC = 30', '(1) משולש ABC  (2) ∠CAB = 90°  (3) ∠ABC = 30', 'CAB'],
     ['משולש ABC ישר זווית ב-B ו-A(0,0)', '(1) משולש ABC  (2) ∠ABC = 90°  (3) A(0,0)', 'ABC'],
-    // the hyphenated noun and the spaced conjunction (folded by shell/conjunction)
+    // the hyphenated noun and the spaced conjunction (folded by shell/lexicon/conjunction)
     ['משולש ABC ישר-זווית ב-B ו-AB = 4', '(1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4', 'ABC'],
     ['משולש ABC ישר זווית ב-B ו- AB = 4', '(1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4', 'ABC'],
   ];

@@ -1,6 +1,6 @@
 /**
  * #1912 ([ADR-3D-329](../../../docs/06b-decisions-3d.md#adr-3d-329)) — 2-D's half of the shared
- * look-alike glyph table (`shell/glyphFold`).
+ * look-alike glyph table (`shell/lexicon/glyphFold`).
  *
  * 2-D's four inline folds (∡∢ → ∠, the guarded `<` → ∠, ⁰ → °, «שורש N» → √) moved into the shared table
  * so 3-D and analytic read them too. **This lock is that 2-D's reading did not change under them** — the

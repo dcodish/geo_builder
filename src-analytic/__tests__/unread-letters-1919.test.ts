@@ -14,7 +14,7 @@ import { errorText } from '../app/errorText';
 import { analyticI18n } from '../i18n';
 import { parseLine } from '../parser/parseAnalytic';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
-import { unreadScriptRuns } from '../../shell/inputScript';
+import { unreadScriptRuns } from '../../shell/lexicon/inputScript';
 import { unreadLetterFaults, type UnreadGate } from '../../shell/__tests__/fixtures/unread-letter-rows';
 
 type T = (k: string, o?: Record<string, unknown>) => string;

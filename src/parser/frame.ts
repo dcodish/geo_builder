@@ -15,7 +15,7 @@
  * typed. The line STORED is always the one the student typed.
  */
 import { SHAPE_NOUN_WORDS, readShapePhrase, type ShapeNoun } from './shapePhrase';
-import { COPULA_HE, ULABEL, LABEL_G } from './lexicon'; // #1999 (ADR-666): the one copula atom
+import { COPULA_HE, ULABEL, LABEL_G } from '../../shell/lexicon/atoms'; // #1999 (ADR-666): the one copula atom
 
 /** The figure, as the exam refers to it — «הסרטוט», «בציור שלפניכם», «האיור». */
 const FIGURE = String.raw`(?:ה)?(?:ציור|סרטוט|שרטוט|איור)(?:\s+ש?לפני(?:ך|כם|כן))?`;

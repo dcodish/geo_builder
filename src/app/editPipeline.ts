@@ -30,10 +30,10 @@ import { extensionSideVerdict } from './extensionSide';
 import { ringOrderVerdict } from './ringOrder';
 import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
-import { findProofTarget } from '../../shell/proofTarget';
-import { unreadScript } from '../../shell/inputScript';
-import { findRadianAngle } from '../../shell/radianAngle';
-import { findNumberPair } from '../../shell/juxtaposedNumbers';
+import { findProofTarget } from '../../shell/lexicon/proofTarget';
+import { unreadScript } from '../../shell/lexicon/inputScript';
+import { findRadianAngle } from '../../shell/lexicon/radianAngle';
+import { findNumberPair } from '../../shell/lexicon/juxtaposedNumbers';
 
 export interface EditDeps {
   t: (key: string, opts?: Record<string, unknown>) => string;

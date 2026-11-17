@@ -14,7 +14,7 @@ import { errorText3 } from '../i18n/errorText3';
 import { decideSubmit3, type Fact3 } from '../store/store3';
 import { parse3 } from '../parser/parse3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
-import { unreadScriptRuns } from '../../shell/inputScript';
+import { unreadScriptRuns } from '../../shell/lexicon/inputScript';
 import { unreadLetterFaults, type UnreadGate } from '../../shell/__tests__/fixtures/unread-letter-rows';
 
 const t = i18n3d.getFixedT('he') as (k: string, o?: Record<string, unknown>) => string;

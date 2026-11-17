@@ -16,7 +16,7 @@
  */
 
 import { fmtNum } from './format';
-import { spellVulgarFractions } from './vulgarFractions';
+import { spellVulgarFractions } from './lexicon/vulgarFractions';
 
 const UNUM = String.raw`\d+(?:\.\d+)?`;
 /** `48`, `(48)`, `(12/4)`. */

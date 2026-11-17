@@ -99,7 +99,7 @@ export interface LabelProbe<L> extends Reader<L> {
 }
 
 /**
- * #2624 ([ADR-W-197](../docs/06w-decisions-workspace.md#adr-w-197)): a label carries its PRIME («A'», «A'B'C'») — the shared
+ * #2624 ([ADR-W-197](../../docs/06w-decisions-workspace.md#adr-w-197)): a label carries its PRIME («A'», «A'B'C'») — the shared
  * {@link PRIME} atom — so a primed name is one occurrence, substituted whole, never «A» with a stray mark beside it.
  */
 const DEFAULT_LABEL_SRC = GLUED_NAME_ATOM;

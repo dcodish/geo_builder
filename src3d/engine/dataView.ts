@@ -23,7 +23,7 @@ import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 import { freeDofCount3, hasAbsoluteFrameObject, knowledgeSamples3, letterIsGaugeLength3, paramIsKnowledge, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3, type Axis3, type Resolved3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, v3, type Vec3 } from './vec3';
 import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf, termLetter3 } from './types';
-import { COMBINING_ARROW } from '../lexicon/marks3';
+import { COMBINING_ARROW } from '../../shell/lexicon/marks3';
 import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { spellingOf } from './types';
 import type { Construction3, FreeVec3, FreeVecMetric3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';

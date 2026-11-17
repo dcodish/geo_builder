@@ -12,7 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runSubmit, type SubmitDeps } from '../submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
-import { CEVIAN_NOUNS_EN, CEVIAN_NOUNS_HE } from '@/parser/lexicon';
+import { CEVIAN_NOUNS_EN, CEVIAN_NOUNS_HE } from '../../../shell/lexicon/atoms';
 import { SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS } from '@/parser/shapePhrase';
 import { KEYWORD_STEMS } from '@/parser/spanAccounting';
 import { droppedPropertyWords, propertyOccurrences2, PROPERTY_VOCABULARY2 } from '@/parser/propertyWords';

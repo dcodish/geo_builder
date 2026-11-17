@@ -6,7 +6,7 @@
  * (#1912's table), and anything else is named back to the student instead of being replaced by A, B, C.
  */
 import { describe, expect, it } from 'vitest';
-import { MAX_NAME_LETTERS, unreadScript, unreadScriptRuns } from '../inputScript';
+import { MAX_NAME_LETTERS, unreadScript, unreadScriptRuns } from '../lexicon/inputScript';
 import {
   READABLE_ROWS,
   UNREAD_ROWS,

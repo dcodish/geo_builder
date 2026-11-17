@@ -6,12 +6,12 @@
  * and its panel row «∠A1» (the parameter's internal id, `∠` a namespace mark); 2-D drew a bare «1» (#263).
  *
  * The class: every place a builder SHOWS an angle label printed its storage form. The display is now one function per
- * layer over one shared spelling (`shell/indexedName` `indexedNameText`): analytic's `symbolText` for the canvas
+ * layer over one shared spelling (`shell/lexicon/indexedName` `indexedNameText`): analytic's `symbolText` for the canvas
  * (`statedText`), the panel row and any sentence quoting a stated value; 2-D's angle-alias label in `replay/core.ts`.
  * The storage id `∠A1` is unchanged (its locks are `issue-1701`, `issue-1785`, `issue-2632`).
  */
 import { describe, expect, it } from 'vitest';
-import { indexedNameText } from '../../shell/indexedName';
+import { indexedNameText } from '../../shell/lexicon/indexedName';
 import { panelKnowledge, paramRows } from '../app/panelRows';
 import { decideSubmit } from '../app/submit';
 import { derive } from '../engine/derive';

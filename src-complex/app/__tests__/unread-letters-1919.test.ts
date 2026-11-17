@@ -16,7 +16,7 @@ import { useComplexStore } from '../../store/useComplexStore';
 import { submitLine } from '../submit';
 import { errorText } from '../errorText';
 import { complexI18n } from '../../i18n';
-import { unreadScriptRuns } from '../../../shell/inputScript';
+import { unreadScriptRuns } from '../../../shell/lexicon/inputScript';
 import { CATALOG } from '../../parser/catalog';
 import { unreadLetterFaults, type UnreadGate } from '../../../shell/__tests__/fixtures/unread-letter-rows';
 

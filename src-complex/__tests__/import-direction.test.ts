@@ -47,7 +47,7 @@ const MAY_IMPORT: Record<string, readonly string[]> = {
   // `shell` is the grid-step rule (shell/ticks, #1465, ADR-W-094): the plane's grid is sized to the visible
   // window, which only the renderer knows, with the step rule analytic grids by — defined once, below both.
   render: ['value', 'scene', 'shell'],
-  // `shell` is the two-numbers detector (shell/juxtaposedNumbers, #2286, ADR-AG-397): one copy for every builder, below them all.
+  // `shell` is the two-numbers detector (shell/lexicon/juxtaposedNumbers, #2286, ADR-AG-397): one copy for every builder, below them all.
   parser: ['value', 'model', 'shell'],
   // `app` is the ONLY layer that may compose the parser with replay: parser names what the student
   // said, replay folds constraints into a figure, and neither may reach for the other. The guard

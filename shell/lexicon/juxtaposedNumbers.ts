@@ -1,5 +1,5 @@
 /**
- * TWO NUMBERS WITH ONLY WHITESPACE BETWEEN THEM (#2286, [ADR-AG-397](../docs/06c-decisions-analytic.md#adr-ag-397)) —
+ * TWO NUMBERS WITH ONLY WHITESPACE BETWEEN THEM (#2286, [ADR-AG-397](../../docs/06c-decisions-analytic.md#adr-ag-397)) —
  * the one detector every builder asks before its grammar and before the model.
  *
  * An expression reader that takes implicit multiplication read «2 3» as 2·3 = 6 in every slot a number is read in, so

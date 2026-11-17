@@ -2,7 +2,7 @@
  * #2532 ([ADR-765](../../docs/06-decisions.md#adr-765)) — AN INCIDENCE CLAUSE THE READING NEVER READ.
  *
  * The phrase sibling of #1888's label member (`unreadParts`), #1904's role-word member (`unreadRoles`) and #2198's
- * number member (`unreadNumbers`), over the same shell module (`shell/readExtent.ts`), in the same battery, so both
+ * number member (`unreadNumbers`), over the same shell module (`shell/lexicon/readExtent.ts`), in the same battery, so both
  * 2-D commit seams have it.
  *
  * WHAT WENT WRONG. «מעגל O» · «AB מיתר העובר דרך מרכז המעגל» committed `point-on-circle A, point-on-circle B,
@@ -26,11 +26,11 @@
  * weak path (escalation), never a commit.
  */
 import type { ParseContext } from '@/parser';
-import { THROUGH_OPEN, THROUGH_VERB } from '@/parser/lexicon';
+import { THROUGH_OPEN, THROUGH_VERB } from '../../shell/lexicon/atoms';
 import type { AnyCommand } from '@/engine';
-import { cutAtReading, labelRuns, readLabelRuns, readWords, type Occurrence, type PartsCut } from '../../shell/readExtent';
+import { cutAtReading, labelRuns, readLabelRuns, readWords, type Occurrence, type PartsCut } from '../../shell/lexicon/readExtent';
 import { clauseReaders, loweringKey, readerIn } from './unreadParts';
-import { LABEL_WHOLE } from '../parser/lexicon';
+import { LABEL_WHOLE } from '../../shell/lexicon/atoms';
 
 /** A whole phrase: an opener, then everything to the clause end. */
 const PHRASE_SRC = String.raw`${THROUGH_OPEN}[^,;.]*`;

@@ -30,7 +30,7 @@
  * (objects referenced → their defining points). Re-widening the EXEMPTION is not.
  */
 import type { AnyCommand } from '@/engine';
-import { CEVIAN_NOUNS_EN, CEVIAN_NOUNS_HE, ULABEL, labelsOf, LABEL, LABEL_G } from './lexicon';
+import { CEVIAN_NOUNS_EN, CEVIAN_NOUNS_HE, ULABEL, labelsOf, LABEL, LABEL_G } from '../../shell/lexicon/atoms';
 import { ROLE_NOUNS, type RoleNoun } from './roleNouns';
 
 /** Latin unit tokens — never a run of point labels. */

@@ -6,7 +6,7 @@
  *
  * Measured at ebacadd1 through `decideSubmit` → `derive`: «X_1» and «X_{1}» already folded to `X₁` (#2391, ADR-AG-315),
  * but «X1(2,3)» built a SEPARATE point `X1`, drawn flat, so «X₁(2,3)» · «X1(4,5)» drew two points; «X12», «X_{12}» and
- * «X₁₂» were `not-handled` (the name took one digit). The fold is now the suite's (`shell/indexedName.foldIndexedName`,
+ * «X₁₂» were `not-handled` (the name took one digit). The fold is now the suite's (`shell/lexicon/indexedName.foldIndexedName`,
  * `'glyph'`) at `orthography`, and every copy of the name atom reads a digit run.
  */
 import { describe, expect, it } from 'vitest';
@@ -15,7 +15,7 @@ import { derive } from '../engine/derive';
 import { buildScene } from '../render/scene';
 import { parseRenameAnalytic } from '../parser/parseAnalytic';
 import { normalizePointName } from '../app/rename';
-import { foldIndexedName } from '../../shell/indexedName';
+import { foldIndexedName } from '../../shell/lexicon/indexedName';
 
 /** Type the lines as the panel does: each recorded line is held; the verdict of every line. */
 function typed(lines: string[]): { held: string[]; kinds: string[] } {

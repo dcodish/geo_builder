@@ -9,9 +9,9 @@
 
   "layers": {
     "$comment": [
-      "A CLASSIFICATION vocabulary. Whether a non-engine layer may be physically shared (a shared/",
-      "tree) is DEFERRED — see ADR-W-003 'What this does not decide' and its named trigger.",
-      "Classifying a directory today costs nothing and makes that later decision measurable."
+      "A CLASSIFICATION vocabulary, and each layer's sharing rule. ADR-W-003 deferred whether a non-engine",
+      "layer may be physically shared; ADR-W-016 decided it for chrome (shell) and ADR-W-220 (#2766) for",
+      "vocabulary (lexicon): plane-geometry LANGUAGE is shared, engines stay per product."
     ],
     "engine": {
       "question": "Does it reason about points, lines, planes, DOF, or constraints?",
@@ -20,8 +20,14 @@
     },
     "lexicon": {
       "question": "Does it name Hebrew/English vocabulary, or map a noun to a shape?",
-      "sharing": "undecided",
-      "rationale": "The vocabulary is identical across products even though the lowering to constraints is not. src3d/lexicon carries it (#753, ADR-3D-188): a leaf importing NOTHING, so parser/ and engine/ may both read the same Hebrew noun gates without either depending on the other — the drift that had already bitten three times. Whether the layer is shared ACROSS products stays undecided."
+      "sharing": "shared",
+      "home": "shell/lexicon",
+      "rationale": "Decided by ADR-W-220 (#2766, operator 2026-11-08: \"it is time to do this ... for future, this will be more maintainable\"): plane-geometry LANGUAGE is shared, engines stay per product. The vocabulary is identical across products even though the lowering to constraints is not, so it lives ONCE, in the home tree (shell/lexicon), and every builder reads it from there. The home is a LEAF: its files import nothing outside it (the ADR-3D-188 rule of src3d/lexicon, #753, generalized), so a product's parser and engine may both read it without depending on each other, and it can never reach a product, the server, or chrome. It names words and spellings; it never reasons about points, lines, planes, DOF or constraints (that is engine, copied per product), and it never branches on which product called it.",
+      "productLocal": {
+        "$comment": "A lexicon directory outside the home is allowed only for vocabulary no plane builder reads, each with its reason. A plane builder (src, src3d, src-analytic) never holds one: its vocabulary belongs in the home.",
+        "src-complex/formulas": "The complex builder's formula table (complex numbers, not plane geometry): it maps formula names to the complex model's constraints, so it imports that model and cannot be a leaf of the shared home. No plane builder reads it."
+      },
+      "planeTrees": ["src", "src3d", "src-analytic"]
     },
     "shell": {
       "question": "Neither of the above.",
@@ -219,6 +225,7 @@
     "shell": "shell",
     "shell/export": "shell",
     "shell/frame": "shell",
+    "shell/lexicon": "lexicon",
 
     "src": "shell",
     "src/app": "engine",
@@ -242,7 +249,6 @@
     "src3d/engine": "engine",
     "src3d/i18n": "shell",
     "src3d/parser": "engine",
-    "src3d/lexicon": "lexicon",
     "src3d/render": "engine",
     "src3d/store": "engine",
     "src3d/app": "engine",
@@ -286,6 +292,7 @@
   },
 
   "classificationNotes": {
+    "shell/lexicon": "THE shared plane-geometry language (ADR-W-220, #2766): the lexical atoms 2-D's grammar composes (atoms.ts, formerly src/parser/lexicon.ts), the space unit's noun and mark vocabulary (marks3, nouns3, revolutionSize3, shapePhrase3, formerly src3d/lexicon/) and the spelling readers every builder calls at its boundary (glyph fold, input script, indexed name, primes, conjunction, incidence phrase, arc run, arc length unit, juxtaposed numbers, proof target, radian angle, read extent, vulgar fractions, formerly loose in shell/). A leaf: it imports nothing outside itself (the isolation test). What stays in shell/ beside it is chrome that PRINTS or ROUTES text rather than reading vocabulary (literal, sentences, studentText, cevianHost, narrowing, converge).",
     "shell/seo": "The page a crawler reads (ADR-W-085): pure SeoPage -> HTML plus the Vite plugin that applies it. shell: it formats text a caller hands it and reasons about nothing; every word and URL arrives in the page.",
     "src/seo": "ASSETS, not code (ADR-W-085): the builder's icon.svg and the two PNGs regenerated from it and from the app. Each product owns its art, so the four seo/ directories are four sets of pictures rather than four copies of a mechanism -- the mechanism is shell/seo, once. src3d/seo, src-complex/seo and src-analytic/seo carry the same classification for the same reason.",
     "src-analytic/debug": "The dev session trace (ADR-AG-131). shell, and deliberately: it OBSERVES the session and reasons about nothing — it holds no geometry, decides nothing a figure depends on, and is a no-op outside DEV. The sibling copies src/debug and src3d/debug carry the same classification for the same reason.",

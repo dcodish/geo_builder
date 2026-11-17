@@ -20,7 +20,7 @@
  * parameter — `2a·AB` keeps its `a`.
  */
 import { evalExpr, normalizeMath, parseExpr, type Env, type Expr } from './expr';
-import { indexedNameText } from '../../shell/indexedName';
+import { indexedNameText } from '../../shell/lexicon/indexedName';
 import { RADIUS_CAPITALS, mentionsPlane, mentionsPointName } from './carriers';
 import { ellipseRolePoint, type EllipseRole, type Pt } from './derived';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';

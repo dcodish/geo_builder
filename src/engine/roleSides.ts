@@ -25,7 +25,7 @@
  * same side again, whatever path the cycling took — so the two legs of «גובה לשוק» twice stay two legs.
  */
 import type { AnyCommand, Construction, GeoObject, Id, RoleSideBinding, SideRole } from './types';
-import { GLUED_NAME_G } from '../../shell/indexedName';
+import { GLUED_NAME_G } from '../../shell/lexicon/indexedName';
 
 /** One role a triangle's declarations induce on one of its sides. */
 export interface RoleSide {

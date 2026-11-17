@@ -17,7 +17,7 @@ import { commitVerdict } from '../submitPipeline';
 import { runEditCommit } from '../editPipeline';
 import { groupKey, replay, useGeoStore } from '@/store/geoStore';
 import { COMMAND_CATALOG, buildParseCtx, parse } from '@/parser';
-import { RING_CIRCUM_HE, RING_INSCR_HE } from '@/parser/lexicon';
+import { RING_CIRCUM_HE, RING_INSCR_HE } from '../../../shell/lexicon/atoms';
 
 const st = () => useGeoStore.getState();
 

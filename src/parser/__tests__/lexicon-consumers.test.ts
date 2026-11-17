@@ -17,7 +17,8 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SRC = resolve(__dirname, '..', '..');
-const LEXICON = join(SRC, 'parser', 'lexicon.ts');
+// #2766 (ADR-W-220): the atoms moved into the shared lexicon tree; the consumers scanned are still 2-D's.
+const LEXICON = resolve(SRC, '..', 'shell', 'lexicon', 'atoms.ts');
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir)) {
@@ -63,7 +64,7 @@ describe('#361 — every exported lexicon atom is consumed', () => {
     expect(atoms.size).toBeGreaterThanOrEqual(12);
     expect(atoms.has('LABEL')).toBe(true);
     expect(external.length).toBeGreaterThan(100_000);
-    expect(external).toContain("from './lexicon'");
+    expect(external).toContain("shell/lexicon/atoms'");
   });
 
   it('no exported atom is dead (measured 2026-09-01: PARALLEL_KW, MEET_KW, BISECT_KW, LABEL_RUN were)', () => {

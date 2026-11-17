@@ -52,7 +52,7 @@ Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
   pattern in this tree; reach for it before adding a construct.
 - **Defaults yield to statements ([ADR-052](../docs/06-decisions.md#adr-052)).** Never invent an unstated
   property: a prism not stated right is **oblique**; a qualifier the parser recognises must be one it can
-  lower (`lexicon/shapePhrase3.ts` is the one vocabulary of nouns AND adjectives, read through `statedQuadBase` /
+  lower (`shell/lexicon/shapePhrase3.ts` is the one vocabulary of nouns AND adjectives, read through `statedQuadBase` /
   `statedTriShape` / `readShapePhrase3` — a position-local qualifier test is how gaps hide). A circle through a
   ring is a claim the ring is cyclic: lower the noun's `CYCLIC_MEMBER` fix, never fit a centre and hope.
 - **Gauge vs knowledge.** A figure's placement/rotation/scale is a gauge. An unanchored figure (no equation

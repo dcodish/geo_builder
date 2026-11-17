@@ -10,7 +10,7 @@
  * A construct whose letter run encodes a ROLE assignment — «רבע מעגל AOB» means *centre O, ends A and
  * B* — fixes that assignment by POSITION. A student who writes the same three letters in a different
  * order gets an unsatisfiable figure, and a refusal that blames their geometry rather than our
- * reading. Which letter is the centre is read by ONE reader, `arcRunRoles` (shell/arcRun.ts): the
+ * reading. Which letter is the centre is read by ONE reader, `arcRunRoles` (shell/lexicon/arcRun.ts): the
  * MIDDLE letter, as in ∠AOB, or an O-family letter written first (operator ruling 2026-10-24, #2486).
  *
  * Measured on the operator's own figure — «ABC משולש ישר זוית» · «AC=15» · «BC=10» · «O על AC» ·
@@ -61,7 +61,7 @@
  * where nothing is satisfiable — close to the cost it has today instead of trebling it.
  */
 import type { AnyCommand, Id } from '@/engine';
-import { spellArcRun } from '../../shell/arcRun';
+import { spellArcRun } from '../../shell/lexicon/arcRun';
 
 /** One alternative reading: the sentence to try, and which letter it makes the centre. */
 export interface RoleReading {

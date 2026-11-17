@@ -36,7 +36,7 @@ import {
   mergeOf,
   type RingNote,
 } from '../../shell/narrowing';
-import { GLUED_NAME_WHOLE } from '../../shell/indexedName';
+import { GLUED_NAME_WHOLE } from '../../shell/lexicon/indexedName';
 
 /** The minimal fact shape this module reads (the replay `Fact`, without importing core — no cycle). */
 interface NFact {

@@ -42,8 +42,8 @@ import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { limitReached, withWorkLimit } from '../../shell/workLimit';
 import { notDecided, type NotDecided } from '../../shell/notDecided';
 import { readDisplayMode } from '../../shell/displayMode';
-import { unreadScript } from '../../shell/inputScript';
-import { findProofTarget } from '../../shell/proofTarget';
+import { unreadScript } from '../../shell/lexicon/inputScript';
+import { findProofTarget } from '../../shell/lexicon/proofTarget';
 import { parseLineV2 } from '../parser/rules';
 import { trigAngleMismatch } from '../parser/normalize';
 import { complexScopeOf, parseAsk } from './deriveLines';
@@ -407,7 +407,7 @@ export function submitQuery(raw: string): boolean {
 }
 
 /**
- * #1870 — is `line` a claim the student must PROVE? The shared rule (`shell/proofTarget`, ADR-W-107) all
+ * #1870 — is `line` a claim the student must PROVE? The shared rule (`shell/lexicon/proofTarget`, ADR-W-107) all
  * four builders call at their submit gate; on a hit the refusal quotes the proof sentence and nothing is
  * recorded. One helper for both gate entry points (`submitLine`, `editLine`); the load path replays
  * through `submitLine`, so an old file's proof line is reported in the load audit, not silently ✓.
@@ -464,7 +464,7 @@ export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = fa
   if (proof) return { kind: 'refuse', error: proof };
 
   // #1919 (ADR-626): a letter this tool cannot read, refused before the ask routing and before the
-  // grammar — the shared rule all four builders call (`shell/inputScript`). Complex folds no glyphs (a
+  // grammar — the shared rule all four builders call (`shell/lexicon/inputScript`). Complex folds no glyphs (a
   // superscript digit is an exponent here, #1912), and it does not need to: the rule folds the look-alike
   // LETTERS itself, so «КМО» reads as KMO and only a letter with no Latin twin is named.
   const unread = unreadScript(line);

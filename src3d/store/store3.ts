@@ -29,10 +29,10 @@ import { normalizeLabel3, pointLabels3, renameFacts3, renamePlaneDisplay3, renam
 import { temporal } from 'zundo';
 import { rowId3 } from './rowIds3';
 import { ingestTypedText } from '../../shell/bidi';
-import { findProofTarget } from '../../shell/proofTarget';
-import { unreadScript } from '../../shell/inputScript';
-import { findRadianAngle } from '../../shell/radianAngle';
-import { findNumberPair, teachPair } from '../../shell/juxtaposedNumbers';
+import { findProofTarget } from '../../shell/lexicon/proofTarget';
+import { unreadScript } from '../../shell/lexicon/inputScript';
+import { findRadianAngle } from '../../shell/lexicon/radianAngle';
+import { findNumberPair, teachPair } from '../../shell/lexicon/juxtaposedNumbers';
 import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3 } from './unreadParts3';
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
@@ -42,13 +42,13 @@ import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableCircle3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { definiteCircle3 } from '../engine/definiteCircle';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
-import { definiteShapeExample3, definiteSolidExample3, solidNounArticle3 } from '../lexicon/shapePhrase3';
+import { definiteShapeExample3, definiteSolidExample3, solidNounArticle3 } from '../../shell/lexicon/shapePhrase3';
 import { anglesProveConvex3, commandStatesCircle3, convexWhenSimple, statedConcyclic3, statedRingCorners3, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
-import { foldPrimes3 } from '../lexicon/marks3';
+import { foldPrimes3 } from '../../shell/lexicon/marks3';
 import { checkInSpan, clearEngineCaches3, statedLetterValue3, crossingOnInk3, declaredRingCrossed3, evaluate3, searchSeed3, type SeedResume3, type SeedSearch3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
@@ -2979,7 +2979,7 @@ function readStatement3(
   // #1666 (ADR-3D-295): a PROOF TARGET is refused BEFORE the grammar, at the one reader both statement
   // seams share (`submit`, the ✎ edit). It used to parse: ADR-3D-002 stripped «הוכיחו כי» / "prove that" and
   // read the claim, which since the T2 addendum DRIVES a free figure — so the figure was made to satisfy
-  // what the student was asked to prove. The rule is shared with 2-D and analytic (`shell/proofTarget`).
+  // what the student was asked to prove. The rule is shared with 2-D and analytic (`shell/lexicon/proofTarget`).
   const proof = findProofTarget(utterance);
   if (proof) return { ok: false, error: { code: 'proof-target', sentence: proof.sentence } };
   // #2062 (ADR-3D-480): the exam's membership QUESTION, read at the same reader — never a given, never the model. It
@@ -2990,17 +2990,17 @@ function readStatement3(
     return { ok: false, error: { code: 'answer-in-panel', point: member.point, plane: member.plane, known: row !== null } };
   }
   // #1837 (ADR-W-142): a plane-geometry angle written in radians, refused at the same reader with 2-D's rule
-  // (`shell/radianAngle`) — never recorded as a π-labelled mark, never sent to the model.
+  // (`shell/lexicon/radianAngle`) — never recorded as a π-labelled mark, never sent to the model.
   if (findRadianAngle(utterance)) return { ok: false, error: { code: 'radian-angle' } };
   // #2286 (ADR-AG-397): two numbers with only a space between them, refused at the same reader with the suite's one
-  // detector (`shell/juxtaposedNumbers`) — never sent to the model. The mixed number «2 1/2» is not this shape (#2248).
+  // detector (`shell/lexicon/juxtaposedNumbers`) — never sent to the model. The mixed number «2 1/2» is not this shape (#2248).
   const pair = findNumberPair(utterance);
   if (pair) {
     const { kind: _k, ...teach } = teachPair(utterance, pair, (l) => parse3(l).ok);
     return { ok: false, error: { code: 'juxtaposed-numbers', detail: pair.text, ...teach } };
   }
   // #1919 (ADR-3D-328): a letter the tool cannot read, refused at the one statement reader both seams
-  // share — the shared rule every builder calls (`shell/inputScript`), run after the glyph fold's
+  // share — the shared rule every builder calls (`shell/lexicon/inputScript`), run after the glyph fold's
   // look-alike row, so «משולש КМО» still records KMO and «משולש ДЖФ» is refused naming Д, Ж, Ф.
   const unread = unreadScript(utterance);
   if (unread) return { ok: false, error: { code: `unread-${unread.kind}`, detail: unread.detail } };

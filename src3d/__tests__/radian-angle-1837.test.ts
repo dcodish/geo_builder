@@ -15,7 +15,7 @@ import { errorText3 } from '../i18n/errorText3';
 import { decideSubmit3, type Fact3 } from '../store/store3';
 import { decideDeterministic3, refusalCategory3 } from '../app/decideDeterministic3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
-import { findRadianAngle } from '../../shell/radianAngle';
+import { findRadianAngle } from '../../shell/lexicon/radianAngle';
 import { radianAngleFaults, RADIAN_SENTENCE_HE, RADIAN_SENTENCE_SPACE_EN, RADIAN_SENTENCE_SPACE_HE, type RadianGate } from '../../shell/__tests__/fixtures/radian-angle-rows';
 
 const t = i18n3d.getFixedT('he') as (k: string, o?: Record<string, unknown>) => string;

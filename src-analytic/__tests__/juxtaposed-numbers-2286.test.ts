@@ -5,7 +5,7 @@
  * Measured at ebacadd1 through `decideSubmit`: «A(2 3, 1)» recorded A = (6, 1), «x = 2 3» the line x = 6, «y = 2 3x + 1»
  * the line y = 6x + 1, «x² + y² = 2 3» a circle of radius √6 — green, for values the student never stated. The cause:
  * `tokenize`'s implicit product takes any operand after another, and the one guard (`findMixedNumber`, ADR-AG-284) knew
- * only «integer, space, fraction». The detector is now the suite's (`shell/juxtaposedNumbers`), asked by the tokenizer
+ * only «integer, space, fraction». The detector is now the suite's (`shell/lexicon/juxtaposedNumbers`), asked by the tokenizer
  * and by `parseLine` before every rule and before the model.
  */
 import { describe, expect, it } from 'vitest';
@@ -16,7 +16,7 @@ import { runFallback } from '../app/fallback';
 import { errorText } from '../app/errorText';
 import { analyticI18n } from '../i18n';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
-import { findJuxtaposedNumbers } from '../../shell/juxtaposedNumbers';
+import { findJuxtaposedNumbers } from '../../shell/lexicon/juxtaposedNumbers';
 
 type T = (k: string, o?: Record<string, unknown>) => string;
 const plain = (f: T): T => (k, o) => f(k, o).replace(/[⁦-⁩]/g, '');

@@ -15,7 +15,7 @@ import { handScaleGivenToPivot3, isScaleGivenClaim, magnitudeScalarPin3, magnitu
 import { nounAdmits, nounOfKind, resolveSolidSubject } from './solidSubject';
 import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, cyclicFixCommands, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_BASES, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
-import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
+import { notCyclic3, type ShapeAdj3 } from '../../shell/lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { builtFrom3, carrierParams3, determinationReach3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';

@@ -42,12 +42,12 @@ export type InputError =
    * #1919 (ADR-626, the operator's ruling of 2026-10-08: *"we only support english or hebrew … rejected.
    * in all tools"*) — a letter this tool cannot read. Complex never DREW such a letter's figure (the
    * silent drop is 2-D's and 3-D's), but it answered «ДЖФ = 2 + i» with the generic "I did not
-   * understand": its share of the ruling is the WORDING, which names the letters. `shell/inputScript`.
+   * understand": its share of the ruling is the WORDING, which names the letters. `shell/lexicon/inputScript`.
    */
   | { key: 'unread-name' | 'unread-word'; detail: string }
   /**
    * #1870 (ADR-CX-083, ADR-W-107; ruling B14/D3) — a claim the student is asked to PROVE («הוכיחו כי |z1| = 5»),
-   * never a given. `detail` is the proof sentence `shell/proofTarget` found, which the refusal quotes.
+   * never a given. `detail` is the proof sentence `shell/lexicon/proofTarget` found, which the refusal quotes.
    */
   | { key: 'proof-target'; detail: string }
   | { key: 'duplicate-name'; detail: string }

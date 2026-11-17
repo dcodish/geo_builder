@@ -22,7 +22,7 @@
  * Nothing here knows a builder: the caller passes its own submit, and maps its own verdict to an outcome.
  */
 import { stripFormatControls } from './bidi';
-import { isProofTarget } from './proofTarget';
+import { isProofTarget } from './lexicon/proofTarget';
 
 /** One sentence of a paste. */
 export interface Sentence {

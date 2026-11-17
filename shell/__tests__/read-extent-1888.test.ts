@@ -1,9 +1,9 @@
 /**
- * #1888 (ADR-W-120) — `shell/readExtent.ts`, product-free: the substitution probe, the co-reference exemption,
+ * #1888 (ADR-W-120) — `shell/lexicon/readExtent.ts`, product-free: the substitution probe, the co-reference exemption,
  * and the parts cut, driven by a toy reader so the contract is pinned apart from any builder's grammar.
  */
 import { describe, expect, it } from 'vitest';
-import { cutAtReading, labelRuns, locate, readLabelRuns, type Reader } from '../readExtent';
+import { cutAtReading, labelRuns, locate, readLabelRuns, type Reader } from '../lexicon/readExtent';
 
 /** A toy grammar: it reads the FIRST label run of the text and nothing else («AB on CD» → "AB"). */
 const firstRun: Reader<string> = {

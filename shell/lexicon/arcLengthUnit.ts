@@ -1,7 +1,7 @@
 /**
- * AN ARC'S VALUE WITH A LENGTH UNIT, ONCE ([ADR-789](../docs/06-decisions.md#adr-789), #2032) — «קשת AB = 4 ס"מ».
+ * AN ARC'S VALUE WITH A LENGTH UNIT, ONCE ([ADR-789](../../docs/06-decisions.md#adr-789), #2032) — «קשת AB = 4 ס"מ».
  *
- * The operator, 2026-11-02 ([ADR-W-175](../docs/06w-decisions-workspace.md#adr-w-175)): *"An arc is in degrees, unless
+ * The operator, 2026-11-02 ([ADR-W-175](../../docs/06w-decisions-workspace.md#adr-w-175)): *"An arc is in degrees, unless
  * specifically says something about the length of an arc. So if no units are given an arc is degrees."* A stated length
  * unit says exactly that, so the line is the arc's length, the reading of «אורך הקשת AB הוא 4». Each builder strips a unit
  * at its own boundary because a unit is noise on any other value, which is how this line read as 4°. So this reads the

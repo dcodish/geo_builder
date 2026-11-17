@@ -1,9 +1,9 @@
 /**
- * #1904 (ADR-604, ADR-W-120) — `readWords`, the word class of `shell/readExtent.ts`, on a toy reader: an occurrence is
+ * #1904 (ADR-604, ADR-W-120) — `readWords`, the word class of `shell/lexicon/readExtent.ts`, on a toy reader: an occurrence is
  * read when DELETING it changes the reading; the same word twice, read together, is a co-reference.
  */
 import { describe, expect, it } from 'vitest';
-import { readWords, type Reader } from '../readExtent';
+import { readWords, type Reader } from '../lexicon/readExtent';
 
 /** A toy grammar: it reads the FIRST role word of the line and nothing after it. */
 const firstRole: Reader<string> = {

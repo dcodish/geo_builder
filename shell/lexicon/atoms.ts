@@ -22,13 +22,13 @@
  * All atoms are SOURCE FRAGMENTS (strings for `new RegExp`) with no capture groups and no anchors.
  */
 
-import { GLUED_NAME_ATOM, PRIMED } from '../../shell/indexedName';
+import { GLUED_NAME_ATOM, PRIMED } from './indexedName';
 
 // ── Labels ────────────────────────────────────────────────────────────────────────────────────────
 /** A point-label token: one Latin letter + optional glued digits + an optional PRIME (`A`, `B2`, `O1`, `A'`).
  *  Case-insensitive contexts must validate case at the use site (see parse.ts `isUpperLabel`).
  *  #2624 ([ADR-806](../../docs/06-decisions.md#adr-806)): the prime is the shared atom's (`PRIMED`,
- *  `shell/indexedName`) — without it every rule read «A'» as A and a stray mark, and «A' על המעגל» drew a point A. */
+ *  `shell/lexicon/indexedName`) — without it every rule read «A'» as A and a stray mark, and «A' על המעגל» drew a point A. */
 export const LABEL = String.raw`[A-Za-z]\d*${PRIMED}`;
 /** An explicitly-uppercase label (the student-vertex convention), prime included («A'B'C'» is three labels) — the
  *  shared glued-index name atom (`GLUED_NAME_ATOM`), the one 2-D's engine, replay and store tokenize ids with. */
@@ -54,10 +54,10 @@ export const labelsOf = (s: string): string[] => s.match(LABEL_G) ?? [];
  *  consumer — the `(?<![A-Za-z])` guard some rules add blocks a LATIN label, not a Hebrew particle. */
 export const NUM = String.raw`(?<![א-ת])-?\d+(?:\.\d+)?`;
 
-/** [ADR-635](../../docs/06-decisions.md#adr-635) — the vulgar-fraction spelling lives in `shell/vulgarFractions.ts`
+/** [ADR-635](../../docs/06-decisions.md#adr-635) — the vulgar-fraction spelling lives in `shell/lexicon/vulgarFractions.ts`
  *  since #2255 ([ADR-W-147](../../docs/06w-decisions-workspace.md#adr-w-147)), where 3-D reads it too; re-exported
  *  so every 2-D import is unchanged. */
-export { spellVulgarFractions } from '../../shell/vulgarFractions';
+export { spellVulgarFractions } from './vulgarFractions';
 
 /**
  * #2065 ([ADR-700](../../docs/06-decisions.md#adr-700)) — the SEPARATOR of a two-term ratio «p:q» / «p ל-q» /
@@ -135,10 +135,10 @@ export function readWordFraction(s: string): { p: number; q: number; at: number;
 
 // ── Name glyphs (#1814, ADR-600) ──────────────────────────────────────────────────────────────────
 /** The student's name alphabet (Latin + Greek), an index on a name, and `UNGLUED` — where a number may
- *  begin. Shared with analytic through `shell/indexedName` (the third-copy rule): a guard that keeps a value
+ *  begin. Shared with analytic through `shell/lexicon/indexedName` (the third-copy rule): a guard that keeps a value
  *  out of a name composes `UNGLUED`, and is never re-spelled per reader (the Latin-only `(?<![A-Za-z])` of
  *  #267 is how «∠ABC = α1» read as 1°). Only the atoms the grammar consumes are re-exported (#361). */
-export { GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName } from '../../shell/indexedName';
+export { GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName } from './indexedName';
 
 // ── Circle roles (ADR-244, #2459 ADR-754) ─────────────────────────────────────────────────────────
 /**
@@ -372,7 +372,7 @@ export const CEVIAN_NOUNS_EN = String.raw`altitude|height|median|bisect\w*`;
  * («דרך הנקודה C העבירו משיק»), so only the verb opener is ever deleted alone. The `_HE` / `_EN` atoms are bare
  * alternations; `THROUGH_OPEN` / `THROUGH_VERB` carry the boundaries.
  *
- * #2547 ([ADR-W-161](../../docs/06w-decisions-workspace.md#adr-w-161)): the atoms live in `shell/incidencePhrase.ts`,
+ * #2547 ([ADR-W-161](../../docs/06w-decisions-workspace.md#adr-w-161)): the atoms live in `shell/lexicon/incidencePhrase.ts`,
  * one spelling of "through" for every builder (analytic's arm 3 of the lost part reads them too); re-exported here.
  */
 export {
@@ -382,7 +382,7 @@ export {
   THROUGH_OPEN_EN,
   THROUGH_OPEN,
   THROUGH_VERB,
-} from '../../shell/incidencePhrase';
+} from './incidencePhrase';
 
 /** The Hebrew copula between a subject and its predicate noun — «AM הוא חוצה זווית», «ABC היא …» (#1685/#1999,
  *  [ADR-666](../../docs/06-decisions.md#adr-666)). One atom: `frame.ts` and the cevian subject read it. Bare alternation. */

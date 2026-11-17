@@ -27,7 +27,7 @@
  * (a pure reading or an analysis probe) says nothing about what exists, so nothing is created there.
  */
 import { applyCommand, constraintRefs, lower, objectParents, type AnyCommand, type Command, type Construction, type GeoObject, type Id } from '@/engine';
-import { LABEL_WHOLE } from './lexicon';
+import { LABEL_WHOLE } from '../../shell/lexicon/atoms';
 
 /** A point label as the student types it in 2-D: an uppercase letter and glued digits. Circles (`circle-O`), lines
  *  (`bis-…`), anonymous centres (`@ctr-O`) and symbols never match. */

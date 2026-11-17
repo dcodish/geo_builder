@@ -11,7 +11,7 @@
  *
  * 1. **A part the reading never read** ({@link unreadPart}). The line parses, but a label run the student typed
  *    changes nothing in what it parses to — «C מחלקת את AB ביחס 3:2 ב-B», «…3:2 על CA». Measured, never declared:
- *    `shell/readExtent.ts` substitutes the run's letters and re-reads the line with `parseLine`, the reading
+ *    `shell/lexicon/readExtent.ts` substitutes the run's letters and re-reads the line with `parseLine`, the reading
  *    itself (context-free here, so one reader serves every clause).
  * 2. **A declined line whose rest is a lost part** ({@link declinedPart}). «משולש ABC ישר זווית ב-B» and
  *    «AC ו-BD נפגשים בנקודה E על AB» do not parse at all, so the probe never runs on them, and they would go to the
@@ -26,7 +26,7 @@
  * 3. **A declined line whose rest is an incidence clause on a segment** ({@link declinedThrough}; #2547,
  *    [ADR-AG-334](../../docs/06c-decisions-analytic.md#adr-ag-334)). «AB מיתר העובר דרך מרכז המעגל»: arm 2 leaves it,
  *    because its rest says something («מרכז», «מעגל»). 2-D refuses it whole (ADR-765), and the operator ruled analytic
- *    the same (2026-10-26). The head before the first incidence opener (`shell/incidencePhrase.ts`) must record and
+ *    the same (2026-10-26). The head before the first incidence opener (`shell/lexicon/incidencePhrase.ts`) must record and
  *    read as a segment, and the phrase's point must carry no fresh letter (named by its role, or by a letter the head
  *    carries). A fresh letter («… דרך C») is left to the model, as 2-D leaves it.
  *
@@ -35,12 +35,12 @@
  * Decided by the reading, never by the spelling.
  */
 import { pointDeclaration } from '../parser/locusPhrases';
-import { cutAtReading, labelRuns, locate, readLabelRuns, type Reader } from '../../shell/readExtent';
+import { cutAtReading, labelRuns, locate, readLabelRuns, type Reader } from '../../shell/lexicon/readExtent';
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
-import { foldConjunctionSpacing } from '../../shell/conjunction';
+import { foldConjunctionSpacing } from '../../shell/lexicon/conjunction';
 import { VOCABULARY_ANALYTIC } from '../parser/scopeAnalytic';
 import { parseLine, POINT_NOUN_EN_ATOM, POINT_NOUN_HE_ATOM } from '../parser/parseAnalytic';
-import { firstIncidenceOpener, incidencePhraseAtStart } from '../../shell/incidencePhrase';
+import { firstIncidenceOpener, incidencePhraseAtStart } from '../../shell/lexicon/incidencePhrase';
 import type { Fact } from '../engine/types';
 import { splitPointNames, withPointName } from '../engine/pointName';
 
@@ -133,7 +133,7 @@ function isLostPart(rest: string, carried: ReadonlySet<string>): boolean {
 
 /**
  * #1947 — a rest cut at its top-level conjunctions: the Hebrew «ו-» (its spacings folded by the shared
- * `shell/conjunction` chokepoint, never re-spelled here) and the English "and".
+ * `shell/lexicon/conjunction` chokepoint, never re-spelled here) and the English "and".
  */
 const conjunctionPieces = (rest: string): string[] =>
   foldConjunctionSpacing(rest)
@@ -199,7 +199,7 @@ function pointCarriesNoFreshLetter(point: string, carried: ReadonlySet<string>):
 /**
  * ARM 3 — #2547 ([ADR-AG-334](../../docs/06c-decisions-analytic.md#adr-ag-334)): A THROUGH-CLAUSE ON A SEGMENT, refused
  * whole as 2-D refuses it (ADR-765). Operator, 2026-10-26 (D10 = A): *"refuse now, like 2-D … instead of passing it to the
- * AI"*. A DECLINED line whose head — the text before its first incidence opener (`shell/incidencePhrase.ts`, the one
+ * AI"*. A DECLINED line whose head — the text before its first incidence opener (`shell/lexicon/incidencePhrase.ts`, the one
  * spelling every builder reads), a trailing comma dropped as 2-D's cut drops it — records and READS AS a segment (a
  * `segment` or `cevian-of` fact: a chord, segment, diameter, tangent, altitude, median), and whose rest is ONE incidence
  * phrase whose point carries no fresh letter. «AB מיתר העובר דרך מרכז המעגל» → «(1) AB מיתר  (2) העובר דרך מרכז המעגל».

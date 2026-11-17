@@ -53,9 +53,40 @@ reading, with one implementation and two consumers.
 | **Primitives** | `theme.ts` · `bidi.ts` · `i18n.ts` · `format.ts` · `math.tsx` · `symbols.ts` · `save.ts` · `switcherConfig.ts` · `work.ts` (the work queue, below) | Pure, no React, no product knowledge. Design tokens, bidi isolation, the i18n bootstrap, number/math display, the save envelope, the config overlay merge |
 | **Frame** | `AppFrame` · `Workbench` · `Switcher` · `InputArea` · `FactList` · `DataPanel` · `AskLane` · `SymbolRow` · `QuickChips` · `Banner` (`error`, `notice`, `info`) · `InfoNote` (the ⓘ on the `info` strip, [ADR-W-180](06w-decisions-workspace.md#adr-w-180); `NarrowingNote` is its name for the narrowing family) · `ManualScreen` · `Modal` · `ToolButton` · `FigureName` | React components implementing the D1–D10 rulings ([02w, *Suite rulings*](02w-requirements-workspace.md), moved from docs/28 §4a), each taking its product-shaped content as a slot |
 | **Export** | `export/svgToPng.ts` · `export/questionDoc.ts` | The shared output paths behind "save image" and "download question" — four consumers: every builder hands `questionDoc` its own givens list and bidi segmenter ([ADR-W-126](06w-decisions-workspace.md#adr-w-126)) |
-| **Also in the tree** | `ticks.ts` · `proofTarget.ts` · `studentText.ts` · `conjunction.ts` · `indexedName.ts` · `marks.ts` · `displayMode.ts` · `mathExpr.ts` · `usageLog.ts` · `session/` · `llm/` · `seo/` · frame: `LetterPopover` · `SegmentMenu` · `ResumeOffer` · `ShareSheet` | Not yet described in a section of their own: the primitives above plus the session, LLM-harness and site-metadata folders, and the frame pieces named |
+| **Lexicon** | `lexicon/` (below) | The shared plane-geometry language: word lists, lexical atoms and the spelling readers every builder calls at its boundary. A leaf |
+| **Also in the tree** | `ticks.ts` · `studentText.ts` · `marks.ts` · `displayMode.ts` · `mathExpr.ts` · `usageLog.ts` · `session/` · `llm/` · `seo/` · frame: `LetterPopover` · `SegmentMenu` · `ResumeOffer` · `ShareSheet` | Not yet described in a section of their own: the primitives above plus the session, LLM-harness and site-metadata folders, and the frame pieces named |
 
 The primitives layer is the one a product can adopt without changing its layout.
+
+### The shared plane-geometry lexicon, `shell/lexicon/` ([ADR-W-220](06w-decisions-workspace.md#adr-w-220), #2766)
+
+**Plane-geometry language is shared; engines stay per product.** The words a student types are the same in every
+builder even where what a builder makes of them is not, so the vocabulary lives once, here, and every builder imports
+it. `BOUNDARIES.json` classifies the directory `lexicon` and names it the layer's `home`.
+
+| File | What it holds | Was |
+|---|---|---|
+| `atoms.ts` | 2-D's lexical atoms: the label token, the number grammar, keyword morphology (`heWord`, `enWord`), the cevian, angle, perpendicular, parallel and circle-role words. A docs/17 §3 chokepoint (the lexical ratchet) | `src/parser/lexicon.ts` |
+| `nouns3.ts` · `shapePhrase3.ts` · `marks3.ts` · `revolutionSize3.ts` | The space unit's noun gates, shape nouns and adjectives, marking vocabulary and revolution-size words (the `3` names the space unit) | `src3d/lexicon/` |
+| `glyphFold.ts` · `inputScript.ts` · `indexedName.ts` · `primes.ts` · `conjunction.ts` · `vulgarFractions.ts` · `incidencePhrase.ts` · `arcRun.ts` · `arcLengthUnit.ts` · `juxtaposedNumbers.ts` · `proofTarget.ts` · `radianAngle.ts` · `readExtent.ts` | The spelling readers each builder calls at its boundary (described in their own sections below and in “The gates a typed line passes”) | loose in `shell/` |
+
+**The rules** (`server/__tests__/isolation.test.ts`, “the shared plane-geometry lexicon”):
+- **A leaf.** A file in `lexicon/` imports nothing outside it, so a product's parser and engine may both read it
+  without depending on each other, and it can never reach a product, the server or chrome (ADR-3D-188's rule for
+  `src3d/lexicon`, generalized). It names words and spellings; it never reasons about points, lines, DOF or
+  constraints, and never branches on which product called it.
+- **One home.** A lexicon directory elsewhere is listed in the manifest's `productLocal` with its reason; a plane
+  builder (2-D, 3-D, analytic) holds none. Today the one entry is `src-complex/formulas` (complex numbers, not plane
+  geometry).
+- **Real.** Every plane builder imports the home.
+
+**What stays in `shell/` beside it**, and why: modules that PRINT or ROUTE text rather than read vocabulary —
+`literal.ts` (prints a given as typed; composes `format`), `sentences.ts` (splits a paste; composes `bidi`),
+`studentText.ts`, `cevianHost.ts` (the row's host tag wording), `narrowing.ts`, `converge.ts`.
+
+**Next (#2766 phase 3, not built).** One shared plane reader, sentence → a product-neutral form → each builder's
+commands, tried on one family (cevians) and judged by that family's parity rows in all three builders. See
+ADR-W-220 “Next step”.
 
 **One i18n bootstrap ([#2201](https://github.com/dcodish/geo_builder/issues/2201) phase 0).** All four
 builders boot their i18n through `shell/i18n.ts` `createProductI18n`, each passing only its own resources
@@ -184,7 +215,7 @@ A `SymbolSpec` whose face (`label`) is one character inserts exactly that charac
 
 ### The spaced conjunction ([ADR-AG-239](06c-decisions-analytic.md#adr-ag-239))
 
-`shell/conjunction.ts` `foldConjunctionSpacing` turns «AB ו- BC», «AB ו -BC» and «AB ו - BC» into «AB ו-BC». It is a PARSER-boundary fold, not a store one: 2-D `normalizeUtterance`, 3-D `normalize3` and analytic `orthography` call it, and the stored line stays as typed. A glued «ו-» always folds; a hyphen with a space before it folds only before a name-shaped token, so a minus sign («2 ו -3», «ו -y = x», «a ו -a») is never absorbed into the conjunction. The cross-builder lock is the parity rows `conj-space-*-1691-*`.
+`shell/lexicon/conjunction.ts` `foldConjunctionSpacing` turns «AB ו- BC», «AB ו -BC» and «AB ו - BC» into «AB ו-BC». It is a PARSER-boundary fold, not a store one: 2-D `normalizeUtterance`, 3-D `normalize3` and analytic `orthography` call it, and the stored line stays as typed. A glued «ו-» always folds; a hyphen with a space before it folds only before a name-shaped token, so a minus sign («2 ו -3», «ו -y = x», «a ו -a») is never absorbed into the conjunction. The cross-builder lock is the parity rows `conj-space-*-1691-*`.
 
 ### Look-alike glyphs ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329))
 
@@ -200,7 +231,7 @@ A `SymbolSpec` whose face (`label`) is one character inserts exactly that charac
 
 ### The input-script rule ([ADR-626](06-decisions.md#adr-626), [ADR-3D-328](06b-decisions-3d.md#adr-3d-328))
 
-`shell/inputScript.ts` answers one question for all four builders: **is there a letter in this line the tool
+`shell/lexicon/inputScript.ts` answers one question for all four builders: **is there a letter in this line the tool
 cannot read?** `unreadScriptRuns` folds the look-alike letters (the glyph table's last row, so «КМО» is
 already KMO), then returns the maximal letter/digit runs carrying a letter outside what the tool reads —
 Latin `A–Z a–z`, Hebrew, Greek (notation, by the ruling), the letterlike and mathematical-alphanumeric
@@ -231,7 +262,7 @@ The cross-builder lock is `shell/__tests__/fixtures/unread-letter-rows.ts` with 
 
 ### Indexed names ([ADR-600](06-decisions.md#adr-600))
 
-`shell/indexedName.ts` is the student's name alphabet, once: `NAME_LETTER` (Latin, and Greek in both cases), `INDEX` (glued digits, `_1` / `_{1}`, subscript digits), `INDEXED_NAME` («S1», «α1», «Α1» — one letter with an index, standing alone) and `UNGLUED`, the zero-width guard that a number never begins glued to a name letter, after an `_`, or inside another number. **The prime** (#2624, [ADR-W-197](06w-decisions-workspace.md#adr-w-197)): `PRIME` is `'` not before a lone «s» (the possessive; spelled with the letter so a case-insensitive rule keeps «A'B'»), `PRIMED` the prime when there is one (a name followed by a prime takes it, so a rule never backs off to the bare letter), and `NAME_ATOM` the point name (a capital, a digit-run index in ASCII or subscript digits, `PRIMED`), with `NAME_ATOM_G`, `NAME_ATOM_WHOLE`, `isPointName` and `splitPointNames`; `GLUED_NAME_ATOM` (and `GLUED_NAME_G` / `GLUED_NAME_WHOLE`) is the same name with an ASCII-digit index, 2-D's id spelling. Analytic's `POINT_NAME` is `NAME_ATOM`; 2-D's `ULABEL`, its engine/replay/store tokenizers and `readExtent`'s default label are `GLUED_NAME_ATOM`; the glyph fold stays `shell/primes`' `foldPrimes`. It is pure regex source with no product knowledge. 2-D re-exports it from `src/parser/lexicon.ts` (the angle value reader, the subscript fold and the number gate compose it); analytic's tokenizer test `INDEXED_TOKEN` (`src-analytic/engine/carriers.ts`, #1785) is `INDEXED_NAME_RE`. The cross-builder lock is the parity rows `indexed-*-1785` and `*-1814`. `foldIndexedName(s, to)` (#2075, [ADR-AG-398](06c-decisions-analytic.md#adr-ag-398)) is the one fold of a name's index spellings at a parser boundary: `'glued'` is 2-D's ASCII form (`X_1`, `X_{1}`, `α_1` → `X1`; `normalizePointSubscript`), `'glyph'` analytic's (a CAPITAL base's underscore form and glued digits → subscript glyphs, `X1`, `X_{12}` → `X₁`, `X₁₂`; `orthography`, rename, the ask lane). A lowercase base, a letter index (`S_{ABC}`) and a decimal are never touched.
+`shell/lexicon/indexedName.ts` is the student's name alphabet, once: `NAME_LETTER` (Latin, and Greek in both cases), `INDEX` (glued digits, `_1` / `_{1}`, subscript digits), `INDEXED_NAME` («S1», «α1», «Α1» — one letter with an index, standing alone) and `UNGLUED`, the zero-width guard that a number never begins glued to a name letter, after an `_`, or inside another number. **The prime** (#2624, [ADR-W-197](06w-decisions-workspace.md#adr-w-197)): `PRIME` is `'` not before a lone «s» (the possessive; spelled with the letter so a case-insensitive rule keeps «A'B'»), `PRIMED` the prime when there is one (a name followed by a prime takes it, so a rule never backs off to the bare letter), and `NAME_ATOM` the point name (a capital, a digit-run index in ASCII or subscript digits, `PRIMED`), with `NAME_ATOM_G`, `NAME_ATOM_WHOLE`, `isPointName` and `splitPointNames`; `GLUED_NAME_ATOM` (and `GLUED_NAME_G` / `GLUED_NAME_WHOLE`) is the same name with an ASCII-digit index, 2-D's id spelling. Analytic's `POINT_NAME` is `NAME_ATOM`; 2-D's `ULABEL`, its engine/replay/store tokenizers and `readExtent`'s default label are `GLUED_NAME_ATOM`; the glyph fold stays `shell/lexicon/primes`' `foldPrimes`. It is pure regex source with no product knowledge. 2-D re-exports it from `shell/lexicon/atoms.ts` (the angle value reader, the subscript fold and the number gate compose it); analytic's tokenizer test `INDEXED_TOKEN` (`src-analytic/engine/carriers.ts`, #1785) is `INDEXED_NAME_RE`. The cross-builder lock is the parity rows `indexed-*-1785` and `*-1814`. `foldIndexedName(s, to)` (#2075, [ADR-AG-398](06c-decisions-analytic.md#adr-ag-398)) is the one fold of a name's index spellings at a parser boundary: `'glued'` is 2-D's ASCII form (`X_1`, `X_{1}`, `α_1` → `X1`; `normalizePointSubscript`), `'glyph'` analytic's (a CAPITAL base's underscore form and glued digits → subscript glyphs, `X1`, `X_{12}` → `X₁`, `X₁₂`; `orthography`, rename, the ask lane). A lowercase base, a letter index (`S_{ABC}`) and a decimal are never touched.
 
 ### The example chips' math ([ADR-W-100](06w-decisions-workspace.md#adr-w-100))
 
@@ -257,7 +288,7 @@ Shell CODE holds no strings. The one exception, ruled by the operator on 2026-10
 - **Refusal voice ([ADR-W-151](06w-decisions-workspace.md#adr-w-151), #1868).** The "not understood" refusal is one suite key, `suite.refusal.notUnderstood`, with no interpolation (no echo of the line). Every builder's not-understood path reads it: 2-D's submit pipeline and `rightAngleVertexNote`, 3-D's `errorText3` for `not-understood`, analytic's and complex's `errorText` for `not-handled`. `<tree>/__tests__/not-understood-1868.test.ts` renders it through each builder's own refusal path (assertions in `shell/__tests__/fixtures/not-understood-1868.ts`); `suite-vocabulary.test.ts` holds the ruled text, the four retired keys, and the "tool's limit" frame (any message saying «מגבלה של הכלי» opens «הכלי עדיין לא יודע» and closes «— זו מגבלה של הכלי»).
 - **The already-there note ([ADR-W-152](06w-decisions-workspace.md#adr-w-152), #1990 → [ADR-W-204](06w-decisions-workspace.md#adr-w-204), #2790).** A line the figure already holds is recorded as its own row with one suite key, `suite.notice.alreadyHeld`, «זה כבר קיים באיור — נוסף כנתון נפרד.», with no interpolation: 2-D's `decideDeterministic` and `editPipeline`, analytic's held `record` (`notice.code: 'already-held'`, ADR-AG-462), complex's `record` `note` (ADR-CX-089). 3-D still answers its `already-stated` no-row notice with the older key `suite.notice.alreadyDrawn` until its port lands. `<tree>/__tests__/already-drawn-1990.test.ts` drives a restatement through each builder (assertions in `shell/__tests__/fixtures/already-drawn-1990.ts`); `suite-vocabulary.test.ts` holds the text and the five retired keys.
 - **The «same point» notice ([ADR-W-176](06w-decisions-workspace.md#adr-w-176), #1595; on `InfoNote` in every builder, [ADR-W-180](06w-decisions-workspace.md#adr-w-180)).** Two letters the drawn figure puts on one dot are named in one suite key, `suite.notice.converge`, 2-D's ADR-123 «{{a}} ו-{{b}} נפלו על אותה נקודה.». `shell/converge.ts` holds the shared half: `coincidentPairs(points, same)` and `convergeText(pairs, t, name?)`. Each builder passes the points its canvas labels and its own identity test (2-D `LEN_EPS` with the forcedness split and the ADR-447 filter, 3-D `samePlace3`, analytic `crossings.apart`, complex the solver's `TOL`), and reads them from the drawn derivation on every render. Locked per tree by `<tree>/__tests__/converge-1595.test.ts` (assertions in `shell/__tests__/fixtures/converge-1595.ts`).
-- **The proof-target refusal ([ADR-W-194](06w-decisions-workspace.md#adr-w-194), #2492).** One suite key, `suite.refusal.proofTarget` (ADR-W-107's sentence, the claim in `{{sentence}}`), read by every builder; the four product keys are retired. A second sentence says where the claim can be checked: 2-D's own `input.scope.proofTargetCheck` (the operator's sentence, the button's label nested as `$t(actions.viewRelations)`), and `suite.refusal.proofTargetCheckPanel` for a builder that sends the student to its data panel, whose `{{panel}}` and `{{ask}}` are that builder's own labels; 3-D's own `err.proofTargetCheck` names what its panel can check ([ADR-W-205](06w-decisions-workspace.md#adr-w-205)). `shell/proofTarget.ts` holds the two key names and `proofTargetPanelText(t, sentence, labels)`. Details under *Proof targets* below.
+- **The proof-target refusal ([ADR-W-194](06w-decisions-workspace.md#adr-w-194), #2492).** One suite key, `suite.refusal.proofTarget` (ADR-W-107's sentence, the claim in `{{sentence}}`), read by every builder; the four product keys are retired. A second sentence says where the claim can be checked: 2-D's own `input.scope.proofTargetCheck` (the operator's sentence, the button's label nested as `$t(actions.viewRelations)`), and `suite.refusal.proofTargetCheckPanel` for a builder that sends the student to its data panel, whose `{{panel}}` and `{{ask}}` are that builder's own labels; 3-D's own `err.proofTargetCheck` names what its panel can check ([ADR-W-205](06w-decisions-workspace.md#adr-w-205)). `shell/lexicon/proofTarget.ts` holds the two key names and `proofTargetPanelText(t, sentence, labels)`. Details under *Proof targets* below.
 
 ### Student-facing text ([ADR-W-096](06w-decisions-workspace.md#adr-w-096))
 
@@ -385,7 +416,7 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 
 ### Proof targets ([ADR-W-107](06w-decisions-workspace.md#adr-w-107))
 
-`shell/proofTarget.ts` decides whether a typed line contains a claim the student is asked to PROVE. It is pure and knows no product: `findProofTarget(text)` returns `{ target: true, span: [start, end), sentence }` or `null`, with indices into the string the caller passed.
+`shell/lexicon/proofTarget.ts` decides whether a typed line contains a claim the student is asked to PROVE. It is pure and knows no product: `findProofTarget(text)` returns `{ target: true, span: [start, end), sentence }` or `null`, with indices into the string the caller passed.
 
 | match | where | examples |
 | --- | --- | --- |
@@ -405,7 +436,7 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 | builder | the second sentence | composed in |
 | --- | --- | --- |
 | 2-D | `input.scope.proofTargetCheck`: «ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור $t(actions.viewRelations).», the label nested from the key that labels the button | `proofTargetNote(sentence)` (`src/app/decideDeterministic.ts`): a `DecideNote` whose `also` is the line. The submit seam and the ✎ edit seam both render it with `renderNote` |
-| analytic, complex | `suite.refusal.proofTargetCheckPanel`, with `panel` = `t('dataTitle')` and `ask` = `t('askAdd')`: the panel's heading and its ask button, as that App draws them | `proofTargetPanelText` (`shell/proofTarget.ts`), called by each `errorText` |
+| analytic, complex | `suite.refusal.proofTargetCheckPanel`, with `panel` = `t('dataTitle')` and `ask` = `t('askAdd')`: the panel's heading and its ask button, as that App draws them | `proofTargetPanelText` (`shell/lexicon/proofTarget.ts`), called by each `errorText` |
 | 3-D | `err.proofTargetCheck` ([ADR-W-205](06w-decisions-workspace.md#adr-w-205)): «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «$t(dataPanel.title)»: שאלו שם על הזווית ולחצו «$t(query.add)» — למשל ∠(AB, CD).», a product key because it names what 3-D's panel answers (its ask box shows no length on a figure with no stated size); both names nested from the keys App3 draws | `errorText3`: the suite sentence, then the line |
 
 The panel line sends the student to the claim's QUANTITIES («עבור AB = AC שאלו על AB ועל AC»), because no ask box judges a typed claim. A builder that adopts it passes its own labels; it never retypes them.
@@ -414,9 +445,9 @@ The panel line sends the student to the claim's QUANTITIES («עבור AB = AC �
 
 ### Angles in radians ([ADR-W-142](06w-decisions-workspace.md#adr-w-142))
 
-`shell/juxtaposedNumbers.ts` decides whether a typed line holds two NUMBERS with only whitespace between them (#2286, [ADR-AG-397](06c-decisions-analytic.md#adr-ag-397)). It is pure, knows no product and returns no strings. `findMixedNumber` (an integer, whitespace, a fraction «5 1/2», ADR-AG-284), `findNumberPair` (any other pair «2 3», a pair that starts a mixed number skipped), `findJuxtaposedNumbers` (either, the mixed number first — analytic's tokenizer and `parseLine`, complex's `lex`) and `teachPair(line, pair, reads)`, which keeps each reading — `2.3` and `23` when both are whole, the product `2*3` or its value, or the comma `2, 3` — only when the caller's grammar reads the line with it in place (#1156). 2-D (`decidePreParse`, `runEditCommit`) and 3-D (`readStatement3`) ask `findNumberPair`; the sentence is the suite key `suite.refusal.juxtaposedNumbers` (and `…Product`, `…Comma`).
+`shell/lexicon/juxtaposedNumbers.ts` decides whether a typed line holds two NUMBERS with only whitespace between them (#2286, [ADR-AG-397](06c-decisions-analytic.md#adr-ag-397)). It is pure, knows no product and returns no strings. `findMixedNumber` (an integer, whitespace, a fraction «5 1/2», ADR-AG-284), `findNumberPair` (any other pair «2 3», a pair that starts a mixed number skipped), `findJuxtaposedNumbers` (either, the mixed number first — analytic's tokenizer and `parseLine`, complex's `lex`) and `teachPair(line, pair, reads)`, which keeps each reading — `2.3` and `23` when both are whole, the product `2*3` or its value, or the comma `2, 3` — only when the caller's grammar reads the line with it in place (#1156). 2-D (`decidePreParse`, `runEditCommit`) and 3-D (`readStatement3`) ask `findNumberPair`; the sentence is the suite key `suite.refusal.juxtaposedNumbers` (and `…Product`, `…Comma`).
 
-`shell/radianAngle.ts` decides whether a typed line gives an ANGLE MEASURE written with π. It is pure, knows no product and returns no strings: `findRadianAngle(text)` returns `{ radian: true, span: [start, end), value }` or `null`, with indices into the string the caller passed.
+`shell/lexicon/radianAngle.ts` decides whether a typed line gives an ANGLE MEASURE written with π. It is pure, knows no product and returns no strings: `findRadianAngle(text)` returns `{ radian: true, span: [start, end), value }` or `null`, with indices into the string the caller passed.
 
 | match | examples |
 | --- | --- |
@@ -433,7 +464,7 @@ A π value is π, kπ, π/n, kπ/n, k/n π, with spaces and parentheses; π is t
 
 `shell/sentences.ts` turns a pasted paragraph into the sentences a builder submits one by one. It is pure, knows no product and returns no strings.
 
-- `splitSentences(text) → Sentence[] | null` — `{ text, rest }` per sentence: `text` is what the builder reads (format controls stripped, a final «.» dropped, «?»/«!» kept); `rest` is the paste from that sentence on, as typed, which is what the box holds if the chain stops there. A boundary is a run of «.?!» (bidi marks inside it skipped) at bracket depth 0 followed by whitespace or the end. Not a boundary: a decimal, a dot in a bracket, «i.e.»/«e.g.»/«etc.»/«vs.»/«cf.»/«fig.». `null` for one sentence, and for a paste carrying a proof target (`shell/proofTarget`, ADR-W-107), which the builder refuses whole.
+- `splitSentences(text) → Sentence[] | null` — `{ text, rest }` per sentence: `text` is what the builder reads (format controls stripped, a final «.» dropped, «?»/«!» kept); `rest` is the paste from that sentence on, as typed, which is what the box holds if the chain stops there. A boundary is a run of «.?!» (bidi marks inside it skipped) at bracket depth 0 followed by whitespace or the end. Not a boundary: a decimal, a dot in a bracket, «i.e.»/«e.g.»/«etc.»/«vs.»/«cf.»/«fig.». `null` for one sentence, and for a paste carrying a proof target (`shell/lexicon/proofTarget`, ADR-W-107), which the builder refuses whole.
 - `submitSentences(sentences, submitOne) → Promise<box>` — awaits each sentence's `SentenceOutcome` in order: `'consumed'` goes on; `'kept'` stops with `rest`; `{ prefill }` stops with the canonical, its sentence end restored, then the next sentence's `rest`.
 - `submitTyped(raw, submitOne, setBox)` — the box's submit for a builder whose one-sentence submit answers an outcome: one sentence is the one-element case. `setBox` takes an UPDATE of the box's current text (a React state setter fits), never a bare string.
 - `boxAfterSubmit(submitted, next) → (current) => string` ([ADR-W-198](06w-decisions-workspace.md#adr-w-198), #2782) — the one way a finished submit writes the box: the submitted text becomes `next`; anything else the box holds by then (a line typed while the submit waited on the geometry worker or the model) stays as typed. `submitTyped` writes through it, and so does 2-D's pipeline.
@@ -444,7 +475,7 @@ A π value is π, kπ, π/n, kπ/n, k/n π, with spaces and parentheses; π is t
 
 ### Read extent ([ADR-W-120](06w-decisions-workspace.md#adr-w-120))
 
-`shell/readExtent.ts` measures which parts of a line a builder's reading READ. It is pure and knows no product; the caller passes a `Reader` (`read(text) → lowering | null`, `same`) in its own context.
+`shell/lexicon/readExtent.ts` measures which parts of a line a builder's reading READ. It is pure and knows no product; the caller passes a `Reader` (`read(text) → lowering | null`, `same`) in its own context.
 
 - `labelRuns(text, run?, label?)` — the label runs, located (default `[A-Z]\d*` with `indexedName`'s `PRIMED`, glued, so «A'B'» is one run of A′ and B′ and a primed name is substituted whole, #2624 [ADR-W-197](06w-decisions-workspace.md#adr-w-197); 3-D passes its own, repeated primes).
 - `readLabelRuns(text, lowering, probe)` — `{ read, unread, exempt }`: a run is read when replacing one of its letters (a letter of the line, else a fresh one outside the line and `figureLabels`; a figure letter is never a stand-in — a rule that names a new point falls back to its default name when the letter is taken) changes the lowering or fails the read. A co-reference is exempt here; `probe.exempt` adds the builder's own.

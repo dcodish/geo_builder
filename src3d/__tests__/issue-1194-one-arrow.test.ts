@@ -32,7 +32,7 @@
 import { describe, expect, it } from 'vitest';
 import { factDisplay3, vectorNotation } from '../render/notation';
 import { parse3 } from '../parser/parse3';
-import { COMBINING_ARROW, SPACING_ARROWS } from '../lexicon/marks3';
+import { COMBINING_ARROW, SPACING_ARROWS } from '../../shell/lexicon/marks3';
 
 /** A `vec-rel` fact carrying `u` — the shape the step list hands the formatter. */
 const row = (utterance: string) => factDisplay3({ utterance, cmds: [{ type: 'vec-rel' }] }, new Set());

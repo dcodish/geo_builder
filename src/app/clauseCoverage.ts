@@ -41,7 +41,7 @@ import type { ParseContext, ScopeMatch } from '@/parser';
 import type { AnyCommand } from '@/engine';
 import { clausesOf } from './independence';
 import { dryRunOutcome, trialFacts, type Fact } from '@/store/geoStore';
-import { LABEL_G } from '../parser/lexicon';
+import { LABEL_G } from '../../shell/lexicon/atoms';
 
 interface ClauseReading {
   clause: string;

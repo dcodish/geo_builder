@@ -19,21 +19,21 @@
 
 import { readOperand, readRelationSides } from './operandToken';
 import { stripFormatControls } from '../../shell/bidi';
-import { foldConjunctionSpacing } from '../../shell/conjunction';
-import { foldGlyphs } from '../../shell/glyphFold';
-import { spellVulgarFractions } from '../../shell/vulgarFractions';
+import { foldConjunctionSpacing } from '../../shell/lexicon/conjunction';
+import { foldGlyphs } from '../../shell/lexicon/glyphFold';
+import { spellVulgarFractions } from '../../shell/lexicon/vulgarFractions';
 import { readLiteral } from '../../shell/literal';
 import { isPlanar, sameOperand } from '../engine/operands';
 import { statedPlaneRuns3 } from '../engine/mintable';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, RevolutionKind, SolidKind, SolidNoun, SymComp, SymTerm, CompSrcs, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, ringCircleId3, soleSymOf, symsOfAffine } from '../engine/types';
-import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../lexicon/nouns3';
-import { REV_CONE_ONLY_NOUN_HE, REV_SIZE_NOUN_EN, REV_SIZE_NOUN_HE, REV_SOLID_EN, REV_SOLID_HE, REV_UNREAD_SLOT_EN, REV_UNREAD_SLOT_HE } from '../lexicon/revolutionSize3';
-import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
-import { isTriangleNoun3, POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, shapeNounArticle3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
+import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../../shell/lexicon/nouns3';
+import { REV_CONE_ONLY_NOUN_HE, REV_SIZE_NOUN_EN, REV_SIZE_NOUN_HE, REV_SOLID_EN, REV_SOLID_HE, REV_UNREAD_SLOT_EN, REV_UNREAD_SLOT_HE } from '../../shell/lexicon/revolutionSize3';
+import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../../shell/lexicon/marks3';
+import { isTriangleNoun3, POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, shapeNounArticle3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../../shell/lexicon/shapePhrase3';
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
 // reader (the ask lane, the LLM sequence gate) reaches it through the normaliser that applies it.
-export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
+export { foldPrimes3, PRIME_GLYPHS3 } from '../../shell/lexicon/marks3';
 import { cyclicFixCommands, cyclicFixRelations, shapeInternal3, type QuadBase, type ShapeRelation3 } from '../engine/baseShapes';
 import { riderPairsT, riderWholeSide, riderWholeT } from '../engine/onSegmentRatio';
 
@@ -183,7 +183,7 @@ function normalizeText3(s: string): string {
     // #1691 (ADR-AG-239): «AB ו- CD», «ו -CD», «ו - CD» are «ו-CD» — the shared fold every builder's boundary calls.
     // #1912 ([ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329)): a LOOK-ALIKE GLYPH is the symbol it
     // renders as — ⟂ ≡ ⊥, ∡/∢ ≡ ∠, the guarded `<` ≡ ∠, ⁰/º/˚ ≡ °, «שורש N» ≡ √. 3-D folded none of them,
-    // so «AC ⟂ AB» was "not understood" while «AC ⊥ AB» built; the table is the shared `shell/glyphFold`,
+    // so «AC ⟂ AB» was "not understood" while «AC ⊥ AB» built; the table is the shared `shell/lexicon/glyphFold`,
     // which 2-D's boundary calls too. It runs BEFORE `upliftLowercaseLabels` (whose anchor set reads
     // `[∠∡∢]`) and before every rule, and the stored fact row keeps the glyph the student typed.
     // #2255 (ADR-3D-374): `spellVulgarFractions` wraps the folds below — see where it closes.
@@ -1450,7 +1450,7 @@ const GREEK = /[α-ωΑ-Ω]/;
  * bare statement must understand the framed one. The PROOF framing (`הוכיחו כי` / `prove that`) was
  * stripped here too until #1666 (ADR-3D-295): a claim to prove is not a given, and since the T2 addendum a
  * claim on a free figure DRIVES it — so it is refused at the store's statement reader before this runs
- * (`shell/proofTarget`), and the parser no longer reads past it. #337 (ADR-3D-088): the corpus wording
+ * (`shell/lexicon/proofTarget`), and the parser no longer reads past it. #337 (ADR-3D-088): the corpus wording
  * «נתון שהזווית שבין … שווה לזווית שבין …» reached no rule for want of exactly this.
  */
 const stripStatementPrefix = (s: string): string =>
@@ -2323,7 +2323,7 @@ export function isBareAltitude3(utterance: string): boolean {
  * own name token; x, y, z are axes). The singular WORD is stripped by `normalize3` and survives as the vector
  * marking, so a bare marked name (or a name list) is the declaration; an UNMARKED bare «u» is never one (it stays the
  * ask lane's). The Hebrew plural noun is not stripped, so it is read here. The «ו-» spacing is already folded by
- * `shell/conjunction` at the seam (ADR-AG-239).
+ * `shell/lexicon/conjunction` at the seam (ADR-AG-239).
  */
 const VEC_NAME_LIST_SEP = /\s*,\s*(?:ו-?\s*|and\s+)?|\s+(?:ו-?\s*|and\s+)/i;
 const declareVector: Rule = (s) => {

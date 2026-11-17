@@ -75,7 +75,11 @@ function directories(tree: string): string[] {
 
 /** All import/require specifiers in a file (static, dynamic, and re-exports). */
 function importSpecifiers(file: string): string[] {
-  const text = fs.readFileSync(file, 'utf8');
+  return specifiersOf(fs.readFileSync(file, 'utf8'));
+}
+
+/** The specifiers of a source text (split out so the leaf rule's negative control can feed it a fake file). */
+function specifiersOf(text: string): string[] {
   const specs: string[] = [];
   const re = /(?:from\s*|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g;
   for (let m = re.exec(text); m; m = re.exec(text)) specs.push(m[1]);
@@ -163,6 +167,83 @@ describe('product boundaries (BOUNDARIES.json is the authority)', () => {
           `such import exists. Remove the entry rather than leaving the manifest describing a ` +
           `coupling the code no longer has.`,
       ).toBeGreaterThan(0);
+    }
+  });
+});
+
+/**
+ * #2766 ([ADR-W-220](../../docs/06w-decisions-workspace.md#adr-w-220)) — PLANE-GEOMETRY LANGUAGE IS SHARED, ENGINES
+ * STAY PER PRODUCT. The lexicon layer's sharing is decided: the vocabulary lives once, in the home tree the manifest
+ * names, and every plane builder reads it from there. Three properties make that a rule rather than a folder:
+ *  - the home is a LEAF — a file in it imports nothing outside it, so it can never reach a product, the server or
+ *    chrome, and a product's parser and engine may both read it without depending on each other (ADR-3D-188's
+ *    rule for src3d/lexicon, generalized);
+ *  - vocabulary has ONE home — a lexicon directory elsewhere is listed in `productLocal` with its reason, and a plane
+ *    builder holds none (its words belong in the home, or the three copies grow back);
+ *  - the sharing is real — every plane builder imports the home (the manifest never advertises a sharing the code
+ *    lost).
+ */
+describe('the shared plane-geometry lexicon (ADR-W-220, #2766)', () => {
+  type LexiconLayer = {
+    sharing: string;
+    home: string;
+    productLocal: Record<string, string>;
+    planeTrees: string[];
+  };
+  const layer = (manifest.layers as Record<string, LexiconLayer>).lexicon;
+  const HOME = layer.home;
+  const homeAbs = path.join(ROOT, HOME);
+  const inHome = (abs: string) => abs === homeAbs || abs.startsWith(homeAbs + path.sep);
+
+  /** The specifiers of `text` (a file living at `file`) that leave the home: anything not resolving inside it. */
+  function leavesHome(file: string, text: string): string[] {
+    return specifiersOf(text).filter((spec) => !spec.startsWith('.') || !inHome(path.resolve(path.dirname(file), spec)));
+  }
+
+  it('the layer is decided — shared, with a declared home classified lexicon', () => {
+    expect(layer.sharing).toBe('shared');
+    expect(fs.existsSync(homeAbs), `the lexicon home ${HOME} is missing`).toBe(true);
+    expect(CLASSIFICATION[HOME]).toBe('lexicon');
+    for (const t of layer.planeTrees) expect(TREES, `planeTrees names undeclared tree ${t}`).toContain(t);
+  });
+
+  it('the home is a leaf: it imports nothing outside itself', () => {
+    const files = sourceFiles(homeAbs).filter((f) => !f.split(path.sep).includes('__tests__'));
+    expect(files.length, 'the home holds no source — the scan would be vacuous').toBeGreaterThan(10);
+    const out = files.flatMap((f) =>
+      leavesHome(f, fs.readFileSync(f, 'utf8')).map((s) => `${path.relative(ROOT, f).split(path.sep).join('/')} -> ${s}`),
+    );
+    expect(out, 'a lexicon file names words; what it needs from elsewhere belongs in the caller, not here').toEqual([]);
+  });
+
+  it('the leaf rule can fail (negative control)', () => {
+    const fake = path.join(homeAbs, 'fake.ts');
+    expect(leavesHome(fake, "import { x } from './glyphFold';")).toEqual([]);
+    expect(leavesHome(fake, "import { fmtNum } from '../format';")).toEqual(['../format']);
+    expect(leavesHome(fake, "import { LABEL } from '../../src/parser/parse';")).toEqual(['../../src/parser/parse']);
+    expect(leavesHome(fake, "import x from 'i18next';")).toEqual(['i18next']);
+  });
+
+  it('vocabulary has one home: every other lexicon directory is listed with its reason, and none sits in a plane builder', () => {
+    const local = withoutComments(layer.productLocal);
+    const stray = Object.entries(CLASSIFICATION)
+      .filter(([dir, l]) => l === 'lexicon' && dir !== HOME && !dir.startsWith(HOME + '/') && !(dir in local))
+      .map(([dir]) => dir);
+    expect(stray, `a lexicon directory outside ${HOME}: move its words into the home, or list it in productLocal`).toEqual([]);
+    for (const [dir, why] of Object.entries(local)) {
+      expect(CLASSIFICATION[dir], `productLocal ${dir} is not classified lexicon`).toBe('lexicon');
+      expect(why.length, `productLocal ${dir} has no reason`).toBeGreaterThan(20);
+      const tree = layer.planeTrees.find((t) => dir === t || dir.startsWith(t + '/'));
+      expect(tree, `${dir} is plane-builder vocabulary kept outside the home`).toBeUndefined();
+    }
+  });
+
+  it('the sharing is real: every plane builder reads the home', () => {
+    for (const tree of layer.planeTrees) {
+      const n = sourceFiles(path.join(ROOT, tree)).filter((f) =>
+        importSpecifiers(f).some((s) => s.startsWith('.') && inHome(path.resolve(path.dirname(f), s))),
+      ).length;
+      expect(n, `${tree} imports nothing from ${HOME} — the manifest advertises a sharing the code lost`).toBeGreaterThan(0);
     }
   });
 });

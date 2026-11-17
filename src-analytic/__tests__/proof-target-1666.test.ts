@@ -20,7 +20,7 @@ import { errorText } from '../app/errorText';
 import { analyticI18n } from '../i18n';
 import { derive } from '../engine/derive';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
-import { findProofTarget } from '../../shell/proofTarget';
+import { findProofTarget } from '../../shell/lexicon/proofTarget';
 import { proofTargetFaults, type ProofGate } from '../../shell/__tests__/fixtures/proof-target-rows';
 import { PANEL_POINTER, PROOF_TARGET_SENTENCE, panelDrawnFaults } from '../../shell/__tests__/fixtures/proof-target-check-2492';
 

@@ -26,7 +26,7 @@
 import { sample } from './rng';
 import { dist3, dot3, norm3, ringCircumcentre2, sub3, type Vec3 } from './vec3';
 import type { Command3, Construction3, Id, PointDef, SolidKind, SolidObj } from './types';
-import type { ShapeAdj3 } from '../lexicon/shapePhrase3';
+import type { ShapeAdj3 } from '../../shell/lexicon/shapePhrase3';
 import { kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 
 /** The quadrilateral base shapes a solid can stand on. */

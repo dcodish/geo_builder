@@ -19,7 +19,7 @@
  * number at all. Asking «AB» on a figure that has not fixed it gets the open answer — which is
  * itself worth knowing, and is the truthful one.
  */
-import { foldIndexedName } from '../../shell/indexedName';
+import { foldIndexedName } from '../../shell/lexicon/indexedName';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';

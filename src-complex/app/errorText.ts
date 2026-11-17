@@ -7,7 +7,7 @@
  * where the strip, the load audit and the tests all call the same function.
  */
 import type { ReservedConstant } from '../model/naming';
-import { proofTargetPanelText } from '../../shell/proofTarget';
+import { proofTargetPanelText } from '../../shell/lexicon/proofTarget';
 import type { Translate } from '../model/why';
 import { whyText } from '../replay/scene2';
 import type { InputError } from '../store/useComplexStore';

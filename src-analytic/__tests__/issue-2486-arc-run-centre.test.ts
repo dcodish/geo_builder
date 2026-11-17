@@ -1,5 +1,5 @@
 /**
- * #2486 (ADR-AG-331) — analytic reads an arc's three letters with 2-D's ONE reader (`shell/arcRun.ts`): the MIDDLE
+ * #2486 (ADR-AG-331) — analytic reads an arc's three letters with 2-D's ONE reader (`shell/lexicon/arcRun.ts`): the MIDDLE
  * letter is the centre (operator ruling 2026-10-24, e8 A), or an O-family letter written first. Before, analytic's
  * quarter read the FIRST letter and its sector read the middle with no O-family exception («גזרה OAB» had centre A,
  * where 2-D draws O) — a divergence under R163 ("analytic's arcs build as 2-D's").
@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import { decideSubmit } from '../app/submit';
 import { derive } from '../engine/derive';
-import { arcRunRoles } from '../../shell/arcRun';
+import { arcRunRoles } from '../../shell/lexicon/arcRun';
 
 const SEEDS = [0, 1, 2];
 

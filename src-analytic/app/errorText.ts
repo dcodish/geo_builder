@@ -8,7 +8,7 @@
  * curve kind cannot reach a refusal without a noun, which is how «הנקודה parabola-I» happened.
  */
 import { MAX_FIGURE_STATEMENTS } from '../../shell/save';
-import { proofTargetPanelText } from '../../shell/proofTarget';
+import { proofTargetPanelText } from '../../shell/lexicon/proofTarget';
 import type { RefKind } from '../engine/names';
 import type { InputError } from '../store/useAnalyticStore';
 import type { HostRef } from '../engine/apply';

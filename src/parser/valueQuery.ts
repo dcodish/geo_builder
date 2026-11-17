@@ -18,7 +18,7 @@
  */
 import type { Id, ValueQuery } from '@/engine';
 import { normalizeUtterance } from './parse';
-import { ULABEL } from './lexicon';
+import { ULABEL } from '../../shell/lexicon/atoms';
 
 /** A point label: an uppercase letter, optional digit subscript, optional prime — the lexicon's atom (#2624). */
 const PT = ULABEL;

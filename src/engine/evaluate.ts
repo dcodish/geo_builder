@@ -30,7 +30,7 @@ import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isS
 import { sideRecordsOf, sideShortfall, statedTangency, type SideRecord } from './requirements';
 import { solveLM } from './solveLM';
 import { budgetExceeded, chargeHit, computeWithCell, countWork, exactKey, measuredRun, registerLedger, servedRuns, serveRun, servingRepeats, solveBudget, type WorkCell } from './solveBudget';
-import { GLUED_NAME_WHOLE } from '../../shell/indexedName';
+import { GLUED_NAME_WHOLE } from '../../shell/lexicon/indexedName';
 import { joinParts, partsOf } from './components';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */

@@ -1,7 +1,7 @@
 /**
  * #1888 item B ([ADR-3D-316](../../docs/06b-decisions-3d.md#adr-3d-316)) — A PART THE READING NEVER READ, in 3-D.
  *
- * The 3-D member over `shell/readExtent.ts` (ADR-W-120), the port of 2-D's `unreadParts` (ADR-603). Both
+ * The 3-D member over `shell/lexicon/readExtent.ts` (ADR-W-120), the port of 2-D's `unreadParts` (ADR-603). Both
  * statement seams reach it (`decideCommands3` on the deterministic lane, the ✎ `replaceFact`), so an edit
  * refuses what a submit refuses.
  *
@@ -32,10 +32,10 @@
  * teaches a line the tool cannot read (docs/17 §9).
  */
 import { parse3, subjectFrameOf3 } from '../parser/parse3';
-import { HE_PREFIX, PART_HE, POLYGON_EN, POLYGON_HE, QUALIFIER_HE } from '../lexicon/nouns3';
+import { HE_PREFIX, PART_HE, POLYGON_EN, POLYGON_HE, QUALIFIER_HE } from '../../shell/lexicon/nouns3';
 import type { Command3 } from '../engine/types';
-import { foldConjunctionSpacing } from '../../shell/conjunction';
-import { cutAtReading, labelRuns, locate, readLabelRuns, type Occurrence, type PartsCut, type Reader } from '../../shell/readExtent';
+import { foldConjunctionSpacing } from '../../shell/lexicon/conjunction';
+import { cutAtReading, labelRuns, locate, readLabelRuns, type Occurrence, type PartsCut, type Reader } from '../../shell/lexicon/readExtent';
 
 /** A 3-D label run: capitals with digits and primes, glued («ABCA'B'C'», «A1»). */
 export const LABEL_RUN3 = /(?<![A-Za-z])(?:[A-Z]\d*'*)+(?![A-Za-z])/g;
@@ -182,7 +182,7 @@ const BARE_LABELS3 = /^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?[A-Z]\
  * The line's clauses — 2-D's `clausesOf` (ADR-603's one splitter), read by `parse3`. A boundary is cut only when the
  * text on both sides says more than naming points, and a piece with no subject of its own continues the clause
  * before it when that subject with the piece reads as a statement. The spaced «ו-» spellings are folded first by the
- * shared `shell/conjunction` chokepoint (#1691), as analytic's arm does (ADR-AG-301).
+ * shared `shell/lexicon/conjunction` chokepoint (#1691), as analytic's arm does (ADR-AG-301).
  */
 export function clausesOf3(utterance: string): string[] {
   const bits = foldConjunctionSpacing(utterance).split(SEPARATORS3);

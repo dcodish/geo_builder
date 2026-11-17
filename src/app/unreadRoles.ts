@@ -1,7 +1,7 @@
 /**
  * #1904 ([ADR-604](../../docs/06-decisions.md#adr-604)) — A ROLE WORD THE READING NEVER READ.
  *
- * The word sibling of #1888's label member (`unreadParts`), over the same shell module (`shell/readExtent.ts`,
+ * The word sibling of #1888's label member (`unreadParts`), over the same shell module (`shell/lexicon/readExtent.ts`,
  * the word class), in the same battery, so both 2-D commit seams have it.
  *
  * WHAT WENT WRONG. «משולש ABC» · «AD גובה לצלע BC שהוא גם תיכון» committed `midpoint, segment`: the median rule is
@@ -21,11 +21,11 @@
  */
 import { augmentParseCtx, parse } from '@/parser';
 import type { ParseContext } from '@/parser';
-import { BISECT_KW, CEVIAN_NOUNS_EN, CEVIAN_NOUNS_HE } from '@/parser/lexicon';
+import { BISECT_KW, CEVIAN_NOUNS_EN, CEVIAN_NOUNS_HE } from '../../shell/lexicon/atoms';
 import type { AnyCommand } from '@/engine';
-import { labelRuns, readWords, type Occurrence, type Reader } from '../../shell/readExtent';
+import { labelRuns, readWords, type Occurrence, type Reader } from '../../shell/lexicon/readExtent';
 import { loweringKey } from './unreadParts';
-import { LABEL_WHOLE } from '../parser/lexicon';
+import { LABEL_WHOLE } from '../../shell/lexicon/atoms';
 
 /** A cevian role; `verb` is a bare bisect verb («שחוצה את …», "bisects"), whose object the word alone does not name. */
 type Role = 'altitude' | 'median' | 'bisector' | 'verb';

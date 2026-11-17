@@ -21,7 +21,7 @@
  */
 import { parse3, CEVIAN_NOUNS3_EN, CEVIAN_NOUNS3_HE, PERP_WORDS3 } from '../parser/parse3';
 import type { Command3 } from '../engine/types';
-import { labelRuns, readWords, type Occurrence, type Reader } from '../../shell/readExtent';
+import { labelRuns, readWords, type Occurrence, type Reader } from '../../shell/lexicon/readExtent';
 import { LABEL3, LABEL_RUN3 } from './unreadParts3';
 
 /** A role; `verb` is a bare bisect verb, `perp` a ⟂ word — neither names a cevian line to teach. */

@@ -41,7 +41,7 @@ import {
 import { FILLER, KEYWORD_STEMS } from './spanAccounting';
 import { SHAPE_NOUN_WORDS } from './shapePhrase';
 import { describedCircle, ringOf, ringRoleSpans, type RingSpan } from './ringRoles';
-import { ULABEL, LABEL_WHOLE } from './lexicon';
+import { ULABEL, LABEL_WHOLE } from '../../shell/lexicon/atoms';
 
 type QuadNounKind = 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'trapezoid' | 'kite';
 /** What a property word names. */

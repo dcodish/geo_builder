@@ -42,7 +42,7 @@
 import type { AnyCommand } from '@/engine';
 import { factorSpans, normalizeUtterance } from './parse';
 import { unaccountedLabels, type LabelAccountCtx } from './labelAccounting';
-import { GREEK_LETTER, INDEX, RATIO_SEP } from './lexicon';
+import { GREEK_LETTER, INDEX, RATIO_SEP } from '../../shell/lexicon/atoms';
 
 export interface UnaccountedSpan {
   kind: 'label' | 'number' | 'relation' | 'symbol' | 'unknown-word';

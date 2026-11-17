@@ -20,26 +20,26 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, COPULA_HE, NUM, LABEL, ULABEL, LABEL_G, LABEL_WHOLE, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, LINE_OPERAND_NOUN, POINT_OPERAND_NOUN, EXTENSION_REF, CIRCLE_NOUN_PHRASE_HE, CIRCLE_NOUN_PHRASE_EN } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, COPULA_HE, NUM, LABEL, ULABEL, LABEL_G, LABEL_WHOLE, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, LINE_OPERAND_NOUN, POINT_OPERAND_NOUN, EXTENSION_REF, CIRCLE_NOUN_PHRASE_HE, CIRCLE_NOUN_PHRASE_EN } from '../../shell/lexicon/atoms';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
-import { foldConjunctionSpacing } from '../../shell/conjunction';
+import { foldConjunctionSpacing } from '../../shell/lexicon/conjunction';
 import { foldTangentSide } from './tangentSide';
-import { foldGlyphs } from '../../shell/glyphFold';
-import { foldPrimes } from '../../shell/primes';
+import { foldGlyphs } from '../../shell/lexicon/glyphFold';
+import { foldPrimes } from '../../shell/lexicon/primes';
 import { hostNounOf, type CevianHost } from '../../shell/cevianHost';
-import { findProofTarget } from '../../shell/proofTarget';
-import { unreadScript } from '../../shell/inputScript';
-import { findRadianAngle } from '../../shell/radianAngle';
-import { arcRunRoles } from '../../shell/arcRun';
+import { findProofTarget } from '../../shell/lexicon/proofTarget';
+import { unreadScript } from '../../shell/lexicon/inputScript';
+import { findRadianAngle } from '../../shell/lexicon/radianAngle';
+import { arcRunRoles } from '../../shell/lexicon/arcRun';
 import { foreignGiven, rightAngledAtVertex } from './scope';
 import { incidenceList, objectListShape } from './incidenceList';
 import { readFrame, readSubjectFrame } from './frame';
 import { withImpliedPoints } from './impliedPoints';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting, RADICAL, radicalTerm, evalRadicalTerm, COUNT_DIGITS, UNIT_WORD } from '../../shell/llm/honestyCore';
-import { readArcUnitValue } from '../../shell/arcLengthUnit';
+import { readArcUnitValue } from '../../shell/lexicon/arcLengthUnit';
 import { resolvePairRoles } from './pairRoles';
 import { dropRingRefs, resolveRingRoles } from './ringRoles';
 import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapeKind, type ShapePhrase } from './shapePhrase';
@@ -119,14 +119,14 @@ export type ParseResult =
   // span accountant), so the shape read as UNLABELLED and `autoVertexLabels` lowered it to A, B, C: the
   // student's letters silently replaced. Refused here, at the one boundary every rule reads, so no caller of
   // `parse` can draw them — the LLM lowering included. The submit and ✎ edit gates refuse it earlier with the
-  // ruled sentence (`decidePreParse`); this is the same shared rule (`shell/inputScript`) one layer down.
+  // ruled sentence (`decidePreParse`); this is the same shared rule (`shell/lexicon/inputScript`) one layer down.
   // `detail` is the student's own run(s); `name` is a run that could be a point name, `word` a word in
   // another language.
   | { ok: false; reason: 'unread-script'; kind: 'name' | 'word'; detail: string }
   // #1837 (ADR-710, ADR-W-142): an angle written in RADIANS — «∠ABC = π/2», «∠ABC = pi/2». Radians are the
   // complex builder's notation only (operator rulings 2026-10-07 / 2026-10-08). «∠ABC = pi/2» lowered to
   // `set-angle B = 2` (the word dropped, 2°). The submit and ✎ edit gates refuse it earlier with the ruled
-  // sentence; this is the same shared rule (`shell/radianAngle`) at the boundary every caller reads, the LLM
+  // sentence; this is the same shared rule (`shell/lexicon/radianAngle`) at the boundary every caller reads, the LLM
   // lowering included. `value` is the π value as typed.
   | { ok: false; reason: 'radian-angle'; value: string }
   // #1698 (ADR-566): a trigonometric function of an angle («sin∢ACB = 3/4», «cos∢B = 2», «tan∢B > 1»)
@@ -470,7 +470,7 @@ const up = (c: string): Id => c.toUpperCase();
  *  Lets a NAMED-segment rule (altitude/midsegment) tell a student label ("CD") from a lowercase connector
  *  word the regex would otherwise read as two single-letter labels ("to" → T,O, "in" → I,N). */
 const isUpperLabel = (c: string | undefined): boolean => !!c && c === c.toUpperCase() && /[A-Z]/.test(c);
-const num = `(${NUM})`; // the one number grammar — src/parser/lexicon.ts (S2.1; the ratchet test caps inline copies)
+const num = `(${NUM})`; // the one number grammar — shell/lexicon/atoms.ts (S2.1; the ratchet test caps inline copies)
 
 /** Deterministic circle id from its centre letter — so "circle O" is referenceable by name. */
 const circleId = (center: string): Id => `circle-${center.toUpperCase()}`;
@@ -7347,7 +7347,7 @@ const semicircle: Rule = (s, ctx) => {
   /**
    * A 3-RUN NAMING CENTRE AND ENDS — «חצי מעגל AOB», «חצי מעגל ODC» (#1204, ADR-545; #2486, ADR-759).
    *
-   * Which letter is the centre is the arc family's ONE reader, `arcRunRoles` (shell/arcRun.ts): the MIDDLE
+   * Which letter is the centre is the arc family's ONE reader, `arcRunRoles` (shell/lexicon/arcRun.ts): the MIDDLE
    * letter, as in ∠AOB (operator ruling 2026-10-24, e8 A), or an O-family letter written first («ODC»).
    * Before #1204 the semicircle was the one member that read no 3-run at all — it went to the LLM lane or to
    * «לא הבנתי», while its two siblings built. Measured before the fix, on one figure:
@@ -13242,7 +13242,7 @@ const normalizeAreaSubscript = (s: string): string =>
  * Scoped to a letter + `_` + DIGITS, so it can't touch the area marker's `S_{ABC}` (uppercase LETTERS).
  * #1814 (ADR-600): any NAME letter, Greek too, so «α_1» ≡ «α1» (one sentence, one verdict). Latin-only, the
  * underscore form slipped past every guard that knows «α1» and read as 1°.
- * #2075 (ADR-AG-398): the fold is the suite's (`shell/indexedName.foldIndexedName`, `'glued'`), which analytic calls
+ * #2075 (ADR-AG-398): the fold is the suite's (`shell/lexicon/indexedName.foldIndexedName`, `'glued'`), which analytic calls
  * with its own canonical form — the third copy moved to the shared atom.
  */
 const normalizePointSubscript = (s: string): string => foldIndexedName(s, 'glued');
@@ -14617,7 +14617,7 @@ function normalizeText(raw: string): string {
   // vocabulary (creation, sizing, chord, tangent, inscribe…) accepts it without touching each rule.
   // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
   // #2624 (ADR-806): every prime glyph (′ ’ ׳ ʹ …) is ASCII `'` from here on — the ONE prime fold every builder's
-  // boundary calls (`shell/primes`, 3-D's ADR-3D-300, analytic's ADR-AG-395), so the label atom reads «A′» as «A'».
+  // boundary calls (`shell/lexicon/primes`, 3-D's ADR-3D-300, analytic's ADR-AG-395), so the label atom reads «A′» as «A'».
   const spelling = foldPrimes(stripFormatControls(raw))
     .replace(/־/g, '-')
     // #531 (ADR-3D-144's 2-D half): NBSP → space — the isolates above were already stripped here
@@ -14643,7 +14643,7 @@ function normalizeText(raw: string): string {
     // so it never fires inside another word.
     .replace(/(?<![א-ת])זוות(?![א-ת])/g, 'זווית');
   // LOOK-ALIKE GLYPHS → the symbol they render as — the SHARED table every builder's parser boundary
-  // calls (#1912, [ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329); `shell/glyphFold`). It holds
+  // calls (#1912, [ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329); `shell/lexicon/glyphFold`). It holds
   // what used to be spelled HERE inline: the ∡/∢ angle twins and the ⁰ degree sign (#45 / ADR-299), the
   // guarded keyboard `<` ≡ ∠ (#237, ADR-381) and «שורש N» ≡ √ (#105) — in the same order, so 2-D's
   // reading is unchanged — and adds the two rows 2-D never folded: ⟂ ≡ ⊥ (read per-rule here, folded
@@ -14820,14 +14820,14 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
 function parseEntry(raw: string, ctx: ParseContext): ParseResult {
   let s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
-  // #1666: a claim to prove never reaches a rule (`shell/proofTarget`, shared by all three builders).
+  // #1666: a claim to prove never reaches a rule (`shell/lexicon/proofTarget`, shared by all three builders).
   const proof = findProofTarget(raw);
   if (proof) return { ok: false, reason: 'proof-target', sentence: proof.sentence };
   // #1919 (ADR-626): a letter the tool cannot read never reaches a rule either — the shared rule
-  // (`shell/inputScript`), on the NORMALIZED text, so the look-alike twins are already Latin letters.
+  // (`shell/lexicon/inputScript`), on the NORMALIZED text, so the look-alike twins are already Latin letters.
   const unread = unreadScript(s);
   if (unread) return { ok: false, reason: 'unread-script', kind: unread.kind, detail: unread.detail };
-  // #1837 (ADR-710): an angle written in radians never reaches a rule (`shell/radianAngle`), on the raw line
+  // #1837 (ADR-710): an angle written in radians never reaches a rule (`shell/lexicon/radianAngle`), on the raw line
   // as the proof target is (the glyph π is what the rule reads).
   const radian = findRadianAngle(raw);
   if (radian) return { ok: false, reason: 'radian-angle', value: radian.value };

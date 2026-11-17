@@ -1,7 +1,7 @@
 /**
  * #1888 / #1889 ([ADR-603](../../docs/06-decisions.md#adr-603)) — A PART THE READING NEVER READ.
  *
- * The 2-D battery member over `shell/readExtent.ts` (ADR-W-120). Both commit seams reach it through
+ * The 2-D battery member over `shell/lexicon/readExtent.ts` (ADR-W-120). Both commit seams reach it through
  * `honestyGateReport`, so the ✎ edit seam refuses what the submit seam refuses (ADR-461 / ADR-W-006).
  *
  * WHAT WENT WRONG. Every gate on the commit path accounts TOKENS: a label counts as read wherever any
@@ -26,7 +26,7 @@ import { augmentParseCtx, normalizeUtterance, parse, rightAngledAtVertex, subjec
 import type { ParseContext } from '@/parser';
 import { endsWithSceneNoun, referencedContextLabels } from '@/parser/labelAccounting';
 import type { AnyCommand } from '@/engine';
-import { cutAtReading, locate, readLabelRuns, type Located, type Occurrence, type PartsCut, type Reader } from '../../shell/readExtent';
+import { cutAtReading, locate, readLabelRuns, type Located, type Occurrence, type PartsCut, type Reader } from '../../shell/lexicon/readExtent';
 import { clausesOf } from './independence';
 
 /** A lowering as the probe compares it: the commands without their `consumed` bookkeeping. */

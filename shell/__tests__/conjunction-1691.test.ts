@@ -6,7 +6,7 @@
  * real submit decision. This file locks the fold itself — above all what it must NOT touch.
  */
 import { describe, expect, it } from 'vitest';
-import { foldConjunctionSpacing } from '../conjunction';
+import { foldConjunctionSpacing } from '../lexicon/conjunction';
 
 describe('foldConjunctionSpacing — the spaced conjunction is «ו-X» (#1691)', () => {
   it.each([

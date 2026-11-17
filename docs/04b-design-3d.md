@@ -40,19 +40,19 @@ split. Last, the subject frame comes off ([ADR-3D-479](06b-decisions-3d.md#adr-3
 `subjectFrame3(normalizeText3(s))`, where `readSubjectFrame3` reads «HE_SUBJ X מקיי(ם|מת|מים|מות) :? rest» / "(the)?
 (point)? X satisf(ies|y) :? rest" (behind «נתון כי» too) and gives `rest` only when it names X. `subjectFrameOf3` reads it
 before it comes off, for `unreadParts3`' exemption (the frame's subject is a co-reference to its statement's label). The number gate's bare-number pass (`droppedGivenNumbers3`) takes `−1/n` beside `1/n`, so a minus-signed `x/n` vector term pays its denominator (ADR-3D-479). **The look-alike glyph fold is the SHARED table** ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329)):
-`shell/glyphFold.ts` `foldGlyphs` (⟂ → ⊥, ∡/∢ → ∠, the guarded `<` → ∠, ⁰/º/˚ → °, «שורש N» → √, the infix «‖» / «||» → ∥), called by
+`shell/lexicon/glyphFold.ts` `foldGlyphs` (⟂ → ⊥, ∡/∢ → ∠, the guarded `<` → ∠, ⁰/º/˚ → °, «שורש N» → √, the infix «‖» / «||» → ∥), called by
 `normalize3` right after `foldPrimes3` and by the ask lane's `parseQuery` — 3-D folded none of them, which is
 why «AC ⟂ AB» was not-understood while «AC ⊥ AB» built (#1912); 2-D's and analytic's boundaries call the same
 table (docs/04w, *Look-alike glyphs*). **The fraction glyphs are spelled by the SHARED reader**
-([ADR-3D-374](06b-decisions-3d.md#adr-3d-374), #2255): `shell/vulgarFractions.ts` `spellVulgarFractions` (2-D's
+([ADR-3D-374](06b-decisions-3d.md#adr-3d-374), #2255): `shell/lexicon/vulgarFractions.ts` `spellVulgarFractions` (2-D's
 ADR-635 reader, moved by ADR-W-147) wraps the fold chain in `normalize3`, after the glyph, √ and axis-letter folds,
 so a mixed number is one number («2½» → `2.5`, «2⅓» → `7/3`), a radical's glyph coefficient moves below it («½√3»
 → `√3/2`), and a lone glyph is `a/b`. No reader below the boundary keeps a glyph branch: `parseCoeff`, the vector
 `TERM`, `SYM_TERM`, `VAL` and `VALUE_START` read digits only. **The magnitude atom `MAG`** (ADR-3D-337) admits `ROOT_PRODUCT`, a `*` or
 `·` between the coefficient and √ only (#2069, [ADR-3D-369](06b-decisions-3d.md#adr-3d-369)); `evalRadical`'s
 `RADICAL_RE` reads the same token, so the atom and its reader stay paired. The triangle noun is the lexicon's
-`TRIANGLE_RE` (`lexicon/shapePhrase3.ts`, `isTriangleNoun3`), which reads «△»/«▲» before a label run. **The prime fold is
-one set** (ADR-3D-300): `PRIME_GLYPHS3` / `foldPrimes3` in `lexicon/marks3.ts` (′ ’ ‘ \` ´ and the Hebrew geresh ׳, ʹ, ʼ → `'`),
+`TRIANGLE_RE` (`shell/lexicon/shapePhrase3.ts`, `isTriangleNoun3`), which reads «△»/«▲» before a label run. **The prime fold is
+one set** (ADR-3D-300): `PRIME_GLYPHS3` / `foldPrimes3` in `shell/lexicon/marks3.ts` (′ ’ ‘ \` ´ and the Hebrew geresh ׳, ʹ, ʼ → `'`),
 called by `normalize3`, the ask lane's `parseQuery`, the LLM sequence gate and the rename dialog, and read by
 the bidi run alphabet — no reader spells its own prime class. Lowercase labels are uplifted by
 `upliftLowercaseLabels`, the ONE chokepoint, only where an anchor proves a label (the angle glyph/word,
@@ -77,19 +77,19 @@ prefix of a number is ever taken, and `readSizeSlot` reads only a plain decimal.
 UNREAD: the rule declines and flags it, and after every rule has declined `parse3` returns
 `solid-size-unread`, which the store words as apply's own `given-not-drivable` size refusal. Every other size
 form reaches the same refusal (#2076, [ADR-3D-363](06b-decisions-3d.md#adr-3d-363)). The size nouns are one
-vocabulary, `lexicon/revolutionSize3.ts`: inside a declaration, a size clause whose noun is not a slot
+vocabulary, `shell/lexicon/revolutionSize3.ts`: inside a declaration, a size clause whose noun is not a slot
 (`UNREAD_SIZE_CLAUSE`: «שקוטרו», «ויוצרו», «ונפחו», "slant height") flags the solid before the slots are read; on its
 own line, `revolutionSizeLine` (after the volume/area claim rules) reads «<size noun> (של)? ה<solid> (הוא|=)?
 <value>» and its English mirror and only RECORDS the solid, so it never claims a line another rule reads. A
 volume/area claim on a free-size solid is apply's same size refusal; `free-size-claim` is retired. The gate values a
 fraction by its value, or by numerator AND denominator together (the ratio's `p`/`q`), never by one part alone.
 
-**Two numbers with only a space between them are refused** (#2286, [ADR-AG-397](06c-decisions-analytic.md#adr-ag-397)). `readStatement3` asks `shell/juxtaposedNumbers.findNumberPair` right after the radian check and answers `{ code: 'juxtaposed-numbers', detail, … }` — `guided`, worded by the suite keys `suite.refusal.juxtaposedNumbers*`, each reading read back through `parse3` (`teachPair`) — so «AB = 2 3» and «A(2 3, 1, 0)» never reach the model.
+**Two numbers with only a space between them are refused** (#2286, [ADR-AG-397](06c-decisions-analytic.md#adr-ag-397)). `readStatement3` asks `shell/lexicon/juxtaposedNumbers.findNumberPair` right after the radian check and answers `{ code: 'juxtaposed-numbers', detail, … }` — `guided`, worded by the suite keys `suite.refusal.juxtaposedNumbers*`, each reading read back through `parse3` (`teachPair`) — so «AB = 2 3» and «A(2 3, 1, 0)» never reach the model.
 
-**An angle written in radians is refused** (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)). `readStatement3` asks `findRadianAngle` (`shell/radianAngle.ts`) right after `findProofTarget` and answers `{ code: 'radian-angle' }` — `guided` in `STORE_CATEGORY3`, worded `err.radianAngle` (2-D's sentence) — so «∠ABC = π» is no longer an angle mark labelled π and the other spellings never reach the model.
+**An angle written in radians is refused** (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)). `readStatement3` asks `findRadianAngle` (`shell/lexicon/radianAngle.ts`) right after `findProofTarget` and answers `{ code: 'radian-angle' }` — `guided` in `STORE_CATEGORY3`, worded `err.radianAngle` (2-D's sentence) — so «∠ABC = π» is no longer an angle mark labelled π and the other spellings never reach the model.
 
 **A letter the tool cannot read is refused by name** (#1919, [ADR-3D-328](06b-decisions-3d.md#adr-3d-328)).
-`readStatement3` — the one reader submit and the ✎ edit share — asks `unreadScript` (`shell/inputScript.ts`,
+`readStatement3` — the one reader submit and the ✎ edit share — asks `unreadScript` (`shell/lexicon/inputScript.ts`,
 the shared rule all four builders call) right after `findProofTarget`, and answers
 `{ code: 'unread-name' | 'unread-word', detail }` with the student's own letters quoted, typed so it never
 escalates. The look-alike LETTERS are folded by the rule itself, so «משולש КМО» records K, M, O while
@@ -108,7 +108,7 @@ only on a failed parse, and fires only if the candidate parses.
 A triangle / quad / pentagon sentence with no letters («המשולש ישר זווית», «משולש», «הריבוע») cannot name its ring
 in a context-free parser, and the old default letters A, B, C… made M1's existing-id idempotency pick whatever was
 called that. `rightTriangle` and `planarPolygon` now emit **`shape-ref3`** `{ article, arity, body }`: the article from
-`shapeNounArticle3` (`lexicon/shapePhrase3.ts`, the copy of 2-D's ADR-654 / #2205 reader), and `body` the named form's
+`shapeNounArticle3` (`shell/lexicon/shapePhrase3.ts`, the copy of 2-D's ADR-654 / #2205 reader), and `body` the named form's
 own lowering over the reserved placeholders `#1…#n`. Labelled sentences are untouched.
 
 `resolveShapeRef3` (`engine/apply.ts`) picks the ring against the figure: **definite** — the one ring of
@@ -125,7 +125,7 @@ and the twin rule, and words the refusal with the sentence and its taught remedy
 the fact (the parser stays context-free and the stored commands are unchanged) and is read against the figure by the
 fold: `unletteredSolidRow3` (`store3.ts`) finds a `solid` command whose run the row's text does not type
 (`typesSolidRun3`: the whole run, or its unprimed letters), reads the solid noun's article (`solidNounArticle3`,
-`lexicon/shapePhrase3.ts`, the `shapeNounSpan3` rule over the solid nouns), and asks `resolveUnletteredSolid3`
+`shell/lexicon/shapePhrase3.ts`, the `shapeNounSpan3` rule over the solid nouns), and asks `resolveUnletteredSolid3`
 (`engine/apply.ts`): definite → the one drawn solid the noun admits (`nounAdmits`, same vertex count), whose kind and
 letters the row takes, or `ambiguous-definite-shape` with `solid` set; indefinite, or definite with none → unchanged
 while no letter of the run is a point, else `freeSolidRun3` (`freeVertexRun3` per letter root, primes following).
@@ -360,7 +360,7 @@ helper ink appears: a `vec-rel` command would draw its carrier segment (a diagon
 
 #### One shape phrase, and a circle through a ring (#1792, [ADR-3D-307](06b-decisions-3d.md#adr-3d-307))
 
-`src3d/lexicon/shapePhrase3.ts` holds the noun and adjective spelling and which pairs exist: **the noun
+`shell/lexicon/shapePhrase3.ts` holds the noun and adjective spelling and which pairs exist: **the noun
 decides the arity, and an adjective is consumed only where `parse3` has a lowering**; an unconsumed one
 declines the rule, never dropped. `statedQuadBase` and the triangle qualifiers read it. The right trapezoid
 lowers to `quad-shape trapezoid` plus a **soft** AD ⟂ AB carrying its `ring`, which derive3 retires when a
@@ -403,7 +403,7 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   for a flat ring, `solid.baseAdj` (→ `SolidObj.baseAdj`) for a quad pyramid's base. `declaredQuads3(c)`
   (`baseShapes.ts`) is the ONE reader of "what was this ring declared to be" — `knownQuadShape`, the
   circle-through-a-ring refusal, the build notices and the warning all ask it.
-- **The two-line circle refusal.** `notCyclic3(noun, adj)` (`lexicon/shapePhrase3.ts`) is the lookup
+- **The two-line circle refusal.** `notCyclic3(noun, adj)` (`shell/lexicon/shapePhrase3.ts`) is the lookup
   `readShapePhrase3` uses too. `apply` refuses `circle3 {circum}` through a declared ring the lookup rejects
   (`against: 'noun'`), and a declaration of such a ring that a circum circle already passes through
   (`against: 'circle'`). `derive3` fills `sentence` (the refused line) and `other` (the first enabled fact that
@@ -1704,7 +1704,7 @@ median: `point-on-segment3` at ½, `centroid3`, `midpoint-auto`, an equal pair; 
 **A part the reading never read (#1888, [ADR-3D-316](06b-decisions-3d.md#adr-3d-316)).** On the deterministic lane
 (`decideSubmit3` → `decideCommands3` with `readExtent`, and the ✎ `replaceFact`) the honesty verdict
 `honestyRefusal3` runs `lostGivens3` plus `unreadParts3` (`src3d/store/unreadParts3.ts`), the 3-D member over
-`shell/readExtent.ts` (ADR-W-120): each label run (primes included) is substituted and re-read with `parse3`; a run
+`shell/lexicon/readExtent.ts` (ADR-W-120): each label run (primes included) is substituted and re-read with `parse3`; a run
 no substitution changes is unread. Exempt: a co-reference (shell) and a run right after a polygon, circle, base or face noun
 (qualifiers allowed between, never a vertex noun) whose letters are on the figure or carried by the reading (3-D's scene name:
 «…במשולש SBC», «פירמידה SABC שבסיסה משולש ABC»). 3-D reads no compound, so the line is one clause, cut at the
@@ -1919,7 +1919,7 @@ StatedComps`. Nothing solves from it. `dataView` prints a component as typed unt
 #481 rule), and then as `cleanMag(evalAffine(…))`. The points loop's free axis prints the stated letter
 (`statedLetterText`) in `points` / `pointCoords`, while `pointComps` keeps «?». A command without `srcs` (an
 internal lowering such as `componentGiven`, or a figure saved before #2077) records no row. The
-composer sits in the engine (`render → engine`); a row's arrow comes from `lexicon/marks3`. `bidi3.test.ts`
+composer sits in the engine (`render → engine`); a row's arrow comes from `shell/lexicon/marks3`. `bidi3.test.ts`
 asserts the section count and `dir: 'app'` on each (never a section-level `dir: 'ltr'`, #559). Every
 measurement field of `DataPanel` keeps only what agrees across the samples.
 
@@ -1969,7 +1969,7 @@ depends on `i18n` and `lexicon`, and `factDisplay3` is its lock's reference.
 
 | layer | imports | why |
 | --- | --- | --- |
-| `lexicon/marks3` | nothing | the marking vocabulary, readable by grammar and display alike (#1194) |
+| `shell/lexicon/marks3` | nothing | the marking vocabulary, readable by grammar and display alike (#1194) |
 | `i18n/bidi` | nothing | the isolation transform, a leaf for the same reason |
 | `render/notation` | `lexicon`, `i18n` | the notation transform; the display layer is the consumer |
 | `render/FactRow3` | `lexicon`, `i18n`, `render/*` | the ROUTING — which renderer a surface uses, for both surfaces |

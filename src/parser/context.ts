@@ -15,7 +15,7 @@ import type { Construction, Id, Vec } from '@/engine';
 import { statedCirclePosition, type StatedCirclePosition } from '@/engine';
 import { isGeoPoint, nounOfKind, circleMembers, pointNeighbors, parallelEdgePairs, roleSidesOf, openRightTriangles } from '@/engine';
 import type { ParseContext } from './parse';
-import { ULABEL, LABEL_WHOLE } from './lexicon';
+import { ULABEL, LABEL_WHOLE } from '../../shell/lexicon/atoms';
 
 /** A circle centre's reference TOKEN ([ADR-342](../../docs/06-decisions.md#adr-342)): an anonymous auto
  *  centre ('@ctr-O') is referenced by its letter ('O' — the circle's name, «מעגל O», `circle-O`), while a

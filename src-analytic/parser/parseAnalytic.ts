@@ -21,7 +21,7 @@ import type { DerivedRule, EllipseSide, FootLine } from '../engine/derived';
 import { cevianFacts, measureFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
 import { TOOL_PREFIX, toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
-import { teachPair } from '../../shell/juxtaposedNumbers';
+import { teachPair } from '../../shell/lexicon/juxtaposedNumbers';
 import { evalExpr, findJuxtaposedNumbers, isConstant, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { INDEXED_TOKEN, POINT_TOKEN, RADIUS_CAPITALS, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, toolSymbol } from '../engine/carriers';
 
@@ -62,12 +62,12 @@ import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, 
 import { CENTRE_SENTINEL, CENTRES_SENTINELS, ELLIPSE_ROLE_SENTINELS, type EllipseRoleUse, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, FIGURE_TANGENT_ID, type ConicHost, type CurveKind, type Domain, type EqOperand, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
 import { inscribePlacements } from '../engine/inscribe';
-import { findProofTarget } from '../../shell/proofTarget';
-import { unreadScript } from '../../shell/inputScript';
-import { findRadianAngle } from '../../shell/radianAngle';
-import { readArcUnitValue } from '../../shell/arcLengthUnit';
-import { foldIndexedName } from '../../shell/indexedName';
-import { arcRunRoles } from '../../shell/arcRun';
+import { findProofTarget } from '../../shell/lexicon/proofTarget';
+import { unreadScript } from '../../shell/lexicon/inputScript';
+import { findRadianAngle } from '../../shell/lexicon/radianAngle';
+import { readArcUnitValue } from '../../shell/lexicon/arcLengthUnit';
+import { foldIndexedName } from '../../shell/lexicon/indexedName';
+import { arcRunRoles } from '../../shell/lexicon/arcRun';
 import { POINT_NAME, splitPointNames } from '../engine/pointName';
 import {
   centreClauses,
@@ -123,7 +123,7 @@ export type ParseFailure =
   /**
    * #1837 (ADR-W-142; operator ruling 2026-10-08: *"analytics tool should not support radians at all. only the
    * complex tool should"*) — an angle measure written with π. «∠ABC = π/2» RECORDED, in degrees: an angle of 1.57°.
-   * The shared rule is `shell/radianAngle`; `detail` is the π value as typed.
+   * The shared rule is `shell/lexicon/radianAngle`; `detail` is the π value as typed.
    */
   | { code: 'radian-angle'; detail: string }
   /**
@@ -150,7 +150,7 @@ export type ParseFailure =
    * in all tools"*) — a letter this tool cannot read. Analytic had no member of the class: it handed
    * «משולש ДЖФ» to the model, where 2-D and 3-D drew A, B, C. It joins for ONE verdict (ADR-W-118 B1).
    * `name` is a run that could be a point name, `word` a word in another language; the shared rule is
-   * `shell/inputScript`, after the glyph fold's look-alike row.
+   * `shell/lexicon/inputScript`, after the glyph fold's look-alike row.
    */
   | { code: 'unread-name' | 'unread-word'; detail: string }
   /**
@@ -163,7 +163,7 @@ export type ParseFailure =
    * #2286 (ADR-AG-397, operator ruling 2026-11-03: *"Refuse it, naming the line, in every builder"*) — any other
    * number, whitespace, number «2 3»: ambiguous as written (2.3, 23 or 2·3), so refused before every rule and before the
    * model. `detail` is the student's own pair; the rest is what it teaches, each reading kept only when the line reads
-   * with it in place (`shell/juxtaposedNumbers.teachPair` — a taught spelling is one the next Enter reads, #1156):
+   * with it in place (`shell/lexicon/juxtaposedNumbers.teachPair` — a taught spelling is one the next Enter reads, #1156):
    * `decimal` / `joined` (both whole) and `product` (`2*3`, or its value), or `comma` («A(2 3)» → `2, 3`).
    */
   | { code: 'juxtaposed-numbers'; detail: string; decimal?: string; joined?: string; product?: string; comma?: string }
@@ -9287,7 +9287,7 @@ export function parseLine(raw: string): ParseResult {
   if (unread) return { ok: false, code: `unread-${unread.kind}`, detail: unread.detail };
   // #2222 (ADR-AG-284) / #2286 (ADR-AG-397): two numbers side by side — an ASCII mixed number, or any other pair — are
   // refused here, before every rule and before the model, so no slot multiplies them and the fallback cannot either:
-  // one teaching sentence, whichever sentence carries them. The suite's one detector (`shell/juxtaposedNumbers`).
+  // one teaching sentence, whichever sentence carries them. The suite's one detector (`shell/lexicon/juxtaposedNumbers`).
   const juxt = findJuxtaposedNumbers(line);
   if (juxt?.kind === 'mixed') return { ok: false, code: 'mixed-number', detail: juxt.text, ...(juxt.decimal ? { decimal: juxt.decimal } : {}), sum: juxt.sum, product: juxt.product };
   if (juxt) {

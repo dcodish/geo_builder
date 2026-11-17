@@ -1,5 +1,5 @@
 /**
- * #2255 ([ADR-W-147](../docs/06w-decisions-workspace.md#adr-w-147)) — THE VULGAR-FRACTION SPELLING, ONE FOR EVERY
+ * #2255 ([ADR-W-147](../../docs/06w-decisions-workspace.md#adr-w-147)) — THE VULGAR-FRACTION SPELLING, ONE FOR EVERY
  * BUILDER THAT READS A GLYPH AS A NUMBER. Moved here byte-identical from 2-D's `src/parser/lexicon.ts` (which
  * re-exports it, so every 2-D import is unchanged) when 3-D became its second caller: 3-D's boundary spelled each
  * glyph as text with no separator, so «2½» became «21/2» = 10.5 in every slot that reads a number. Pure string
@@ -11,7 +11,7 @@
 import { UNGLUED } from './indexedName';
 
 /**
- * [ADR-632](../docs/06-decisions.md#adr-632) (#172), made total by [ADR-635](../docs/06-decisions.md#adr-635)
+ * [ADR-632](../../docs/06-decisions.md#adr-632) (#172), made total by [ADR-635](../../docs/06-decisions.md#adr-635)
  * (#2008) — a Unicode VULGAR-FRACTION glyph spelled as the digits the number readers understand. A glyph carries
  * no digit, so every reader that looks for a number found none and fell back to its default: «שטח EFGH = ¼ משטח
  * ABCD» committed ratio 1, green, and «∠A = 22½°» drew 22°. Applied ONCE, at the parser boundary

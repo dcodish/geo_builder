@@ -16,7 +16,7 @@
  * covered without their author having to think about bidi, which is the whole defect class.
  */
 
-import { PRIME_GLYPHS3 } from '../lexicon/marks3';
+import { PRIME_GLYPHS3 } from '../../shell/lexicon/marks3';
 
 /** Hebrew LETTERS (not the whole block — Hebrew punctuation and niqqud must not split a run). */
 const HEBREW_LETTER = /[א-ת]/;
