@@ -117,6 +117,9 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   givens allow agrees on it, and an «או» row lists every option. A point the givens fix up to two discrete roots that
   no seed happens to draw («A'K : A'C = 2 : 3» on a free A′) reads «A'(6, 0, 6) או (6/5, 24/5, 6/5)», never one root
   as fact; the drawing and «הציגו תצורה אחרת» are unchanged by this.
+  **Only configurations that keep every stated given are evidence** (#2916, [ADR-3D-533](06b-decisions-3d.md#adr-3d-533)): a
+  configuration that breaks a stated sign, side, angle bound or mutual position («שיעור ה-y של הקודקוד A שלילי», «k חיובי») is
+  not one the givens allow, so no value in the values panel or the ask box is read off it — 2-D's and analytic's rule.
   An **anchored** figure (an absolute object, a coordinate, or a stated vector fixes it in space) that the givens
   still let turn about a pinned point or axis, or resize, is turned to a new angle and resized by «הציגו
   תצורה אחרת»; the first drawing may be tilted (operator 2026-10-23, #2378: *"Each press turns the cube about
