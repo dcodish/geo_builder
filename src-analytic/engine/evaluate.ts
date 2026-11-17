@@ -3960,6 +3960,7 @@ function subBlockRoots(
     return [...ids];
   };
   const base = sys.positionsAt(anchor);
+  const namedIds = c.objects.filter((o) => isPositional(o) && !(o.kind === 'derived' && o.helper)).map((o) => o.id);
   const h = span * 1e-4;
   for (let i = 0; i < sys.ids.length && out.length < SUB_BLOCK_MAX; i += 1) {
     const id = sys.ids[i];
@@ -4034,7 +4035,12 @@ function subBlockRoots(
         const x = withP(p);
         if (!admit(x)) return false;
         const pos = sys.positionsAt(x);
-        return ringFaultsOf(c, (id) => pos.get(id)).length === 0;
+        if (ringFaultsOf(c, (id) => pos.get(id)).length > 0) return false;
+        // …and no two named points on one spot (2-D's rule): a root that stacks them is the givens' degenerate case
+        const pts = namedIds.map((id) => pos.get(id)).filter((q): q is Pt => !!q);
+        for (let a = 0; a < pts.length; a += 1)
+          for (let b = a + 1; b < pts.length; b += 1) if (Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y) <= span * 1e-6) return false;
+        return true;
       },
       delta: (a, b, k) => (a[k] - b[k]) / span,
       same: SOLVE_RESOLUTION,
