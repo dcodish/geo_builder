@@ -11,7 +11,7 @@ import { freePlaneDef } from './freePlane';
 import { heldRadius3, radiusLengthCircle3 } from './freeCircle';
 import { definiteCircle3 } from './definiteCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
-import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
+import { handScaleGivenToPivot3, isScaleGivenClaim, magnitudeScalarPin3, magnitudeSizeStated3, scaleGivenLane3, scaleGivenReadsFigure3, scaleGivenSafe } from './scaleGiven';
 import { nounAdmits, nounOfKind, resolveSolidSubject } from './solidSubject';
 import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, cyclicFixCommands, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_BASES, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
@@ -2372,6 +2372,10 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     if (r.ok && APPLY_DEPTH === 1) r = settleLetters3(c, r.next);
     // #1188 step 2 (ADR-3D-390): and what it did to the free-vector system, the same way
     if (r.ok && APPLY_DEPTH === 1) r = settleFreeVectors3(c, r.next);
+    // #2792 (ADR-3D-521): a line that leaves a recorded scale given on a figure whose ties now fix or couple its size
+    // («אורך AB = 4» then «A(1,2,3)» and «B(5,2,3)») hands it to the pivot at this event, as ADR-3D-393 did only for a
+    // later magnitude — so it acts as a pin (reached, or refused naming the statements), never silently dropped
+    if (r.ok && APPLY_DEPTH === 1 && r.next !== c && r.next.scaleGivens.length > 0 && scaleGivenLane3(r.next)?.lane === 'pivot') handScaleGivenToPivot3(r.next);
   } finally {
     APPLY_DEPTH -= 1;
   }
@@ -3272,9 +3276,22 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // The claim recorded below stays the arbiter.
       if (cmd.claim.type === 'length-eq' && determinationReach3(c, [cmd.claim.a, cmd.claim.b]).length > 0)
         next.determinations.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
+      // #2792 (ADR-3D-521): minted where the router gives a rescale lane (origin or content), and only for a size read
+      // off the figure's own points; where the figure's ties fix or couple its size (the 'pivot' lane) it enters the
+      // pivot below as its own pin, never the claim lane that refused it «size-on-solid». Only the FIRST size, as for the
+      // scale given (ADR-3D-171): once a magnitude already states the size (`magnitudeSizeStated3`: the scale given, or a
+      // demoted one, ADR-3D-393), a later magnitude is a value to CHECK — «אורך AC = 10» on a cube sized by «AB = 2» is
+      // claim-refuted, never a pin whose failure would blame every pin owner («AE = 1» included).
+      const sizeToPivot =
+        isScaleGivenClaim(cmd.claim) &&
+        c.scaleGivens.length === 0 &&
+        !magnitudeSizeStated3(c) &&
+        scaleGivenLane3(c)?.lane === 'pivot' &&
+        scaleGivenReadsFigure3(c, cmd.claim);
       if (
         isScaleGivenClaim(cmd.claim) &&
         scaleGivenSafe(c) &&
+        scaleGivenReadsFigure3(c, cmd.claim) &&
         c.scaleGivens.length === 0 &&
         ((cmd.claim.type !== 'length-eq' && cmd.claim.type !== 'length-sum') || freeDims(c) === 0)
       ) {
@@ -3308,7 +3325,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // demotion below takes them together.
       const scaleReaches = c.scaleGivens.some((g) => statementReachesFreeDof3(c, g));
       const reaches = statementReachesFreeDof3(c, cmd.claim) || (isScaleGivenClaim(cmd.claim) && scaleReaches);
-      if (reaches || claimPointIds(c, cmd.claim).some((id) => c.points.get(id)?.kind === 'free3')) {
+      if (reaches || sizeToPivot || claimPointIds(c, cmd.claim).some((id) => c.points.get(id)?.kind === 'free3')) {
         // #316 (ADR-3D-075): the COORDS twin — «D=(8,10,-12)» on an under-determined figure is the
         // same statement as «D(8,10,-12)» (one statement, one semantics, docs/17 §2.3; the `=` sign
         // must not turn a GIVEN into a refused claim). It lowers to the pivot pin exactly like
@@ -3346,16 +3363,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
          * (the final verification stays the arbiter, the ADR-3D-030 pattern); a length keeps its
          * historical no-claim pin shape byte-identical.
          */
-        const magnitudeScalarPin = (cl: Claim3): ScalarPin | null =>
-          cl.type === 'length-eq'
-            ? { kind: 'length', a: cl.a, b: cl.b, value: cl.value }
-            : cl.type === 'length-sum' // #1680 (ADR-3D-392): drives like `length`, by its own signed residual
-              ? { kind: 'length-sum', terms: cl.terms, value: cl.value }
-            : cl.type === 'area-eq'
-              ? { kind: 'area3', ids: cl.ids, value: cl.value }
-              : cl.type === 'volume-poly'
-                ? { kind: 'volume3', noun: cl.noun, ids: cl.ids, value: cl.value }
-                : null;
+        const magnitudeScalarPin = magnitudeScalarPin3;
         // …never over a SYMBOL-defined point (SN=k·SC): the pivot does not position it (ADR-3D-030,
         // the same entry rule as the coords arm above), so its residual could never close and a true
         // magnitude would read refuted. Such a statement stays with the claim arbiter below.
@@ -3363,20 +3371,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const mag = symbolDefined ? null : magnitudeScalarPin(cmd.claim);
         // #1782 (ADR-3D-393): free dims, or a free carrier in reach — #2609 (ADR-3D-408): on any figure the pivot runs
         // on, a solid-free one of created points included (the `free3` clause keeps its own length arm below)
-        if (mag && reaches) {
-          if (c.scaleGivens.length > 0) {
-            next.scaleGivens = [];
-            for (const g of c.scaleGivens) {
-              const gp = magnitudeScalarPin(g);
-              if (!gp) continue;
-              next.scalarPins.push(gp);
-              // #1782 (ADR-3D-393): its claim is already recorded; a demoted LENGTH becomes the pin's arbiter
-              // (`given: true`, the #1567 seam), so it is judged as the given it now is — never as an answer
-              // the size-on-solid guard would refuse on a figure the pivot sized. Same slot, so its owner holds.
-              const at = next.claims.indexOf(g);
-              if (g.type === 'length-eq' && at >= 0) next.claims[at] = { ...g, given: true };
-            }
-          }
+        if (mag && (reaches || sizeToPivot)) {
+          // #1782 (ADR-3D-393): a scale given in force is demoted with it (#2792: the one demotion, shared)
+          if (c.scaleGivens.length > 0) handScaleGivenToPivot3(next);
           // #1567 (ADR-3D-285): the length pin records its arbiter; a volume or an area keeps its plain claim
           const lengthPin = cmd.claim.type === 'length-eq' || cmd.claim.type === 'length-sum';
           recordClaim3(next, c, cmd.claim, { pin: () => next.scalarPins.push(mag), record: lengthPin ? 'arbiter' : 'claim' });

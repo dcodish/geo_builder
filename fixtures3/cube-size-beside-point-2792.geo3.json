@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-16T21:03:21.760Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "אורך AB = 4",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 4
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "P(1,2,3)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "P",
+          "x": 1,
+          "y": 2,
+          "z": 3
+        }
+      ]
+    }
+  ]
+}

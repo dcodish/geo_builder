@@ -657,6 +657,23 @@ const SEEDED: SeededCorpus = {
   // drawn crossed at 14 of 24 seeds). Simple at every seed, A, B, C unmoved and the pentagon twin are asserted in
   // engine3.test.ts; this is the build + drift + load net.
   'ring-circle-rider-simple-2829.geo3.json': ['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD'],
+  // #2792 (ADR-3D-521): a size beside a fixed object off the origin, in the order that turned it red (before: «אורך AB = 4»
+  // size-on-solid, the cube at edge 1; the volume red, V = 0.38). The lanes, both orders and the kept refusals are asserted
+  // in placement-gauge.test.ts; these are the build + drift net.
+  'cube-size-beside-point-2792.geo3.json': ["קובייה ABCDA'B'C'D'", 'אורך AB = 4', 'P(1,2,3)'],
+  'pyramid-volume-beside-plane-2792.geo3.json': ['פירמידה ABCDS', 'נפח הפירמידה ABCDS = 12', 'x+y+z=1'],
+  // #2834 (ADR-3D-520): the exam box fixed by the plane A'B'C'D', B and the line AB (before: the nine labels on one pixel,
+  // the patch grown to a parallel line's "crossing" at t ≈ 1e12). The framing is asserted in line-perp-plane-mark.test.ts;
+  // this is the build + drift net.
+  'exam-box-plane-line-2834.geo3.json': [
+    'תיבה',
+    "מישור A'B'C'D' הוא x+4y-8z-142=0",
+    'B(0,7,6)',
+    'משוואת הישר AB היא x = (0,7,6) + t(0,2,1)',
+    'אורך המקצוע AB הוא 5√5',
+    'שיעור ה-y של הקודקוד A שלילי',
+    'נתונה נקודה M(k,1,3)',
+  ],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
