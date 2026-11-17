@@ -4027,6 +4027,8 @@ figure) joins the saved-session net.
 ## ADR-CX-065 — The canvas shows what the student typed; computed values go to the panel (#1862)
 
 > **⚠ Superseded in part** 2026-11-05 by [ADR-CX-088](#adr-cx-088): "the panel's readings do not change" no longer holds for a number typed as a decimal, which reads as a decimal in the panel.
+>
+> **Discharged** 2026-11-16 by [ADR-CX-103](#adr-cx-103): the "Not in this ADR" paragraph (#2002) is built — a typed polar form in a letter and a W7 pair holding a letter read as typed on the canvas.
 
 **Status:** accepted, 2026-10-12 · **Issue:** [#1862](https://github.com/dcodish/geo_builder/issues/1862) (feature, P2, `complex`, PR) · round #1998 ·
 supersedes the canvas half of [ADR-CX-015](#adr-cx-015) and the 2026-08-18 ruling that the reading returns to the canvas; partly supersedes [ADR-CX-043](#adr-cx-043) ("substituted", canvas clause) and [ADR-CX-058](#adr-cx-058) (canvas substitution)
@@ -4736,3 +4738,33 @@ Each memo was also switched off alone, in the same minutes. Without the fold mem
 
 **What the student will see.**
 - Nothing today: no figure reaches the limit (measured above). [ruled] If one ever does: «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with «המשיכו לחפש» (operator, 2026-11-14, #2893 question 1: *"«עדיין לא נמצא פתרון…» (Recommended)"*), the button searching the same amount again from where it stopped (question 2: *"Another ~10 s round (Recommended)"*), and the typed line staying in the box, not added (question 3: *"Stays in the box, not added (Recommended)"*). The limit counted in work (*"10s is an ok number"*, 2026-11-13).
+
+## ADR-CX-103 — A typed polar form in a letter reads as typed on the canvas: «z = r·cis30°», «z = 9r·cis30°» (#2002)
+
+**Status:** accepted · 2026-11-16 · bug (complex, `wrong-answer`) · fix round #2914, stream H · branch `fix/2002-polar-letter-form` · **discharges** [ADR-CX-065](#adr-cx-065)'s "Not in this ADR" paragraph · operator ruling of 2026-10-13 on #2002 (option A), on W7, W8 and [ADR-W-047](06w-decisions-workspace.md#adr-w-047) clauses 2–3 as recorded in ADR-CX-065 §3–4 · absorbs #1738 (family merge, operator 2026-11-01)
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-KN-5, FR-CN-10 · **Design:** [04d](04d-design-complex.md) § "The canvas prints its own label" (the polar reader) · **LADDER stage:** 5d (no new stage), [LADDER-CX](LADDER-CX.md)
+
+**Measured before** (`3f6132c2`, through `deriveLines` at configurations 0/1 and seeds 0/7): «z = r·cis(30°)» read «z ≈ r·cis30°» / «z ≈ 0.74+0.42i» (seed 7: «z ≈ 2+1.15i»), a sampled decimal; with «|z| = 4» it read «z = 4·cis30°» / «z = 2√3+2i», a value the tool solved for r; «|z| = 9r» · «arg(z) = 30°» read «z ≈ 9r·cis30°» / «z ≈ 6.63+3.82i» (#1738's line); «z = (r+1)·cis(30°)» and «|z| = 2r+1» · «arg(z) = 30°» read a bare «z»; no letter/value chip was offered for a valued letter in a polar modulus. The plan's `|r|` no longer showed (a polar modulus letter is a size since ADR-CX-070), and the no-dot spellings «z = r cis 30» / «z = rcis30°», out of reach when the plan was written, now declare r as a parameter (ADR-CX-068), so they joined the class.
+
+**Root cause.** The stage-5d canvas composer had one symbolic reader, `definitionOf` (ADR-CX-058), which accepts a definition only when it is Gaussian-affine over ℚ. `r·cis30°` = r·(√3/2 + i/2) is not, and a W7 pair has no definition at all, so the composer fell to the PANEL's string — the carriers' reading, which substitutes a tool-solved letter and prints the drawn sample. **Class:** a number the student typed in polar form, whose modulus holds a letter, printed a computed or sampled value on the canvas instead of the typed form.
+
+**Decision.**
+1. **A polar reader beside the cartesian one** (`polarDefinitionOf`, `model/polarForm.ts`): a typed `name = M·cis θ` (any spelling the parser lowers to the same literal, the trig form included) or the W7 pair `|name| = M` · `arg name = θ`, read off the constraint shapes: M a real ℚ-affine form in parameters, its terms in the order typed; θ an exact angle. Null for a closed modulus or a letter in the argument; a form `definitionOf` also reads (`r·cis90°`) keeps «z = ri», because the canvas asks `definitionOf` first.
+2. **The canvas** (`canvasPoints`, `replay/derive2.ts`): when `definitionOf` is null and the polar reader answers, only the letters whose chip shows the value are substituted (ADR-CX-065 §3). A letter left → «z = M·cisθ» in BOTH views, with `=`, M bracketed when it has more than one term, θ spelled as the closed polar reading spells it. Closed → the path it took before.
+3. **The chip**: a valued letter in M is reported in `paramChips` (ADR-CX-065 §4), so «r = 2» now offers the letter/value chip.
+
+**Unchanged.** The panel (`reading`/`readingCart`), the ask lane, the gate, `statedAs`, every closed typed number, and a Gaussian-affine form.
+
+**Not reached (found, not built).** A letter in the ARGUMENT («z = 4cis(t)») still prints a bare «z»: no ruling covers a symbolic angle.
+
+**Siblings.** 2-D, 3-D and analytic already print the student's letters (ADR-W-047). Not a plane-geometry sentence, so no docs/22 §10 row.
+
+**Locks.** Unit: `src-complex/model/__tests__/polarForm.test.ts` (every spelling, the W7 pair, what it does not read, the substitution). The canvas table: `src-complex/__tests__/canvas-spelling-1497.test.ts` (both views, configurations 0/1, seeds 0/7; the tool-solved letter kept; the chip and letter mode; the control). The class net: `src-complex/__tests__/fixtures.test.ts` (a canvas label holding a letter reads alike in both views, with no «≈», `|letter|` or decimal). Fixtures `polar-letter-2002.complex.json` and `polar-letter-pair-2002.complex.json`.
+
+**What the student will see.**
+- [ruled] «z = r·cis(30°)» reads «z = r·cis30°» on the canvas in both views, in every configuration (ruling 2026-10-13 on #2002).
+- [ruled] «z = r·cis(30°)» then «|z| = 4» still reads «z = r·cis30°»; the value is in the panel (ADR-W-047 clause 3).
+- [ruled] «|z| = 9r» with «arg(z) = 30°» reads «z = 9r·cis30°» in both views, with no sampled decimal (W7).
+- [ruled] Every spelling of the class: «z = 2r·cis30°», «z = (r+1)·cis30°», «z = r·cis30°» for the trig form and the no-dot spellings, «z = (2r+1)·cis30°» (W8).
+- [ruled] After «r = 2» the canvas reads the number as before, and the «r = 2» row offers the letter/value chip (ADR-W-047 clause 2).
