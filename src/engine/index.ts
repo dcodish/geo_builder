@@ -27,6 +27,7 @@ export type { StepResult, StepOk, StepErr } from './step';
 export { allConstraints, applySeed, freeDofs, freeDofCount, movableIds, scalePinned, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, baseSeedOf, withReflectMask, REFLECT_MAX, REFLECT_STRIDE } from './sample';
 // #2796 (ADR-853): the independent parts of a figure and the per-part configuration
 export { partsOf, joinParts, adoptParts, seedNumber, seedOfPart, canonicalSeed, withPartSeed, seedKey, sameSeed, cleanSeed, seedPartsOf, type Part, type Seed } from './components';
+export { enumerateFreePointRoots, applyRootChoice, rootChoice, blockRootStats, type FreePointRoots } from './blockRoots';
 export { checkGivens, checkLabels, declaredRingsHold, trapezoidMorphed, forcedOffArcs, type ForcedOffArc, type PrintedLabels } from './verify';
 export { solveBudget, budgetExceeded, withLadderSpent, withSearchLimit } from './solveBudget';
 export type { GivenViolation } from './verify';

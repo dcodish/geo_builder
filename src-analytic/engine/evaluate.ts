@@ -13,7 +13,7 @@
 import { curveInLetters, readInLetters, type Monomial, type SymbolicCurve } from './locusFit';
 import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, isRadiusSymbol, labelRows, narrowedDomain, noFreedomReaches, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
 import { curveParentsOf, parentsOf } from './derived';
-import { enumerateBlockRoots, pinReach, statedScale, walkPins, type Pin } from './pinRoots';
+import { anchorFrameOf, enumerateBlockRoots, fromFrame, pinReach, statedScale, toFrame, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, parabolaFocus, type Box } from './curves';
 import { toWorld } from './conicFrame';
@@ -3793,7 +3793,22 @@ interface BlockList {
   syms: string[];
   /** The admitted roots, each with its index in the listing (0 is configuration 0's own root). */
   roots: Array<{ x: number[]; index: number }>;
+  /**
+   * #2744 ([ADR-AG-502](../../docs/06c-decisions-analytic.md#adr-ag-502)): a figure with freedom left lists, instead of
+   * the whole block, each free vertex its OWN rows fix (every other unknown held) — its admitted roots in the frame of
+   * the two most separated points those rows name, since the seed moves the rest of the figure. `roots` is then empty.
+   */
+  points?: SubBlockPoint[];
 }
+interface SubBlockPoint {
+  id: Id;
+  /** [a0, a1] or [a0, a1, a2] (`anchorFrameOf`): three anchors keep the root on its side of them when a seed mirrors the figure. */
+  frame: Id[];
+  /** The roots as coordinates in the frame (`toFrame`); index 0 is configuration 0's own root. */
+  roots: Array<{ u: number; v: number }>;
+}
+/** At most this many vertices are listed on their own (2-D's `REFLECT_MAX`). */
+const SUB_BLOCK_MAX = 4;
 const blockMemo = new ContentCache<Map<string, BlockList | null>>('blockMemo');
 function blockRootsOf(raw: Construction, choiceSeed: number): BlockList | null {
   const akey = assignmentAt(raw, choiceSeed).key;
@@ -3819,7 +3834,7 @@ function listBlockRoots(raw: Construction, choiceSeed: number, akey: string): Bl
     evaluateStats.uncached += 1;
     f = evaluateUncached(raw, 0, choiceSeed, 1, false);
   }
-  if (f.unsatisfied.length > 0 || f.carrierDof !== 0 || f.vacant.length > 0) return null;
+  if (f.unsatisfied.length > 0 || f.vacant.length > 0) return null;
   const c = resolvedAt(raw, 0, anchorSeed);
   const sys = carrierSystem(c, f.env);
   if (sys.ids.length + sys.syms.length === 0 || c.constraints.length === 0) return null;
@@ -3860,6 +3875,12 @@ function listBlockRoots(raw: Construction, choiceSeed: number, akey: string): Bl
     return admissibleAt(c, placeOrderFree(c, e, pos, 0) ?? pos, e);
   };
   blockRootStats.listings += 1;
+  // #2744 (ADR-AG-502): freedom left, so the whole block has no discrete root set — its determined vertices may.
+  if (f.carrierDof !== 0) {
+    if (pinIdx.size > 0) return null; // a pin's other roots are ADR-AG-303's axis; this listing holds none
+    const points = subBlockRoots(c, sys, anchor, at, span, admit);
+    return points.length > 0 ? { pinned, ids: sys.ids, syms: sys.syms, roots: [], points } : null;
+  }
   const listed = enumerateBlockRoots({
     anchor,
     residuals: (x) => sys.residualsAt(held(x)),
@@ -3883,12 +3904,15 @@ function listBlockRoots(raw: Construction, choiceSeed: number, akey: string): Bl
  * Configuration `seed`'s start at a listed root (`blockRootsOf`): the vertices and parameters written in, and the root's
  * index for `rootKey`. Configuration 0, an unlisted block, or pins that took another root: `null`, nothing moves.
  */
-function steerToBlockRoot(raw: Construction, seed: number, choiceSeed: number, env: Env, seeded: Map<Id, Pt>): { env: Env; index: number } | null {
+function steerToBlockRoot(raw: Construction, c: Construction, seed: number, choiceSeed: number, env: Env, seeded: Map<Id, Pt>, wide: boolean): { env: Env; index: number } | null {
   if (seed === 0) return null;
   const list = blockRootsOf(raw, choiceSeed);
   if (!list) return null;
   for (const [sym, v] of list.pinned) if (!(Math.abs((env[sym] ?? Number.NaN) - v) <= SOLVE_RESOLUTION * Math.max(1, Math.abs(v)))) return null;
   if (!list.ids.every((id) => seeded.has(id))) return null;
+  // #2744 (ADR-AG-502): the first drawing's walk (`wide` false: a prettier drawing of configuration 0's own choices,
+  // ADR-AG-227) is never steered, so the drawing a student opens on is the one it always was.
+  if (list.points) return wide ? steerSubBlock(c, list.points, seed, env, seeded) : null;
   const root = list.roots[Math.min(list.roots.length - 1, Math.floor(jitter(seed + BLOCK_STREAM, 1) * list.roots.length))];
   list.ids.forEach((id, i) => seeded.set(id, { x: root.x[2 * i], y: root.x[2 * i + 1] }));
   const out: Record<string, number> = { ...env };
@@ -3896,6 +3920,159 @@ function steerToBlockRoot(raw: Construction, seed: number, choiceSeed: number, e
     out[sym] = root.x[2 * list.ids.length + j];
   });
   return { env: out, index: root.index };
+}
+
+/**
+ * THE VERTICES THE GIVENS FIX, IN A FIGURE WITH FREEDOM LEFT (#2744, [ADR-AG-502](../../docs/06c-decisions-analytic.md#adr-ag-502),
+ * amending ADR-AG-451's predicate from the whole figure to a determined part of it).
+ *
+ * «ריבוע ABCD שצלעו 10 · E על הישר AB · DE = 12»: the square's pose is free (`carrierDof` 3), so ADR-AG-451 never ran,
+ * yet E is fixed up to a choice — 6.63 from A on either side. Each free vertex P whose OWN rows fix it (the residuals
+ * over its two coordinates, every other unknown held at configuration 0's root, have rank 2) has its roots listed by
+ * the same deflated descent (`enumerateBlockRoots`), started first from P's mirror images through the points its rows
+ * name and across the lines through two of them: a ridge between the roots (an area's |·| where the triangle
+ * flattens) holds a descent from a near start. A root counts when the solve's judge admits the whole figure there.
+ * Each root is stored in the frame of the two most separated points P's rows name that do not move with P, since the
+ * seed places the rest of the figure elsewhere. At most `SUB_BLOCK_MAX` vertices.
+ */
+function subBlockRoots(
+  c: Construction,
+  sys: CarrierSystem,
+  anchor: number[],
+  at: ReadonlyMap<Id, Pt>,
+  span: number,
+  admit: (x: number[]) => boolean,
+): SubBlockPoint[] {
+  const out: SubBlockPoint[] = [];
+  const named = (k: Constraint): Id[] => {
+    const ids = new Set<Id>();
+    const walk = (v: unknown): void => {
+      if (typeof v === 'string') {
+        const o = objectById(c, v);
+        if (o && isPositional(o)) ids.add(o.id);
+        return;
+      }
+      if (!v || typeof v !== 'object') return;
+      if (Array.isArray(v)) v.forEach(walk);
+      else Object.values(v as Record<string, unknown>).forEach(walk);
+    };
+    walk(k);
+    return [...ids];
+  };
+  const base = sys.positionsAt(anchor);
+  const namedIds = c.objects.filter((o) => isPositional(o) && !(o.kind === 'derived' && o.helper)).map((o) => o.id);
+  const h = span * 1e-4;
+  for (let i = 0; i < sys.ids.length && out.length < SUB_BLOCK_MAX; i += 1) {
+    const id = sys.ids[i];
+    const root = [anchor[2 * i], anchor[2 * i + 1]];
+    const withP = (p: readonly number[]) => {
+      const x = [...anchor];
+      x[2 * i] = p[0];
+      x[2 * i + 1] = p[1];
+      return x;
+    };
+    // what moves with P (P and what is built from it), read by a nudge
+    const moved = new Set<Id>([id]);
+    for (const d of [
+      [h, 0],
+      [0, h],
+    ]) {
+      const q = sys.positionsAt(withP([root[0] + d[0], root[1] + d[1]]));
+      for (const [k, v] of q) {
+        const w = base.get(k);
+        if (w && Math.hypot(v.x - w.x, v.y - w.y) > span * 1e-9) moved.add(k);
+      }
+    }
+    const rows = c.constraints.filter((k) => named(k).some((r) => moved.has(r)));
+    if (rows.length === 0) continue;
+    const anchors = [...new Set(rows.flatMap(named))].filter((r) => !moved.has(r) && at.has(r));
+    const frame = anchorFrameOf(anchors, (r) => at.get(r)!, span);
+    if (!frame) continue;
+    const residuals = (p: number[]) => sys.residualsAt(withP(p));
+    // rank 2: P's rows fix it
+    const col = (dx: number, dy: number) => {
+      const plus = residuals([root[0] + dx, root[1] + dy]);
+      const minus = residuals([root[0] - dx, root[1] - dy]);
+      return plus.map((v, k) => ((v - minus[k]) / 2) * (span / h));
+    };
+    const jx = col(h, 0);
+    const jy = col(0, h);
+    if ([...jx, ...jy].some((v) => !Number.isFinite(v))) continue;
+    let sxx = 0;
+    let syy = 0;
+    let sxy = 0;
+    for (let k = 0; k < jx.length; k += 1) {
+      sxx += jx[k] * jx[k];
+      syy += jy[k] * jy[k];
+      sxy += jx[k] * jy[k];
+    }
+    const tr = sxx + syy;
+    const disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - (sxx * syy - sxy * sxy)));
+    const big = tr / 2 + disc;
+    const small = tr / 2 - disc;
+    if (!(big > 0) || !(small > 0) || Math.sqrt(small / big) < 1e-4) continue;
+    const pts = anchors.map((r) => at.get(r)!);
+    const images: number[][] = pts.map((q) => [2 * q.x - root[0], 2 * q.y - root[1]]);
+    for (let a = 0; a < pts.length; a += 1)
+      for (let b = a + 1; b < pts.length; b += 1) {
+        const dx = pts[b].x - pts[a].x;
+        const dy = pts[b].y - pts[a].y;
+        const L = dx * dx + dy * dy;
+        if (L < span * span * 1e-12) continue;
+        const t = ((root[0] - pts[a].x) * dx + (root[1] - pts[a].y) * dy) / L;
+        images.push([2 * (pts[a].x + t * dx) - root[0], 2 * (pts[a].y + t * dy) - root[1]]);
+      }
+    const listed = enumerateBlockRoots({
+      anchor: root,
+      residuals,
+      solve: (x0, fn) => {
+        const r = solveLM(x0, fn, 120);
+        return { values: r.values, ok: r.ok };
+      },
+      // a part's other root must keep every ring its noun promises — a soft fault too (a trapezoid drawn as a
+      // parallelogram is the noun's other root, never a solution the student's figure has)
+      admit: (p) => {
+        const x = withP(p);
+        if (!admit(x)) return false;
+        const pos = sys.positionsAt(x);
+        if (ringFaultsOf(c, (id) => pos.get(id)).length > 0) return false;
+        // …and no two named points on one spot (2-D's rule): a root that stacks them is the givens' degenerate case
+        const pts = namedIds.map((id) => pos.get(id)).filter((q): q is Pt => !!q);
+        for (let a = 0; a < pts.length; a += 1)
+          for (let b = a + 1; b < pts.length; b += 1) if (Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y) <= span * 1e-6) return false;
+        return true;
+      },
+      delta: (a, b, k) => (a[k] - b[k]) / span,
+      same: SOLVE_RESOLUTION,
+      cap: OPTION_CAP + 1,
+      images: images.slice(0, 10),
+    });
+    blockRootStats.solves += listed.solves;
+    if (!listed.admitted[0]) continue;
+    const kept = listed.roots.filter((_, k) => listed.admitted[k]);
+    if (kept.length < 2) continue;
+    const F = frame.map((r) => at.get(r)!);
+    const coords = kept.map(([x, y]) => toFrame({ x, y }, F));
+    if (coords.some((r) => r === null)) continue;
+    out.push({ id, frame, roots: coords as Array<{ u: number; v: number }> });
+  }
+  return out;
+}
+
+/** Configuration `seed`'s starts at its chosen root of each listed vertex, placed in the anchors as the seed placed them. */
+function steerSubBlock(c: Construction, points: readonly SubBlockPoint[], seed: number, env: Env, seeded: Map<Id, Pt>): { env: Env; index: number } | null {
+  const pos = place(c, env, seeded);
+  let index = 0;
+  let steered = false;
+  points.forEach((p, k) => {
+    const F = p.frame.map((id) => pos.get(id));
+    if (F.some((v) => !v) || !toFrame(F[0]!, F as Pt[])) return;
+    const pick = Math.min(p.roots.length - 1, Math.floor(jitter(seed + BLOCK_STREAM, k + 1) * p.roots.length));
+    seeded.set(p.id, fromFrame(p.roots[pick], F as Pt[]));
+    index = index * (OPTION_CAP + 1) + pick;
+    steered = true;
+  });
+  return steered ? { env, index } : null;
 }
 
 /**
@@ -4587,7 +4764,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const named = labelsFromFigure(c, env, seeded);
   env = named.env;
   // #2731 (ADR-AG-451): a determined block's configuration s ≥ 1 starts AT one of its listed roots — the seed chooses.
-  const block = steerToBlockRoot(raw, seed, choiceSeed, env, seeded);
+  const block = steerToBlockRoot(raw, c, seed, choiceSeed, env, seeded, wide);
   if (block) env = block.env;
 
   const unsatisfied: Constraint[] = [];

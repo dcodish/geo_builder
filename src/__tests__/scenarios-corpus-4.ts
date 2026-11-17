@@ -6866,6 +6866,59 @@ export const SCENARIOS_4: Scenario[] = [
       // the control: the diagonal the square forces still commits
       expect(gateVerdict(factsOf(['ריבוע ABCD']), 'AC = 10').kind, 'a square with only its diagonal stated commits').toBe('commit');
     },
+  },  {
+    id: 'square-E-beyond-A-2744',
+    title: '#2744 (ADR-856): a point its givens fix up to a choice — E on line AB with DE = 12 — shows each solution through «הציגו תצורה אחרת», and «BE» lists both values',
+    guards:
+      '#2744 (P2, wrong-answer). Measured at 3f6132c2 through parse -> replay: «ריבוע ABCD שצלעו 10 · E על הישר AB · DE = 12» drew BE = 3.37 at 24 of 24 seeds, «הציגו תצורה אחרת» found nothing, and the values panel and the question box stated BE = 3.37 as known while 16.63 is equally valid; the same with «זווית ADE = 30» and «שטח ADE = 20». Root cause: a free point two scalar givens fix is solved by descent from a start the seed barely moves, so the pool held one root (the class of ADR-AG-451 / ADR-3D-447). Fix (ADR-856): the fold lists the point\'s other roots by deflated descent and mirror-image starts (`engine/blockRoots.ts`), and every seed but 0 starts the point at the root it chooses. The unit matrix is src/engine/__tests__/blockRoots.test.ts.',
+    steps: ['ריבוע ABCD שצלעו 10', 'E על הישר AB', 'DE = 12'],
+    check(fig) {
+      allStepsOk(fig);
+      const be = dist(at(fig, 'B'), at(fig, 'E'));
+      expect(Math.min(Math.abs(be - 3.3668), Math.abs(be - 16.6332)), 'BE is one of the two roots').toBeLessThan(1e-3);
+      expect(Math.abs(dist(at(fig, 'D'), at(fig, 'E')) - 12), 'DE = 12 holds (to the solver tolerance)').toBeLessThan(1e-4);
+      if (checked2744) return; // the pool and press assertions read the whole figure once, not per swept seed
+      checked2744 = true;
+      const roots = (steps: string[], read: (f: ReturnType<typeof replay>) => number) => {
+        const facts = factsOf(steps);
+        const tally = new Map<string, number>();
+        for (let s = 0; s < 24; s++) {
+          const k = read(replay(facts, s)).toFixed(2);
+          tally.set(k, (tally.get(k) ?? 0) + 1);
+        }
+        return tally;
+      };
+      const BE = (f: ReturnType<typeof replay>) => dist(at(f, 'B'), at(f, 'E'));
+      const lines = ['ריבוע ABCD שצלעו 10', 'E על הישר AB', 'DE = 12'];
+      const facts = factsOf(lines);
+      // the first drawing is today's: E between A and B
+      expect(BE(replay(facts, 0)), 'seed 0 is unchanged').toBeCloseTo(3.3668, 3);
+      // both roots over seeds 0–23, each at least 6 times
+      const pool = roots(lines, BE);
+      expect([...pool.keys()].sort(), 'the pool holds both roots').toEqual(['16.63', '3.37']);
+      for (const [k, n] of pool) expect(n, `root BE = ${k} at least 6 of 24 seeds`).toBeGreaterThanOrEqual(6);
+      // one press from the first drawing reaches E beyond A
+      const next = searchAnotherView(facts, 0, undefined, Number.POSITIVE_INFINITY);
+      expect(next, '«הציגו תצורה אחרת» finds another configuration').not.toBeNull();
+      expect(BE(replay(next!.facts, next!.seed)), 'the press shows E beyond A').toBeCloseTo(16.6332, 3);
+      // «BE» lists both values (ADR-634), in the panel and in the question box
+      const v = computeValues(facts, [{ text: 'BE', q: parseValueQuery('BE') }]);
+      const row = v.rows.find((r) => r.kind === 'length' && [...r.ids].sort().join('') === 'BE');
+      expect(row?.value, 'the panel row: 3.37 …').toBeCloseTo(3.3668, 3);
+      expect(row?.or?.value, '… או 16.63').toBeCloseTo(16.6332, 3);
+      expect(v.queryRows[0].value).toBeCloseTo(3.3668, 3);
+      expect(v.queryRows[0].or?.value, 'the question box: both values').toBeCloseTo(16.6332, 3);
+      // the siblings of the class reach both roots
+      expect([...roots(['ריבוע ABCD שצלעו 10', 'E על הישר AB', 'זווית ADE = 30'], BE).keys()].sort(), 'an angle').toEqual(['15.77', '4.23']);
+      expect([...roots(['ריבוע ABCD שצלעו 10', 'E על הישר AB', 'שטח ADE = 20'], BE).keys()].sort(), 'an area').toEqual(['14.00', '6.00']);
+      // controls: a bound that selects the far root still draws it first; the segment form keeps its one root
+      expect(BE(replay(factsOf([...lines, 'BE > 10']), 0)), 'BE > 10 draws the far root').toBeCloseTo(16.6332, 3);
+      const seg = factsOf(['ריבוע ABCD שצלעו 10', 'E על AB', 'DE = 12']);
+      expect(searchAnotherView(seg, 0, undefined, Number.POSITIVE_INFINITY), 'the segment admits one root: no other configuration').toBeNull();
+      // the SSA control keeps both triangles
+      const ssa = roots(['משולש ABC', 'AB = 5', 'AC = 4', 'זווית ABC = 40'], (f) => dist(at(f, 'B'), at(f, 'C')));
+      expect([...ssa.keys()].sort(), 'SSA: both triangles').toEqual(['1.45', '6.21']);
+    },
   },
   {
     id: 'unreachable-length-refused-2572',
@@ -6931,6 +6984,8 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
 ];
+/** #2744: the scenario's pool and press assertions run once, not at every swept seed. */
+let checked2744 = false;
 /** #2370 / #2444 (ADR-828): the vertex of ABC that carries a right angle ('' = none, two letters never happen in a triangle). */
 function rightAngleSeat(f: ReturnType<typeof replay>): string {
   const ids = ['A', 'B', 'C'] as const;

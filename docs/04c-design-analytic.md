@@ -1750,7 +1750,13 @@ unknown no pin fixed, `blockRootsOf` lists the roots of its `carrierSystem` by d
 each candidate polished on the real residuals and judged — domains, free-direction signs, `admissibleAt`; directions
 mod π; at most `OPTION_CAP + 1`), memoised per (construction, assignment), and `steerToBlockRoot` starts configuration
 s ≥ 1 at admitted root ⌊jitter(s + `BLOCK_STREAM`)·n⌋, vertices and parameters both; configuration 0 is never steered,
-and a root past the anchor writes `;b<i>` into `rootKey`. `Figure.rootKey` joins `drawableAt`'s assignment comparison; `resampledInside` frees a
+and a root past the anchor writes `;b<i>` into `rootKey`. A configuration 0 with freedom left lists a DETERMINED PART instead
+([ADR-AG-502](06c-decisions-analytic.md#adr-ag-502), #2744): `subBlockRoots` takes each free vertex whose own rows have rank 2
+over its coordinates (every other unknown held; no pin), lists its roots by the same descent, started first from its
+mirror images through the points its rows name and across the lines through two of them (`images`), admits a root only
+with no ring fault at all (a noun's other ring is no solution) and no two named points on one spot, and stores each
+root in those points' frame (`anchorFrameOf`: the two farthest, plus one off their line, so a mirrored configuration keeps
+the side); `steerSubBlock` places the chosen root in the frame as configuration s ≥ 1 sampled it. `Figure.rootKey` joins `drawableAt`'s assignment comparison; `resampledInside` frees a
 stalled parameter; `admittedToPool(f)` (`selectorsOk`, no `hardRingFaults`) feeds `admittedOf(c, seeds)`, and
 `starved(figs)` (fewer than `MIN_WITNESSES` pictures, `sameConfiguration`, `signatureParts`) withholds a value;
 `derive` refuses failing selectors after the search.
