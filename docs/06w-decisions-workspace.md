@@ -1380,6 +1380,16 @@ Related: #778 (the umbrella), #779 (the P1 the case half exposes), #777 (the sam
 rather than guess" spine on an incomplete comparative), [ADR-289](06-decisions.md#adr-289) and
 ADR-3D-040 (the guidance registers), [ADR-W-029](#adr-w-029), [ADR-052](06-decisions.md#adr-052).
 
+**Amendment (2026-11-12, #2164) — complex reads the exam's capital «Z₁» as typed; the table's complex row was wrong.**
+Operator ruling, 2026-11-12, #2164 option C: *"2164 - C"*. That means: keep it as typed, close #2164 as working as
+specified, and correct this ADR's complex row. The row above says complex "accepts `z1` and `Z1` alike, silently" as if
+that were an unwanted register to teach away. It is not. The exam itself writes Z₁ (`docs/02d-requirements-complex.md`
+P2: *"subscripts (`Z₁`) … normalize"*; F1's own example `Z1 ו-Z2 מספרים מרוכבים`), so the capital is complex's
+canonical register as much as the lowercase. Invariant 1 stands as written: *what varies per product is which register
+is canonical*. For complex, both cases of a z/w-family name are canonical and name the same number, so nothing is
+rewritten into a different register and nothing is taught. No code change.
+**Requirements:** none (02d P2 already promises this) · **Design:** none (internal).
+
 ## ADR-W-031 — A restated fact SUCCEEDS, appends no row, and says so — in every product (#613)
 
 > **⚠ Ruled to change — superseded by [ADR-W-200](#adr-w-200)** (operator 2026-11-09, #2790: *"if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists … this ruling is for all tools."*): a restated fact is to be accepted as its own row, with a notice. **⚠ Superseded in 2-D** by [ADR-W-204](#adr-w-204) / [ADR-822](06-decisions.md#adr-822) (2026-11-10), **in analytic** by [ADR-AG-462](06c-decisions-analytic.md#adr-ag-462) and **in complex** by [ADR-CX-089](06d-decisions-complex.md#adr-cx-089) (2026-11-10); this entry holds in 3-D until #2790's port lands.
@@ -1686,6 +1696,17 @@ the script belongs to no product): the same file is `own` to its product and `si
 a 2-D slice sees both others as siblings; every registered product is a usable viewpoint owning its
 whole tree; `productOf` resolves by longest prefix, not list order; an unknown viewpoint THROWS rather
 than silently classifying everything as sibling; and the partition is total under every viewpoint.
+
+**Amendment 1 (2026-11-16) — a PR is measured against its base BRANCH, never a frozen base sha.** Found landing PR #2828
+(a 3-D-only change): every lane's guard failed listing `src/`, `src-analytic/`, `shell/` and `server/` files the PR never
+touched, and the `changes` job ran all four lanes. Cause: CI passed `--base github.event.pull_request.base.sha`. On a
+`pull_request` run HEAD is GitHub's test merge of the PR into the base's CURRENT tip, while that sha was frozen at an
+earlier event (here `19da6b89`, many `main` commits back), so `base...HEAD` counted every commit `main` gained since as the
+PR's own change — the PR's real diff from its merge-base with `main` is 19 `src3d/` files, 1 `fixtures3/`, 3 docs.
+Decision: the four sibling steps pass `--base origin/<base_ref>` (a push still passes `github.event.before`), and the
+`changes` job classifies from `git merge-base origin/<base_ref> HEAD` (no usable base still runs every lane). The guard
+itself is unchanged: `base...HEAD` from the base branch is exactly the PR's net change, and an unreachable base still
+stops the run. **Requirements:** none (internal: CI) · **Design:** none (internal) · LADDER stage: none.
 
 ### ADR-W-037 — the tier artifact carries shared state and nothing else (#812)
 
@@ -5155,7 +5176,7 @@ That makes two copies of one surface, with a third on the way. ADR-W-016 rule 1 
 
 ## ADR-W-107 — A claim to prove is refused in every builder, by one shared rule (#1666)
 
-**⚠ Amended by [ADR-W-194](#adr-w-194) (2026-11-08):** the builders no longer word their own refusal: it is one suite sentence, `suite.refusal.proofTarget`, followed by where the claim can be checked (2-D its relations button; analytic and complex their data panel; 3-D pending the operator, #2492).
+**⚠ Amended by [ADR-W-194](#adr-w-194) (2026-11-08):** the builders no longer word their own refusal: it is one suite sentence, `suite.refusal.proofTarget`, followed by where the claim can be checked (2-D its relations button; analytic and complex their data panel; 3-D what its data panel can check, [ADR-W-205](#adr-w-205)).
 
 **Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*. **Extends** [ADR-W-016](#adr-w-016) (a new `shell/` decision) and applies [ADR-W-071](#adr-w-071) (docs/28 §5c). Product sides: [ADR-561](06-decisions.md#adr-561) (2-D), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295) (3-D); analytic's first copy was ADR-AG-187 (#1618).
 
@@ -5669,6 +5690,8 @@ The precedent, for every later parity case: **B1 asks for one verdict per plane-
 **ADR-W-118 Amendment 3 (2026-10-17): a right angle stated at a NAMED point is a value (#1946, #2103).** The operator's ruling of 2026-10-10 on #1946 (option C): *"a stated ⟂ whose right angle sits at a NAMED point is a VALUE, so the knee is drawn at rest, in both 2-D and 3-D"*; follow-up: *"A single knee at D, on the DC side — the right angle is stated once, so it is marked once."* B2 now reads: **A stated relation (AB = AC, ∥, a ⟂ whose right angle sits at no named point) is in the givens list and drawn only in an opt-in relations layer, never as a mark at rest, in every tool. A stated right angle whose vertex is a named point — a shared endpoint, an endpoint the figure puts on the other segment («D על BC» · «AD ⟂ BC», «AD גובה»), or a point stated as the crossing («O נקודת חיתוך האלכסונים» · «AC ⟂ BD») — is a value: it is marked at rest, once, in the corner the statement names (toward the other segment's second-named letter; at a crossing, toward each segment's second-named letter — rulings of 2026-10-14 and 2026-10-15), and that corner never changes when the figure is cycled.** Realised by [ADR-731](06-decisions.md#adr-731) (2-D) and [ADR-3D-366](06b-decisions-3d.md#adr-3d-366) (3-D); analytic's display of it is #2320. **Requirements:** [02](02-requirements.md) FR-RN-7, [02b](02b-requirements-3d.md) FR-RD-16 · **Design:** none (a rule; the mechanisms are the two product ADRs').
 
 **ADR-W-118 Amendment 4 (2026-11-03): B7's conic line follows the 2026-10-14 ruling (#1863, #1218).** The operator, 2026-10-14 (card `d14-1218-focus`): *"the 9 October four-state control wins"* over the 2026-10-07 "always marked" line. So analytic marks a parabola's focus and directrix, and an ellipse's foci and both directrices, **only when the student presses the curve's chip** (nothing → directrix → focus → both), writing their values when the givens determine them. The circle-centre exception is unchanged. Realised by [ADR-AG-376](06c-decisions-analytic.md#adr-ag-376). **Requirements:** [02c](02c-requirements-analytic.md) R20, R221, R222 · **Design:** none (a ruling transcribed; the mechanism is ADR-AG-376's).
+
+**ADR-W-118 Amendment 5 (2026-11-12): a value the student HID stays readable in the givens row (#2852).** B2 adds: *a value the student hid stays readable in the givens row, which shows «מוסתר»; a hidden value is the student's choice, never the tool's.* Hiding a segment takes its value, its marks and a point the tool named only for it ([ADR-W-207](#adr-w-207)). **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-14 · **Design:** none (a rule; the mechanism is ADR-W-207's).
 
 ## ADR-W-119 — The C4 documentation guards: a superseded ADR says so, requirement ids are unique, a cited ladder lists its ADR, instruction files point at live docs, a parity gap names open work or is parked, MEMORY.md has a ceiling (#1861)
 
@@ -7198,6 +7221,8 @@ Each crash also reset the daily AI cap, the concurrency cap and the per-IP limit
 
 ## ADR-W-194 — The proof-target refusal is one suite sentence, and it says where the claim can be checked: 2-D its relations button, analytic and complex their data panel (#2492)
 
+**⚠ Amended by [ADR-W-205](#adr-w-205) (2026-11-12):** decision 4 is replaced. 3-D's refusal ends with a line of its own naming what its panel can check (operator 2026-11-10, option (b)).
+
 **Status:** accepted · 2026-11-08 · feature (P2, all four builders) · fix round #2745, stream G · branch `feat/2492-proof-target-check` · **Operator:** 2026-10-24, playing round #2466 T12: *"For all cases of הוכיחו we should add to the message that they can check if its true using the data panel. ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות וזוויות שוות."*; his ruling the same day (ballot e19, answer B with a note that wins over the card): *"Other tools have the data panel and there is a ask button there that might be able to answer such questions so for non-2d tools, we tell them to check the claim in the data panel"* · plan of 2026-10-24 (#2492), armed `auto-ok` on that ruling · **Amends** [ADR-W-107](#adr-w-107) (each builder no longer words its own refusal) · **Extends** [ADR-W-148](#adr-w-148) (two suite keys) · per-product notes on [ADR-561](06-decisions.md#adr-561), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295), [ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)
 **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 and its parity row *A proof target «הוכיחו כי»*; [02](02-requirements.md) FR-RV-1 (the refusal names the control); [02c](02c-requirements-analytic.md) *Out of the language*; [02d](02d-requirements-complex.md) FR-KN-2 · **Design:** [04w](04w-design-shell.md) § *Suite-wide text* and § *Proof targets*; [04d](04d-design-complex.md) (the complex wording site)
 
@@ -7433,6 +7458,25 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 
 **Not changed.** Eligibility (`auto-ok`, no `[proposed]`, no open question), the never-patch escalation exit, item gates, the full suite per landing, the round issue as the live ledger, the published report.
 
+## ADR-W-202 — The Rulings Inbox: one live page holds every test and decision waiting on the operator, with everything needed to answer from a phone, and his answers feed the running round (#2817)
+
+**Status:** accepted · 2026-11-10 · operator request · process (workspace) · builds [ADR-W-201](#adr-w-201)'s "waiting on you" list · beside [ADR-W-116](#adr-w-116) (the round dashboard stays tracking only) and [ADR-W-159](#adr-w-159) (the roadmap page keeps the plan)
+**Operator:** 2026-11-10, in chat:
+> "I will need a live artifact with items that i need ruling on. that would include testing and decisions. this list will be updated when new issues come in or when i provide feedback for a specific test passing or a decision. the computer doing the work is my home pc and i will mostly be monitoring and providing the feedback through claude desktop on remote control so i need this artifact to include as much information as possible for me to decide on."
+
+**Requirements:** none (internal) · **Design:** the fix-round skill Step 2b; `scripts/ruling-inbox/` (the page's source and the item builder)
+
+**Decision.**
+1. **One page, three lists:** Decide, Test, Answered — https://claude.ai/artifact/JZnrjaW56UbrWqgEWbAtxR. Its database has three collections: `items/<id>` and `meta/status`, written only by the session; `answers/<id>`, written only by the page. Writes are owner/editor-only.
+2. **A decision carries** what a student sees today, the context (what the tool does, measured; his earlier rulings, quoted), a Hebrew example, why it is his call, 2–4 options each with what the student would see, its cost and what it rules out, the recommendation and why, and what the answer unblocks. He picks an option, adds a note, or answers in his own words.
+3. **A test carries** the Server URL — the live site when the change is deployed, because he works remotely and the home PC's local server is out of his reach — the Hebrew lines (copyable), Look for, Before, and the pre-played screenshots stored as the page's assets. Pass, or fail with what was wrong.
+4. **The session reads `answers/*` at every wake** and transcribes each answer to its durable home (the issue's `## Operator ruling` comment, `playsheet:close --audit`, a held PR released), then marks the item done with a one-line resolution. An answer can be changed until then. The page never holds a ruling the repo does not.
+5. **Items are written when they arise**, not at the end of a round: escalations, judge escalations, 🎮 cases and pending spot audits. `scripts/ruling-inbox/build-items.mjs` builds them from the repo's own records.
+
+**Why a page and not the issue list.** He answers from a phone, between other work, through remote control: the evidence (screenshots, options, the student's view) must be one tap away, and the answer must reach the running session without a chat round-trip.
+
+**ADR-W-202 Amendment 1 (2026-11-10): an item leaves the inbox as soon as the session has acted on it; what still needs him is colour-coded apart from what he has sent.** Operator: *"when you finish with a test i already answered, it should be removed from the ruling inbox. It now appears in answered - question is how long does it stay there"*, then *"they should disappear as soon as you acted on them or have them color coded so i know what is already addressed vs needs my attention. same for decisions"*. Decisions and tests alike: an unanswered item carries the accent stripe and is counted on its tab; an answered one not yet acted on is dimmed, grey-striped, marked «sent · waiting for Claude» and sorted last; once the session has acted, it deletes the item and its answer, and says what it did in chat. The Answered tab is gone. The record stays where it was transcribed (the issue's ruling comment, `scripts/playsheets/spot-audits.json`).
+
 ## ADR-W-203 — A lowercase letter that can only be a point label is accepted and written in uppercase; an ambiguous one asks for uppercase, in every builder (#2823)
 
 **Status:** accepted · 2026-11-10 · operator ruling, all four builders · not yet built (#2823) · changes what 2-D's lowercase-names message and analytic's AI fallback do today · LADDER stage: **none** (the reading of a label)
@@ -7465,3 +7509,610 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 1. **One notice key** for a held row in every builder: `suite.notice.alreadyHeld` — «זה כבר קיים באיור — נוסף כנתון נפרד.» / "That's already on the figure — added as a separate given." (new text of the session's, ADR-W-174). `suite.notice.alreadyDrawn` retires when the last builder ports.
 2. **One shared table** of held sequences and controls (`held-row-2790.ts`), asserted by each tree through its own decision: one row appended, the notice, no point moves, the relation holding once the earlier row is unticked and deleted.
 3. **Split landing.** The round landed 2-D first (the reference, ADR-W-118 B1), then analytic and complex (ADR-AG-462, ADR-AG-463, ADR-CX-089), each asserting the shared table through its own decision; until 3-D's port lands it answers a held line with its old no-row note — a parity known gap naming #2790.
+
+## ADR-W-209 — One management console on the server, answered on the page, reading GitHub live (#2868)
+
+**Status:** accepted · 2026-11-13 · operator request and rulings (#2868, comment of 2026-11-13) · **step 1 + 2 of 3** (the old pages retire in step 3, after he has used this one) · LADDER stage: **none** (operator tooling)
+**Requirements:** none (internal: the operator's page, no builder changes) · **Design:** [04s](04s-design-server.md) "The management console" · [RUNBOOK](RUNBOOK.md) "The management console"
+
+**Context.** The operator: *"I don't have a good system to manage the development… it's bits and pieces put together."* The roadmap page, the Rulings Inbox and the round dashboard each kept their own copy of GitHub's state, aligned by a skill and a cloud routine. The copies failed (ten answers lost on 2026-10-26, the cloud refresh failing on 2026-10-31, #2643), and an artifact page cannot reach GitHub, so every answer waited for a session to relay it. On 2026-11-13 he asked to build it now: *"the page needs to be in hebrew but english terms like issues and commits etc can be in english… a management console on some of the screens and funcional (like decisions, tests, etc.) on some of the screens. I want to be able to manage the whole status from this site."* Base path: *"themathbible.com/geo-builder/management"*; login: *"8 hours is enough"*; the Roadmap Map: *"should be consolidated into this new management page"*.
+
+**Decision.**
+1. **New routes in the existing server** (`server/ops/`), at `/geo-builder/management`, behind the console's **own** login: its own username, password and cookie secret (never the dashboards' shared password, #2762), a cookie scoped to its own path, 8 hours.
+2. **GitHub is the record; the console keeps no copy.** Each view reads GitHub's REST API with a fine-grained token for this repository only, through a cache of three minutes that every write drops. No LLM at open time, no database. Judgement (dossiers, plans, triage clusters, the readiness measure) is written by sessions into issues and repo files; the console only reads it.
+3. **Seven screens, one per question he asks.** Working screens: *what needs me* (P1, decisions, PRs to play, spot audits, plans awaiting approval, the running round's waiting list) and an issue's own page. Console screens: *what happened since I last looked*, *plan and pace* (the plan's board, the teaching calendar, unit readiness, outside the plan), *what is live*, *backlog* (open features oldest first, `later`, the icebox, and the Roadmap Map's directions with live counts), *usage* (per builder, and what real users failed this week), *what a change costs* (per round, from its ledger lines). Hebrew, right to left; GitHub's own terms stay in English. Plain forms, no script, a CSP that forbids script.
+4. **Answering on the page: a fixed allow-list**, each action validated by the server and recorded in its permanent home, each comment stamped as written on the page: a ruling (`## Operator ruling` comment, `needs-operator` removed), a PR played pass/fail (a comment), a spot audit (the ledger `scripts/playsheets/spot-audits.json`, through `recordAudit`, committed), approving a plan (`auto-ok` + the ADR-W-014 audit comment), a priority change, parking (`icebox`, closed as not planned, the reason required), pulling an issue into a plan week (a commit to `ops/plan.json`), a note, and filing a real user's failed line as a `reported` issue. File edits are pinned to the sha read, so a concurrent change is refused, never overwritten. **The server never merges, deploys, closes a round or closes an issue as fixed**: those stay with a session, which runs the gates.
+5. **Login is a username and password**, like the admin dashboards (operator, 2026-11-13: *"I dont want the authenticator part. just user password like i have for the geo-builder admin page"*; a TOTP second factor was built and removed the same day). The console keeps its own password and cookie because the dashboards' password is shared with other pages on the origin (#2762) and this page writes; whether to reuse the admin password is his to say. Every POST carries a CSRF token bound to the session and must come from the same origin. `MGMT_WRITES=dry` validates and shows the writes without sending them (how a PR is played).
+6. **The plan moves into the repo** as `ops/plan.json` (from the roadmap page's `plan/current`, its names translated); the Roadmap Map's directions inventory as `ops/directions.json`.
+7. **Unit readiness** (Addition A) beside [ADR-W-172](#adr-w-172): `ops/units.json` lists every question of each unit, transcribed or not, with the repo members that transcribe it; `npm run ops:readiness` replays them (the corpora per question with the ratchets' own readings, the fixtures nets, named tests) and commits `ops/readiness.json`: **green** (every member passes), **partial** (some do), **red**, **untried** (no member, counted, never dropped). Each run appends the day's green counts, so the page shows the weekly change.
+8. **What real users failed** (Addition B): per builder, the last 7 days (or 30), lines not understood or built only by the AI, grouped by normalized text and outcome, through each dashboard's own classifier; whether each still fails (the triage verdict map, with its age); the issue whose title carries the line; a session link. The operator's own devices (each one he logs into the console from) are left out of the counts. A builder with no log on the server says so, never zero.
+
+**Not decided here (step 3, after he has used the console):** retiring the Rulings Inbox, the roadmap page and its database, `roadmap-refresh`, the daily cloud routine (#2643) and the round dashboard, with the skills and docs/22 that point at them. Until then they keep running beside it. Also open: editing an answer from the page before a session acts on it (ADR-W-202 §4); today a correction is a second comment.
+
+**Consequences.** A ruling, a pass or an approval is in GitHub the moment he taps; a running round reads it at its next wake as it reads any comment. The GitHub token and the console password are new production secrets (RUNBOOK). The unit map's question list is a session's assignment from `docs/sample questions/` (2026-11-13) and is his to correct.
+
+## ADR-W-210 — One compute contract for every builder: the page never solves, every wait is shown and bounded, and a work meter gates regressions (#2867)
+
+**Status:** accepted · 2026-11-13 · operator direction, session mechanism · workspace (all four builders + `shell/`) · a program, not one change: each phase lands under its own issue and PR. The student-visible parts are listed at the end and wait for rulings ([ADR-W-117](#adr-w-117)).
+**Operator:** 2026-11-12, Rulings Inbox:
+> "Speed is very important. Users waiting for 30s will most likely leave if they just wait with no feedback that something is happening. A dedicated session should track these long cases and find ways to deal with them"
+
+2026-11-13, in chat, on the per-case session list the scoping pass proposed:
+> "im not conviced that the optimizations planed are the right ones. I dont want local optimization - i want overall optimization so we dont end up fixing one issue just to discover later we have an issue somewhere else. This is something we need a higher level of thinking for."
+>
+> "we must fix this for all tools. user should know the engine is working and not frozen"
+
+2026-11-13, in chat, on a search that is cut off before it finishes (as against one that finishes and finds nothing):
+> "we should say honestly that a solution was not found and if we should continue searching"
+
+**Requirements:** [docs/03](03-nonfunctional-requirements.md) NFR-PF-1 is the promise this serves; it is not amended here (phase 0 adds the measured budgets) · **Design:** none yet: each phase edits [docs/04w](04w-design-shell.md) and its builder's design doc in its own commit
+
+**Why (measured, 2026-11-13, `main` @ c9d2ce02; the map and the sizing sheets are on #2867).**
+- About 33 600 student actions were replayed and timed across the four builders. About 375 take 5 s or more: 2-D 238 (19 of them ≥ 30 s; the worst prod session had a student wait 36–148 s per line), analytic about 70 (one over 60 s), 3-D 67, complex none.
+- **The rules already exist and nothing checks them.** [docs/17 §7](17-design-rules.md) requires a deadline inside the innermost loop, a failure path cheaper than the success path, and one shared sampler. NFR-PF-1 promises a step in about 200 ms. Each is broken in more than one builder.
+- **Local fixes moved cost instead of removing it.** #2749 fell from 179 s to 4.9 s and what is left is another cause; #1647's decision fell to 0.09 s and the line still takes 1.7 s to draw; #2513 was filed at 2.5 s and measures about 20 s; the analytic pool slice was documented as 7–101 ms ([ADR-AG-180](06c-decisions-analytic.md#adr-ag-180)) and takes 6–9 s on one exam figure.
+- **The slow cases share five causes**, none of them local to a function:
+  1. the engine solves on the page's UI thread (all of 3-D, analytic and complex; in 2-D every gate that runs before the worker prefold, plus edit, delete, toggle and the load audit);
+  2. one action solves the same content several times, because caches hang off objects that are rebuilt per action (only 2-D's fold is keyed by content; analytic's `derive` has no memo at all; 3-D folds from an empty construction every time);
+  3. a line that cannot hold costs more than one that can;
+  4. limits are wall clocks checked between work units, or there are none; and **a search that runs out is shown as a verdict** in every iterative builder (2-D «אין תצורה אחרת — הצורה נקבעה» after the 12 s clip; 3-D `bound-unsatisfiable`; analytic a refusal on the walk's fallback figure);
+  5. each solve starts cold.
+- **Facts that constrain the design** (sizing pass):
+  - In 2-D, 3-D and analytic, accepting or refusing a line IS the solve. There is no cheap figure to draw before the verdict on a submit or an edit.
+  - Each iterative builder has exactly one innermost solving function, and a counter already sits in or beside it: 2-D `evaluateCore` + `countWork` ([ADR-558](06-decisions.md#adr-558)); 3-D `leastSquares` + `leastSquaresStats`; analytic `solveLM` (its `evaluateStats` counts a coarser unit).
+  - The derived figure crosses a worker boundary as data in 2-D, analytic and complex. In 3-D it does not as it stands: three lazy closures on the pivot run the solver on whichever thread reads them first (the clone throws on 82 of 176 fixtures).
+  - The pages call engine readers on the derived object (about 50 sites in 2-D and in analytic), and 240–320 test files per builder call the engine synchronously.
+  - A busy worker cannot see a cancel message; cancel means terminating it, which discards its caches.
+  - 2-D's clock budgets are `Infinity` under test, so the suite never runs the browser's control flow for a search.
+  - The shared chrome's edit and rename contracts return synchronously (`shell/frame/FactList.tsx`, `LetterPopover.tsx`).
+
+**Decision — five invariants, the same in every builder.**
+
+1. **The page never solves.** Every call into a builder's innermost solving function made on the UI thread is counted per student action, and that count is ratcheted to zero, builder by builder. The check lives at that one function, so it sees transitive calls a name list cannot (2-D's `main-thread-sweeps.test.ts` is the name-list precedent it replaces). Complex is the stated exception: its fold is exact and costs about 2 ms, so it keeps the UI thread under a work ceiling and gets no worker until the meter says otherwise.
+2. **One job per student action, on one shared queue.** `shell/` owns the queue: lanes (what the student waits for; background knowledge), a basis stamp on every job (the result is applied only if the facts and seed it was computed for are still current), cancellation, and a synchronous in-process executor for tests and for complex. **The working state is derived from the queue**, never from a flag a call site sets and clears. This is how the operator's ruling reaches every tool at once.
+3. **Bounded and honest.** Every search has a limit in work units, checked inside the solver's loop. Reaching it is its own outcome, "not decided": never a verdict, never a refusal that names a statement, never cached as one. No wall clock decides a verdict or a stored fact (the #1857 class), so the suite and the browser run the same control flow.
+4. **Compute once.** Solved content is keyed by content, and the part that does not depend on the configuration is shared by every configuration (analytic's construction is a function of the lines alone; 2-D's fold already is). The caches live where the solving runs and outlive the action. Where a drawing does not depend on knowledge (show-another, load, delete, undo, panels, asks, crossings), the figure is delivered first and knowledge follows as pending. On submit and edit the verdict is the solve, so no provisional figure is drawn.
+5. **Metered.** Each student action reports three counts: total work, work on the UI thread, and work before the first paint. A committed baseline over every fixture and the slow corpus feeds a gate: an action whose count grows fails the suite unless its ADR records the before and after (docs/17 §7's fourth rule, made mechanical). Counts are compared per figure against that figure's own baseline, because a unit's cost differs between figures and builders.
+
+**How it is built.**
+- **Route: settle, then hand over** (2-D's prefold, widened), not "the page never derives". The worker runs the whole decision for an action and returns a *settled* result: plain data with every lazily solved value already forced. The page adopts it into its own memo and keeps its synchronous readers, which invariant 1 then proves solve-free. The rejected route (the figure arrives as data and the page holds no engine) would convert about 50 synchronous readers per builder and leave the production path almost untested by the existing suites; it fixes nothing the chosen route does not.
+- **`shell/` gains** the queue, the worker client with its synchronous fallback, the busy state, the basis check and the meter envelope, parameterized by each builder's operations and carrying no product knowledge ([ADR-W-016](#adr-w-016)). The edit and rename contracts become awaitable once, for all four builders.
+- **Cancel** stays termination for a search the student abandons; a work limit ends everything else. A cancel flag the solver can read would need cross-origin isolation on a shared host and is not adopted.
+- **Existing decisions this will amend when its phase lands**, each by its own ADR with measurements: the unbounded primary fold ([ADR-281](06-decisions.md#adr-281)); the interactive searches' clock budgets ([ADR-296](06-decisions.md#adr-296), ADR-558's known limit); analytic's pool that completes on the UI thread (ADR-AG-180); the identity-keyed memo locks in 3-D.
+
+**Phases, in dependency order.** Each has an exit the meter can show. Sizes are S / M / L per builder and are estimates.
+
+| Phase | What lands | Size | Exit |
+|---|---|---|---|
+| 0 — Meter and gate | the three counts at each inner function; the baseline; the gate; `scripts/perf/` as the timing instrument | S–M | every fixture action in all four builders has a recorded count; the gate is in `test:full` |
+| 1 — A visible working state | the shell queue and busy state in all four builders; the indicator is painted before the work starts, as 2-D's submit already does | S–M | every action longer than the threshold shows it, in every tool, pre-played |
+| 2 — Compute once | content keys: one construction per line list in analytic; fold reuse in 3-D; in 2-D the solved tail, the per-gate trial arrays and the fold cache's size | M each | total work per action falls against the baseline; no figure's count rises |
+| 3 — Off the page | the decision as one worker job with a settled result: analytic (L), 3-D (L, needs the pivot's lazies forced and the pin-origin table carried), 2-D's remaining gates, edit, delete and load (M–L), complex on the same-thread executor (S) | L | UI-thread work is zero across the corpus |
+| 4 — Limits and the third outcome | work limits replace clocks; "not decided" exists in every builder | M each, after rulings | no clock on a verdict path; the suite runs the browser's flow |
+| 5 — A cheap "no", then solver internals | impossibility checks before a search, shared failure memory, and whatever the meter ranks next | open | chosen by the meter, never by a single report |
+
+Phase 2 precedes phase 3 because a worker result has to be adopted into a content-keyed memo, and analytic and 3-D have none.
+
+**The open speed issues are evidence, not a work list.** #2787, #863, #2601, #2359, #2481, #2104, #1768, #2295 and #2513 are each a row of the slow corpus and close when the phase that removes their cause lands. Fixing one alone is the local optimization this ADR exists to stop. Operator, 2026-11-13: *"we take the 9 issues and treat them in this round"*: they belong to this program, their `auto-ok` is removed, and no fix round takes one alone. Logging wait times in the prod event is deferred by him the same day (*"wait times in prod can wait"*). Phases 0 and 1 are started on his word (*"start phase 0 and 1"*).
+
+**Found on the way, covered by invariant 2 (2-D, read from code, not yet reproduced):** the busy flag has three owners and no `finally`, so a rejected prefold can leave it set and every later submit dropped (`src/app/submitPipeline.ts:297-311`); a verdict is committed onto the live store with no check that the figure it was computed for is still there (`submitPipeline.ts:130-136`), while undo, delete and edit stay enabled.
+
+**Not changed.** What any line means, any verdict, any drawing. `(facts, seed)` stays the source of truth and positions are never stored. Product trees still never import each other; the shared part lives in `shell/`. Rule 2: none of this touches the model.
+
+**What the student will see.**
+- [asked] Every tool shows that the engine is working; the page never looks frozen. *"user should know the engine is working and not frozen"*
+- [2-D] The indicator is 2-D's «חושב…» on the submit button, and input while busy follows [ADR-W-198](#adr-w-198) and the #2861 ruling, in every tool.
+- [asked] When a search is cut off before it finishes, the tool says that no solution was found and asks whether to keep searching, instead of refusing the line or saying «אין תצורה אחרת — הצורה נקבעה». *"we should say honestly that a solution was not found and if we should continue searching"* (2026-11-13). A search that finishes and finds nothing keeps today's refusal.
+- [asked] The longest a student waits before that question is about 10 seconds. *"10s is an ok number"* (2026-11-13). The limit is counted in work and calibrated to that time (invariant 3). Measured the same day over the 1 716 lines real students submitted in prod: 16 (0.9 %) take 10 s or more, 15 of them in 2-D, in 4 of 173 sessions; 10 of those 15 end accepted, so the limit is a safety net and the speed work is the cure.
+- [asked] In 3-D, after a figure is redrawn (another configuration, load, delete), the values panel and the crossing dots may show as pending for a moment, as analytic's values do. *"3d can behave like analytics"* (2026-11-13).
+
+### ADR-W-210 Amendment 1 (2026-11-13) — phase 0 as built: the work meter and its gate (#2873)
+
+**Status:** built · 2026-11-13 · debt (P2, workspace: all four builders + `shell/`) · branch `debt/2873-work-meter` · started on the operator's word (*"start phase 0 and 1"*)
+**⚠ Amended by Amendment 3, below (2026-11-14):** where a walk starts, the `edit` action, 2-D's `detect` lane and complex's unit. The numbers below are phase 0's, as recorded.
+**Requirements:** none (internal): no line, verdict, drawing or message changes, and [NFR-PF-1](03-nonfunctional-requirements.md) is not amended. The counts are the instrument its budgets will be set from · **Design:** [docs/04w](04w-design-shell.md) "The work meter" (the counter, the lane, the phase); [docs/08](08-testing-strategy.md) "The work meter" (the gate, the baseline, when to re-record); [docs/17 §7](17-design-rules.md) (each rule now names its check)
+
+**Root cause addressed.** docs/17 §7's rules and NFR-PF-1 had no check, so every speed regression was found by the operator's play (PR #2860: 0.2 s presses became 6 s presses). After this change, a recorded student action that does more solver work than its baseline fails the suite, in every builder.
+
+**What is counted.** One counter, `shell/workMeter.ts`, called from each builder's innermost solving function. A unit is a count, never a time, and its cost differs between builders and figures, so a count is only compared with the same action of the same figure.
+
+| Builder | One unit | Where the unit is charged |
+|---|---|---|
+| 2-D | one `evaluateCore` call | `countWork()` (`src/engine/solveBudget.ts:57`), which `evaluateCore` (`src/engine/evaluate.ts:1650`) calls first. It is the EXECUTED call: [ADR-558](06-decisions.md#adr-558)'s `work.done` goes on charging memo hits for its own budgets, and the meter does not read it |
+| 3-D | one residual evaluation of `leastSquares`, the Jacobian's included | `src3d/engine/solve3.ts:90`, beside the existing `leastSquaresStats.evals` |
+| Analytic | one residual evaluation | `solveLM` (`src-analytic/engine/solve.ts:1644`), and in the same unit the two routines that solve beside it: `jacobianRank` (`:1975`, every rank the engine takes, with `freeRank`'s own evaluation at `:1942`) and `scanRoots` (`src-analytic/engine/pinRoots.ts:46`). `enumerateBlockRoots` (`pinRoots.ts:291`) makes its solves through `solveLM` and is counted there |
+| Complex | one exact solve | `exactSolve` (`src-complex/replay/derive2.ts:475`): every `foldConstraints` (`:682`) makes exactly one and `entailedBy` (`:509`) two. The counter sits one call below the fold so that the entailment gate is counted in the same unit |
+
+**What is not counted, and how much it is.** Measured on CPU profiles of whole walks of the heaviest fixtures (every action of the figure, 500 µs sampling): the share of sampled time that is under a counted function.
+
+| Builder | Walks profiled | Time inside the counted function | The rest |
+|---|---|---|---|
+| 2-D | the five heaviest fixtures (`hexagon-regular-by-angles-2797`, `issue-1771-semicircle-three-vertices`, `issue-2405-all-common-tangents-apart`, `inscribe-square-in-quad-2257`, `2022-summer-a-issue59`) | 33–54 % inside `evaluateCore` | 41–64 % is `resolveDriven`'s own loops (Nelder–Mead, LM, Gauss–Seidel) around their evaluations. Each evaluation is one counted call, so this time moves with the count. 2.6–5.6 % is outside the solver: parsing, the fold's bookkeeping, garbage collection |
+| 3-D | the five heaviest (`prism-eq-first-815`, `letter-coords-new-point-2563`, `plane-both-forms-2367`, `nine-separate-shapes-2764`, `length-letter-2092`), and the slow corpus's parameter figure `#863 on-line` | 92–95 % inside `leastSquares` (96.7 % on `#863 on-line`) | garbage collection and the walk's own code 5–8 % (3 % on `#863 on-line`); the knowledge sampler's code outside a solve under 1 % |
+| Analytic | `exam-2379-q3-route-2392`, `issue-2231-rhombus-perp-foot`, `issue-2230-rhombus-strict-side`, `corpus471.json#18/4`, `corpus471.json#3/5` | 91–95 % (on the three figures `solveLM` alone is 94.6–95.2 %; the rank adds 0.2–0.4 %) | `evaluateUncached`'s own code 1.4–2.3 %, garbage collection about 2 % |
+| Complex | `2b-capstone`, walked 200 times | **3 %** inside `exactSolve` | **80 % is re-reading the lines** (`parseLineV2`, `src-complex/parser/rules.ts:1461`, reached from `lowerLines`, `src-complex/app/deriveLines.ts:240`, and `complexScopeOf`, `:494`); the fold outside its exact solve is 9 % |
+
+Solver routines that make no counted call, each with its measured share on those walks:
+- **2-D:** none in a loop. Every solver evaluation is one `evaluateCore` call: `solveOneParam`'s scan (`src/engine/evaluate.ts:350`), `residFull` (`:508`), `rowsFor` (`:533`), `costFull` (`:1126`) and the Gauss–Seidel `ownResid` (`:1216`). The closed-form scan of an on-segment point, `solvedOnSegmentCandidates` (`src/engine/solve.ts:865`, with `directionRoots` `:809` and `solveParam` `src/engine/geometry.ts:254`; called from `tryEval`, `evaluate.ts:2246`, and `branchCount`, `step.ts:2880`), evaluates no figure and is not counted: 0.0 % of the sampled time on all five walks.
+- **3-D:** the parameter root scans `signChangeRoots` and `touchZeroRoots` (`src3d/engine/evaluate.ts:704`, `:739`) and the rank probes `numericRank` (`src3d/engine/solve3.ts:546`), `matrixRank3` (`src3d/engine/evaluate.ts:2429`) and `metricRank` (`src3d/engine/freeVecSystem.ts:469`). A solve they trigger is counted in `leastSquares`; their own arithmetic is not. On the five walks, and on the parameter figure `#863 on-line`, the scans and the probes outside a counted solve are 0.0 % of the sampled time.
+- **Analytic:** `tangentFreedomOf`'s own finite-difference Jacobian (`src-analytic/engine/evaluate.ts:950`) evaluates positions, not a solve, and is not counted (0.0 %). The rank it takes afterwards is. On three light parameter figures (`answer-in-parameter-q16-2735`, `exam-2024w-locus-param-1138`, `issue-2521-radius-letter-binds`, about 0.1 s a walk) the pin-root seeding's own code outside a counted routine (`seedPinRoots`, `src-analytic/engine/evaluate.ts:3656`) is about 1 %. On those figures only 55 % of the time is under a counted routine at all: the rest is reading the lines and building the scene, which is not solving. The meter guards the slow cases, which are solver-bound, and says nothing about a light figure's parsing.
+- **Complex:** `solveTier1` called directly by `placeSolutionSets` while lowering (`src-complex/app/deriveLines.ts:563`): one linear solve per lowering that places a solution set, under 0.1 %. **The larger fact is the table's last row.** Complex's time is in reading its lines, which every fold and every scope lookup repeats, and the meter was specified to count solving. A change that doubles the folds of an action fails the complex gate; a change that makes each fold read its lines twice does not. Before complex's count is used as the "work ceiling" invariant 1 gives it, line lowering has to be counted too (one `meterWork()` in `lowerLines`). That changes what complex's unit is, so it is left as a decision and not made here.
+
+One thing follows for 2-D's existing work budgets ([ADR-558](06-decisions.md#adr-558)), which use the same unit: an `evaluateCore` call is between a third and a half of the time of the solve that makes it, not all of it. Their calibration in seconds already includes the rest, so nothing changes; it is recorded because the ADR's "one innermost solving function" reads as if the call were the whole cost.
+
+**Lanes.** Each unit is charged to `page` or `worker`. In a real Worker the global scope says so (`globalThis instanceof WorkerGlobalScope`) and nothing there is page work. Everywhere else the lane is `page` unless the work runs through `inWorkerLane`: 2-D's worker client does that in its synchronous fallback (`src/store/geoWork.ts:129`), so under node the work a browser sends to its worker is charged to the worker. 3-D, analytic and complex have no worker, and every unit of theirs is page work. That is the honest starting point of invariant 1.
+
+**Before the paint.** The third count is the work done before the action's figure can paint. The action drivers say where that is, in the App's order:
+- 2-D: everything the student waits for is before the paint (decide, the worker's prefold, commit, the render and its readers, the resolve gate and, when it fails, the worker's search, because the App holds the previous figure until it answers, #573). The background detection sweep is after it.
+- Analytic: the decision and the re-render's derive and readers are before the paint. The passive effects, the configuration pool's slices and its settle are after it.
+- 3-D and complex: there is no work after the paint. Every unit is before it.
+
+**Actions.** Per fixture: `submit#k` (re-typing row k on the figure of the rows before it), `another#1` (one «הציגו תצורה אחרת»), `load` (cold), `edit` (the last row to its own text: 2-D `runEditCommit`, 3-D `replaceFact`, analytic `decideEditHost`, complex `editLine`), `delete` (the first row) and, in 2-D, `detect` (the background sweep, from cold caches, as its own worker instance has them). The drivers are `<tree>/__tests__/work-meter/driver*.ts`, lifted out of the four `scripts/perf/` harnesses, which now import them: the gate and the timing harness run one driver, so a count and a time describe the same action. Two things the 2-D harness did not drive were added to the driver, because `App.tsx` does them: the render-time readers (`configurationAxes`, `freeDofs`, `freeDofCount`, `unstatedChoices`) and the load audit (`auditLoadedFigure`).
+
+**The baseline.** `<tree>/__tests__/work-meter/baseline.jsonl`, one line per figure-action (`{"k":"<figure>|<action>","total":…,"page":…,"prePaint":…}`), sorted by key under one header line, so two branches that each add a fixture merge as insertions. It lives in the product's tree so that a product's lane and its CI path filter carry it. Registered in [docs/22 §9](22-workflow.md)'s product table and §8's artifact map.
+
+| Builder | Figures | Actions (lines) | Size | Total work | On the page | Before the paint |
+|---|---|---|---|---|---|---|
+| 2-D | 171 | 1 327 | 121 KB | 129 131 273 | 35 497 669 (27.5 %) | 98 851 107 (76.6 %) |
+| 3-D | 176 | 1 266 | 109 KB | 93 384 256 | 93 384 256 (100 %) | 93 384 256 (100 %) |
+| Analytic | 208 | 1 963 | 177 KB | 189 345 082 | 189 345 082 (100 %) | 139 294 357 (73.6 %) |
+| Complex | 45 | 305 | 26 KB | 1 231 | 1 231 (100 %) | 1 231 (100 %) |
+
+Units are not comparable across rows. 2-D by action, where its lanes differ: `detect` 30.3 M (none on the page, none before the paint), `another` 26.0 M (0.0 % on the page), `submit` 25.8 M (47.5 %), `load` 23.4 M (23.2 %), `delete` 17.5 M (66.3 %), `edit` 6.2 M (99.8 %). In analytic the part after the paint is the pool and the passive effects: 32.9 % of a submit, 48.6 % of a load, 46.7 % of an edit. `npm run work:report` prints these from the committed baselines.
+
+**The gate** is one test file per tree, `<tree>/__tests__/work-meter-gate.test.ts`, over the shared rule in `shell/__tests__/work-gate.ts`. It runs in `npm run test:full` and in the product's own `test:run:<product>` lane.
+- An action above its baseline in `total`, `page` or `prePaint` fails. The message names the figure, the action, the typed line, each count's before and after, the `scripts/perf` command that times the same action, the re-record command, and the docs/17 §7 obligation.
+- An action with no baseline line fails (a new fixture is recorded before it is committed). So does a baseline line the walk no longer produces, and a baseline figure that is no longer a fixture.
+- The builder's summed `page` count over the recorded actions may not rise (invariant 1, as a ratchet). With a zero tolerance this can only fire together with a per-action failure; it is stated as its own assertion so that it keeps meaning if a tolerance is ever introduced.
+- **The tolerance is zero**, because the counts are exactly reproducible (next paragraph). Any difference is a change in what the code does.
+- A count below its baseline is printed and written to `reports/work-meter/<builder>.json`, never failed. It is locked by re-recording.
+- `npm run work:record -- <builder>` is the same walk writing the baseline. It adds new figures, drops deleted ones and lowers fallen counts. It writes a rise only with `--accept-rise`, and then prints the before and after for the ADR. `--only <text>` re-records the figures whose name contains the text, in seconds.
+
+**Determinism, which is the acceptance bar.** Measured on the dev PC, each run a fresh process:
+- 2-D: four runs (record, record again, `--order reverse`, `--order shuffle:11`), 171 figures and 1 327 actions each, the same counts every time. The second record wrote 0 added, 0 fell, 0 rose; each check reported 0 rises and 0 falls.
+- 3-D: three runs (record, reverse, `shuffle:11`), 176 figures and 1 266 actions, identical.
+- Analytic: three runs (record, reverse, `shuffle:11`), 208 sequences and 1 963 actions, identical.
+- Complex: four runs (record, check, reverse, `shuffle:7`), 45 figures and 305 actions, identical.
+- Independent of what ran before: a gate is its own test file, and vitest gives every file its own process, so no other test shares its module state. Inside the file the two other orders above show that no figure's count depends on its predecessor.
+- Each gate ends with the lock docs/17 §7's fifth rule asks for: it walks two figures again (the one at the tenth and the one at the fiftieth percentile of cost), after the whole corpus and twice in a row, and asserts equal counts.
+- Two things made a count depend on something other than the input, one seen and one latent. Both were removed at the root rather than tolerated:
+  1. **A memo `clearReplayCaches` did not clear** (2-D, seen). `narrowingNotes2D` keeps one content-keyed entry (`src/replay/narrowing.ts`), and its attribution replays the figure. A detection sweep of the same figure twice in a row counted 93 902 units, then 49 220. The lock above caught it on its first run. `clearReplayCaches` now clears it (`clearNarrowingMemo`).
+  2. **Two wall clocks on the load path** (2-D, latent). `refreshLoadedFigure` and `auditLoadedFigure` (`src/store/loadAudit.ts`) stop after 4 s and 3 s of real time, under vitest too, and each step they leave unread is a prefix replay. Measured on the dev PC with the suite running, the hexagon fixture's refresh takes 2.5 s and its audit 2.4 s: inside the budgets here, and past them on a machine half as fast, where the load's count would differ. Their budgets are now off under vitest (`import.meta.env.MODE === 'test'`), exactly as the search budgets of `replay/core.ts` have always been. The browser's budgets are unchanged.
+- 3-D, analytic and complex needed nothing: their memos hang off objects each fixture builds anew, and no clock reaches their solvers.
+
+**The suite measures 2-D's unclipped work, not the browser's clipped flow.** Under vitest every 2-D clock budget is off, so a search runs to its end. A browser's worker stops it after 12 s. The gate therefore fails on work a browser might never reach, and says nothing about where a browser's clock cuts a search. `scripts/perf/2d` runs the browser's budgets and marks an action `clipped`; its count for such an action is not reproducible. Phase 4 (limits in work units) removes the difference.
+
+**Cost of the gate**, measured: the wall time of each gate file run alone on the dev PC.
+
+| Builder | Wall time, the gate alone | Wall time inside `npm run test:full` | Excluded |
+|---|---|---|---|
+| 2-D | 6.3 min (377–385 s over four runs) | 11.4 min | nothing |
+| 3-D | 5.1 min (295–322 s over three runs) | 9.7 min | nothing |
+| Analytic | 11.1 min (647–675 s over three runs) | 15.5 min | nothing |
+| Complex | 1.5 s | 1.6 s | nothing |
+
+The full step-by-step walk fits in the suite, so no subset was needed and **no fixture and no action is excluded**. The dearest single action is analytic's `exam-2379-q3-route-2392.analytic.json|another#1`, about 70 s and 18.8 M units. Each gate is one file, so it joins the measured slow tier and `npm run test:fast` does not run it. The whole suite took 23.2 min of wall time with the gates in it (1 459 files, 316 CPU-minutes); a full run of another branch without them, the same hour on the same machine, took 19.8 min. The analytic gate is now the longest file of the suite. If that wall time matters, the gate splits into two files by fixture, which needs the re-record to run them one after the other; it was not done here.
+
+**The counter's own cost** (docs/17 §7, fourth rule), measured as the wall time of one heavy fixture's whole walk with the `meterWork()` calls in the engines and with them removed, minimum of the faster of two timed walks after a warm-up walk, one process per state, the states run one after the other runs each, alternating:
+
+| Builder | Workload | Units | Without the counter | With it | Difference |
+|---|---|---|---|---|---|
+| 2-D | `issue-2405-all-common-tangents-apart`, whole walk | 3 543 606 | 12.91 s | 12.70 s | −1.6 % |
+| 3-D | `prism-eq-first-815`, whole walk | 4 574 248 | 14.32 s | 14.35 s | +0.2 % |
+| Analytic | `corpus471.json#3/5`, whole walk | 12 099 647 | 25.40 s | 25.51 s | +0.4 % |
+| Complex | all 45 fixtures, walked 20 times | 24 620 | 13.27 s | 12.77 s | −3.8 % |
+
+The differences are inside the noise: two of the four are negative, the two timed walks of one state differ by up to 1.1 %, and complex, where the counter fires 24 620 times in 13 s, read 3.8 % faster with it. So the cost was also computed. One `meterWork()` call takes 7 ns under vitest, and the counting wrapper around a residual function 10 ns (a tight loop of 50 M calls, best of nine). At the units above that is 25 ms of 12.7 s in 2-D (0.2 %), 32 ms of 14.3 s in 3-D (0.2 %), 121 ms of 25.5 s in analytic (0.5 %; the measured difference was 113 ms) and 0.2 ms in complex. It is negligible, and a production bundle inlines the call. A second alternating round was started and abandoned when another session's full suite took the machine: one round is what is reported.
+
+**`scripts/perf/` reports the same three counts.** Every record of every harness carries `work { total, page, prePaint }` beside its timings, each summary prints the corpus's work with its page and before-paint shares, and the slow tables gain the three columns. The harnesses gained the `edit` action in their fixture walks. `node scripts/perf/work-meter.mjs` (`npm run work:record` / `work:check` / `work:report`) records, checks and reads the baselines.
+
+**The slow corpus.** The open speed issues' own sequences moved from the harnesses into `<tree>/__tests__/work-meter/slowCorpus*.ts` (2-D 17 sequences, 3-D 14, analytic 3; complex has none, as the ADR's measurement found no complex action over 5 s). The gate walks them on demand, `npm run work:check -- <builder> --slow`, against `baseline-slow.jsonl`. Recorded on 2026-11-13: 2-D 151 actions, 140 304 291 units, 6.7 min (the dearest sequence, `1768-kite-area`, takes 186 s and 52.6 M units, more than a third of the whole fixture corpus); 3-D 94 actions, 39 522 268 units, 2.6 min; analytic 37 actions, 5 916 217 units, 14 s. Together they take about ten minutes: they are outside the suite because #2873 asked for that, not because they could not fit.
+
+**Known limits, said plainly.**
+- **2-D's `page` count is a lower bound.** Under node the page and the worker are one module instance and share one memo. A view the worker has searched is a memo hit when the page draws it, and under node the detection sweep is made cold by clearing the shared caches, where a browser's detect worker keeps its own. Charging a hit the page takes on a worker-computed entry (ADR-558's rule, applied across lanes) or measuring in a real Worker is owed before 2-D's page count is ratcheted to zero in phase 3.
+- **Before-the-paint is the driver's statement** of where the App paints, read from the App's code. No builder marks its paints at run time.
+- **The fixtures hold accepted rows.** A line that cannot hold is walked only where a slow-corpus sequence ends in one, so docs/17 §7's second rule (the failure path is cheaper) is checked on demand, not by the suite.
+- **A fall is not failed.** Until someone re-records, the old, higher count stays the ceiling.
+- **The gate counts work with no clock.** It cannot see whether a loop takes a deadline parameter.
+- **CI runs the gates** in each product's lane (`npx vitest run <tree>/ …`), which adds their wall time there. On this change's first CI run (PR #2884) the gates took 21.5 min (2-D), 13.4 min (3-D), 19.8 min (analytic) and under 2 s (complex), and the lanes 83, 60, 34 and 3 min, against 46–70, 28–32, 37–38 and 2–3 min on the two runs of `main` before it. One run is not a measurement of the lanes, and the 3-D lane's extra half hour is more than its gate; it was not looked into.
+- **"Any machine" was measured on one.** The baselines were recorded on Node 24.15, Windows x64. A count follows the solver's floating-point path, so it assumes the same arithmetic: a JavaScript engine whose `Math` functions round a last bit differently could count differently. CI runs Node 22 on Linux, and it was the first check of that: on this change's first commit all four lanes passed their gates against these baselines (PR #2884), so every count was the same on a second operating system and a second Node major. If a machine ever disagrees, the fix is to find the operation that differs, never a tolerance.
+
+**Files changed outside tests and docs:** `shell/workMeter.ts` (new: the counter); `src/engine/solveBudget.ts`, `src3d/engine/solve3.ts`, `src-analytic/engine/solve.ts`, `src-analytic/engine/pinRoots.ts`, `src-complex/replay/derive2.ts` (the `meterWork()` calls); `src/store/geoWork.ts` (the worker lane around the synchronous fallback); `src/store/loadAudit.ts` (the two load budgets, off under vitest); `src/replay/narrowing.ts` and `src/replay/core.ts` (`clearReplayCaches` clears the narrowing memo); `scripts/perf/` (the harnesses import the drivers and print the counts; `work-meter.mjs` is new); `package.json` (three scripts).
+
+**Sibling audit.** All four builders are instrumented, gated and recorded in this one change. `server/` has no solver.
+
+**What the student will see.**
+- [asked] Nothing. This is the measuring instrument (*"start phase 0 and 1"*); no line, verdict, drawing, message or timing a student meets changes. The two 2-D budgets changed are changed under vitest only.
+
+### ADR-W-210 Amendment 2 (2026-11-13) — phase 1 as built: the work queue, the derived working state, and an indicator that moves (#2874)
+
+Branch `feat/2874-working-indicator`, a feature PR (all four builders + `shell/`). Operator, 2026-11-13: *"we must fix this for all tools. user should know the engine is working and not frozen"*; *"start phase 0 and 1"*.
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-37 (new), and its parity row · **Design:** [04w](04w-design-shell.md) § "The work queue and the working indicator"; the edit and rename contracts in § "The letter popover" and the fact list
+
+**Measured before** (`main` @ `0ccf557a`, a real browser through `scripts/lib/browser-harness.mjs`, the page's own animation frames recorded). 2-D is the reference:
+- *Submit.* Within one frame of Enter (4–10 ms) «הוסף» is off, greyed (opacity 0.6) and reads «חושב…», and a small «חושב…» shows under the box. Both clear one frame after the figure appears: 110–125 ms for an ordinary line. Nothing on the page moves meanwhile: on «מעגל O» · «ריבוע ABCD חסום במעגל O» · «ריבוע חוסם את מעגל O» the third line shows «חושב…» for 5.1 s, 3.7 s of it with the page's thread busy and the label standing still. A format guide answered before the parse (a LaTeX line) shows nothing.
+- *«הציגו תצורה אחרת».* That button itself is off and reads «חושב…» while the search runs; the submit button does not change and the box stays open.
+- *Load* (`hexagon-regular-by-angles-2797`). The indicator is first painted 783 ms after the file is chosen, behind 767 ms of work that started in the same task as the flag; then it stays for the worker's prefold and the audit, 9.0 s in all.
+- *Delete, toggle, edit, undo, rename, swap, merge, promote.* Nothing is shown.
+- 3-D and analytic show «חושב…» on the submit button only around the model call; complex shows nothing.
+
+**Root cause.** The working state was a flag each call site set and cleared around the one wait it knew about. The engine's own work runs synchronously in the handler or in the React render after the store update, so a flag set in the same task cannot paint before it, and most actions had no flag at all. In 2-D the flag had three owners (the submit, the load, the post-commit search) and no `finally`: **reproduced on `main`** by rejecting the worker's prefold with an error that is not a cancel — `setBusy` was called `[true]` and never `false`, and the student's next submit was dropped by the busy gate, committing nothing.
+
+**Built.**
+- **`shell/work.ts` — the queue.** `createWorkQueue({ paint, basis, sameBasis })` gives `run(work, { lane?, paint? })`, `runIfIdle(…)`, `working(lane?)`, `inJob()`, `subscribe`, `idle()`. A job is COUNTED when it is asked for, waits for a paint, runs after every earlier job of its lane, and is released in a `finally` after the paint that follows its work. `working()` is the count: no call site sets it. A job's handle carries `basis` (the stamp taken at the action) and `stale()`, `join(promise)` (work started and not awaited, such as 2-D's post-commit search, belongs to the job) and `paint()`. `paint` is injected; with no `requestAnimationFrame` (node, the suite) it resolves at once, so no test of the engines or the stores changed. In a browser it is two animation frames, and resolves at once in a hidden tab, so a figure opened in a background tab still loads.
+- **Lanes.** `interactive` is the student's actions and drives the submit button. `another` is «הציגו תצורה אחרת», shown on its own button as 2-D shows it. `model` is the model call a submit makes, nested in the submit's job with `paint: false`; in 3-D it keeps the last line's notices hidden until the answer, as the old flag did.
+- **`shell/frame/WorkingMark.tsx`.** `WorkingMark` is a ring turned by a CSS animation of `transform` alone, on its own layer; `InputArea` shows it beside «חושב…» while `busy`. `useWorking(queue, lane)` reads the derived state; `useLatest` keeps a component's job bodies as the latest render defines them, so a job that waited its turn reads the figure as it is when it runs.
+- **Two shell contracts are awaitable, once for all four builders:** `FactList`'s `onEditCommit` and `LetterPopover`'s `onRename` / `onSwap` may answer a promise. The editor and the popover stay as they are while the answer is pending, and a second commit of the same edit (Enter, then the blur) is not sent.
+- **Per builder: a queue, a registry, a queued table** — `src/app/work.ts`, `src3d/app/work3.ts`, `src-analytic/app/workAn.ts`, `src-complex/app/workCx.ts`. Every function the store exposes is a job (it writes the figure's basis) or free with a reason; the queued table (`act…`) is derived from the job list. Routed in every builder: submit (typed, a chip, the guide's «try», a named crossing), «הציגו תצורה אחרת», load (file, shared link, restored session), edit, delete, toggle, rename and swap (typed and from the canvas), undo, redo, clear. 2-D also: merge and a centre's name (typed), promote, the post-commit search, the load audit.
+- **2-D's three-owner boolean is gone.** `SubmitDeps` lost `ui.setBusy`, `isBusy` and `nextPaint` and gained `work`. A submit is one job; a pasted paragraph is one job with a paint between its sentences; the post-commit search is joined to the job that launched it.
+
+**Measured after** (the same probe, the branch's dev server):
+
+| Action | Before | After |
+| --- | --- | --- |
+| 2-D ordinary submit | «חושב…» 110–125 ms | nothing shown: it is over in 115–130 ms, inside the 0.3 s threshold (below) |
+| 2-D load (hexagon) | indicator first painted at 783 ms | at 28 ms |
+| 2-D delete / toggle of row 2 (hexagon) | about 1 s, nothing shown | «חושב…» for the whole second |
+| 3-D «\|SA\| = 5» on «ריבוע ABCD» · «קטע AS» | 2.3 s frozen, nothing shown | «חושב…» from 0.32 s to the figure |
+| 3-D «הציגו תצורה אחרת», re-enable, edit on that figure | 2.2 s each, nothing shown | shown throughout (the search on its own button) |
+| analytic «x_A > 0» after the rhombus lines | 11.5 s frozen, nothing shown | shown throughout |
+| analytic delete (8.1 s), undo (11.1 s), «הציגו תצורה אחרת» (11.7 s) | nothing shown | shown throughout |
+| complex, any action | nothing shown | nothing shown: each is over in 50–65 ms, and would show «חושב…» if it reached 0.3 s |
+
+**The indicator moves while the page's thread is busy — measured, not assumed.** A screencast is fed by the compositor. Recorded around a slow action, with the stretch in which the page ran no animation frame taken as "its thread was busy": 3-D's submit, 2.3 s busy, 132 screencast frames inside it, 130 distinct images of the button; analytic's submit, 11.5 s busy, 682 frames, 662 distinct; analytic's delete, 8.1 s, 476 and 462; 2-D's delete, 0.97 s, 51 and 51. On `main` the same stretch has no change at all.
+
+**What this phase did not take from invariant 2.** No cancellation and no worker client (phase 3); 2-D's search keeps its own ✕. The basis stamp is carried and read by nothing: what a job commits is unchanged, and the hazard recorded above (a verdict committed onto a figure that changed meanwhile) is narrower only because a routed action now waits for the job before it.
+
+**Locks.** `shell/__tests__/working-reveal-2874.test.tsx` (the threshold: a working button is off and reads its working label in its FIRST render, carries the whole look in that render, and every reveal is an animation of `opacity` alone as long as the one threshold, with no transition and no delay). `shell/__tests__/work-queue-2874.test.ts` (the count, paint first, one at a time in order, release on a throw, joined work, lanes, the stamp, the guard). `shell/__tests__/fixtures/work-routing-rows.ts` with a thin lock per tree (`work-routing.test.ts`) and the meta-lock `work-routing-meta-2874.test.ts`: a store action nobody classified fails; a free action that writes a basis field fails (read from the store's own `set(…)` calls); a component that reaches a job action through the store fails; a product that draws the working mark itself, past the shell's delayed face, fails; and the product's real table is driven under the basis guard. `src/app/__tests__/submit-wedge-2874.test.ts` is the reproduced wedge. Each page arms the basis guard in development: a figure that changes with no job running is reported on the console.
+
+**Sibling audit.** The class (a working state owned by call sites) was present in all four builders and is removed in all four. Not routed, on purpose, each a registry row with its reason: the ask lanes and the data panels (they read the figure, and 2-D's and analytic's show their own pending state), display choices, the figure's name, complex's drag of a free point.
+
+**Ruled on the first play sheet (2026-11-13), and built in the same PR.** Four questions went to the operator with the sheet, each with a recommendation; his answer to all four: *"i go with your recommendations"*.
+1. *An action pressed while the tool is working waits its turn* (recommended: keep it as built, rather than greying «בטל», delete and the rest). Ruled; nothing to build.
+2. *The indicator is shown only after about 0.3 s, so a fast action shows nothing* (recommended: yes; it changes 2-D's submit too, which blinked «חושב…» on every line). Ruled, and built here: below.
+3. *Asks and the data panel show the indicator too* (recommended: yes, as a follow-up). Ruled; filed as #2886, not built here.
+4. *2-D's second, small «חושב…» under the box* (recommended: leave it in 2-D only for now). Ruled; it stays, and waits for the same 0.3 s.
+
+**Played and approved (2026-11-13).** The second sheet (22 cases: T1, T21 and T22 for him, 19 closed on assertion) went to the operator with the threshold built. His answer: *"all tested and can be merged and deployed"*.
+
+**The threshold: why the page's thread cannot do the waiting.** In 3-D and analytic the thread that would count 0.3 s is the one that is busy, so a timer on it fires when the work is over. The working look is therefore put in the document and painted in the queue's first paint, INVISIBLE, and revealed by CSS animations of `opacity` alone, as long as the threshold (`WORKING_SHOWN_AFTER_MS` = 300), which the compositor runs by itself like the ring's turn:
+- `WorkingFace` (in `shell/frame/WorkingMark.tsx`) is a button's label. While working, the button's text in the document is the working label at once (what a test and a screen reader read); the idle label is drawn over it from an attribute and the two swap at the threshold. `workingDim` holds the button at full strength until then.
+- **The button has one size.** A change of size is layout, which only the page's thread can do, and on `main` it is half of the blink: «הוסף» grows from 70 to 100 px while it reads «חושב…» and the box beside it shrinks by 30 px. The working label is now centred over the face and may reach into the button's own padding, so the button is 70 px at rest and while working, and «הציגו תצורה אחרת» is 136 px in both. In the English interface the idle label is too short for that: «Add» is 90 px at rest, where it was 64.
+- The submit button and the four «הציגו תצורה אחרת» buttons take the face from the shell; no product draws the mark itself (a fault of the routing lock).
+- **2-D's second signs** (the small «חושב…» under the box, the search's progress and its ✕) change the layout when they arrive, which the compositor cannot delay. They wait for the same threshold on the page's own clock (`useShownWorking`), so they can only be late: on a line the page itself computes they arrive when its thread is free.
+
+**Measured, the threshold** (the branch's dev server, a real browser through the harness; the time is from the moment the button is switched off in the document to the first screencast frame in which most of its pixels differ from its look at rest):
+
+| Action | Worked for | Page thread's longest silence | The working look appears |
+| --- | --- | --- | --- |
+| 3-D «ריבוע ABCD», «קטע AS»; complex «w1 = 3+4i», an undo; analytic «A(1,2)»; 2-D «מעגל O», an undo; «הציגו תצורה אחרת» on a cube, a point, a triangle | 51–129 ms | 17–67 ms | never (at most 3 % of the button's pixels change, the text's anti-aliasing) |
+| 3-D «\|SA\| = 5» | 2.0 s | 2.0 s | at 320 ms, then 103 distinct frames of the ring |
+| 3-D «הציגו תצורה אחרת» on that figure | 2.0 s | 1.9 s | at 332 ms, on its own button |
+| analytic «מרחק נקודה O מהצלע DA הוא √5» | 8.1 s | 8.1 s | at 323 ms, then 448 distinct frames |
+| 2-D «ריבוע חוסם את מעגל O» | 5.6 s | 4.0 s | at 321 ms; the small line under the box at 4.0 s, when the thread is free |
+
+Before this change, on the same branch, every one of the fast actions showed «חושב…» for 65–150 ms.
+
+**What the student will see.**
+- [asked] In every tool, whenever the engine has been working for about 0.3 s on something the student did, the submit button is greyed and reads «חושב…» until the result is on screen. *"user should know the engine is working and not frozen"*
+- [ruled] An action that is over in less than about 0.3 s shows nothing: no «חושב…», no greying, no change in the button's size. This includes 2-D's ordinary lines, which blinked «חושב…» until now. Operator, 2026-11-13, on question 2 above: *"i go with your recommendations"*.
+- [ruled] 2-D keeps its second, small «חושב…» under the box, in 2-D only; it too waits for 0.3 s, and on a line the page itself computes it arrives late, when the page is free. Operator, 2026-11-13, on question 4.
+- [ruled] The buttons no longer change size when they read «חושב…»: «הוסף» stays 70 px wide where it grew to 100, and the box beside it no longer narrows. A button that changed size at the press would be a blink on every fast action, which question 2 rules out.
+- [ruled] In the English interface the «Add» button is wider at rest: 90 px, where it was 64, and the box beside it 25 px narrower. Its working label «Thinking…» does not fit a 64 px button, and a button may not change size while the page computes. The Hebrew interface is unchanged at rest. Put to him as play case T22 ("Is the wider «Add» acceptable? The alternative is a button that still changes size in English"); operator, 2026-11-13, after playing the sheet: *"all tested and can be merged and deployed"*.
+- [2-D] It is 2-D's indicator, where 2-D shows it: the submit button for an action on the figure, and the «הציגו תצורה אחרת» button itself for that search (measured at `main`, above). Complex gains the wording «חושב…».
+- [asked] A ring beside «חושב…» keeps turning while the page computes. *"working and not frozen"*
+- [2-D] Enter is off while the tool works, and a typed line stays in the box ([ADR-W-198](#adr-w-198)): now during every action, in every tool. Measured in 3-D on the slow figure, with a row re-enabled (2 s) and «M אמצע AB» typed and entered meanwhile: `main` takes the Enter when the page thaws and adds the row; the branch leaves the line in the box, and a second Enter adds it. Saying so on that Enter is #2861 («עדיין עובד…»), ruled and not built here.
+- [ruled] An action pressed while the tool is still working (a delete during a model call, a second undo) runs when the first is done, in the order pressed. During a frozen page that was already so; during a wait on the model or on 2-D's worker it used to run at once. Operator, 2026-11-13, on question 1 above: *"i go with your recommendations"*. Measured in 2-D: «משולש ABC», then a file is loaded (8 s in the worker) and «בטל» is pressed while it loads. On `main` the undo runs at once and the session ends on the loaded figure; on the branch it runs after the load and undoes it, ending on the triangle.
+
+
+### ADR-W-210 Amendment 3 (2026-11-14) — phase 2 as built: every builder keeps solved content by its content, and the meter's walk is a session (#2888)
+
+**Status:** built · 2026-11-14 · debt (P2, workspace: all four builders) · branch `debt/2888-compute-once`, one branch per builder merged into it · started on the operator's word, 2026-11-14, after phases 0 and 1 were deployed: *"go ahead with next phases"*
+**Requirements:** none (internal): no line, verdict, drawing or message changes in this phase. The one change a student sees landed beside it under its own ruled issue and ADR ([ADR-828](06-decisions.md#adr-828), #2370; below) · **Design:** each builder's design doc, in its own ADR's commit: [04](04-design.md) § "Compute once", [04b](04b-design-3d.md), [04c](04c-design-analytic.md), [04d](04d-design-complex.md); [docs/08](08-testing-strategy.md) "A walk is a session"
+
+**The four ADRs.** Each builder measured its repeats first (docs/17 §9) and built only what the measurement justified.
+
+| Builder | ADR | What repeated, measured | What is kept, and its key | Bound | Emptied by |
+|---|---|---|---|---|---|
+| 2-D | [ADR-827](06-decisions.md#adr-827) | The fold was already keyed by content, and each gate's trial array already hit it (1 repeated fold in 500 submits). What repeated: the fold memo's 8 entries evicted content a session still used, and the sampled tail and the pool jobs were solved again per new array | The fold memo, now least-recently-used; a table of sampled constructions keyed by the construction sampled from, the lane and a slot (`tail:<seed>`, `pool:<s>`, `warm`) | 64 folds, 1 024 samples; a long session holds 2.3–4.2 MB | `clearReplayCaches` |
+| 3-D | [ADR-3D-491](06b-decisions-3d.md#adr-3d-491) | About 15 % of the recorded work, most of it in edits; and «הציגו תצורה אחרת» judged again 199 of the 200 seeds the submit had just judged | `derive3` by the fact list's content and the seed; a solve by the construction's content; a seed's verdict once per construction | 64 derives, 64 constructions, 1 024 seed verdicts per construction | `clearSolveCaches3` |
+| Analytic | [ADR-AG-476](06c-decisions-analytic.md#adr-ag-476) | 52.8 % of the recorded work: `derive` had no memo, so every action rebuilt the construction and every solver memo started cold | One construction per line list (lines, seed names, pins), shared by every configuration; the 16 solver memos keyed by content | 64 line lists, 96 configurations each; ten heavy fixtures in one session hold 20.1 MB | `clearAnalyticCaches` |
+| Complex | [ADR-CX-090](06d-decisions-complex.md#adr-cx-090) | Every fold read every line again: 80 % of an action's time, which the meter did not count (Am. 1's open decision) | A line's reading by its text and the declared letter families; a fold by its configuration, seed, lines, questions and chips; compiled patterns | 1 024 readings, 256 figures, 512 patterns; every fixture in one session holds 3.4 MB | `clearComplexCaches` |
+
+Rules every one of them follows: a result never depends on whether an entry is warm (each has a cold-equals-warm lock); nothing a clock cut short is kept; every table has a size and drops its least recently used entry; one test-only function per builder empties all of them. In 2-D a memo hit goes on charging [ADR-558](06-decisions.md#adr-558)'s budgets what it saved, and a fold beyond the old eight is readable only by the lane that computed it, because under node the page and the worker are one module instance and no browser heap shares them.
+
+**Before and after**, from the committed baselines (`npm run work:report`; phase 0 is `main` @ `9cd61315`). Units are not comparable across builders.
+
+| Builder | Total, phase 0 | Total now | By action |
+|---|---|---|---|
+| Analytic | 189 345 082 | 126 274 259 (−33.3 %); before the paint 139 294 357 → 83 773 335 (−39.9 %) | another 49.2 M → 0.77 M (−98.4 %) · submit 88.1 M → 76.5 M (−13.2 %) · edit 20.8 M → 18.6 M (−10.4 %) · load −4.1 % · delete 0 · 1 359 lines lower, 604 equal, none higher |
+| 3-D | 93 384 256 | 87 785 971 (−6.0 %) | edit 17.1 M → 12.9 M (−24.3 %) · another −5.1 % · submit −3.4 % · load 0 · delete 0 · 76 lines lower, 1 183 equal, 7 higher (below) |
+| 2-D | 129 131 273 as recorded; 141 376 955 with the detect lane corrected (below) | 139 720 597. Without `edit`, whose definition changed: 135 171 928 → 125 599 575 (−7.1 %) | another 26.0 M → 18.0 M (−30.8 %: 15.7 % from the memos, the rest from two presses whose search ran out finding nothing until ADR-828) · load 23.4 M → 22.0 M (−5.9 %) · submit and delete unchanged · detect −0.5 % on the corrected lane |
+| Complex | 9 307 in the new unit with no memo (1 231 exact solves in phase 0's unit) | 1 205 (−87.1 %) | a 112-line synthetic session: 4.30 s of typing → 0.45 s |
+
+Slow corpora (`baseline-slow.jsonl`): analytic 5 916 217 → 4 618 435 (−21.9 %); 3-D 39 522 268 → 38 903 940 (−1.6 %); 2-D without `edit`, on the corrected lane, 137 849 875 → 134 165 494 (−2.7 %).
+
+Wall time, the same actions through `scripts/perf/`: analytic `exam-2379-q3-route-2392` «הציגו תצורה אחרת» 67 s → 2 ms, and `issue-2231`'s presses 8–10 s → about 10 ms; 3-D `stated-length-7-9999-2361`'s press 500 439 units → 12 813; 2-D `hexagon-regular-by-angles-2797`'s press 23.7 s (cut off by the clock) → 9.0 s; complex `2b-capstone`'s whole walk 62 ms → 9 ms. In 3-D a long session's memory also fell (`nine-separate-shapes-2764`, 120 presses with edits and undos: 149.6 MB → 30.9 MB), because every past fact array used to keep its own derives alive.
+
+**Measured in a browser** (the two dev servers, `main` @ `9cd61315` and this branch, a real browser through `scripts/lib/browser-harness.mjs`; from the press to the last change of the page; one run each, so a reading, not a benchmark):
+
+| Action | `main` | Branch |
+|---|---|---|
+| Analytic «מעוין BADC» · «שכל קודקודיו מונחים על הצירים» · «CA=10» · «O(0,0)» · «מרחק נקודה O מהצלע DA הוא √5» · «x_A > 0»: lines 5 and 6 | 7.7 s, 10.9 s | 4.0 s, 5.5 s |
+| on that figure, «הציגו תצורה אחרת» twice | 11.0 s, 11.2 s | 0.09 s, 0.08 s |
+| on that figure, deleting row 6, then «בטל» | 7.7 s, 10.7 s | 0.06 s, 0.09 s |
+| 3-D «ריבוע ABCD» · «קטע AS» · «|SA| = 5»: the third line, then «הציגו תצורה אחרת» | 1.85 s, 1.78 s | 1.86 s, 1.81 s |
+| on that figure, row 3 turned off and on again | 1.94 s | 0.09 s |
+| 2-D «מעגל O» · «ריבוע ABCD חסום במעגל O» · «ריבוע חוסם את מעגל O»: the third line | 5.2 s | 5.2 s |
+| 2-D «משולש ABC» · «המשולש ישר זווית»: three presses of «הציגו תצורה אחרת» | 2.3 s, then the button is gone; the figure does not change | 0.13 s, 0.11 s, 0.09 s; the right angle at A, B, C |
+| Complex «w1 = 3+4i» · «w2 = 2cis150» · «w = w1*w2» · «z^5 = w^2», and row 4 off and on | 60–83 ms each | 62–83 ms each |
+
+The gates' wall time inside `npm run test:full` after the change: analytic 12.3 min (15.5 before), 2-D 11.7 min (11.4), 3-D 9.4 min (9.7); the whole suite 18.1 min, 1 475 files.
+**What phase 2 did not buy, said plainly.** A first-time solve costs what it did. The dearest submits, loads and deletes are first-time work and did not move: analytic's first submit of its dearest lines still takes 8–13 s, 3-D's loads and deletes are unchanged to the unit, and 2-D's submits and deletes are unchanged. The scoping map's sizing was wrong for two builders: 3-D's repeats were 15 % of its work, not most of it, and 2-D's main repeat is between the page's heap and the worker's (the page's gates fold a line and the worker's prefold folds it again: 4.89 M units in the fixtures' submits, 6.77 M after a delete, 5.23 M when a press's result is drawn), which one process cannot remove. Those are phases 3 and 5.
+
+**The meter's walk changed, and what each change does to the numbers.** A cache keyed by content cannot be told which fixture it serves, so the walk has to say where a session starts. [docs/08](08-testing-strategy.md) "A walk is a session" is the standing statement; this is the record of the change.
+1. **A fixture's walk starts from emptied caches and stays warm while its rows are typed.** `load` stays cold; `delete` runs in the loaded session. This replaces Am. 1's "3-D, analytic and complex needed nothing: their memos hang off objects each fixture builds anew", which is no longer true of any builder. A cache added later must join its builder's clear function, or the gate's determinism lock fails.
+2. **`edit` has one definition in every builder, and is the walk's last action.** Am. 1 measured the last row re-typed to its own text. With content keys that content is already solved in the session and the action counted nothing (complex: 0 in all 45 fixtures; analytic: 20.8 M → 84 K), which would have read in phase 3 as "an edit puts nothing on the page". Now: emptied caches; rows 1..n−1 shown, unmeasured; all n rows put in the store unsolved; the edit of the last row to its own text is measured. An edit costs about what the submit of that row costs, through the edit path. In 2-D this RAISED the recorded `edit` (6 205 027 → 14 121 022; slow 12.1 M → 23.5 M), because phase 0's 2-D edit ran warm on the fold memo; that rise is the definition, and it is why 2-D's totals are quoted without `edit`. Four 3-D edit lines rose for the same reason.
+3. **Complex's unit is one executed line read or one exact solve**, which closes the decision Am. 1 left open. Its phase 0 baseline (1 231) is in the old unit and is not comparable; 56 of its lines read higher against it, from the unit and from the edit's definition.
+4. **3-D: the reading memo is emptied at the session's start as well.** Three submits had been recorded warm from the load before them and rose: `edge-point-lengths-only-1680|submit#3` 70 936 → 98 079, `new-point-equal-lengths-2804|submit#3` 84 586 → 121 869, `rider-lengths-only-1680|submit#3` 0 → 5 819.
+5. **2-D: the detect lane is handed its own copy of the facts** (`structuredClone`), as a browser's detect worker is. Phase 0's driver passed the page's own array, so a "cold" sweep read figures the other lanes had left on it. Phase 0's code under the corrected driver counts 42 525 848 for `detect` where 30 280 166 was recorded (162 lines higher); no other action's count differs. This corrects Am. 1's measurement and is not new work. The fall the first re-record showed on the hexagon's sweep (3.7 M) was the same artifact.
+6. **2-D: three counts rose by 13–15 units** with ADR-828's fix (`definite-triangle-predicate-2205|submit#2` 9 946 → 9 961, and the page count of two presses 0 → 13): the fold no longer reads a memo entry an earlier step had written into.
+
+So phase 2's exit, "no figure's count rises", holds for analytic outright, and for the other three with the rises listed above, each one a corrected measurement or the bug fix, none of them added work. Determinism was re-run per builder after the change (fresh process, `--order reverse`, `--order shuffle:11`): identical counts in 2-D, analytic and complex; 3-D's reverse and shuffle were run before its last commit and its plain and `--slow` checks after it.
+
+**Found on the way and fixed under its own issue: `applyCommand` wrote into the construction it was given** ([ADR-828](06-decisions.md#adr-828), #2370 with #2444). Keeping more folds made an old bug fail a fixture: a right triangle stated on a drawn triangle wrote its `solve` onto a vertex object shared with the memo's entry for the rows before it. The plan on #2370 was already ruled and armed, so it was completed here, in its own commit: copy-on-write, a sweep of every in-place write in the reducer (none other found), a class lock that folds every fixture and catalog example over a frozen construction, and a lock that a resumed fold equals the cold one.
+
+**Three existing tests changed, each recorded in its builder's ADR.** 3-D's `issue-863-resolve-memo.test.ts` asserted that a copy of the construction solves again; a copy is now the same figure and solves nothing, which is the identity-keyed lock this ADR said phase 2 would amend. Analytic's `issue-1473-perf-budget.test.ts` and 2-D's `fold-cache.test.ts` gained a clear in their set-up, so that their "cold" is cold; no expectation changed. 2-D's `clockSpent` compares with `>=`, so a zero budget is spent at once instead of after the first millisecond tick.
+
+**Carried forward, with the measurement that puts each in its phase.**
+- **Phase 3 (off the page).** 2-D's cross-heap refolds above; its edit path has no worker prefold; a prefold the page never adopts is orphaned work. Analytic fills its configuration pool on the page (`issue-2231`'s eighth line holds the page 8 s after the verdict). 3-D's panel values and the pivot's three lazies still solve on whichever thread reads them. Complex's `figures` memo is the place a settled result is adopted.
+- **Phase 4 (limits).** 2-D's budget ledgers remember what earlier actions spent, and ADR-827 emulates the old eight-entry visibility inside a spent budget so that no verdict moved; work limits remove both. Complex's blame loop runs 2n folds with no bound.
+- **Phase 5 (a cheap "no", solver internals).** 2-D's `restatesExistingShape` probes a spent ladder (0.37 M units in the fixtures, 6.0 M in the slow corpus). Analytic's two dearest refusals cost more than most accepted lines (`corpus471.json#7/4` «D על BC» 763 370 units; `#23/5` «A מעל O» 619 835). 3-D's solves start cold, and its dearest action kind is the delete (28.1 M, unchanged).
+- **Open PRs this meets.** #2860 adds an identity-keyed memo and a `cycleMemo` in analytic's `app/another.ts`; on merge the first is redundant and the second must join `clearAnalyticCaches`. #2832 and #2828 touch 3-D's `store3.ts` and `evaluate.ts` and re-record their fixtures' lines.
+
+**Sibling audit.** The class (solved content keyed by an object that is rebuilt per action) was measured and removed in all four builders in this one change. `server/` and `shell/` hold no solved content; `shell/workMeter.ts` changed in its header comment only.
+
+**What the student will see.**
+- [asked] Nothing but speed: an action that repeats work the session has already done is faster, most of all «הציגו תצורה אחרת» in analytic. No line, verdict, drawing or message changes. *"Speed is very important."* (2026-11-12) · *"go ahead with next phases"* (2026-11-14)
+- [ruled] In 2-D, after «משולש ABC» · «המשולש ישר זווית», «הציגו תצורה אחרת» moves the right angle to A, then B, then back to C, as it already did for «משולש ישר זווית ABC»; before, it answered that there is no other configuration. This is #2370's own ruled line ([ADR-481](06-decisions.md#adr-481)), recorded in [ADR-828](06-decisions.md#adr-828).
+
+### ADR-W-210 Amendment 4 (2026-11-14) — phase 3, round 1 as built: the shared worker client, the stamp of a job's turn, 2-D's honest meter, and complex's ceiling (#2890)
+
+**Status:** built · 2026-11-14 · feature (P2, workspace: `shell/`, 2-D, complex, and one declaration in each builder's work registry) · branch `feat/2890-shell-client` · plan steps 1, 2 and 6 of [#2890](https://github.com/dcodish/geo_builder/issues/2890), started on the operator's word (*"go ahead with next phases"*, 2026-11-14)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-37 (the ruled turn of «הציגו תצורה אחרת», and its parity row); nothing else a student reads changes · **Design:** [04w](04w-design-shell.md) § "The worker client", § "The work queue and the working indicator" (the stamp, `behind`, `span`, `around`), § "The work meter" (`meterRemote`); [docs/08](08-testing-strategy.md) "The work meter" (three heaps, the corrected actions); the builders' own entries: [ADR-829](06-decisions.md#adr-829) (2-D) and [ADR-CX-091](06d-decisions-complex.md#adr-cx-091) (complex)
+
+**What the design pass measured, and this round builds on** (the three design files are comments on #2890; measured at `cbada4e1`).
+- The page reaches zero in all three iterative builders when an action runs whole in another heap and its result is adopted, and each builder hands over something different (analytic adopts into `derive`'s line-list store, 3-D a journal of memo entries, 2-D the settled replay with its evaluation, freedom count and fold). So what is shared is a transport that carries opaque payloads.
+- A stateless worker is enough: starting every 2-D action from a fresh clone of the figure changes 7 of 1 327 recorded actions, because phase 2 keys solved content by content.
+- 2-D's meter under-counted its page, and two of its actions were wrong (below).
+- Phase 1's queue stamped a job's basis when the job was asked for. All three agents found it independently.
+
+**Root causes addressed.**
+1. *The only worker transport was 2-D's own*, in two files that each spelled its five operations out. Analytic and 3-D would have copied it for their first worker.
+2. *The stamp was read at the wrong moment* (`shell/work.ts`, Am. 2: "the stamp taken at the action"). A job that waits its turn acts on the figure as it is when it runs, so a stamp from before the wait made every such job stale by construction. Nothing read the stamp yet, which is why nothing failed; the first reader would have dropped every action a student pressed while the tool worked, against Am. 2's own ruling.
+3. *A lane was also an order.* «הציגו תצורה אחרת» is counted on its own lane so that its own button shows it, and so it ran beside the student's other actions.
+4. *2-D's page count was a lower bound, and the gate could not see a missed adoption* (Am. 1's known limit): under node the page and both workers were one module instance.
+5. *Complex's "work ceiling" (invariant 1) did not exist.*
+
+**Built.**
+
+*1. The worker client* (`shell/`, no product knowledge; the full contract is 04w § "The worker client").
+
+| Module | Holds |
+|---|---|
+| `shell/workerProtocol.ts` | page → worker `run { id, op, args }`, `seed { args }`, `drop { id }`; worker → page `ready`, `progress`, `part`, `done`, `error`, the last three with `units` (the meter envelope). An operation is `(args, ctx)`; `ctx.part`, `ctx.progress`, `ctx.tick()` |
+| `shell/workerHost.ts` | `serveWorker(ops, { seed })`: one request at a time; a synchronous operation is answered inside its own message; a value that does not clone is the request's error |
+| `shell/workerClient.ts` | `createWorkerClient({ lanes, executor, seed })`: `start()` spawns every lane with the page; `cancel(lane, which)` terminates only when the RUNNING request is cancelled, hands the new worker the builder's checkpoint and posts again what was not cancelled; a waiting request is dropped by message; a crash; the fall back to the executor |
+| `shell/workerExecutor.ts` | `sameInstanceExecutor` (the suites: this module instance, the worker lane, by reference), `pageLaneExecutor`, `isolatedExecutor` (a second module instance, `structuredClone` both ways, its units in the envelope), `executorByLane`, `pageLaneCeiling` |
+| `shell/workMeter.ts` | `meterRemote(units, prePaint)`: units counted in another heap join the page's counts under the LANE's phase, never as page work; `holdWorkerLane()` |
+
+Left out on purpose, against the design file: the client does not take the queue's job or drop a stale result itself. The sink that applies a result is the builder's, and it has to check there anyway; no builder needed the second check.
+
+*2. The queue* (`shell/work.ts`).
+- **The stamp is read when the job's turn starts**, after its opening paint and after every job it waited behind. `stale()` now means one thing: the figure changed while THIS job worked.
+- **`behind`**: a lane may be declared behind another (queue option, or per `run`). Its jobs are counted and shown on their own lane and also wait for every job the other lane had been asked for; the other lane does not wait for them.
+- **`span`**: called at a job's turn, and what it returns at the job's release after its closing paint. One student action, whole.
+- **`queuedActions(…, { around })`**: the builder's wrapper of every routed action.
+
+*3. The ruled ordering, in all four builders.* Each registry (`src/app/work.ts`, `src3d/app/work3.ts`, `src-analytic/app/workAn.ts`, `src-complex/app/workCx.ts`) declares `behind: { another: interactive }`. Two rows of the cross-product routing lock run it against each builder's real queue; with the declaration removed from 2-D's registry the row fails.
+
+*4. 2-D on the shared client* ([ADR-829](06-decisions.md#adr-829)): one table of operations (`geoOps.ts`), the worker entry as one `serveWorker` call, the client keeping what is 2-D's, both workers started with the page, and the checkpoint: the fold of the figure on screen, handed to a worker spawned after a cancel or a crash.
+
+*5. 2-D's honest meter* (ADR-829). The gate hands 2-D's client one isolated executor per lane: the interactive worker and the detect worker are each a module instance of their own (`shell/__tests__/isolated-ops.ts`) and every message is cloned. Three actions are corrected: `delete` no longer runs the resolve gate and the search the App never runs after a delete; `edit` puts a clone of its rows in the store; `undo` and `toggle` are walked.
+
+*6. Complex's ceiling* ([ADR-CX-091](06d-decisions-complex.md#adr-cx-091)): 256 units an action, asserted by its gate over the corpus and reported on the development console for a job measured whole; its routed store actions run through the page-lane executor. No baseline line of complex moved (1 205 units in 305 actions).
+
+**2-D's baseline, before and after** (`src/__tests__/work-meter/baseline.jsonl`; units are executed `evaluateCore` calls). The SAME code under the committed driver gives the committed baseline to the unit: `npm run work:check -- 2d` at this round's first commit, 173 of 173, total 139 720 597, page 42 023 998, before the paint 97 386 118, no rise and no fall. Everything below is the measurement changing.
+
+| Action | Lines | Total, before → after | On the page, before → after | Lines whose total is higher / lower / equal | What moved it |
+|---|---|---|---|---|---|
+| submit | 500 | 25 770 577 → 31 827 026 | 12 248 498 → 13 354 116 | 500 / 0 / 0 | the worker's prefold and search fold in their own heap what the page's gates folded in theirs; the page renders a found view from its fold alone |
+| load | 171 | 21 975 313 → 25 211 251 | 4 043 448 → 4 806 498 | 171 / 0 / 0 | the same; and the page's smoke replay is a tail on the transplanted fold |
+| another | 171 | 17 977 623 → 20 436 504 | 1 396 → 2 448 681 | 154 / 0 / 17 | the page folds the found view cold: the search hands back facts and a seed, no fold |
+| delete | 143 | 17 541 583 → 11 624 269 | 11 624 282 → 11 624 269 | 0 / 42 / 101 | the search the App never runs after a delete is gone (42 lines); one page count falls by 13, the render of that search's found view |
+| edit | 171 | 14 121 022 → 14 587 581 | 14 106 374 → 14 389 922 | 13 / 0 / 158 | 7 lines: the rows are a clone, so the loaded session's replay no longer serves them; 6 lines: the edit's own search, in the worker's heap |
+| detect | 171 | 42 334 479 → 42 334 479 | 0 → 0 | 0 / 0 / 171 | nothing: it has been walked on its own copy of the facts since Am. 3 |
+| undo (new) | 143 | 0 | 0 | | the earlier figure comes back by reference: nothing is solved, in any of the 143 |
+| toggle (new) | 143 | 24 325 285 | 11 636 855 | | the page's cold fold of the rows left on, then the search the App does run after a toggle (80 of the 143) |
+| **all lines** | 1 327 → 1 613 | 139 720 597 → 170 346 395 | 42 023 998 → 58 260 341 | 838 rose, 42 fell, 286 added | before the paint 97 386 118 → 128 011 916 |
+| **the 1 327 lines both have** | | 139 720 597 → 146 021 110 | 42 023 998 → 46 623 486 | | before the paint 97 386 118 → 103 686 631 |
+
+- On the lines both baselines have, the page's count is 46.6 M where 42.0 M was recorded (+4.6 M, +10.9 %): the lower bound Am. 1 named, now measured in the gate. The design pass read 46.4 M with the old `edit`.
+- The total on those lines is 6.3 M higher: +12.2 M is content two heaps each solve (what plan step 5 removes: in one heap an action costs its old recorded total, measured in the design pass on 1 156 of 1 156 actions), 0.26 M of it the clone of the edit's rows; and −5.9 M is the search `delete` no longer runs.
+- No line of any action moved for another reason. `detect` is identical to the unit in 171 of 171, which is the check that the three-heap walk itself changes no count: its lane was already walked this way.
+- The ten largest moves of the page count are eight presses of «הציגו תצורה אחרת» (for example `issue-2405-all-common-tangents-apart` 29 → 500 179), the clone of `issue-2407-tangent-at-touch`'s edit (713 976 → 946 407) and one load (`issue-855-tangency-sampled-seat` 3 928 → 121 337). The largest falls are deletes (`issue-1604-saved-reload` 3 157 124 → 293 821).
+
+The slow corpus (`baseline-slow.jsonl`, on demand):
+
+| Action | Lines | Total, before → after | On the page, before → after | Lines whose total is higher / lower / equal |
+|---|---|---|---|---|
+| submit | 66 | 55 657 874 → 65 517 698 | 13 434 599 → 13 779 190 | 66 / 0 / 0 |
+| load | 17 | 25 992 640 → 26 590 444 | 5 009 069 → 5 133 562 | 17 / 0 / 0 |
+| another | 17 | 10 331 972 → 10 509 532 | 136 → 177 530 | 13 / 0 / 4 |
+| delete | 17 | 15 489 207 → 1 513 549 | 1 513 549 → 1 513 549 | 0 / 2 / 15 (`1768-kite-area` 13 521 613 → 149 153; `2860-tangent-right-triangle` 809 981 → 206 783) |
+| edit | 17 | 23 460 994 → 32 362 694 | 15 533 320 → 15 533 320 | 4 / 0 / 13 (the edit's search, folded again in the worker's heap) |
+| detect | 17 | 26 693 801 → 26 693 801 | 0 → 0 | 0 / 0 / 17 |
+| undo (new) | 17 | 0 | 0 | |
+| toggle (new) | 17 | 15 845 169 | 1 513 549 | |
+| **all lines** | 151 → 185 | 157 626 488 → 179 032 887 | 35 490 673 → 37 650 700 | 100 rose, 2 fell, 34 added |
+| **the 151 lines both have** | | 157 626 488 → 163 187 718 | 35 490 673 → 36 137 151 | |
+
+Determinism of the three-heap walk, each run a fresh process: the record, `--order reverse` and `--order shuffle:11` over the 171 fixtures (173 of 173 tests each; 570 s, 567 s and 576 s) and a second walk of the slow corpus (18 of 18) gave the same counts: no rise and no fall in any run. Each walk still ends by walking two figures again, after the whole corpus and twice in a row, with equal counts.
+
+**Measured in a browser** (the two dev servers through `scripts/lib/browser-harness.mjs`: `main` @ `bda48f42` on port 5173, this branch on 5180; one machine, other sessions' suites running, so readings and not a benchmark).
+
+| Probe | `main` | Branch |
+|---|---|---|
+| The first line of a fresh session («משולש ABC»), Enter to the row, 8 sessions each | 119–135 ms, median 133; the worker's files are asked for AFTER Enter in 8 of 8 | 59–79 ms, median 67; asked for after Enter in 0 of 8 |
+| The second line of those sessions, median | 85 ms | 84 ms |
+| «מעגל O» · «ריבוע ABCD חסום במעגל O» · «ריבוע חוסם את מעגל O», and «הציגו תצורה אחרת» pressed 0.6 s into the third line | the page's thread is busy 3.9 s, so the press lands at 3.96 s; the row appears at 5.50 s; both buttons are back at 5.55 s and the figure is the line's own: **the press was dropped** | the same 3.9 s and 3.95 s; the row appears at 5.43 s and «הוסף» is back at 5.48 s while «הציגו תצורה אחרת» still reads «חושב…»; at 5.62 s **the figure changes to another configuration** and the button is back at 5.66 s |
+| «ABC משולש ישר זוית» · «AC=15» · «BC=10» · «חצי מעגל ABC», then «M אמצע AB», Enter to the row (two runs each) | 99 and 107 ms | 108 and 108 ms |
+| the same, after «הציגו תצורה אחרת» and its ✕ pressed 1.5 s into the search | accepted; 763 and 801 ms | accepted; 187 and 200 ms |
+| `hexagon-regular-by-angles-2797` loaded from its file, then «M אמצע AB», Enter to the row (three runs each) | accepted; 20.4, 21.0 and 20.6 s | accepted; 20.3, 20.7 and 21.2 s |
+| the same, after «הציגו תצורה אחרת» and its ✕ | accepted; 21.4, 21.5 and 21.8 s | accepted; 21.2, 21.6 and 22.2 s |
+
+What the last four rows say about the round's biggest risk, a verdict cut by a clock in a heap that has just been restarted: no line was refused or cut after a restart, on either side. On the light figure the branch is 0.6 s faster after the ✕, and that is the worker being spawned at the cancel instead of at the next line. On the hexagon the ✕ costs the next line about 0.9 s on BOTH sides: the checkpoint (the fold) did not shorten it measurably, so what a restarted worker pays there is not the fold. That line takes about 21 s with or without a restart: about 14 s in the worker first, with the page free, and then about 7.2 s with the page's thread busy, in every run on both sides. The risk is therefore unchanged by this round, neither removed nor made worse: the page's gates still run on the page, under the page's clocks, in a heap no cancel empties. It is owed its probe again when plan step 5 moves those gates into the worker.
+
+**Existing tests changed, both because of what this round is asked to change.** `shell/__tests__/work-queue-2874.test.ts` asserted the stamp taken at the ask; it now asserts the stamp of the turn, and that a figure that moves while a job works makes that job stale. `src/replay/__tests__/issue-443-macro-convexity.test.ts` drives 2-D's worker entry directly; its two harness lines speak the new protocol and its expectations of the search are unchanged.
+
+**Not done in this round.** Nothing is adopted and no page work moves: 2-D's page count is 58 260 341 units over the 1 613 recorded actions (46 623 486 on the 1 327 the walk had before) and that is where step 5 starts. Analytic's and 3-D's gates do not walk separate heaps yet, because they have no worker; they join through `isolatedExecutor` with their own op tables. The asks are not in 2-D's walk, nor are rename, swap, merge, the cycle chips and a clicked crossing. The wall time of 2-D's gate inside `npm run test:full` was not measured with three heaps (alone it is 9.5 min where it was 6.3; inside the 2-D slice 11.2 min). Safari and Firefox were not probed.
+
+**What the student will see.**
+- [ruled] «הציגו תצורה אחרת» pressed while another action runs waits its turn and then searches the figure that action left, in every tool. ADR-W-210 Am. 2, question 1 (operator, 2026-11-13: *"i go with your recommendations"*, on "an action pressed while the tool is working waits its turn"); the plan on #2890 records it. Until now 2-D dropped the press when the action finished, and in the other three the page was frozen for the whole action.
+- [asked] 2-D's first line of a session no longer waits for the worker to download (about 0.4 s on the live site, Am. 2; 133 ms → 67 ms on the dev servers). *"Speed is very important."* (operator, 2026-11-12)
+
+### ADR-W-210 Amendment 5 (2026-11-14) — phase 3, part 2 as built: the page never solves in 2-D, 3-D and analytic, and the values follow the figure (#2890)
+
+**Status:** built · 2026-11-14 · feature (workspace: 2-D, 3-D, analytic) · branch `feat/2890-part2`, three builder branches merged into it · on the operator's word (*"go ahead with next phases"*) and his three rulings of 2026-11-14 on #2890
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-33 (the values follow the figure, Must); [02c](02c-requirements-analytic.md) R16 (two promises: the figure before its values, the page answers while it computes) · **Design:** [04](04-design.md), [04b](04b-design-3d.md) "The page does not solve", [04c](04c-design-analytic.md); [docs/08](08-testing-strategy.md) (each gate walks separate heaps through the product's own client)
+
+**The three ADRs.** [ADR-830](06-decisions.md#adr-830) (2-D), [ADR-3D-493](06b-decisions-3d.md#adr-3d-493), [ADR-AG-478](06c-decisions-analytic.md#adr-ag-478). Each builder's whole decision runs in its worker on the shared client of Amendment 4; the page adopts the settled result into its phase 2 memos and solves nothing. How each hands over is the builder's own: 2-D applies a settled view (replay, fold, the drawn construction's evaluation and DOF count) through one store sink, `geoStore.adopt(slice, basis)`; analytic adopts the line-list store's entries and renders the last state whose figure it holds; 3-D adopts the worker's journal and runs its own unchanged action over it.
+
+**Invariant 1 reached.** Every gate walks the page and the worker as separate module instances (`isolatedExecutor` over `secondInstance`), every message cloned.
+
+| Builder | Page work, part 1 → part 2 | Total | Before the paint |
+|---|---|---|---|
+| 2-D | 58 260 341 → **0** | 170 346 395 → 140 769 144 (−17.4 %: what a browser solved twice, on the page and in the worker) | 128 011 916 → 109 258 693 |
+| 3-D | 138 045 517 → **0** | 138.05 M → 138.03 M (two panel lines fell) | 138.05 M → 118.86 M |
+| Analytic | 165 433 537 → **0** | unchanged in every action | 112 407 658 → 15 289 737 |
+| Complex | 1 205, on the page by design, under its ceiling (Amendment 4) | unchanged | unchanged |
+
+Slow corpora: page 0 in all three (2-D 37.7 M → 0, 3-D 71.7 M → 0, analytic → 0). No line's total rose in any builder.
+
+**Measured in a browser** (dev servers through the harness, `main` @ `f594c42d` against each branch; the longest stretch with no animation frame on the page's thread is the "frozen" measure of Amendment 2):
+
+| Builder, action | Frozen, `main` → branch | Figure on screen | Values complete |
+|---|---|---|---|
+| 2-D «ריבוע חוסם את מעגל O» | 4.0 s → 17 ms; a click answered after 3.1 s → 35 ms | unchanged | unchanged |
+| analytic rhombus line 5 | 4 124 ms → 30 ms | 4 147 ms → 199 ms | 4 147 ms → 4 372 ms |
+| analytic rhombus line 6 | 5 776 ms → 29 ms | 5 797 ms → 174 ms | 5 797 ms → 5 887 ms |
+| 3-D «\|SA\| = 5» | 2.2–2.4 s → 17 ms; a drag turns the figure while «חושב…» shows | 2 254 → 2 260 ms | with the figure (under 0.3 s, so no «בודק…») |
+
+**The cold-restart risk of the design pass, measured.** 2-D's page gates run under wall clocks that decide verdicts; they now run in a worker that the search's ✕ terminates. The respawned worker is seeded with the page's fold of the figure on screen. Over 52 browser sessions (the hexagon fixture with and without a ✕ before the next line, and the five dearest slow-corpus lines with and without a ✕ before them, two passes), every verdict and refusal text equals `main`'s. Not covered: on three of those five lines the search ended before the ✕ appeared, so only the kite line and the hexagon ran after a restart. Phase 4 (work limits) removes the clocks.
+
+**What the operator ruled for this part** (#2890, 2026-11-14, each with its options and a recommendation): figure first in analytic and 3-D, «בודק…» for a value not there after 0.3 s; in 3-D one grey «בודק…» line in the data panel; after every redraw. And, playing analytic's T1 with the question put beside it: a click while a figure's values are still computing is taken at once and the old figure's values are dropped (*"T1 works great"*).
+
+**Found and fixed on the way.** 3-D's narrowing memo was keyed by the fact array, so the worker's cloned arrays recomputed it; it is keyed by content now. 2-D's ✕ stops only the searches, not a line typed during one (as on `main`). 3-D's App rendered to a string had no server snapshot for its values store.
+
+**Left on the page, and not walked by the meters.** 2-D: the model path's context building before a call, when a line names by use or the answer has several lines (`boundView`, `lostNewLabels`, `laneContext`). Analytic: the gate walks the driver's copy of the readers, not `App.tsx`, and no development guard reports a unit charged to the page lane; `shell/workMeter.ts` needs that listener. 3-D: a basis that changes a third time during one job falls back to the page solving (correct, slower). The asks, rename, swap, merge, the cycle chips and a clicked crossing are still outside 2-D's walk. Safari and Firefox were not probed. The worker chunks grew: 2-D 368 KB → 839 KB (271 KB gzip), and analytic and 3-D now ship one each.
+
+**Sibling audit.** The three iterative builders change together; complex stays on the page under its ceiling by design (invariant 1's stated exception). `shell/` is unchanged in this part.
+
+**What the student will see.**
+- [asked] While 2-D, 3-D or analytic computes, the page is not frozen: it scrolls, answers clicks, and in 3-D the figure can be turned. *"user should know the engine is working and not frozen"* (operator, 2026-11-13)
+- [ruled] In analytic and 3-D, when a line is accepted the figure is drawn at once and the values follow; a value not there after 0.3 s shows «בודק…». Operator, 2026-11-14, #2890 question 1: *"Figure first, both tools (Recommended)"*.
+- [ruled] In 3-D, while the values are being computed the data panel shows one grey line «בודק…», and the rows appear together; never a number from the previous figure. #2890 question 2: *"One «בודק…» line (Recommended)"*. After every redraw and when the panel is opened: question 3, *"Yes, all redraws (Recommended)"*. And *"3d can behave like analytics"* (2026-11-13).
+- [ruled] Once a figure is on screen, the next action does not wait for that figure's values; the old figure's values are dropped. Operator, 2026-11-14, after playing analytic's T1 with that question beside it: *"T1 works great"*.
+- [ruled] An action pressed while the tool works on a figure waits its turn (Am. 2, question 1).
+- [2-D] Save, share, the exports, the language and the guide stay usable while a job runs and act on the figure on screen: measured in 2-D on `main` during its worker search (save 43 ms, language 47 ms, guide 53 ms) and in 3-D on the branch (save 36 ms).
+
+### ADR-W-210 Amendment 6 (2026-11-15) — phase 4 as built: every search is bounded in work, and one that reaches its limit says so (#2893)
+
+**Status:** built · 2026-11-15 · feature (workspace: 2-D, 3-D, analytic, shell) · branch `feat/2893-phase4`, three builder branches merged into it · on the operator's word (*"go ahead with next phases"*) and his four rulings on #2893 (2026-11-13 and 2026-11-14) · awaiting his play
+**Requirements:** [02](02-requirements.md) FR-ALT-8 (new); [02b](02b-requirements-3d.md) FR-SP-34 (new); [02c](02c-requirements-analytic.md) R16 (a new promise) · **Design:** [04w](04w-design-shell.md) § "The work limit and "not decided""; [04](04-design.md), [04b](04b-design-3d.md), [04c](04c-design-analytic.md) (each builder's limit)
+
+**The shared part** (`shell/`): `workLimit.ts` (`withWorkLimit(units, fn)`, `limitReached()`, `unitsLeft()`), `notDecided.ts` (the third outcome, `{kind:'not-decided', resume, spent}`: never a verdict, never a refusal, never a memo entry, never a fact, never an undo step), `frame/NotDecidedNote.tsx` with the suite keys `suite.notDecided.message` / `.continue`, and the letter popover's not-decided answer (`frame/letterOffer.ts`).
+
+**The three ADRs.** [ADR-831](06-decisions.md#adr-831) (2-D), [ADR-3D-494](06b-decisions-3d.md#adr-3d-494), [ADR-AG-479](06c-decisions-analytic.md#adr-ag-479). Every wall clock on a path that decides a verdict, a stored fact or what is drawn is gone; the check sits inside each solver's loop, where the meter counts. Complex has no search that can run out and is unchanged.
+
+| Builder | Limit, a named constant | Measured in the browser (dev PC, through the harness) | Counted how |
+|---|---|---|---|
+| 2-D | `TEN_SECONDS_OF_WORK` = 12 M (ruled *"2 b"*) | 770 k units a second on a search that solves what it touches, so about 15 s; every fixture and slow-corpus search but the kite's (14.4 M, on unticking its first row) decides in one round; the #566 two-circle line draws at once, as on `main` | charged units: a served repeat and a memo hit count as computed |
+| 3-D | `SEED_SEARCH_LIMIT3` = 2.5 M over the 200-seed window | the square + |SA| = 5 + «179 < ∠SAB < 180»: 10.8 s, then 8.9 s (113.6 s frozen on `main`); the pyramid with the same range: all 200 seeds tried, refused in 0.42 s as on `main` | `chargedWork3`: executed units plus what each memo hit saved |
+| Analytic | `SEARCH_LIMIT_AN` = 3.8 M | exam 2379 + «P(1,1)»: 10.1 s and 10.0 s, then today's refusal at 6.7 s | `chargeUnit`: every evaluation the solver asks for, served or computed |
+
+Each limit is counted so that the same input stops at the same unit cold or warm, in any order, in any heap and on any machine. Each builder's gate asserts that, plus that a "not decided" is never served from a memo as a verdict and that «המשיכו לחפש» does not repeat what the first round tried.
+
+**Recalibrated after phase 5.** Phase 5's served repeats ([ADR-832](06-decisions.md#adr-832), [ADR-AG-480](06c-decisions-analytic.md#adr-ag-480)) made each charged unit cheaper in time. The first limits then stopped at 5.6 s (2-D) and 6.6 s (analytic) against a sentence that says «כ-10 שניות», so both were raised to about 10 s as ruled. A served repeat stays charged to the limit, so phase 5 changes when a round ends in seconds, never which unit it ends at.
+
+**The meter.** Analytic and 3-D: no recorded action reaches its limit; analytic's baselines are byte-identical to `main`'s and 3-D's did not move. 2-D, against `main` @ `9e96c6f0`: fixtures 92 005 252 → 90 201 730, slow corpus 92 675 197 → 87 106 692, and no line above `main`'s (at 7.7 M five lines rose, among them `issue-572-load-collapse`'s edit 0.56 M → 3.01 M, signed off by the operator on 2026-11-15, *"i sign off on the items you mentioned about 2x work. its ok for now"*; at 12 M all five are back at or under `main`).
+
+**Found on the way.** In 3-D a range no angle can be in is now refused at once without a search, keeping 2-D's verdict on «זווית ABC גדולה מ-200». A square-with-|SA| case that froze 3-D for 113.6 s on `main` now asks at 10.8 s. As first built, 3-D treated its 200-seed window as a run-out; ruling *"1a"* made a spent count a finished search in every builder, so its refusals are `main`'s again.
+
+**Sibling audit.** 2-D, 3-D and analytic change together on one shell part. Complex: no search, unchanged. The sentence, the button and the key are shared, so every builder says the same words.
+
+**What the student will see.**
+- [ruled] When a search reaches its limit without a solution, the tool says «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with a button «המשיכו לחפש», where it shows a refusal (or «אין תצורה אחרת — הצורה נקבעה») today. A search that finishes and finds nothing keeps today's words. Operator: *"we should say honestly that a solution was not found and if we should continue searching"* (2026-11-13); wording: *"«עדיין לא נמצא פתרון…» (Recommended)"* (2026-11-14).
+- [ruled] «המשיכו לחפש» searches the same amount again from where it stopped. *"Another ~10 s round (Recommended)"* (2026-11-14).
+- [ruled] In 3-D and analytic, a typed line whose search stopped stays in the box and is not added. *"Stays in the box, not added (Recommended)"* (2026-11-14). 2-D: the line stays added, *"3 a"* (2026-11-15).
+- [ruled] The limit is counted in work, about 10 s on the dev PC (2-D about 15 s, by *"2 b"*), the same everywhere. *"10s is an ok number"* (2026-11-13).
+- [ruled] A spent try-count is a FINISHED search in every builder (today's refusal); only a search the work limit cuts short asks. 3-D's 200-seed window is its count. Operator, 2026-11-15, after playing T1, T5 and T11 of PR #2895 (*"all tests pass"*): *"1a"*.
+- [ruled] 2-D's limit is raised so every corpus search but the kite's decides in one round. *"2 b"* (2026-11-15). ADR-831.
+- [ruled] 2-D: the typed line stays added when its search stops, as built. *"3 a"* (2026-11-15). The submit gates, the variant settle and the load's refresh ask at their limit, built when a figure first reaches one ([#2896](https://github.com/dcodish/geo_builder/issues/2896)). *"4 yes"* (2026-11-15).
+- [ruled] Analytic: a figure's values have no limit. *"5 yes"* (2026-11-15). ADR-AG-479.
+
+## ADR-W-205 — 3-D's proof-target refusal names what its own data panel can check: an angle, a perpendicular or a parallel (#2492)
+
+**Status:** accepted · 2026-11-12 · feature (P2, 3-D) · fix round #2855, stream H · branch `feat/2492-prove-refusal-check-pointer` · **Operator:** 2026-11-10, Rulings Inbox, on the 3-D arm escalated in #2492: chose **(b)** *"A 3-D line naming what its panel can check"*, with the example «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «נתונים»: שאלו שם על הזווית ולחצו «שאלו» — למשל ∠(AB, CD).»; the exact text is the session's (ADR-W-174), recorded with `judgments.mjs chose` (`text-2492-3d-proof-target-check`) · **Amends** [ADR-W-194](#adr-w-194) decision 4 · per-product note on [ADR-3D-295](06b-decisions-3d.md#adr-3d-295) · LADDER stage: **none** (a refusal's wording)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 and its parity row *A proof target «הוכיחו כי»* · **Design:** [04w](04w-design-shell.md) § *Proof targets* (the per-builder table)
+
+**Context, measured at pickup (`caf619a5`).** PR #2747 (ADR-W-194) is merged: 2-D, analytic and complex end the refusal with their line; 3-D reads the suite sentence alone. 3-D's ask box (`answerQuery` on `derive3`'s construction, the real submit path) answers the claims the line names: «מקבילית ABCD» `∠(AB, CD)` → «180°»; «תיבה ABCDA'B'C'D'» `∠(AB, D'C')` → «0°», `∠(AA', AB)` → «90°»; «פירמידה SABCD שבסיסה ריבוע · SA מאונך למישור ABCD» `∠SBC` → «90°», `∠(SA, BC)` → «90°». An equal-lengths claim on a figure with no stated size still has no answer there (ADR-W-194's table), which is why the line does not name lengths.
+
+**Decision.**
+1. **A 3-D product key**, `err.proofTargetCheck`: «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «$t(dataPanel.title)»: שאלו שם על הזווית ולחצו «$t(query.add)» — למשל ∠(AB, CD).» / "You can check a claim about an angle, a perpendicular or a parallel in the «$t(dataPanel.title)» panel: ask there for the angle and press «$t(query.add)» — for example ∠(AB, CD)." It renders as the ruling's example byte for byte. Not a suite key: no other builder says it (ADR-W-148's rule).
+2. **The names are nested** from the keys App3 draws the panel heading and the ask button with (`dataPanel.title`, `query.add`), never retyped.
+3. **`errorText3`** composes the refusal: the suite sentence quoting the claim, then the line. It is 3-D's one wording site, so the empty-canvas refusal is the same.
+
+**Locks.** `src3d/__tests__/proof-target-1666.test.ts`: «הוכיחו ש-AB = AC» after «משולש ABC», Hebrew and English, renders the suite sentence then the line, in full; the empty canvas reads the same; the locale nests both names and App3 draws `<DataPanel title={t('dataPanel.title')}>` and `<AskLane addLabel={t('query.add')}>` (`panelDrawnFaults`); the pointer is true: the ask box answers the line's example (180°), a box's parallel edges (0°) and a perpendicular (90°). `suite-vocabulary.test.ts`'s rule that no table outside 2-D names «הצג צלעות וזוויות שוות» still holds.
+
+**Behaviour change for a student:** in 3-D, a «הוכיחו…» line is refused as before, and the message now ends: «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «נתונים»: שאלו שם על הזווית ולחצו «שאלו» — למשל ∠(AB, CD).»
+
+## ADR-W-206 — «הציגו תצורה אחרת» shows each new solution before another placement of one already shown, in every builder; a mirror image is the same solution placed differently (#2831)
+
+**Status:** accepted · 2026-11-12 · feature, all four builders · fix round #2855, PR branch `feat/2831-mirror-same-solution` · **built in** 2-D ([ADR-824](06-decisions.md#adr-824)) and analytic ([ADR-AG-473](06c-decisions-analytic.md#adr-ag-473)); 3-D ([ADR-3D-461](06b-decisions-3d.md#adr-3d-461)) and complex already hold it, measured · LADDER stage: **none** (the button's search)
+**Requirements:** [02](02-requirements.md) FR-ALT-2, [02c](02c-requirements-analytic.md) P7, [02b](02b-requirements-3d.md) (the two-configuration requirement, #2814), [02d](02d-requirements-complex.md) FR-CN-3 — the same sentence · **Design:** [04](04-design.md) § the configuration axes (the solution cycle), [04c](04c-design-analytic.md) § "The configuration search"
+**Operator:** 2026-11-10, Rulings Inbox Q-2731c (b): *"New solutions first, in every builder"*; 2026-11-12 on #2831: *"2831 - A"* — a mirror image of a drawing is the SAME solution placed differently, so on the book's p2-15 all three ellipses appear within the first presses.
+
+**The rule.**
+1. **One solution** is a drawing up to a rigid motion of the figure, a mirror image included, with every letter the student declared at the same value and every curve the same shape. This is 3-D's ADR-3D-461 key (built under Q-2814a/b: SSA's two mirrors are one group), stated for every builder.
+2. **The order.** On a figure with finitely many configurations (no shape freedom left), the button walks a cycle:
+   - the configurations, exact repeats dropped;
+   - grouped by solution;
+   - groups in order of first appearance from the first drawing;
+   - interleaved round-robin: g0#0, g1#0, g2#0, …, g0#1, g1#1, ….
+   A press moves to the successor of the drawing on the screen. So every new solution comes before another placement of one already shown, a figure whose only alternatives are placements still reaches them, the first drawing never changes, and nothing new is stored.
+3. **A figure with freedom left** has infinitely many solutions, and every press already draws a new shape, so its walk is unchanged.
+
+**Per builder, measured at `c82d767c`.**
+- **2-D:** `searchAnotherView`'s odometer turned a placement axis faster than a solution axis. ADR-824 adds the cycle.
+- **Analytic:** the seed walk had no grouping (p2-15's third ellipse came on press 13). ADR-AG-473 adds the cycle.
+- **3-D:** `configurationOrder3` (ADR-3D-461) already interleaves its groups. Every one of the 11 fixed figures with more than one group reaches all G groups within G−1 presses through `resample`, so there is no code change, only a press-walk lock.
+- **Complex:** each configuration is its own value set. A conjugate is a different value, not a placement, and the complex plane has no rigid-motion gauge. None of the 6 multi-configuration fixtures holds a relabelled copy, and pressing from 0 visits every configuration before repeating, so there is no code change, only a lock.
+
+**Behaviour change for a student:** when the givens fix a figure with several different solutions, «הציגו תצורה אחרת» shows each of them before showing a mirror image or other placement of one already shown.
+
+## ADR-W-207 — A hidden segment takes what exists only for it; a value the student hid stays readable in the givens row (#2852)
+
+**Status:** accepted · 2026-11-12 · round #2855 · **amends** [ADR-W-118](#adr-w-118) B2 and [ADR-W-106](#adr-w-106) · **built by** [ADR-825](06-decisions.md#adr-825) (2-D) and [ADR-AG-474](06c-decisions-analytic.md#adr-ag-474) (analytic) · LADDER stage: **none** (display)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-14 · **Design:** [04w](04w-design-shell.md) § *The segment menu* — `hiddenWith`, the row's `hidden` mark, the suite keys `suite.hiddenRow.*`
+
+**The operator's report and ruling** (2026-11-12, #2852). Analytic, «מעוין שצלעו 5» · «גובה המעוין 4.8» · «אלכסוני המעוין על הצירים», the height hidden: *"i wanted to say that the height is 4.8 just so the shape is shown correctly but without showing it on the screen. So i pressed the line and hid it, but the 4.8 was still there and H and the knee are still there."* Asked about hiding AB in triangle ABC, the ruling: *"in that case, we can go with the original proposal"*.
+
+**Decision.**
+1. **What goes with a hidden segment**, in every builder with segment hide: its value (a length written on it), its marks (a right-angle knee with an arm along it, an equal-length tick on it), and an endpoint that exists only for it: a point the TOOL named that no other drawn segment, kept mark or value, curve, circle, line or other point uses, and that no other active line names. A point the student named never goes, nor one anything else uses: hiding AB in «משולש ABC» takes AB and its value only.
+2. **One decision**, `hiddenWith` in `shell/frame/segmentDisplay.ts` beside `segInk`, over point ids. Each product reads its scene into it and decides `lone` (who named a point, which lines use it) over its own record; both canvases paint from what it leaves.
+3. **Display only.** The constraint, the row, every answer, the undo slice and the stability rule are untouched. Clicking the ghost (or the row's mark) shows it all again. The export serialises the canvas, so it draws none of it.
+4. **B2, amended:** *a value the student HID stays readable in the givens row, which shows «מוסתר» (hidden); a hidden value is the student's choice, never the tool's.* The row that drew the segment as its own line or stated its length carries the mark (`FactRow.hidden`, `suite.hiddenRow.mark` / `.title`); clicking it shows the segment again.
+5. **3-D** has no segment hide (FR-SU-14 promises it only where a student can click a segment), so there is nothing to port; this arrives with 3-D's segment menu. No parity cell: the parity table holds sentences, and this is a display rule.
+
+**Behaviour change for a student:** hiding a line (2-D and analytic) also hides its number, its right-angle mark and a point the tool named only for it; the row in the list keeps the value and shows «מוסתר», and clicking the faint line or the mark brings everything back.

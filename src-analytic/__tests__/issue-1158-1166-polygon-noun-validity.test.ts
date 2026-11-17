@@ -26,7 +26,7 @@ import { describe, expect, it } from 'vitest';
 import { anotherConfiguration } from '../app/another';
 import { derive } from '../engine/derive';
 import { drawableAt } from '../engine/evaluate';
-import { ringViolation, type RingPt } from '../engine/rings';
+import { ringConvexityProofAg, ringFaultsOf, ringViolation, type RingPt } from '../engine/rings';
 import { SHAPES } from '../engine/shapes';
 import type { Seed } from '../engine/evaluate';
 
@@ -294,5 +294,27 @@ describe('#1158/#1166 — a declared polygon is drawn as the ring its noun promi
     const d = derive(['טרפז ABCD', 'A(5,8)', 'B(9,6)'], 1);
     const chosen = drawableAt(d.construction, 1);
     expect(chosen.ringFaults).toEqual([]);
+  });
+});
+
+/**
+ * #2813 (ADR-AG-471, 2-D's ADR-823): a stated corner angle is the INTERIOR angle — a simple ring that seats a stated
+ * corner as the reflex corner of a dent carries the hard `reflex-corner` fault; and stated interior angles summing to at
+ * least (n − 3)·180° prove the ring convex (`ringConvexityProofAg`).
+ */
+describe('#2813 — the stated corner is the interior corner', () => {
+  const ring = ['A', 'B', 'C', 'D'];
+  const dart = new Map<string, RingPt>([['A', { x: 0, y: 0 }], ['B', { x: 4, y: 2 }], ['C', { x: 1, y: 0.2 }], ['D', { x: 4, y: -2 }]]);
+  it('a stated corner seated reflex is a hard ring fault; a stated corner that turns with the ring is not', () => {
+    const atC = derive(['מרובע ABCD', '∠BCD = 110°'], 0).construction;
+    expect(ringFaultsOf(atC, (id) => dart.get(id)).map((f) => f.violation)).toEqual(['reflex-corner']);
+    const atA = derive(['מרובע ABCD', '∠DAB = 70°'], 0).construction;
+    expect(ringFaultsOf(atA, (id) => dart.get(id))).toEqual([]);
+  });
+  it('the proof reads the stated corners against (n − 3)·180°, equality included', () => {
+    const proof = (lines: string[]) => ringConvexityProofAg(derive(lines, 0).construction, { vertices: ring, noun: 'מרובע' })?.constraints ?? null;
+    expect(proof(['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°'])).toHaveLength(2);
+    expect(proof(['מרובע ABCD', '∠DAB = 70°', '∠BCD = 100°'])).toBeNull();
+    expect(proof(['מרובע ABCD', '∠ABD = 70°', '∠BCD = 110°']), 'a diagonal angle is not a corner').toBeNull();
   });
 });

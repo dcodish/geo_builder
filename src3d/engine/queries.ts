@@ -15,12 +15,12 @@
 import { knowledgeSamples3, letterIsGaugeLength3, resolve3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3 } from './evaluate';
 import { seedNumber3, type Seed3 } from './components3';
 import { SHAPE_SUBJ } from '../lexicon/nouns3';
-import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, branchAnswer, decompStr, letterSpan3, lineEquationForms3, linePlaneAngleAt, vecDefLetterAt3, paramRows3, parametricFitter3, parametricPlaneForm, pinLetters3, planeEqStr, planeOffsetAnchored3, planeSymbols, type OpenParam3 } from './dataView';
+import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, branchAnswer, decompStr, letterSpan3, lineEquationForms3, linePlaneAngleAt, vecDefLetterAt3, paramRows3, parametricFitter3, parametricPlaneForm, pinLetters3, planeEqStr, planeOffsetAnchored3, planeSymbols, type OpenParam3, pointPlaneRow3 } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { angleBetweenOperands, distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
 import { revolutionMeasure } from './claims';
-import { angleAskOperands, componentAskOf, foldPrimes3, lineAskOf, revolutionAskOf } from '../parser/parse3';
+import { angleAskOperands, componentAskOf, foldPrimes3, lineAskOf, membershipQuestion3, revolutionAskOf } from '../parser/parse3';
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
 import { namedVector3 } from './vecExpr';
@@ -65,7 +65,9 @@ type Query =
   | { kind: 'plane'; name: string | null; ids: Id[] | null }
   // #1541 (ADR-3D-475): «משוואת BB'» / «משוואת הישר ℓ» — a line's equation, read by the statement grammar
   // (`lineAskOf`). A POINT PAIR is answered from its two points; a NAMED line from the canvas echo's decision.
-  | { kind: 'line'; name: string; pair: [Id, Id] | null };
+  | { kind: 'line'; name: string; pair: [Id, Id] | null }
+  // #2062 (ADR-3D-480): «האם הנקודה M נמצאת במישור AEC?» — answered by pointing at the panel's point × plane row.
+  | { kind: 'membership'; point: Id; plane: string };
 
 /** #1746 (ADR-3D-339) — every query kind, so the ask-row sweep can be TOTAL over them (a new kind cannot
  *  ship without a row case). */
@@ -92,6 +94,8 @@ export interface QueryResult {
   note?: string;
   /** For note `depends`: the free named parameter(s) the quantity is a function of («α»). */
   param?: string;
+  /** #2062 (ADR-3D-480): for note `inPanel` — the point and the plane whose panel row holds the answer. */
+  inPanel?: { point: string; plane: string };
   /**
    * #1543 (ADR-3D-301) — how the question's ECHO is rendered: `'vector'` iff the parse bound at least one
    * operand as a VECTOR ({@link queryEcho3}); `'plain'` otherwise, and always for a question that was not
@@ -138,6 +142,7 @@ function vectorAtoms(q: Query): Atom[] {
     case 'component':
     case 'plane':
     case 'line':
+    case 'membership':
       return [];
     default: {
       const unhandled: never = q;
@@ -232,6 +237,13 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   // `parseValueQuery` gets this for free by running the whole of `normalizeUtterance`).
   const s = foldGlyphs(foldPrimes3(raw)).replace(/\s+/g, ' ').trim();
   if (!s) return null;
+
+  // #2062 (ADR-3D-480): the exam's membership question — the statement reader's own (`membershipQuestion3`), so the
+  // main input and this box read the same sentences.
+  {
+    const mq = membershipQuestion3(s);
+    if (mq) return { kind: 'membership', point: mq.point, plane: mq.plane };
+  }
 
   // #319 — LINE↔PLANE angle: «הזווית בין SB למישור ABC» / «angle between SB and plane ABC»
   // (valueless — a QUESTION; the statement form with a value/label is the linePlaneAngle fact rule).
@@ -454,6 +466,7 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
     case 'component':
     case 'plane':
     case 'line':
+    case 'membership':
       return null;
     case 'distance': {
       const ctx = abs ?? { lines: new Map(), planes: new Map() };
@@ -703,6 +716,12 @@ export function answerQuery(c: Construction3, text: string, seed: Seed3): QueryR
 
 /** Answer one PARSED question (the echo is attached by {@link answerQuery}). */
 function answerParsed(c: Construction3, text: string, q: Query, seed: Seed3): Answer3 {
+  // #2062 (ADR-3D-480): one decision, two surfaces — the panel's point × plane row, as the main input reads it
+  if (q.kind === 'membership') {
+    return pointPlaneRow3(dataView(c, seed), q.point, q.plane)
+      ? { text, answer: null, note: 'inPanel', inPanel: { point: q.point, plane: q.plane } }
+      : { text, answer: null, note: 'undetermined' };
+  }
   const seeds = querySeeds3(seed);
   const stableNums = (vals: (number | null)[]): number | null => {
     if (vals.some((v) => v === null || !Number.isFinite(v))) return null;

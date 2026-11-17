@@ -92,6 +92,9 @@ export const CASES: { raw: string; contains: string[]; said?: string }[] = [
   { raw: 'non-finite position computed', contains: [] },
   { raw: '|AB| = |AD| references an unknown point', contains: ['|AB| = |AD|'] },
   { raw: 'over-constrained: |AC| = 9 cannot hold', contains: ['|AC| = 9'] },
+  // #2894 (ADR-835): the metric closure's reason, 3-D's lengths-impossible sentences
+  { raw: 'over-constrained: segment AC would be both 3√2 and 10 cannot hold', contains: ['שני אורכים שונים', 'AC', '3√2', 'AC = 10'], said: 'AC = 10' },
+  { raw: 'over-constrained: |AB| = 6 but |OA| + |OB| = 4 in triangle OAB cannot hold', contains: ['|AB| = 6', '|OA| + |OB| = 4', 'אי־שוויון המשולש', 'OAB'], said: 'AB = 6' },
   // step.ts (#2591, ADR-778): an over-constraint that names no constraint — the ruled reason-less frame, naming the sentence
   { raw: 'over-constrained', contains: ['מחלקת את', 'ביחס', 'סותר נתון קודם'], said: 'D מחלקת את AB ביחס 1:2' },
   // #2165 + #2119 (ADR-681): a second size for a stated circle — the ruled frame without a reason clause

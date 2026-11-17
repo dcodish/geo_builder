@@ -22,6 +22,8 @@
  * show the least-bad one: `solve` reports that it did not converge, and the caller says so. A drawn
  * figure that violates its own givens is the defect this whole product is built to avoid.
  */
+import { meterWork } from '../../shell/workMeter';
+import { chargeUnit, solverUnit } from './workLimitAn';
 import { evalExpr, exprText, symbolsOf, type Env } from './expr';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import { CIRCLE_CONIC_WORDS } from '../parser/circleConicWords';
@@ -682,8 +684,8 @@ function describeRule(r: DerivedRule): string {
       return `מפגש האלכסונים ${r.v.join('')}`;
     case 'incircle-centre':
       return `מרכז המעגל החסום ב-${r.v.join('')}`;
-    case 'parabola-focus':
-      return `מוקד ${r.curve}`;
+    case 'parabola-point':
+      return `${r.role === 'vertex' ? CONIC_ROLE_WORDS.vertex : CONIC_ROLE_WORDS.focus} ${r.curve}`;
     case 'ellipse-point':
       return `${r.role.k === 'focus' ? CONIC_ROLE_WORDS.focus : CONIC_ROLE_WORDS.vertex} ${r.curve}`;
     case 'circle-centre':
@@ -1613,6 +1615,50 @@ export interface SolveResult {
   anchored?: boolean;
 }
 
+/** The repeat table is on; off only inside {@link withoutServedRepeats}. */
+let repeatsServed = true;
+/**
+ * AN INSTRUMENT (#2893, ADR-AG-479's lock): run `fn` with no repeat served, every evaluation computed — the solve before
+ * ADR-AG-480, which the work limit must stop at the same charged unit. Not a mode: nothing outside the locks calls it.
+ */
+export function withoutServedRepeats<T>(fn: () => T): T {
+  const was = repeatsServed;
+  repeatsServed = false;
+  try {
+    return fn();
+  } finally {
+    repeatsServed = was;
+  }
+}
+
+/**
+ * #2894 ([ADR-AG-480](../../docs/06c-decisions-analytic.md#adr-ag-480), ADR-W-210 phase 5) — AN EXACT REPEAT IS SERVED.
+ *
+ * Within ONE solve, a residual vector already computed at a point bit-for-bit equal to `x` is returned again instead of
+ * being computed again. A residual function is a pure function of its point for the life of a solve, so the iterates,
+ * the result and every verdict built on it are unchanged; only the work meter sees the evaluation that did not happen.
+ * Nothing outlives the solve (the map is the call's). The returned array is shared with the first caller, and no caller
+ * writes into a residual vector. A point with a NaN coordinate is never served (NaN has more than one bit pattern).
+ * 3-D's `leastSquares` reaches the same end by caching its Jacobian (ADR-3D-210); this serves every repeat the
+ * analytic loop makes, wherever it makes it.
+ */
+function servingRepeatedPoints(f: (x: number[]) => number[]): (x: number[]) => number[] {
+  if (!repeatsServed) return f;
+  const seen = new Map<string, number[]>();
+  return (x) => {
+    let key = '';
+    for (const v of x) {
+      if (Number.isNaN(v)) return f(x);
+      key += (Object.is(v, -0) ? '-0' : String(v)) + ',';
+    }
+    const hit = seen.get(key);
+    if (hit) return hit;
+    const r = f(x);
+    seen.set(key, r);
+    return r;
+  };
+}
+
 /**
  * Levenberg–Marquardt over the free carriers.
  *
@@ -1627,7 +1673,7 @@ export interface SolveResult {
  */
 export function solveLM(
   x0: number[],
-  residuals: (x: number[]) => number[],
+  residuals0: (x: number[]) => number[],
   maxIter = 120,
   /**
    * How many LEADING coordinates are ANCHORED at `x0` (#1182, [ADR-AG-359](../../docs/06c-decisions-analytic.md#adr-ag-359)):
@@ -1637,6 +1683,20 @@ export function solveLM(
    */
   anchored = 0,
 ): SolveResult {
+  // #2873 (ADR-W-210): one residual evaluation is analytic's unit of work. The rank and the finishing solve below are
+  // handed the bare function, because each meters its own evaluations.
+  // #2894 (ADR-W-210 phase 5): a point this solve has already evaluated is served, not evaluated again — the residuals at
+  // the iterate (taken by the cost, then again at the top of the next iteration), the whole Jacobian after a rejected
+  // step (x has not moved), the finish's re-reads. Measured: 31.9 % of every evaluation was such a repeat.
+  // #2893 (ADR-AG-479): every evaluation ASKED for is charged to the work limit, a served one too; only a computed one is metered.
+  const served = servingRepeatedPoints((v: number[]): number[] => {
+    meterWork();
+    return residuals0(v);
+  });
+  const residuals = (v: number[]): number[] => {
+    chargeUnit();
+    return served(v);
+  };
   const n = x0.length;
   /*
    * A DETERMINED START IS NOT ANCHORED (round #2627, ruling 2026-10-30 "5 A"): with no free direction at the start
@@ -1646,7 +1706,7 @@ export function solveLM(
    */
   /** A figure solve (one that asks to anchor) is always finished by the plain step at the tight tolerance — below. */
   const finish = anchored > 0;
-  if (anchored > 0 && freeRank(x0, residuals) === 0) anchored = 0;
+  if (anchored > 0 && freeRank(x0, residuals0) === 0) anchored = 0;
   let x = [...x0];
   let lambda = 1e-3;
 
@@ -1798,7 +1858,7 @@ export function solveLM(
    * than the loop's tolerance. A determined start (not anchored) is finished the same way.
    */
   if (finish) {
-    const p = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x, residuals, POLISH_ITER));
+    const p = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x, residuals0, POLISH_ITER));
     if (cost(p.values) < f) {
       x = p.values;
       f = cost(x);
@@ -1931,7 +1991,9 @@ function gaussian(A: number[][], n: number): number[] | null {
  */
 export function freeRank(x: number[], equalities: (v: number[]) => number[]): number {
   const n = x.length;
-  if (n === 0 || equalities(x).length === 0) return n;
+  if (n === 0) return n;
+  solverUnit(); // #2873: the one evaluation made here; `jacobianRank` meters its own
+  if (equalities(x).length === 0) return n;
   return Math.max(0, n - jacobianRank(x, equalities).rank);
 }
 
@@ -1960,7 +2022,12 @@ export const RANK_REL_TOL = 10 * SOLVE_TOL;
  * Every rank the analytic engine takes goes through here: `freeRank` (the DOF cue, the entailment gate, `freedomOf`)
  * and the locus tracer's `nullDirection` (docs/17 §3 chokepoint registry).
  */
-export function jacobianRank(x: number[], residuals: (v: number[]) => number[]): { rank: number; nullBasis: number[][]; sigma: number[] } {
+export function jacobianRank(x: number[], residuals0: (v: number[]) => number[]): { rank: number; nullBasis: number[][]; sigma: number[] } {
+  // #2873 (ADR-W-210): a rank's residual evaluations are solver work in the same unit as `solveLM`'s.
+  const residuals = (v: number[]): number[] => {
+    solverUnit();
+    return residuals0(v);
+  };
   const n = x.length;
   const m = residuals(x).length;
   const identity = (): number[][] => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));

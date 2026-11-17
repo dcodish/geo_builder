@@ -1,0 +1,59 @@
+{
+  "name": "feat-2894-b-3d",
+  "title": "#2894 part 2 B — 3-D: a rename or a swap keeps the drawing in place (PR, port 5201)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5201",
+      "path": "/3d.html",
+      "title": "3-D: renaming a vertex, then swapping two, changes only the letters: the triangle stays exactly where it was",
+      "lines": [
+        "משולש ABC",
+        "AB = 5",
+        "BC = 4",
+        "∠BAC = 40°",
+        "שנה שם A ל-Q",
+        "החלף בין B ל-C"
+      ],
+      "lookFor": "Start from «נקה הכל». After «∠BAC = 40°» note where C is drawn. After «שנה שם A ל-Q» the vertex at A is labelled Q and nothing moves; after «החלף בין B ל-C» the two labels B and C trade places and nothing moves. Every row still reads green, with the new letters.",
+      "before": "prod redraws the triangle at the rename: with these two sides and this angle there are two triangles, and the rename flips to the other one (C jumps to about a quarter of the way along AB); the swap redraws it again.",
+      "expectFigure": ["Q", "B", "C"],
+      "expectRows": ["משולש QCB", "∠CQB = 40°"]
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5201",
+      "path": "/3d.html",
+      "title": "3-D: a renamed cube vertex is re-lettered in every row and on the figure",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "מישור ABCD",
+        "שנה שם A ל-M"
+      ],
+      "lookFor": "Start from «נקה הכל». The rows read «קובייה MBCDA'B'C'D'» and «מישור MBCD»; M is drawn where A was, A' keeps its letter.",
+      "before": "unchanged (the cube has no free size, so prod draws it in place too)",
+      "expectFigure": ["M", "A'"],
+      "expectRows": ["קובייה MBCDA'B'C'D'", "מישור MBCD"]
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5201",
+      "path": "/3d.html",
+      "title": "3-D: renaming onto a letter the figure already uses is still refused, offering the swap",
+      "lines": [
+        "משולש ABC",
+        "שנה שם A ל-B"
+      ],
+      "lookFor": "Start from «נקה הכל». «השם «B» כבר תפוס בציור — בחרו אות פנויה, או החליפו ביניהן: הקלידו «החלף בין A ל-B» (שינוי שם לאות תפוסה היה מאחד שתי נקודות)». The row stays «משולש ABC».",
+      "before": "unchanged",
+      "expectRefusal": "כבר תפוס בציור",
+      "expectRows": ["משולש ABC"]
+    }
+  ]
+}

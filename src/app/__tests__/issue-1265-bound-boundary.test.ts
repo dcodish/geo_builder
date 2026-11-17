@@ -27,20 +27,20 @@ import { runSubmit } from '../submitPipeline';
 import type { SubmitDeps } from '../submitPipeline';
 import { parse } from '@/parser';
 import { replay, useGeoStore } from '@/store/geoStore';
+import { createWorkQueue } from '../../../shell/work';
 
 function makeDeps() {
   const calls = { notes: [] as string[], cleared: 0 };
   const deps: SubmitDeps = {
     t: (key, opts) => (opts ? `${key}:${JSON.stringify(opts)}` : key),
     locale: 'he',
-    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++, setBusy: () => {} },
+    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++ },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => raw ?? '',

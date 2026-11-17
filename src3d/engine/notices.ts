@@ -22,7 +22,7 @@ import { claimPinsParam, isSelfDetermined, lineDirCarriesParam, operandLabel, pl
 import { cross3, dot3, norm3, sub3 } from './vec3';
 import type { Vec3 } from './vec3';
 import type { Resolved3 } from './evaluate';
-import { unusedLetter3, type Construction3, type Id, type Operand3, type Positions3, type SolidKind } from './types';
+import { unusedLetter3, type Claim3, type Construction3, type Id, type Operand3, type Positions3, type SolidKind } from './types';
 
 /**
  * #1918 (ADR-3D-313) — the FIGURE-MISMATCH channel: what the drawing on screen shows that a stated noun says
@@ -299,14 +299,17 @@ function pointEntailedInPlane(
  * it was not. The conservative direction is kept in all four: when entailment cannot be SHOWN, say
  * nothing.
  */
-function alreadyKnown(c: Construction3, samples: readonly Resolved3[]): BuildNotice3[] {
+/** #2790 (ADR-3D-484, Q-2790c [judged]): `held` — the claims of rows recorded as HELD; their one note is the held notice,
+ *  so cases 2–4 say nothing for them. A row that pinned, added an object or confirmed a default is never held. */
+function alreadyKnown(c: Construction3, samples: readonly Resolved3[], held: ReadonlySet<Claim3> = new Set()): BuildNotice3[] {
   const out: BuildNotice3[] = [];
 
   // ---- case 1 (#612, ADR-3D-158): a shape statement that was true of the figure already.
   // Test: the apply-time flag — `applyShape` records the statement it found nothing to change.
-  for (const r of c.redundantShapes) {
-    out.push({ kind: 'already-known', rel: 'shape', subject: [...r.ids].join(''), shape: r.base });
-  }
+  // #2790 (ADR-3D-484): retired. A shape statement the figure already holds is a HELD row, and the held notice
+  // («זה כבר קיים באיור — נוסף כנתון נפרד.», `suite.notice.alreadyHeld`) is the one thing it says — 2-D's answer (the
+  // #2171 pair table). The apply-time flag stays: `impliedByPrior3` reads it as the statement's own part.
+  void c.redundantShapes;
 
   // ---- case 2 (#396, ADR-3D-108): a relation between two SELF-DETERMINED objects could never have
   // driven anything — both are fixed by their own defining equations, so the statement adds nothing.
@@ -326,6 +329,7 @@ function alreadyKnown(c: Construction3, samples: readonly Resolved3[]): BuildNot
       cl.type === 'plane-rel' || cl.type === 'mutual-rel' || cl.type === 'distance-rel' ? [cl.a, cl.b]
       : cl.type === 'line-rel' ? [cl.op, { kind: 'line', name: cl.line }] : null;
     for (const cl of c.claims) {
+      if (held.has(cl)) continue;
       const pair = pairOf(cl);
       if (!pair) continue;
       const [a, b] = pair;
@@ -344,6 +348,7 @@ function alreadyKnown(c: Construction3, samples: readonly Resolved3[]): BuildNot
   // endpoint). Point-run planes only: an absolute plane's redundancy is case 2's lane, and a
   // gauge-riding segment against a point-run plane is never two self-determined sides.
   for (const cl of c.claims) {
+    if (held.has(cl)) continue;
     if (cl.type !== 'plane-rel' || cl.rel !== 'contained') continue;
     const planeSide = cl.a.kind === 'plane-run' || cl.a.kind === 'plane-named' ? cl.a : cl.b;
     const linear = planeSide === cl.a ? cl.b : cl.a;
@@ -379,6 +384,7 @@ function alreadyKnown(c: Construction3, samples: readonly Resolved3[]): BuildNot
       ),
     );
     for (const cl of c.claims) {
+      if (held.has(cl)) continue;
       if (cl.type !== 'perp-plane' && cl.type !== 'par-plane') continue;
       const rel = cl.type === 'perp-plane' ? ('perp' as const) : ('parallel' as const);
       // A relation that DROVE the figure is information, not a consequence — never reported.
@@ -398,7 +404,7 @@ function alreadyKnown(c: Construction3, samples: readonly Resolved3[]): BuildNot
  * Every notice the figure currently warrants. Recomputed on each derive — a notice is a property of
  * the built figure, never a one-shot event, so undo/redo and load all show the right thing.
  */
-export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = [], narrowed: readonly NarrowedRing3[] = []): BuildNotice3[] {
+export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = [], narrowed: readonly NarrowedRing3[] = [], heldClaims: ReadonlySet<Claim3> = new Set()): BuildNotice3[] {
   const out: BuildNotice3[] = [];
   // #1918 (ADR-3D-313; #1915 step 2, "out of family, no pair"): a ring the drawing shows as a parallelogram
   // carries the trapezoid warning, and a narrowing note beside it would contradict it — so a warned ring gets
@@ -439,7 +445,7 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
   // #853 (ADR-3D-209): everything that says «true, and already known» — one predicate, one channel.
   // The four cases that used to live here inline (a redundant shape, a relation between two
   // self-determined objects, an entailed containment, an implied ∥/⟂) are cases of `alreadyKnown`.
-  out.push(...alreadyKnown(c, samples));
+  out.push(...alreadyKnown(c, samples, heldClaims));
   // #936's flat-solid notice is retired (#1860, ADR-3D-358): a declared solid the givens force flat is REFUSED
   // at the pivot (`solve3.ts`, `solidSliver`), the declared-polygon judgement of ADR-3D-310.
 

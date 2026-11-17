@@ -30,9 +30,7 @@ function play(lines: readonly string[]): { st: St; recorded: boolean } {
   let st: St = { facts: [], seed: 0 };
   for (const line of lines) {
     const v = decideDeterministic3(st, line, () => `f${++n}`);
-    // #2341 (ADR-3D-449): a given the figure already holds («ABCD חסום במעגל» · «זווית DAB = 90») is read and answered
-    // «כבר קיים», adding no row — kept, as analytic's gate keeps its `already-known` (its narrowing-note-1996 test)
-    if (v.kind === 'already-stated') continue;
+    // #2790 (ADR-3D-484): a given the figure already holds («ABCD חסום במעגל» · «זווית DAB = 90») is its own row now
     if (v.kind !== 'record') return { st, recorded: false };
     st = { facts: v.facts, seed: v.seed };
   }

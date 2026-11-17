@@ -21,20 +21,20 @@ vi.mock('@/parser/llm', () => ({ llmParse: (...a: unknown[]) => llmParseMock(...
 import { runSubmit, type SubmitDeps } from '@/app/submitPipeline';
 import { introducedNewLabels } from '@/parser';
 import { replay, useGeoStore } from '@/store/geoStore';
+import { createWorkQueue } from '../../../shell/work';
 
 function makeDeps() {
   const notes: string[] = [];
   const deps: SubmitDeps = {
     t: (key, opts) => (opts ? `${key}:${JSON.stringify(opts)}` : key),
     locale: 'he',
-    ui: { setInputNote: (m) => notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => {}, setBusy: () => {} },
+    ui: { setInputNote: (m) => notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => {} },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => raw ?? '',

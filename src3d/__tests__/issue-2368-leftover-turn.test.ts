@@ -17,7 +17,7 @@
 import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { dataView } from '../engine/dataView';
-import { knowledgeSamples3, resolve3 } from '../engine/evaluate';
+import { knowledgeSamples3, placementFreedom3, resolve3 } from '../engine/evaluate';
 import { answerQuery } from '../engine/queries';
 import { symmetricEigen } from '../engine/solve3';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
@@ -94,7 +94,7 @@ describe('#2368 — the operator’s four lines', () => {
 });
 
 describe('#2368 — the rank probe', () => {
-  const freedom = (lines: string[], seed = 0) => resolve3(cAt(build(lines), seed), seed).pivot?.placementFreedom?.();
+  const freedom = (lines: string[], seed = 0) => placementFreedom3(resolve3(cAt(build(lines), seed), seed));
 
   it('the report: dim 1, a rotation about the line AB (through A, ∥ x)', () => {
     for (const seed of [0, 1, 5]) {

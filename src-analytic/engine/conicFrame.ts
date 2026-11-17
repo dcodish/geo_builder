@@ -57,6 +57,17 @@ export function lineToWorld(cu: ConicCurve, l: { a: number; b: number; c: number
     : { kind: 'line', a: l.a, b: l.b, c: l.c - l.a * h - l.b * k };
 }
 
+/**
+ * A parabola's ROLE POINTS (#2835, [ADR-AG-470](../../docs/06c-decisions-analytic.md#adr-ag-470)) — the focus `(p/2, 0)` and
+ * the vertex `(0, 0)` of `v² = 2p·u`, carried to the world through the frame. The ONE closed form: the derived rule
+ * `parabola-point` («F מוקד הפרבולה», «V קודקוד הפרבולה»), `curves.ts`'s `parabolaFocus` and the ask lane read it, so a
+ * named role point and an asked one cannot disagree.
+ */
+export type ParabolaRole = 'focus' | 'vertex';
+export function parabolaRolePoint(c: Extract<NumCurve, { kind: 'parabola' }>, role: ParabolaRole): Pt {
+  return toWorld(c, role === 'focus' ? c.p / 2 : 0, 0);
+}
+
 /** The same conic at the origin, opening along x — what the canonical closed forms take. */
 export function canonicalOf<C extends ConicCurve>(c: C): C {
   if (isCanonicalFrame(c)) return c;

@@ -303,6 +303,8 @@ export function buildScene(
     mirrored?: boolean;
     /** #942 (ADR-486): pairs the geometry drove onto one spot — drawn as ONE label, «B=D». */
     coincidences?: [Id, Id][];
+    /** #2852 (ADR-825): points that went with a hidden segment (`shell` `hiddenWith`) — not drawn, nor extended to. */
+    suppress?: ReadonlySet<Id>;
   },
 ): Scene {
   // "Show circle centres": reveal every circle's centre with its label (O, P, …), even an AUTO one
@@ -400,6 +402,7 @@ export function buildScene(
   for (const o of c.objects) {
     if (isGeoPoint(o)) {
       if (o.id.startsWith('~')) continue; // hidden helper (a coincidence target, ADR-028) — not drawn
+      if (opts?.suppress?.has(o.id)) continue; // #2852: it existed only for a segment the student hid
       if (autoCenters.has(o.id) && !incident.has(o.id) && !showCenters) continue; // an unused auto-centre — hidden unless "show centres" is on
       const pos = positions.get(o.id);
       // An ANONYMOUS promotable point (`@`-prefixed, #32 / ADR-297): drawn as a clickable dot with NO label

@@ -69,8 +69,8 @@ describe('#1485 — the noun is display, never identity', () => {
     submit('פירמידה SABC');
     submit('הזווית בין הפאה SBC לבסיס ABC היא 60');
     submit('הזווית בין המישור SBC למישור ABC היא 60');
-    expect(state().facts).toHaveLength(2);
-    expect(state().lastNotice).toMatchObject({ code: 'already-stated' });
+    expect(state().facts).toHaveLength(3);
+    expect(state().lastNotice).toMatchObject({ code: 'already-held' });
   });
 });
 

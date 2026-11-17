@@ -1,0 +1,66 @@
+{
+  "name": "feat-2894-c-lengths-analytic",
+  "title": "#2894 C (analytic): stated lengths no figure can have are refused at once, in 3-D's words",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5198",
+      "path": "/analytic.html",
+      "title": "A square's diagonal stated otherwise than the square forces is refused at once, saying why",
+      "lines": ["ריבוע ABCD", "AB = 3", "AC = 10"],
+      "expectRefusal": "יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10",
+      "lookFor": "On a cleared canvas, type the three lines. The third is refused at once: «הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.» (the square forces AC = 3√2, as 2-D says). Two rows stay.",
+      "before": "«לא נמצאה תצורה שבה מתקיים: «AC = 10»» after a search (148 665 units; now 450)."
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5198",
+      "path": "/analytic.html",
+      "title": "A side longer than the other two together: the triangle inequality, named",
+      "lines": ["משולש ABC", "AB = 3", "BC = 4", "AC = 10"],
+      "expectRefusal": "הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «AB = 3», «BC = 4»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 7",
+      "lookFor": "Refused at once with the triangle-inequality sentence naming «AB = 3» and «BC = 4»; three rows stay.",
+      "before": "«לא נמצאה תצורה שבה מתקיים: «AC = 10»» after a search"
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5198",
+      "path": "/analytic.html",
+      "title": "A square's second side of another length: one segment, two lengths",
+      "lines": ["ריבוע ABCD", "AB = 3", "BC = 4"],
+      "expectRefusal": "יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4",
+      "lookFor": "«הנתונים סותרים זה את זה — «BC = 4» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.»",
+      "before": "«לא נמצאה תצורה שבה מתקיים: «BC = 4»» after a search"
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5198",
+      "path": "/analytic.html",
+      "title": "The flat edge case keeps its own refusal",
+      "lines": ["משולש ABC", "AB = 5", "BC = 3", "AC = 8"],
+      "expectRefusal": "משטיח את ABC",
+      "lookFor": "Refused «…«AC = 8» משטיח את ABC…» as today.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T5",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5198",
+      "path": "/analytic.html",
+      "title": "Lengths that fit are drawn",
+      "lines": ["משולש ABC", "AB = 3", "BC = 4", "AC = 6"],
+      "expectRows": ["AC = 6"],
+      "lookFor": "Four rows; the triangle drawn.",
+      "before": "unchanged"
+    }
+  ]
+}

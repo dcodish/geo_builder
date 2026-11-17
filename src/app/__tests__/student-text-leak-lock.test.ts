@@ -41,6 +41,7 @@ import { internalTextViolations, labelsIn, type StudentVocabulary } from '../../
 import { GOLDEN } from '@/i18n/__tests__/humanize-golden.test';
 import { SCENARIOS, scenarioFacts } from '@/__tests__/scenarios-corpus';
 import type { Fact } from '@/store/geoStore';
+import { createWorkQueue } from '../../../shell/work';
 
 const T: Record<'he' | 'en', Translate> = {
   he: (k, o) => i18n.getFixedT('he')(k, o) as string,
@@ -90,10 +91,9 @@ async function play(lines: readonly string[], locale: 'he' | 'en' = 'he') {
     const deps: SubmitDeps = {
       t: T[locale],
       locale,
-      ui: { setInputNote: (m) => { if (m) notes.push({ text: m, said: line, vocab: vocabNow() }); }, setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => {}, setBusy: () => {} },
+      ui: { setInputNote: (m) => { if (m) notes.push({ text: m, said: line, vocab: vocabNow() }); }, setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => {} },
       view,
-      isBusy: () => false,
-      nextPaint: async () => {},
+      work: createWorkQueue(),
       resolveAfterCommit: () => {},
       llmAbortRef: { current: null },
       explainError: (raw, said, other) => figureExplainer(T[locale], view().construction, st().facts)(raw, said, other),

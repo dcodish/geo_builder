@@ -27,7 +27,8 @@
 import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { deserializeFigure } from '@/store/figureFile';
 import { replay, groupKey } from '@/store/geoStore';
-import { findValidConfig, meetsRequirements } from '@/replay/core';
+import { meetsRequirements } from '@/replay/core';
+import { findValidConfigInRounds } from './searchRounds';
 import type { Fact } from '@/store/geoStore';
 import { parse, buildParseCtx } from '@/parser';
 import type { AnyCommand } from '@/engine';
@@ -101,7 +102,8 @@ describe('figure-file fixtures net', () => {
       if (!r.ok) return;
       const { facts: savedFacts, seed: savedSeed } = r.file;
       // ADR-537: the load rescue (ADR-446), for the fixtures that name themselves above — and only those.
-      const rescued = FIXTURE_LOAD_RESCUED.has(name) ? findValidConfig(savedFacts) : null;
+      // #2893 (ADR-831): the rescue as the student reaches it — the search continued with «המשיכו לחפש» until it decides
+      const rescued = FIXTURE_LOAD_RESCUED.has(name) ? findValidConfigInRounds(savedFacts).value : null;
       if (FIXTURE_LOAD_RESCUED.has(name)) {
         it('the load rescue reseats a figure whose default configuration is refused (ADR-537 on ADR-446)', () => {
           // the app's own trigger (resolveView): the saved configuration fails its requirements
@@ -114,6 +116,21 @@ describe('figure-file fixtures net', () => {
       const facts = savedFacts;
       const built = rescued?.facts ?? savedFacts;
       const builtSeed = rescued?.seed ?? savedSeed;
+
+      // #2888 (ADR-827, ADR-624's class): the fold memo holds each prefix's construction, by content, for as long as a
+      // session uses it. A step that WRITES INTO the construction it starts from (instead of building a new one)
+      // changes what every later reader of that prefix gets. Each prefix is folded in turn, the whole figure after
+      // them, and no prefix's construction may have changed. Rides this walk: the parser-drift test below folds the
+      // same prefixes, so this adds no solve.
+      it('folding a row writes into no construction an earlier row built (applyCommand is pure)', () => {
+        const shots = stepsOf(built).map((step) => {
+          const prefix = built.slice(0, step.start);
+          return { prefix, was: JSON.stringify(replay(prefix, builtSeed).construction) };
+        });
+        replay(built, builtSeed);
+        for (const { prefix, was } of shots)
+          expect(JSON.stringify(replay(prefix, builtSeed).construction), `the construction of the first ${prefix.length} fact(s) changed once later rows were folded`).toBe(was);
+      });
 
       it('replays green: builds, verified, nothing pending', () => {
         const fig = replay(built, builtSeed);

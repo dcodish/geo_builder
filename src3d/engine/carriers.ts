@@ -1,5 +1,5 @@
 import type { Claim3, Construction3, Id, PointDef } from './types';
-import { freeCoordKey, GAUGE_KINDS, pivotRuns3, ringCircle3 } from './types';
+import { freeCoordKey, GAUGE_KINDS, openPinSymsOf, pivotRuns3, ringCircle3 } from './types';
 
 /**
  * #1498 — THE SAMPLED-CARRIER TABLE: one enumeration of every free point-DOF the sampler owns.
@@ -149,6 +149,7 @@ export function pointInputs3(c: Construction3, def: PointDef): { points: Id[]; f
     case 'coord':
     case 'partial':
     case 'coord-sym':
+    case 'sym-coord': // #2563: absolute, built from no point
     case 'rev-point':
     case 'free3':
       return [];
@@ -260,6 +261,54 @@ export function figureLanes3(c: Construction3): ReadonlyMap<Id, FigureLane3> {
  */
 export function gaugeFramePoint3(c: Construction3, id: Id): boolean {
   return figureLanes3(c).get(id) === 'figure';
+}
+
+/**
+ * #2563 (ADR-3D-489) — THE POOL LETTERS NOTHING DRIVES. An open letter written only in `sym-coord` definitions («N(k,p,3)»'s
+ * p), where neither those points nor any point built from them is named by a pivot driver (a pin, a scalar pin, a
+ * membership, a frame relation, a vector definition, …), is read by no residual: it stands at its seed anchor
+ * (`pinSymAnchor3`) and is not a pivot unknown. The rider lane's rule (#820: a parameter joins only when a residual reads
+ * it), so adding such a point moves nothing that is already drawn. Conservative: a name found anywhere in a driver keeps
+ * the letter an unknown.
+ */
+export function detachedPinLetters3(c: Construction3): Set<string> {
+  const symPts = [...c.points].filter(([, d]) => d.kind === 'sym-coord');
+  if (symPts.length === 0) return new Set();
+  const written = new Set<string>();
+  for (const pin of [...c.pins, ...c.vectorPins, ...c.pairPins])
+    for (const comp of [pin.x, pin.y, pin.z]) if (comp !== null && typeof comp === 'object') for (const t of comp.terms) written.add(t.sym);
+  for (const def of c.lines.values()) if (def.kind === 'parametric' && def.sym !== undefined) written.add(def.sym);
+  for (const def of c.planes.values()) if (def.sym !== undefined) written.add(def.sym);
+  const named = new Set<string>();
+  const walk = (v: unknown, depth: number): void => {
+    if (depth > 8) return;
+    if (typeof v === 'string') named.add(v);
+    else if (Array.isArray(v)) v.forEach((x) => walk(x, depth + 1));
+    else if (v instanceof Map) v.forEach((x, k) => { walk(k, depth + 1); walk(x, depth + 1); });
+    else if (v && typeof v === 'object') Object.values(v as Record<string, unknown>).forEach((x) => walk(x, depth + 1));
+  };
+  walk([c.pins, c.vectorPins, c.pairPins, c.scalarPins, c.planePins, c.coordPlanePins, c.memberships, c.linePerps, c.lineRels, c.vecDefs, c.determinations, c.paramGivens, c.signGivens, c.componentSigns, c.symbolPins], 0);
+  const children = new Map<Id, Id[]>();
+  for (const [id, def] of c.points) for (const p of pointParents3(c, def)) children.set(p, [...(children.get(p) ?? []), id]);
+  const reachNamed = (id: Id): boolean => {
+    const seen = new Set<Id>();
+    const stack = [id];
+    while (stack.length > 0) {
+      const q = stack.pop()!;
+      if (seen.has(q)) continue;
+      seen.add(q);
+      if (named.has(q)) return true;
+      stack.push(...(children.get(q) ?? []));
+    }
+    return false;
+  };
+  const out = new Set<string>();
+  for (const sym of openPinSymsOf(c)) {
+    if (written.has(sym)) continue;
+    const carriers = symPts.filter(([, d]) => d.kind === 'sym-coord' && [d.x, d.y, d.z].some((comp) => typeof comp === 'object' && comp.terms.some((t) => t.sym === sym)));
+    if (carriers.length > 0 && !carriers.some(([id]) => reachNamed(id))) out.add(sym);
+  }
+  return out;
 }
 
 /** #2798 (ADR-3D-456): the figure's `'mixed'` points, in declaration order — the ones `reseatMixed3` re-derives. */

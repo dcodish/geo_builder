@@ -1,0 +1,101 @@
+{
+  "name": "feat-2894-c-analytic",
+  "title": "#2894 C (analytic): a refused line reads the configurations its own search walked — half the work, the same words",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "title": "An isosceles triangle with a right base angle is refused quickly, with today's words",
+      "lines": [
+        "משולש ABC",
+        "AB = AC",
+        "∠ABC = 90"
+      ],
+      "expectRefusal": "משטיח את ABC",
+      "lookFor": "On a cleared canvas, type the three lines. The third is refused about twice as fast as before (measured: half the solver work), with today's message word for word: «∠ABC = 90» flattens ABC — together with the earlier givens it forces the vertices onto one line, and a flat shape is not a triangle as «משולש ABC» says; «∠ABC = 90» is not added. Two rows stay.",
+      "before": "The same refusal, word for word, after about twice the work (750 958 → 385 932 units)."
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "title": "A side longer than the other two together keeps today's refusal",
+      "lines": [
+        "משולש ABC",
+        "AB = 3",
+        "BC = 4",
+        "AC = 10"
+      ],
+      "expectRefusal": "לא נמצאה תצורה שבה מתקיים: «AC = 10»",
+      "lookFor": "The fourth line is refused «לא נמצאה תצורה שבה מתקיים: «AC = 10»»; three rows stay.",
+      "before": "unchanged (half the work: 140 863 → 71 987 units)"
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "title": "A square's diagonal that cannot be keeps today's refusal",
+      "lines": [
+        "ריבוע ABCD",
+        "AB = 3",
+        "AC = 10"
+      ],
+      "expectRefusal": "לא נמצאה תצורה שבה מתקיים: «AC = 10»",
+      "lookFor": "The third line is refused «לא נמצאה תצורה שבה מתקיים: «AC = 10»»; two rows stay.",
+      "before": "unchanged (half the work: 148 665 → 75 901 units)"
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "title": "An ordinary triangle is drawn as before",
+      "lines": [
+        "משולש ABC",
+        "AB = 5",
+        "BC = 4"
+      ],
+      "expectRows": [
+        "משולש ABC",
+        "AB = 5",
+        "BC = 4"
+      ],
+      "lookFor": "Three rows; the triangle drawn with AB = 5 and BC = 4 marked.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T5",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "title": "Exam 2379: a tenth line that cannot hold is refused in one go, without «עדיין לא נמצא פתרון»",
+      "lines": [
+        "נתון מעגל שמרכזו M(8,-3)",
+        "המעגל משיק לישר 4x+3y+2=0 בנקודה A",
+        "נתון מעגל שמרכזו N1 ורדיוסו 10",
+        "מעגל N1 משיק למעגל M בנקודה A",
+        "נתון מעגל שמרכזו N2 ורדיוסו 10",
+        "מעגל N2 משיק למעגל M בנקודה A",
+        "N1 משמאל ל-N2",
+        "הישר l משיק לשני מעגלים N1 ו- N2 בנקודות P ו- Q בהתאמה",
+        "הישר l חותך את ציר ה- y בנקודה הנמצאת מעל ציר ה- x",
+        "P(1,1)"
+      ],
+      "expectRefusal": "לא נמצאה תצורה שבה מתקיים: «P(1,1)»",
+      "expectAbsent": [
+        "עדיין לא נמצא פתרון"
+      ],
+      "lookFor": "On a cleared canvas, type the nine lines, then «P(1,1)». After «חושב…» the refusal «לא נמצאה תצורה שבה מתקיים: «P(1,1)»» appears in ONE search: no «עדיין לא נמצא פתרון», no «המשיכו לחפש». Nine rows stay.",
+      "before": "«עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with «המשיכו לחפש»; the refusal only after pressing it (the search took 6.5 M units; now 3.4 M, inside the 3.8 M limit)."
+    }
+  ]
+}

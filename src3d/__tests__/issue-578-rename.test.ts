@@ -6,9 +6,11 @@
  * points (2026-08-14): the text command and the click-on-point popover, "sharing the one renameFacts3
  * core" — so the tests below drive the same core from both sides and assert they cannot drift.
  *
- * The property that matters beyond the letters: a rename is a rewrite of HISTORY, so the figure after it
- * must be exactly the figure the student would have had if they had typed the new letter from the start.
- * That is asserted directly — same coordinates, point for point.
+ * The property that matters beyond the letters: a rename is a rewrite of HISTORY — every row reads as if the new
+ * letter had been typed from the start. Since #2894 part 2 B (ADR-3D-497) the DRAWING is the one before the rename:
+ * each row keeps the first names of its renamed letters (`Fact3.as`) and the figure is sampled under them
+ * (`rename-keeps-drawing-2894.test.ts`). Where the renamed point carries no sample of its own (a height's foot, below)
+ * that is also the figure typed with the new letter.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';

@@ -504,3 +504,31 @@ describe('#1076 — a CARRIER is not a stated object', () => {
     expect(Math.hypot(p.x, p.y)).toBeCloseTo(5, 6);
   });
 });
+
+/**
+ * #2835 (ADR-AG-470) — the parabola's ROLE POINTS, one rule: `parabola-point` reads the focus and the vertex off the
+ * resolved curve through its frame. Oracle by hand: `y² = 8x` (p = 4) has focus (2, 0) and vertex (0, 0); `x² = 8y` (the
+ * axis swapped) has focus (0, 2) and vertex (0, 0); `(y − 3)² = 8(x − 2)` has focus (4, 3) and vertex (2, 3).
+ */
+describe('#2835 — parabola-point: the focus and the vertex of one parabola', () => {
+  const at = () => null;
+  const curves = {
+    canonical: { kind: 'parabola', p: 4 },
+    swapped: { kind: 'parabola', p: 4, axis: 'y' },
+    translated: { kind: 'parabola', p: 4, h: 2, k: 3 },
+  } as const;
+  it.each([
+    ['canonical', 'focus', { x: 2, y: 0 }],
+    ['canonical', 'vertex', { x: 0, y: 0 }],
+    ['swapped', 'focus', { x: 0, y: 2 }],
+    ['swapped', 'vertex', { x: 0, y: 0 }],
+    ['translated', 'focus', { x: 4, y: 3 }],
+    ['translated', 'vertex', { x: 2, y: 3 }],
+  ] as const)('%s parabola, %s', (which, role, want) => {
+    const p = evalRule({ t: 'parabola-point', curve: 'c', role }, at, () => curves[which] as never);
+    expect(p).toEqual(want);
+  });
+  it('not a parabola here: vacant, never a fallback position', () => {
+    expect(evalRule({ t: 'parabola-point', curve: 'c', role: 'vertex' }, at, () => ({ kind: 'ellipse', a: 5, b: 3 }))).toBeNull();
+  });
+});

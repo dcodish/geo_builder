@@ -37,6 +37,7 @@ Define how Geo Builder is tested and — critically — **what must pass before 
 | `node scripts/test-tiers.mjs kinds [full\|fast]` | — | instant | The latest run's CPU by kind of test and by tree ([ADR-W-191](06w-decisions-workspace.md#adr-w-191)), from the per-file times every run keeps beside the log |
 | `npm run test:tiers` | — | instant | Which slow files have actually caught something |
 | `npm run test:exams` | the exam corpus: every replayed exam/textbook sequence, all builders (`-- --changed` = only the builders the diff touches) | **~90 s** all four, measured; per builder in [ADR-W-172](06w-decisions-workspace.md#adr-w-172) | A fix round's **per-item** exam check. Not a separate batch gate: every member already runs in `test:full`. Writes `reports/exam-run.json` |
+| `npm run work:check -- <builder>` · `work:record` · `work:report` | one builder's work-meter gate alone · re-record its baseline · the totals | 2-D ~6 min, 3-D ~5 min, analytic ~8 min, complex ~2 s for a whole builder; `--only <fixture>` takes seconds | [The work meter](#the-work-meter-adr-w-210-am-1-2873), below. Every gate already runs in `test:full` |
 | **`npm run test:docs`** | the `DOCS.json` doc-gate set | **~2 s**, 674 tests | **The gate for a DOC-ONLY change** ([ADR-W-041](06w-decisions-workspace.md#adr-w-041)). Anything touching `.ts`/`.tsx` pays `test:full`. Five product tests read a document at runtime — two BYTE-MATCH one against a code table — and `ci.yml` ignores `docs/`, so `.github/workflows/docs.yml` runs this set on the paths CI declines (#905) |
 
 **The split is measured, never hand-written.** `test:full` records the files exceeding 60 s into `reports/test-tiers.json`; `test:fast` derives its `--exclude` list from it. A newly-slow test joins the slow tier by itself — the drift that quietly undid [ADR-280](06-decisions.md#adr-280)'s 3-min suite over two weeks. The file is rewritten only when *membership* changes, so a routine green run leaves the tree clean. Commit it: the fast tier must mean the same thing on every machine.
@@ -95,6 +96,129 @@ are 2-D unless stated; the **structure** around them is workspace-wide:
   asserts the per-version coverage directly, naming any generation that lost it. The rule is the second
   half: it catches every route to the loss, not just the eager generator that revealed it. Implemented in
   3-D; the sibling trees copy the pattern when their corpora gain a second schema version.
+
+## The work meter ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1, #2873)
+
+Every builder counts its solver work in **units, never seconds**, at its innermost solving function
+(`shell/workMeter.ts`), and each tree has a gate that fails when a recorded student action does more work than
+it used to. It is the check behind [docs/17 §7](17-design-rules.md): before it, a change that made a 0.2 s
+press take 6 s was found by the operator's play.
+
+| | 2-D | 3-D | Analytic | Complex |
+| --- | --- | --- | --- | --- |
+| One unit | one `evaluateCore` call | one residual evaluation of `leastSquares` | one residual evaluation of `solveLM`, `jacobianRank` or `scanRoots` | one executed line read (`parseLineV2`) or one exact solve of a fold ([ADR-CX-090](06d-decisions-complex.md#adr-cx-090)) |
+| Gate | `src/__tests__/work-meter-gate.test.ts` | `src3d/__tests__/work-meter-gate.test.ts` | `src-analytic/__tests__/work-meter-gate.test.ts` | `src-complex/__tests__/work-meter-gate.test.ts` |
+| Baseline | `src/__tests__/work-meter/baseline.jsonl` | `src3d/__tests__/work-meter/baseline.jsonl` | `src-analytic/__tests__/work-meter/baseline.jsonl` | `src-complex/__tests__/work-meter/baseline.jsonl` |
+| Gate's wall time alone (2026-11-13; analytic 2026-11-14; 2-D with three heaps 2026-11-14) · inside `test:full` (2026-11-14, after phase 2) | 9.5 min · 11.2 min inside `npm run test:run:2d`; inside `test:full` not measured with three heaps (12 min before) | 5 min · 9 min | 8 min · 12 min | under 2 s |
+
+**What a gate does.** It walks **every** fixture of its tree through the student's actions, with the tree's
+action driver (`<tree>/__tests__/work-meter/driver*.ts`, the same code `scripts/perf/` times): re-typing each row
+(`submit#k`), one «הציגו תצורה אחרת» (`another#1`), a cold `load`, the `delete` of the first row, an `edit` of the last
+row, and in 2-D the `undo` of that delete, the first row turned off (`toggle`) and the background `detect` sweep. Analytic's walk goes on in the edit's session with what it left out until
+#2890 ([ADR-AG-477](06c-decisions-analytic.md#adr-ag-477)): `ask` (the questions the figure's menus offer), `toggle#1` and
+`toggle#2` (the first row ticked off and on), `undo`, `redo` and `rename`. Each action gets three counts: `total` (all the
+work), `page` (the part on the page's UI thread, as against a worker) and `prePaint` (the part before the figure can
+paint). The baseline holds one line per figure-action, sorted, so two branches that each add a fixture merge as
+insertions. Nothing is sampled or skipped: a gate is one test file, in the slow tier, run by `npm run test:full` and by
+its product's `test:run:<product>` lane.
+
+**A walk is a session** ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 3, #2888). Every builder keeps solved
+content by its content, and the caches outlive the action, so a count is **what the action adds to its session**, and
+the walk states where a session starts. Each builder has ONE test-only function that empties every content-keyed cache
+(2-D `clearReplayCaches`, 3-D `clearSolveCaches3`, analytic `clearAnalyticCaches`, complex `clearComplexCaches`); a
+cache added later joins it, or the gate's determinism lock fails.
+- A fixture's walk starts from emptied caches and stays warm while the rows are typed: `submit#k` runs on the figure
+  of the rows before it, which that session has solved. The press follows in the same session.
+- `load` is cold: a saved file opened in a new session. `delete` runs in the loaded session.
+- `edit` is the walk's last action and has one definition in every builder: **a student who has built rows 1..n
+  changes the last row; the rows before it are solved in the session, the edited row's content is not.** The walk
+  builds that state (emptied caches; rows 1..n−1 shown, unmeasured; all n rows in the store, unsolved) and then
+  measures the edit of the last row to its own text. So an edit costs about what the submit of that row costs,
+  through the edit path. Re-typing a row on a session that has already solved it would count nothing.
+- **3-D's walk also drives what a walk of five actions leaves out** ([ADR-3D-492](06b-decisions-3d.md#adr-3d-492) part 3,
+  #2890): after the delete, in its session, `undo`, `redo`, `untick` and `retick` of the first row; and after the
+  edit, in a session of their own (emptied caches, the built figure shown with the data panel closed), `panel` (the
+  panel opened on a standing figure), `rename`, `swap` and `ask#k` (three questions the ask lane reads on the
+  figure). The asks alone are 4 164 843 units on the fixtures that no line counted before. A gate proves
+  its invariant for the actions it walks: an action a student can take and the walk does not drive is a hole in the
+  page count, and it is closed by driving it.
+- 2-D's `detect` runs as a browser's detect worker does: on its own copy of the facts, with nothing another lane
+  computed.
+
+**2-D's gate walks three heaps** ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 4,
+[ADR-829](06-decisions.md#adr-829), #2890). A browser runs 2-D in three heaps: the page, the interactive worker and
+the detect worker. Under node they were one module instance sharing every memo, so the page's count was a lower
+bound. The gate now hands 2-D's worker client one **isolated executor** per lane (`shell/workerExecutor`): each
+worker's operations are loaded as a module instance of their own (`shell/__tests__/isolated-ops.ts`,
+`secondInstance`), every argument and result passes through `structuredClone`, and the units a worker's instance
+counts come back in the meter envelope. So:
+- the `page` count is what a browser's page computes, and nothing a worker solved is a memo hit for it;
+- a result that does not clone fails the walk, at the action that produced it;
+- an adoption that misses (phase 3's later steps) shows as page work, which the one-instance gate could not see.
+
+**3-D's gate walks two heaps** ([ADR-3D-493](06b-decisions-3d.md#adr-3d-493), #2890 round 2): the page (the test file's
+own instance) and 3-D's worker (`app/ops3.ts` loaded with `secondInstance`, served by `isolatedExecutor`). Every action
+and every step the walk takes between actions goes through the App's own job path (`app/offPage3.ts`), so the page's
+count is zero, `total` is the worker's work and `prePaint` is its figure's part. `newSession3` empties both heaps.
+
+A builder's first worker joins the same way: load its op table with `secondInstance`, hand it to `isolatedExecutor`,
+and inject the executor into its worker client. A driver whose client has separate heaps says so (2-D's
+`WorkerOps.reset`), and empties those heaps where a session starts.
+
+**Three of 2-D's actions were corrected with it** (the measurement, not the code a student runs):
+- `delete` is `removeGroup` and the render, as the App's delete is. It used to be followed by the resolve gate and
+  the worker's search, which the App runs after a toggle or an edit and never after a delete (ADR-518): on a figure
+  whose first row is gone that search ran to its end for nothing.
+- `edit` puts a CLONE of the n rows in the store. The loaded session's own array still carried its replay, keyed by
+  the array's identity, which no clear empties.
+- `undo` (of that delete) and `toggle` (the first row turned off, with the resolve gate the App runs after it) are
+  walked. They were student actions the meter did not see.
+
+**The rule.** An action above its baseline in **any** of the three counts fails, and the message names the
+figure, the action, the numbers and the next step. So does an action with no baseline line, a baseline line the walk
+no longer produces, and a builder whose summed `page` count rose. **The tolerance is zero**: the counts are exact (the
+same code gives the same count on any machine, in any fixture order), so any difference is a real change in what the
+code does. Each gate ends by walking two figures again, after the whole corpus and twice in a row, and asserting
+equal counts — the lock [docs/17 §7](17-design-rules.md)'s fifth rule asks for. A count **below** its baseline is
+printed, never failed.
+
+**When you run `npm run work:record`** (it is the same walk, writing the baseline; it takes the suite lock):
+
+| What happened | Command | Then |
+| --- | --- | --- |
+| You added or changed a fixture | `npm run work:record -- <builder> --only <part of its file name>` (seconds) | commit the new baseline lines with the fixture |
+| You deleted a fixture | `npm run work:record -- <builder>` | commit |
+| The gate printed that counts **fell** | `npm run work:record -- <builder>` | commit: the lower count is now the ceiling |
+| The gate **failed on a rise** | none yet. It is a regression until the cause is known: `scripts/perf/<builder>` times the same action and prints the same counts | remove the extra work; or, when it is the price of a change the operator wants, `npm run work:record -- <builder> --accept-rise` and put the before and after it prints in the change's ADR ([docs/17 §7](17-design-rules.md)) |
+
+`<builder>` is `2d`, `3d`, `analytic`, `complex` or `all`. `npm run work:check -- <builder>` runs one gate alone
+(`--order reverse` or `--order shuffle:<seed>` walks the fixtures in another order), and `npm run work:report` prints
+every builder's totals from the committed baselines. A re-record never writes a rise unless `--accept-rise` is given.
+
+**What the counts are, and are not.**
+- They are work, not time. A unit's cost differs between builders and between figures, so a count is only ever
+  compared with the same action of the same figure. Time is `scripts/perf/`'s job; its records carry the same three
+  counts, so one run gives both.
+- **2-D's gate measures the whole search, not the browser's clipped one.** Under vitest 2-D's clock budgets are off
+  (`import.meta.env.MODE === 'test'`: the search budgets in `replay/core.ts`, and since #2873 the two load budgets in
+  `store/loadAudit.ts`), which is what makes the counts exact. A browser stops a search after 12 s.
+- **2-D's `page` count is 0** since [ADR-830](06-decisions.md#adr-830): every decision runs in the worker and the page
+  adopts the settled figure. A 2-D change that puts solver work back on the page fails the gate on that action.
+- **2-D's `page` count is a browser's** since #2890 (above): the gate's workers are their own module instances. In
+  every OTHER suite, and in `scripts/perf/2d`, 2-D's worker operations run in the page's module instance, charged to
+  the worker lane by the client's same-instance executor (`shell/workerExecutor`); a page count read there is still a
+  lower bound, because a view the worker searched is a memo hit when the page draws it.
+- 3-D, analytic and complex have no worker: every unit is page work today.
+- What is not counted is listed, with its measured size, in [ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1.
+
+**The slow corpus.** The open speed issues' own sequences (`<tree>/__tests__/work-meter/slowCorpus*.ts`) are too slow
+for the suite. They are walked by the same gate on demand, `npm run work:check -- <builder> --slow`, against
+`baseline-slow.jsonl` beside the fixtures' baseline (`work:record … --slow` re-records it). An optimisation session
+runs it before and after.
+
+**Adding a builder:** a `meterWork()` call at its innermost solving function, a driver and a walk under its
+`__tests__/work-meter/`, and a `work-meter-gate.test.ts` that hands them to `shell/__tests__/work-gate.ts`. The script
+finds the gate through `BOUNDARIES.json`'s trees.
 
 ## What we test, per layer
 

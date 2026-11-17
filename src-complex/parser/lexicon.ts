@@ -18,6 +18,7 @@
  *
  * Atoms carry **no capture groups**, so adopting one never renumbers a rule's own captures.
  */
+import { contentMemo } from '../value/contentMemo';
 
 /** A complex-number or parameter name: a letter, optional letters, optional digits. */
 export const NAME = String.raw`[A-Za-z][A-Za-z]*\d*`;
@@ -364,8 +365,30 @@ export const FIRST_TERMS_PHRASE = String.raw`(?:(?:${HE_COUNT}\s+)?${TERMS_KW}\s
  */
 export const COPULA_KW = String.raw`(?:הוא\s+|היא\s+|הם\s+|הן\s+|is\s+|are\s+)?`;
 
-/** Build a case-insensitive, unicode-aware regex from atoms. */
-export const rx = (fragment: string, flags = 'iu'): RegExp => new RegExp(fragment, flags);
+/**
+ * How many compiled patterns {@link rx} keeps. The grammar's patterns are built from the atoms of this file and from
+ * fixed keyword lists, never from a student's text, so their number is a property of the grammar (44
+ * after every catalog specimen and every fixture line was read; `compute-once-2888.test.ts` holds it under the
+ * bound). The bound is a guard for a rule that one day builds a pattern from input: it would evict, never grow.
+ */
+export const RX_MEMO_MAX = 512;
+const compiled = contentMemo<RegExp>('patterns', RX_MEMO_MAX);
+
+/**
+ * Build a case-insensitive, unicode-aware regex from atoms — ONCE per pattern (#2888, ADR-CX-090).
+ *
+ * A rule spells its pattern inline, from atoms, and calls this on every line it is offered; compiling the pattern
+ * on each call was 43 % of the builder's time. The compiled expression is kept by its source and flags.
+ *
+ * A GLOBAL or STICKY expression is never kept: it carries `lastIndex` between calls, so a shared one would make a
+ * match depend on the match before it. Those are built fresh, as before. Every other expression matches from the
+ * start of its input whatever ran earlier, which is what makes sharing it safe.
+ */
+export const rx = (fragment: string, flags = 'iu'): RegExp => {
+  if (flags.includes('g') || flags.includes('y')) return new RegExp(fragment, flags);
+  const key = `${flags}/${fragment}`;
+  return compiled.get(key) ?? compiled.set(key, new RegExp(fragment, flags));
+};
 
 /**
  * The atoms a ratchet test counts, so "did a rule inline a fragment?" is measurable.

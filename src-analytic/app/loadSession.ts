@@ -11,11 +11,18 @@
  * the viewport (#1209).
  */
 
-import { derive } from '../engine/derive';
 import { logAnalytic } from '../debug/sessionLogAnalytic';
 import { cleanSeed, useAnalyticStore } from '../store/useAnalyticStore';
-import { parseLine } from '../parser/parseAnalytic';
-import { activeOf, activePins, rowOf } from './active';
+import { auditLoadedLines, type LoadFailure } from './loadAudit';
+
+/**
+ * Who audits a load (#2890, [ADR-AG-478](../../docs/06c-decisions-analytic.md#adr-ag-478)). The audit replays the saved
+ * lines, which is solving: the page hands it to its worker and passes {@link AUDIT_LATER}, then reports the worker's
+ * answer through {@link finishLoadAudit}. Every other caller audits here, as before.
+ */
+export type LoadAuditor = (lines: readonly string[], disabled: readonly number[], hosts: Readonly<Record<number, readonly string[]>>) => LoadFailure[] | null;
+/** The audit is the caller's, after the restore. */
+export const AUDIT_LATER: LoadAuditor = () => null;
 
 /**
  * Restore a validated envelope's body, then AUDIT it (#1087): the lines are re-parsed on the way
@@ -25,7 +32,7 @@ import { activeOf, activePins, rowOf } from './active';
  * `fallbackName` names the figure when the envelope carries no name of its own (a file passes the
  * filename, per the #42 rule; a restored session has nothing to pass).
  */
-export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackName: string): { lines: string[]; failed: number } {
+export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackName: string, audit: LoadAuditor = auditLoadedLines): { lines: string[]; failed: number } {
   const savedLines = Array.isArray(envelope.lines) ? envelope.lines.filter((l): l is string => typeof l === 'string') : [];
   const st = useAnalyticStore.getState();
   st.restore({
@@ -50,23 +57,17 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     // #1973 (ADR-AG-430) — the hosts the cevian lines were accepted in; the store keeps only rings that name a line
     hosts: envelope.hosts,
   });
-  /**
-   * #1548 — a MUTED line loads muted, so the audit replays the figure the student will actually see:
-   * the ACTIVE lines, with each fault translated back to its row. A muted line is not in that figure,
-   * but it is still the student's sentence, so one that no longer PARSES is named too — it would be
-   * refused the moment they un-mute it, and the drift net is exactly for that.
-   */
+  // The audit itself is `loadAudit.ts` (#2890): the lines replayed, with no store in its imports, so it can run off the page.
   const { disabled, hosts } = useAnalyticStore.getState(); // the restored set, already range-checked
-  const rows = rowOf(savedLines.length, disabled);
-  const replayed = derive(activeOf(savedLines, disabled), 0, {}, activePins(hosts, savedLines.length, disabled));
-  const failed = [
-    ...replayed.faults.map((f) => ({ line: savedLines[rows[f.index]] ?? '', reason: f.code })),
-    ...disabled.flatMap((i) => {
-      const r = parseLine(savedLines[i] ?? '');
-      return r.ok ? [] : [{ line: savedLines[i] ?? '', reason: r.code }];
-    }),
-  ];
-  st.setLoadAudit({ total: savedLines.length, failed });
+  const failed = audit(savedLines, disabled, hosts);
+  if (failed === null) return { lines: savedLines, failed: -1 };
+  finishLoadAudit(savedLines, failed);
+  return { lines: savedLines, failed: failed.length };
+}
+
+/** Report a load's audit: the panel's line, and the trace (#1300). */
+export function finishLoadAudit(savedLines: readonly string[], failed: LoadFailure[]): void {
+  useAnalyticStore.getState().setLoadAudit({ total: savedLines.length, failed });
   // #1300 — a load REPLACES the figure, so a replay that misses it continues from the wrong one. The
   // audit's own result rides along: a file that stopped loading is the parser-drift signal this trace
   // exists to make visible.
@@ -76,5 +77,4 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     detail: `${savedLines.length} lines`,
     result: failed.length ? `${failed.length} failed` : 'ok',
   });
-  return { lines: savedLines, failed: failed.length };
 }

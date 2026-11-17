@@ -113,7 +113,7 @@ describe('#1567 — the same statements, true of the figure, stay green', () => 
   for (const [title, seq] of GREEN) {
     it(`${title}: «${seq[seq.length - 1]}» is already known, never refused`, () => {
       const v = decideSubmit3(build(seq.slice(0, -1)), seq[seq.length - 1]);
-      expect(v.kind).toBe('already-stated');
+      expect(v.kind === 'record' && v.held).toBe(true);
     });
   }
 });

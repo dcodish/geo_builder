@@ -19,6 +19,7 @@ import { replay, useGeoStore } from '@/store/geoStore';
 import { otherUtteranceForError } from '@/app/errorSubject';
 import { runSubmit, type SubmitDeps } from '@/app/submitPipeline';
 import { hasEngineToken } from '../../../shell/studentText';
+import { createWorkQueue } from '../../../shell/work';
 
 const he: Translate = (k, o) => i18n.getFixedT('he')(k, o) as string;
 const st = () => useGeoStore.getState();
@@ -33,15 +34,13 @@ function deps(): SubmitDeps {
       setRenameNote: (m) => { if (m) notes.push(m); },
       setLlmDropped: () => {},
       clearText: () => {},
-      setBusy: () => {},
     },
     view: () => {
       const s = st();
       const d = replay(s.facts, s.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw, said, other) => explainError(raw, he, said, other),

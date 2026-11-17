@@ -1,0 +1,133 @@
+{
+ "name": "prod-2026-11-10-3",
+ "title": "Prod smoke — deploy prod/2026-11-10-3 (round #2822 wave 2)",
+ "cases": [
+  {
+   "id": "P1",
+   "title": "#2819 a flat shape in 3-D has no dashed edge",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "מלבן ABCD",
+    "מעוין ABCD"
+   ],
+   "expectAbsent": [
+    "שגיאה"
+   ],
+   "lookFor": "All four sides solid.",
+   "before": "Every side dashed since 8 Nov."
+  },
+  {
+   "id": "P2",
+   "title": "#2820 a plane named π prints its name once",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "מישור π 2x+y=1"
+   ],
+   "expect": [
+    "π = (0, 1, 0)"
+   ],
+   "expectAbsent": [
+    "π: π ="
+   ],
+   "lookFor": "«π = (0, 1, 0) + t·(0, 0, 1) + s·(1, -2, 0)».",
+   "before": "«π: π = …»."
+  },
+  {
+   "id": "P3",
+   "title": "#2625 a diameter of a parabola is refused with its reason",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=8x",
+    "AB קוטר בפרבולה"
+   ],
+   "expectRefusal": "לפרבולה אין מרכז",
+   "lookFor": "Refused «לפרבולה אין מרכז…».",
+   "before": "Went to the AI."
+  },
+  {
+   "id": "P4",
+   "title": "#2664 a translated ellipse is drawn",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "נתונה אליפסה שמשוואתה (x-3)^2/25 + (y+1)^2/9 = 1",
+    "F1 ו-F2 מוקדי האליפסה"
+   ],
+   "expectAbsent": [
+    "אינו נתמך"
+   ],
+   "lookFor": "Centred at (3, −1).",
+   "before": "Refused."
+  },
+  {
+   "id": "P5",
+   "title": "#2735 a midpoint answers in k",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "A(2k,0)",
+    "B(0,4k)",
+    "M אמצע AB"
+   ],
+   "expect": [
+    "(k, 2k)"
+   ],
+   "lookFor": "M = (k, 2k).",
+   "before": "—."
+  },
+  {
+   "id": "P6",
+   "title": "#2731 the parabola question gives both answers (wave-1 guard)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=4px",
+    "p > 0",
+    "K על הפרבולה",
+    "y_K = 12",
+    "F מוקד הפרבולה",
+    "KF = 20"
+   ],
+   "asks": [
+    "p"
+   ],
+   "expect": [
+    "2 או 18"
+   ],
+   "lookFor": "«p» answers «2 או 18».",
+   "before": "«2»."
+  },
+  {
+   "id": "P7",
+   "title": "Complex loads and builds (untouched this round) (wave-1 guard)",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z1 = 3+4i"
+   ],
+   "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i».",
+   "before": "Unchanged.",
+   "section": "prod",
+   "expect": [
+    "z₁ = 3+4i"
+   ]
+  }
+ ]
+}

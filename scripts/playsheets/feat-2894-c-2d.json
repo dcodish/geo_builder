@@ -1,0 +1,123 @@
+{
+  "name": "feat-2894-c-2d",
+  "title": "#2894 item C, 2-D — a line no figure can hold is refused at once, in the same words (port 5194)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5194",
+      "path": "/",
+      "title": "A square's diagonal that cannot be: refused at once",
+      "lines": [
+        "ריבוע ABCD",
+        "AB = 3",
+        "AC = 10"
+      ],
+      "lookFor": "The third line is refused in well under a second with the same message as before: «לא ניתן: «AC = 10» סותר את «AB = 3» — אי אפשר לקיים את שניהם יחד…». The square with AB = 3 stays on the canvas.",
+      "before": "prod: the same message after about 2–3 s of «חושב…».",
+      "expectRefusal": "סותר את «AB = 3»"
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5194",
+      "path": "/",
+      "title": "A rectangle's diagonal that cannot be (the sides allow only 5)",
+      "lines": [
+        "מלבן ABCD",
+        "AB = 3",
+        "BC = 4",
+        "AC = 7"
+      ],
+      "lookFor": "«AC = 7» is refused, naming «BC = 4».",
+      "before": "prod: the same message after about 15 s.",
+      "expectRefusal": "סותר את «BC = 4»"
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5194",
+      "path": "/",
+      "title": "An equilateral triangle's second side that differs",
+      "lines": [
+        "משולש שווה צלעות ABC",
+        "AB = 3",
+        "BC = 5"
+      ],
+      "lookFor": "«BC = 5» is refused, naming «AB = 3».",
+      "before": "prod: the same message after about 5 s.",
+      "expectRefusal": "סותר את «AB = 3»"
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5194",
+      "path": "/",
+      "title": "A diameter longer than 2r",
+      "lines": [
+        "מעגל O ברדיוס 2",
+        "AB קוטר במעגל",
+        "AB = 6"
+      ],
+      "lookFor": "«AB = 6» is refused, naming the diameter line.",
+      "before": "prod: the same message after about 1 s.",
+      "expectRefusal": "סותר את «AB קוטר במעגל»"
+    },
+    {
+      "id": "T5",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5194",
+      "path": "/",
+      "title": "A square declared over two sides already unequal",
+      "lines": [
+        "מרובע ABCD",
+        "AB = 3",
+        "BC = 4",
+        "ABCD ריבוע"
+      ],
+      "lookFor": "«ABCD ריבוע» is refused, naming «BC = 4».",
+      "before": "prod: the same message after about 8 s.",
+      "expectRefusal": "סותר את «BC = 4»"
+    },
+    {
+      "id": "T6",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5194",
+      "path": "/",
+      "title": "Control: a square's diagonal with no side stated still builds",
+      "lines": [
+        "ריבוע ABCD",
+        "AC = 10"
+      ],
+      "lookFor": "Both lines build; the square is drawn with AC = 10; no refusal.",
+      "before": "unchanged",
+      "expectAbsent": [
+        "לא ניתן"
+      ]
+    },
+    {
+      "id": "T7",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5194",
+      "path": "/",
+      "title": "Control: a rectangle's diagonal with one side stated still builds",
+      "lines": [
+        "מלבן ABCD",
+        "AB = 3",
+        "AC = 7"
+      ],
+      "lookFor": "All three lines build; BC takes the length the diagonal allows; no refusal.",
+      "before": "unchanged",
+      "expectAbsent": [
+        "לא ניתן"
+      ]
+    }
+  ]
+}

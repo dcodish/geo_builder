@@ -31,6 +31,7 @@ import type { SubmitDeps } from '../submitPipeline';
 import { parse } from '@/parser';
 import { ctxOf, factsOf } from '@/__tests__/scenario-pipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
+import { createWorkQueue } from '../../../shell/work';
 
 function makeDeps() {
   const calls = { notes: [] as string[], cleared: 0 };
@@ -42,15 +43,13 @@ function makeDeps() {
       setRenameNote: () => {},
       setLlmDropped: () => {},
       clearText: () => calls.cleared++,
-      setBusy: () => {},
     },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => raw ?? '',

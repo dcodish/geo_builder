@@ -1,0 +1,190 @@
+{
+ "name": "round-2855-prs",
+ "title": "Fix round #2855 — the PRs waiting for your play",
+ "cases": [
+  {
+   "id": "T30",
+   "title": "PR #2856 · click the foci, then build a triangle on them",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5181",
+   "path": "/analytic.html",
+   "lines": [
+    "7x^2+9y^2=63"
+   ],
+   "lookFor": "Steps after the lines: Press «הצג מוקדים» on the ellipse row. Then: Click the dot F₁ on the canvas and confirm the letter (✓). Then: Click the dot F₂ and confirm. Then: Type «משולש F1F2D». — Look for: Two new rows «F1 מוקד ימני של האליפסה» and «F2 מוקד שמאלי של האליפסה», and the triangle's base on the foci at (±√2, 0).",
+   "before": "The foci were labels only; «משולש F1F2D» built two new free points."
+  },
+  {
+   "id": "T31",
+   "title": "PR #2859 · «נתונה פרבולה» is a free parabola that turns",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5183",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונה פרבולה"
+   ],
+   "cycles": 4,
+   "lookFor": "A parabola is drawn; pressing «הציגו תצורה אחרת» moves it and turns it (right, left, up, down), and the givens equation follows.",
+   "before": "«נתונה פרבולה» was not understood."
+  },
+  {
+   "id": "T32",
+   "title": "PR #2859 · «נתונה אליפסה» is a free ellipse",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5183",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונה אליפסה"
+   ],
+   "cycles": 2,
+   "lookFor": "An ellipse off the origin, with letters h, k, a, b in its row; «הציגו תצורה אחרת» moves and reshapes it. «אליפסה קנונית» (try it) stays at the origin.",
+   "before": "«נתונה אליפסה» was not understood."
+  },
+  {
+   "id": "T33",
+   "title": "PR #2860 · p2-15: all three ellipses come first",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5184",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונה אליפסה שציריה הם צירי השיעורים",
+    "F1 ו-F2 מוקדי האליפסה",
+    "נתון ישר l המקביל לציר ה-x",
+    "הישר l חותך את האליפסה בנקודות A ו-B",
+    "AB=8",
+    "AF1=6",
+    "AF2=10"
+   ],
+   "cycles": 2,
+   "lookFor": "The first drawing and the next two presses show three DIFFERENT ellipses; mirror images only from press 3 on.",
+   "before": "The third ellipse appeared on press 13."
+  },
+  {
+   "id": "T34",
+   "title": "PR #2860 · 2-D: the right angle moves to a new vertex on each press",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5184",
+   "path": "/",
+   "lines": [
+    "נתון מעגל O שרדיוסו 5",
+    "מנקודה A הוציאו משיק למעגל בנקודה B",
+    "OA = 13",
+    "משולש ישר זווית ABD",
+    "BD = 6"
+   ],
+   "cycles": 1,
+   "lookFor": "Press «הציגו תצורה אחרת» twice; the first press can show «חושב…» for up to ~30 s (question Q7 on the inbox). Look for: each press puts the right angle at a new vertex, with no mirror image in between.",
+   "before": "The distinct triangles came on presses 0, 2 and 4, with mirrors between."
+  },
+  {
+   "id": "T35",
+   "title": "PR #2862 · 3-D: a new point with letters shares k with B",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5185",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה SABCD",
+    "B(2t, t, k)",
+    "N(k,p,3)"
+   ],
+   "cycles": 2,
+   "lookFor": "N at height 3, N.x equal to B.z; «הציגו תצורה אחרת» moves p.",
+   "before": "«N(k,p,3)» was not understood."
+  },
+  {
+   "id": "T36",
+   "title": "PR #2862 · 3-D: «N(k,p,3)» on a blank page",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5185",
+   "path": "/3d.html",
+   "lines": [
+    "N(k,p,3)"
+   ],
+   "lookFor": "N is drawn at height 3; the freedom count shows 2.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T37",
+   "title": "PR #2863 · hiding the rhombus height hides H, the knee and 4.8",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5186",
+   "path": "/analytic.html",
+   "lines": [
+    "מעוין שצלעו 5",
+    "גובה המעוין 4.8",
+    "אלכסוני המעוין על הצירים"
+   ],
+   "lookFor": "Steps after the lines: Click the segment DH and choose «הסתירו קטע». — Look for: No H, no right-angle mark, no «4.8»; the rhombus and its «5» unchanged; row 2 shows «מוסתר».",
+   "before": "H, the knee and 4.8 stayed after hiding DH."
+  },
+  {
+   "id": "T38",
+   "title": "PR #2863 · «מוסתר» brings it all back",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5186",
+   "path": "/analytic.html",
+   "lines": [
+    "מעוין שצלעו 5",
+    "גובה המעוין 4.8",
+    "אלכסוני המעוין על הצירים"
+   ],
+   "lookFor": "Steps after the lines: Hide DH as in the previous case. Then: Click «מוסתר» on row 2. — Look for: H, the knee and «4.8» are back.",
+   "before": "No «מוסתר» mark existed."
+  },
+  {
+   "id": "T39",
+   "title": "PR #2864 · «V קודקוד הפרבולה» names the vertex",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5187",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=8x",
+    "V קודקוד הפרבולה"
+   ],
+   "lookFor": "V is drawn at the origin, the parabola's vertex. (Pre-play note: the view zooms right in on V, so the parabola looks almost straight; zoom out with − to see it. Tell me if that framing is wrong.)",
+   "before": "Not understood."
+  },
+  {
+   "id": "T40",
+   "title": "PR #2864 · the vertex of a moved parabola, and asking for it",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5187",
+   "path": "/analytic.html",
+   "lines": [
+    "(y-3)^2=8(x-2)",
+    "V קודקוד הפרבולה"
+   ],
+   "asks": [
+    "שיעורי קודקוד הפרבולה"
+   ],
+   "lookFor": "V at (2, 3), and the question answers (2, 3).",
+   "before": "Not understood; the question was unreadable."
+  },
+  {
+   "id": "T41",
+   "title": "PR #2864 (refusal) · a parabola has no centre — the refusal teaches the vertex",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5187",
+   "path": "/analytic.html",
+   "lines": [
+    "y^2=8x",
+    "O מרכז הפרבולה"
+   ],
+   "lookFor": "Refused: «לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «O קודקוד הפרבולה».»",
+   "before": "Refused without pointing to the vertex.",
+   "expectRefusal": "לפרבולה אין מרכז"
+  }
+ ]
+}

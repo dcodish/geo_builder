@@ -11,6 +11,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildParseCtx, parse } from '@/parser';
 import {
+  clearReplayCaches,
   dryRunOutcome,
   foldStats,
   getFoldFor,
@@ -24,6 +25,7 @@ import {
 } from '../geoStore';
 import { geoWork, isStaleBasis, supersedeStaleSearches } from '../geoWork';
 import type { AnyCommand } from '@/engine';
+import { meterAction, workLane } from '../../../shell/workMeter';
 
 let n = 0;
 function factsOf(...utterances: string[]): Fact[] {
@@ -107,7 +109,7 @@ describe('geoWork — the no-Worker fallback (vitest env)', () => {
   it('resample resolves the same COMPOSITE the sync search finds (ADR-340: validated facts + seed, never a bare seed)', async () => {
     const facts = factsOf('מעגל שמרכזו O', 'A על המעגל', 'B על המעגל');
     const sync = searchAnotherView(facts, 0);
-    const viaWork = await geoWork.resample(facts, 0);
+    const viaWork = (await geoWork.resample(facts, 0)) as { facts: Fact[]; seed: number } | null; // #2893: decided here (asserted equal to the sync search)
     expect(viaWork).toEqual(sync && { ...sync, basis: { facts, seed: 0 } }); // + the #2757 basis it ran on
     expect(viaWork, 'this figure has another configuration').not.toBeNull();
     // The contract: whatever is returned is a WHOLE view the caller applies verbatim — and it is valid.
@@ -150,7 +152,7 @@ describe('the search basis — applyView is a compare-and-set, a stale search is
 
   it('every search result carries the basis it was searched on — the caller\'s own reference', async () => {
     const facts = st().facts;
-    const found = await geoWork.resample(facts, 0);
+    const found = (await geoWork.resample(facts, 0)) as { basis: { facts: Fact[]; seed: number } } | null; // #2893: a view, here
     expect(found?.basis.facts).toBe(facts);
     expect(found?.basis.seed).toBe(0);
   });
@@ -166,5 +168,38 @@ describe('the search basis — applyView is a compare-and-set, a stale search is
     st().toggleHidden('A');
     expect(supersedeStaleSearches(st())).toBe(false);
     await expect(pending).resolves.not.toBeNull();
+  });
+});
+
+describe('the work meter lane (#2873, ADR-W-210): the fallback is the work a browser sends to its worker', () => {
+  it('charges every operation of the client to the worker lane, and the same work called directly to the page', async () => {
+    const triangle = () => factsOf('משולש ABC', 'AB = 5', 'BC = 6', 'זווית ABC = 40');
+    for (const op of [
+      (f: Fact[]) => geoWork.prefold(f, 0),
+      (f: Fact[]) => geoWork.resample(f, 0),
+      (f: Fact[]) => geoWork.autoResolve(f, 0),
+      (f: Fact[]) => geoWork.detect(f),
+    ]) {
+      const facts = triangle();
+      clearReplayCaches();
+      const m = meterAction();
+      await op(facts);
+      const work = m.end();
+      expect(work.total).toBeGreaterThan(0); // the operation did solve: the lane below is not vacuous
+      expect(work.page).toBe(0);
+    }
+    const facts = triangle();
+    clearReplayCaches();
+    const m = meterAction();
+    replay(facts, 0);
+    const direct = m.end();
+    expect(direct.total).toBeGreaterThan(0);
+    expect(direct.page).toBe(direct.total);
+  });
+
+  it('restores the page lane after a fallback that throws', async () => {
+    const broken = [{ id: 'x', utterance: 'x', enabled: true, cmd: null }] as unknown as Fact[];
+    await geoWork.prefold(broken, 0).catch(() => undefined);
+    expect(workLane()).toBe('page');
   });
 });

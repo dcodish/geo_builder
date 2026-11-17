@@ -237,7 +237,9 @@ const he = {
   errRadianAngle: 'בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90',
   // #2625 (ADR-AG-454) — a diameter of the parabola: the reason, chosen under ADR-W-174 (`chose-2625-text`, 2026-11-02)
   // #2625 (ADR-AG-454 Am. 1) — its centre: the same reason, and the vertex said plainly to be unread (no next step to teach)
-  errParabolaNoCentre: 'לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, הכלי עדיין לא קורא אותו.',
+  errParabolaNoCentre: 'לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «{{name}} קודקוד הפרבולה».',
+  errParabolaNoCentreAsk: 'לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «שיעורי קודקוד הפרבולה».',
+  errParabolaNoCentreNoName: 'לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «V קודקוד הפרבולה».',
   errParabolaNoDiameter: 'לפרבולה אין מרכז, ולכן אין לה קוטר. אם התכוונתם למיתר, כתבו «{{detail}} מיתר בפרבולה».',
   errArcLengthUnread: 'הכלי עדיין לא קורא אורך של קשת. קשת נכתבת כאן במעלות — למשל קשת {{detail}} = 40',
   errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — «{{detail}}» אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
@@ -271,6 +273,8 @@ const he = {
   segSolid: 'רציף',
   // #1598 — the letter popover opened on an unnamed circle's centre
   centreTitle: 'מרכז המעגל',
+  // #2851 — the letter popover opened on a shown focus of a parabola or an ellipse
+  focusTitle: 'מוקד',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: «{{detail}}»',
   // #1423 — the letter is the problem, named with the student's own defining sentence and the remedy
   errUnsatisfiableReused: '{{reusedId}} כבר מוגדרת: «{{definedBy}}». המשפט «{{detail}}» סותר את ההגדרה הקיימת — לנקודה חדשה בחרו אות אחרת.',
@@ -361,6 +365,15 @@ const he = {
   errAngleNameTaken_vs: 'לזווית {{nameOf}} כבר יש שם: {{holder}} (בשורה «{{declared}}»). לכל זווית שם אחד — המשיכו עם {{holder}}.',
   errLengthNameTaken: 'לקטע {{nameOf}} כבר יש שם: {{holder}}. לכל קטע שם אחד — המשיכו עם {{holder}}.',
   errLengthNameTaken_vs: 'לקטע {{nameOf}} כבר יש שם: {{holder}} (בשורה «{{declared}}»). לכל קטע שם אחד — המשיכו עם {{holder}}.',
+  // #2894 (ADR-AG-483) — 3-D's sentence (ADR-3D-495), word for word: stated lengths no figure can have
+  errLengthsImpossibleValue:
+    "הנתונים סותרים זה את זה — «{{detail}}» לא מתקיים יחד עם {{others}}: יחד הם נותנים לקטע {{seg}} שני אורכים שונים, {{lenA}} ו-{{lenB}}. בדקו איזה מהאורכים האלה לא נכון.",
+  errLengthsImpossibleValueAlone:
+    "הנתונים ב«{{detail}}» סותרים זה את זה: הם נותנים לקטע {{seg}} שני אורכים שונים, {{lenA}} ו-{{lenB}}. בדקו איזה מהאורכים האלה לא נכון.",
+  errLengthsImpossibleTriangle:
+    "הנתונים סותרים זה את זה — «{{detail}}» לא מתקיים יחד עם {{others}}: יחד הם קובעים |{{long}}| = {{longLen}} ו-|{{sideA}}| + |{{sideB}}| = {{lenSum}}, אבל לפי אי־שוויון המשולש {{tri}} תמיד |{{long}}| ≤ |{{sideA}}| + |{{sideB}}|. בדקו איזה מהאורכים האלה לא נכון.",
+  errLengthsImpossibleTriangleAlone:
+    "הנתונים ב«{{detail}}» סותרים זה את זה: הם קובעים |{{long}}| = {{longLen}} ו-|{{sideA}}| + |{{sideB}}| = {{lenSum}}, אבל לפי אי־שוויון המשולש {{tri}} תמיד |{{long}}| ≤ |{{sideA}}| + |{{sideB}}|. בדקו איזה מהאורכים האלה לא נכון.",
   errMeasureContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errMeasureContradictsAlone: 'לא ניתן: «{{detail}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errRadiusContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד.',
@@ -384,6 +397,9 @@ const he = {
   errPolygonCollapsed:
     '«{{detail}}» משטיח את {{polygon}}: יחד עם הנתונים הקודמים הוא מחייב שהקודקודים ייפלו על ישר אחד, ' +
     'וצורה שטוחה אינה {{shapeHe}} — כפי שקובע «{{declared}}». «{{detail}}» לא נוסף.',
+  // #2813 (ADR-AG-471): 2-D's input.ringContradictsAngles, verbatim
+  errRingContradictsAngles:
+    'לא ניתן להוסיף את «{{detail}}»: לפי {{declared}} הצורה {{polygon}} קמורה, ולנקודות במצב קמור יש רק סדר אחד שבו הצלעות לא נחתכות — לכן {{pair}} מתקפלת על עצמה. שנו את אחת הזוויות או את סדר האותיות.',
   errRingContradictsNoun:
     'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «{{detail}}». אפשר לשנות את סדר האותיות ' +
     'כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
@@ -656,10 +672,10 @@ const he = {
   locusChipShow: 'הצג מקום גאומטרי',
   locusChipHide: 'הסתר מקום גאומטרי',
   // #1863 (ADR-AG-376) — the conic chip names its NEXT action (operator, 2026-10-09): directrix → focus → both → hide.
-  // The words are the session's (ADR-W-174); the ellipse's are plural, two foci and two directrices.
+  // The words are the session's (ADR-W-174). An ellipse shows its two foci only (#2709, ADR-AG-466): foci → hide.
   conicChip: {
     parabola: { directrix: 'הצג מדריך', focus: 'הצג מוקד', both: 'הצג מוקד ומדריך', none: 'הסתר' },
-    ellipse: { directrix: 'הצג מדריכים', focus: 'הצג מוקדים', both: 'הצג מוקדים ומדריכים', none: 'הסתר' },
+    ellipse: { focus: 'הצג מוקדים', none: 'הסתר' },
   },
   // #1863 (ADR-AG-377) — an ellipse the givens make a circle, said in the narrowing note's voice (cause first, ADR-W-129)
   conicCircle: '{{cause}}, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה.',
@@ -865,7 +881,9 @@ const en: typeof he = {
   errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
   errRenameBadName: '«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errRadianAngle: 'In plane geometry, angles are written in degrees — for example ∠ABC = 90',
-  errParabolaNoCentre: 'A parabola has no centre. If you meant its vertex, the tool does not read it yet.',
+  errParabolaNoCentre: 'A parabola has no centre. If you meant its vertex, write «{{name}} is the vertex of the parabola».',
+  errParabolaNoCentreAsk: 'A parabola has no centre. If you meant its vertex, write «the vertex of the parabola».',
+  errParabolaNoCentreNoName: 'A parabola has no centre. If you meant its vertex, write «V is the vertex of the parabola».',
   errParabolaNoDiameter: 'A parabola has no centre, so it has no diameter. If you meant a chord, write «{{detail}} is a chord of the parabola».',
   errArcLengthUnread: "This tool does not read an arc's length yet. An arc is written here in degrees — for example arc {{detail}} = 40",
   errUnreadWord: 'This tool reads Hebrew and English only — «{{detail}}» is in neither. Try writing the line in Hebrew or English.',
@@ -893,6 +911,7 @@ const en: typeof he = {
   segDashed: 'Dashed',
   segSolid: 'Solid',
   centreTitle: 'Circle centre',
+  focusTitle: 'Focus',
   errUnsatisfiable: 'No configuration satisfies: «{{detail}}»',
   errUnsatisfiableReused: '{{reusedId}} is already defined: «{{definedBy}}». «{{detail}}» contradicts that definition — pick another letter for a new point.',
   'locus.line': 'line',
@@ -973,6 +992,15 @@ const en: typeof he = {
   errAngleNameTaken_vs: 'Angle {{nameOf}} already has a name: {{holder}} (in the line «{{declared}}»). An angle has one name — keep using {{holder}}.',
   errLengthNameTaken: 'Segment {{nameOf}} already has a name: {{holder}}. A segment has one name — keep using {{holder}}.',
   errLengthNameTaken_vs: 'Segment {{nameOf}} already has a name: {{holder}} (in the line «{{declared}}»). A segment has one name — keep using {{holder}}.',
+  // #2894 (ADR-AG-483) — 3-D's sentence (ADR-3D-495), word for word: stated lengths no figure can have
+  errLengthsImpossibleValue:
+    "The givens contradict each other — «{{detail}}» cannot hold together with {{others}}: together they give the segment {{seg}} two different lengths, {{lenA}} and {{lenB}}. Check which of these lengths is wrong.",
+  errLengthsImpossibleValueAlone:
+    "The givens in «{{detail}}» contradict each other: they give the segment {{seg}} two different lengths, {{lenA}} and {{lenB}}. Check which of these lengths is wrong.",
+  errLengthsImpossibleTriangle:
+    "The givens contradict each other — «{{detail}}» cannot hold together with {{others}}: together they make |{{long}}| = {{longLen}} and |{{sideA}}| + |{{sideB}}| = {{lenSum}}, but by the triangle inequality in {{tri}}, always |{{long}}| ≤ |{{sideA}}| + |{{sideB}}|. Check which of these lengths is wrong.",
+  errLengthsImpossibleTriangleAlone:
+    "The givens in «{{detail}}» contradict each other: they make |{{long}}| = {{longLen}} and |{{sideA}}| + |{{sideB}}| = {{lenSum}}, but by the triangle inequality in {{tri}}, always |{{long}}| ≤ |{{sideA}}| + |{{sideB}}|. Check which of these lengths is wrong.",
   errMeasureContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold. The reason: {{what}}.',
   errMeasureContradictsAlone: 'Can\'t do that: «{{detail}}» contradicts an earlier given — they can\'t both hold. The reason: {{what}}.',
   errRadiusContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold.',
@@ -990,6 +1018,8 @@ const en: typeof he = {
   errPolygonCollapsed:
     '«{{detail}}» flattens {{polygon}}: together with the earlier givens it forces the vertices onto one line, ' +
     'and a flat figure is not the {{shapeEn}} that «{{declared}}» declares. «{{detail}}» was not added.',
+  errRingContradictsAngles:
+    "«{{detail}}» can't be added: by {{declared}}, the shape {{polygon}} is convex, and points in convex position have only one order in which the sides don't cross — so {{pair}} would fold over itself. Change one of the angles or the order of the letters.",
   errRingContradictsNoun:
     'The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so ' +
     'the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.',
@@ -1227,7 +1257,7 @@ const en: typeof he = {
   locusChipHide: 'Hide locus',
   conicChip: {
     parabola: { directrix: 'Show directrix', focus: 'Show focus', both: 'Show focus and directrix', none: 'Hide' },
-    ellipse: { directrix: 'Show directrices', focus: 'Show foci', both: 'Show foci and directrices', none: 'Hide' },
+    ellipse: { focus: 'Show foci', none: 'Hide' },
   },
   conicCircle: '{{cause}}, the ellipse is now a circle — a circle is a kind of ellipse.',
   conicCircleNamed: '{{cause}}, the ellipse {{name}} is now a circle — a circle is a kind of ellipse.',

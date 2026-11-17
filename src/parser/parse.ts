@@ -35,7 +35,7 @@ import { findRadianAngle } from '../../shell/radianAngle';
 import { arcRunRoles } from '../../shell/arcRun';
 import { foreignGiven, rightAngledAtVertex } from './scope';
 import { incidenceList, objectListShape } from './incidenceList';
-import { readFrame } from './frame';
+import { readFrame, readSubjectFrame } from './frame';
 import { withImpliedPoints } from './impliedPoints';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting, RADICAL, radicalTerm, evalRadicalTerm, COUNT_DIGITS, UNIT_WORD } from '../../shell/llm/honestyCore';
@@ -14598,6 +14598,18 @@ const SIDE_CLAUSE = String.raw`\s*(?:שצלעו|שאורך\s+צלעו|שכל\s+�
 const SIDE_SHAPES = String.raw`ריבוע|מעוין|square|rhombus|(?:משולש\s+)?שווה[\s-]?צלעות|equilateral(?:\s+triangle)?`;
 
 export function normalizeUtterance(raw: string): string {
+  return readFrame(normalizeText(raw));
+}
+
+/**
+ * #2062 ([ADR-819](../../docs/06-decisions.md#adr-819)) — the line's SUBJECT FRAME («הנקודה M מקיימת …»), read off the
+ * normalised text before {@link readFrame} takes it away: the read-extent gate's exemption for the frame's subject.
+ */
+export function subjectFrameOf(raw: string): { subject: string; rest: string } | null {
+  return readSubjectFrame(normalizeText(raw));
+}
+
+function normalizeText(raw: string): string {
   // maqaf U+05BE → ASCII hyphen (so the ל-?/ב-?/מ-? suffix groups match); then strip invisible format
   // chars: ALM, ZWSP/ZWNJ/ZWJ/LRM/RLM, LRE…RLO, isolates LRI…PDI, BOM.
   // עיגול (disk) ≡ מעגל (circle): the everyday Hebrew synonym students use interchangeably. Normalising it
@@ -14673,8 +14685,9 @@ export function normalizeUtterance(raw: string): string {
   const words = normalizeWordEquality(normalizeWordDegrees(lengths));
   const folded = normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
   // #1676 (ADR-630): the exam's sentence frame — «בסרטוט שלפניך מתואר …», «O – …», «המרובע ABCD הוא טרפז (…)» — read
-  // off LAST, on the fully folded text, so every rule and every honesty gate sees the canonical sentence.
-  return readFrame(folded);
+  // off LAST, on the fully folded text, so every rule and every honesty gate sees the canonical sentence
+  // (`normalizeUtterance`, above).
+  return folded;
 }
 
 /**
@@ -15064,6 +15077,8 @@ const REGION_TAIL = new RegExp(
  * present, no command carries a region, and a head label went unreferenced — rescue via
  * {@link regionSideFallback}, never commit the subject-less half-parse.
  */
+/** The item the honesty battery names when {@link droppedRegionSubject} fires: the region words the line stated. */
+export const REGION_SUBJECT_ITEM = 'בתוך/מחוץ';
 export function droppedRegionSubject(utterance: string, commands: AnyCommand[]): boolean {
   // Normalizes internally (idempotent) so the App's LLM commit path (#266/ADR-387 — the second
   // attempt must hold the same line, the ADR-240 discipline) can pass the raw utterance.
@@ -15151,6 +15166,8 @@ const POLY_NOUN =
  * `shape-variant`, or a midpoint-pinning `set-equal` (the ADR-411 determined lowering). Fires the
  * same escalate-never-commit route as its siblings, on the grammar AND the LLM commit paths.
  */
+/** The item the honesty battery names when {@link droppedMidsegment} fires. */
+export const MIDSEGMENT_ITEM = 'קטע אמצעים';
 export function droppedMidsegment(utterance: string, commands: AnyCommand[]): boolean {
   if (!/midsegment|mid-?segment|midline|קטע\s+ה?אמצעים/i.test(utterance)) return false;
   return !commands.some(
@@ -16238,6 +16255,8 @@ export const VERB_TANGENT = 'משיק/tangent';
 export const VERB_PARALLEL = 'מקביל/parallel';
 export const VERB_PERPENDICULAR = 'מאונך/perpendicular';
 
+/** The bisection gate's verb: the item the battery names, and what `droppedGivenVerbs` reports. */
+export const BISECT_VERB = 'חוצה/bisect';
 export const VERB_GATES: VerbGate[] = [
   // "tan- : a REFERENCE to a drawn tangent line ("המשיק חותך…" → line:"tan-A"); tanaux-/tanmid- : the
   // Thales AUX-CIRCLE construction of an external tangent (tangentFromExternal / tangentsFromExternal,
@@ -16246,7 +16265,7 @@ export const VERB_GATES: VerbGate[] = [
   // `present.source` for a substring, which is the same substring-stands-for-identity defect this
   // issue closes — and would have broken silently the moment the source was recomposed.
   gate({ verb: VERB_TANGENT, he: ['משיק'], en: [['tangent']], satisfied: family('tangent', 'circles-tangent', 'set-perpendicular', '"tan-', 'tanaux-', 'tanmid-'), tangency: true }),
-  gate({ verb: 'חוצה/bisect', he: ['חוצ'], en: [['bisect', 's|ed|ing|ors|or|ion']], satisfied: family('bisector', 'midpoint', 'set-angle-ratio', 'set-equal', 'arc-midpoint', 'set-line') }),
+  gate({ verb: BISECT_VERB, he: ['חוצ'], en: [['bisect', 's|ed|ing|ors|or|ion']], satisfied: family('bisector', 'midpoint', 'set-angle-ratio', 'set-equal', 'arc-midpoint', 'set-line') }),
   // `parallelogram` is listed EXPLICITLY: the macro does encode the parallel pairs, so it is genuine
   // evidence — it simply has to be evidence by intent rather than by substring coincidence (#771).
   gate({ verb: VERB_PARALLEL, he: ['מקביל'], en: [['parallel']], satisfied: family('parallel', 'parallelogram') }),

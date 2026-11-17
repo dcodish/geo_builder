@@ -87,19 +87,19 @@ describe('#1560 — a false vector or dot product over typed points is refused (
 });
 
 describe('#1560 — a TRUE restatement stays green', () => {
-  // #2341 (ADR-3D-449): a restatement the figure already holds is «כבר קיים» — never refused, no row. G2 states letters
+  // #2341 → #2790 (ADR-3D-484): a restatement the figure already holds is held — never refused, its own row. G2 states letters
   // the figure does not fix yet (n, p), so it is information and records.
-  const guards: [string, string[], string, 'record' | 'already-stated'][] = [
-    ['G1', TYPED, 'u = (2,0,0)', 'already-stated'],
+  const guards: [string, string[], string, 'record' | 'held'][] = [
+    ['G1', TYPED, 'u = (2,0,0)', 'held'],
     ['G2', TYPED, 'u = (2, n, p)', 'record'],
-    ['G3', PAIR, 'AB = (2,0,0)', 'already-stated'],
-    ['G4', PAIR, 'BA = (-2,0,0)', 'already-stated'],
-    ['G5', TYPED, 'u·v = 0', 'already-stated'],
+    ['G3', PAIR, 'AB = (2,0,0)', 'held'],
+    ['G4', PAIR, 'BA = (-2,0,0)', 'held'],
+    ['G5', TYPED, 'u·v = 0', 'held'],
   ];
   for (const [row, setup, line, kind] of guards) {
     it(`${row}: «${line}» stays green (${kind})`, () => {
       const v = decideSubmit3(build(setup), line);
-      expect(v.kind).toBe(kind);
+      expect(v.kind === 'record' && v.held ? 'held' : v.kind).toBe(kind);
       if (v.kind === 'record') expect(derive3(v.facts, v.seed).status[v.fact.id]).toBe('ok');
     });
   }

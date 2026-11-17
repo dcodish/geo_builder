@@ -1,0 +1,190 @@
+{
+  "name": "feat-2890-3d",
+  "title": "#2890 round 2 — 3-D computes off the page: the page stays alive, the figure comes first and the data panel's values follow (PR, port 5188)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: while a slow line computes the figure can be turned; the figure comes first, then the panel says «בודק…», then its rows",
+      "lines": [
+        "מנסרה ישרה משולשת ABCA'B'C'",
+        "AA'=(k-1,k-7,k+1)",
+        "AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)"
+      ],
+      "expectRows": [
+        "מנסרה ישרה משולשת ABCA'B'C'",
+        "AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)"
+      ],
+      "lookFor": "Type the first two lines. Type the third and press Enter. While «הוסף» reads «חושב…», drag the figure with the mouse: it turns, and the page scrolls. When the prism lands, the data panel on the left reads one grey line «בודק…» for a few seconds, and then all its rows appear together (the parameter k, the points, the planes).",
+      "before": "On prod the page freezes for the whole line: the drag does nothing until the figure lands, and the figure and the panel appear together."
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: after «הציגו תצורה אחרת» on a figure whose values take seconds, the panel reads «בודק…» and no number of the previous drawing",
+      "lines": [
+        "מנסרה ישרה משולשת ABCA'B'C'",
+        "AA'=(k-1,k-7,k+1)",
+        "AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)"
+      ],
+      "cycles": 1,
+      "expect": [
+        "בודק…"
+      ],
+      "lookFor": "Right after the press the new drawing is on the canvas and the panel shows only «בודק…»; its rows come back a few seconds later.",
+      "before": "On prod the page freezes for the press, then the new drawing and its panel appear together."
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: a row unticked redraws the figure at once; the panel reads «בודק…» until its values are in",
+      "lines": [
+        "מנסרה ישרה משולשת ABCA'B'C'",
+        "AA'=(k-1,k-7,k+1)",
+        "AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)"
+      ],
+      "after": [
+        {
+          "toggle": 1
+        }
+      ],
+      "expect": [
+        "בודק…"
+      ],
+      "lookFor": "Untick row 1: the figure is redrawn at once, the panel reads «בודק…», then its rows.",
+      "before": "On prod the page freezes, then the figure and its panel appear together."
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: a fast figure is drawn whole: the panel never reads «בודק…»",
+      "lines": [
+        "קובייה ABCD",
+        "M אמצע BB'"
+      ],
+      "cycles": 1,
+      "expectRows": [
+        "קובייה ABCD",
+        "M אמצע BB'"
+      ],
+      "expectFigure": [
+        "M"
+      ],
+      "expectAbsent": [
+        "בודק…"
+      ],
+      "lookFor": "The cube and M on BB′; the panel's rows are there with the figure every time.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T5",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: a wrong claim is still refused",
+      "lines": [
+        "קובייה ABCD",
+        "∠BAC = 60"
+      ],
+      "expectRefusal": "הטענה לא מתקיימת בציור",
+      "lookFor": "«הטענה לא מתקיימת בציור — בדקו את החישוב»; one row.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T6",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: the slow square figure, a row off and on, and «הציגו תצורה אחרת»",
+      "lines": [
+        "ריבוע ABCD",
+        "קטע AS",
+        "|SA| = 5"
+      ],
+      "after": [
+        {
+          "toggle": 3
+        },
+        {
+          "toggle": 3
+        }
+      ],
+      "cycles": 1,
+      "expectRows": [
+        "ריבוע ABCD",
+        "קטע AS",
+        "|SA| = 5"
+      ],
+      "expect": [
+        "|AS| = 5"
+      ],
+      "lookFor": "Three rows at the end, S with SA = 5; the press redraws; the panel's «|AS| = 5» row is back.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T7",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: a question in the panel is answered (solved off the page)",
+      "lines": [
+        "קובייה ABCD",
+        "AB = 4"
+      ],
+      "asks": [
+        "|AC|"
+      ],
+      "expect": [
+        "5.66"
+      ],
+      "lookFor": "The question row reads «|AC| = 5.66», as on prod.",
+      "before": "unchanged (a regression guard)."
+    },
+    {
+      "id": "T8",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "title": "3-D: «בטל» and «בצע שוב» bring the rows back",
+      "lines": [
+        "משולש ABC",
+        "D על AB",
+        "AD = 3"
+      ],
+      "after": [
+        {
+          "click": "בטל"
+        },
+        {
+          "click": "בצע שוב"
+        }
+      ],
+      "expectRows": [
+        "משולש ABC",
+        "D על AB",
+        "AD = 3"
+      ],
+      "expectFigure": [
+        "D"
+      ],
+      "lookFor": "Three rows at the end, D on AB.",
+      "before": "unchanged (a regression guard)."
+    }
+  ]
+}

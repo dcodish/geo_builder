@@ -1,0 +1,70 @@
+{
+  "name": "feat-2894-e-2d",
+  "title": "#2894 item E, 2-D — a view that fails at every seed is tried at one (port 5195)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5195",
+      "path": "/",
+      "title": "The kite with its area statement: the last line settles, same figure as before",
+      "lines": [
+        "ABCD דלתון חסום במעגל",
+        "AB=AD",
+        "CB=CD",
+        "E על DC",
+        "BE⊥DC",
+        "AC",
+        "N = חיתוך BE ו-AC",
+        "שטח משולש NCE = שטח משולש ACD"
+      ],
+      "lookFor": "All eight lines commit (no «לא ניתן»); the last one («שטח משולש NCE = שטח משולש ACD») thinks noticeably less long than on prod and draws the same kite.",
+      "before": "prod: the same figure; the last line's configuration search spends about a quarter more work first.",
+      "expectAbsent": [
+        "לא ניתן"
+      ]
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5195",
+      "path": "/",
+      "title": "The same kite: «הציגו תצורה אחרת» still says there is no other configuration",
+      "lines": [
+        "ABCD דלתון חסום במעגל",
+        "AB=AD",
+        "CB=CD",
+        "E על DC",
+        "BE⊥DC",
+        "AC",
+        "N = חיתוך BE ו-AC",
+        "שטח משולש NCE = שטח משולש ACD"
+      ],
+      "lookFor": "After the eight lines, one press reads «אין תצורה אחרת».",
+      "before": "unchanged",
+      "cycles": 1,
+      "expect": [
+        "אין תצורה אחרת"
+      ]
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5195",
+      "path": "/",
+      "title": "A refused square diagonal, then a press: the figure before it is still offered",
+      "lines": [
+        "ריבוע ABCD",
+        "AB = 3",
+        "AC = 10"
+      ],
+      "lookFor": "«AC = 10» is refused; a press of «הציגו תצורה אחרת» answers as on prod (the square is determined: «אין תצורה אחרת»).",
+      "before": "unchanged",
+      "cycles": 1,
+      "expectRefusal": "סותר את «AB = 3»"
+    }
+  ]
+}

@@ -53,7 +53,7 @@ import { btn, card as themeCard, fs, sectionTitle } from '@/ui/theme';
 // tree's own btn.accent/btn.subtle, which the operator praised); every builder's row consumes it.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { configurationAxes, factsWaitingForLetter, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
-import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
+import { cancelGeoWork, geoJobs, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, figureNameFromFileName, figureStateOf, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import type { FigureLoadOutcome, FigureLoadRefusal } from '@/store/figureLoad';
@@ -84,14 +84,14 @@ import { bidiSegments, isolateLtrRuns, textDir } from '@/i18n/bidi';
 // #745: the rasteriser and the printed width are SHARED (shell/export/svgToPng), so every builder that
 // prints a figure prints it at one width and one ink weight. Two copies could drift; one cannot.
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
-import { auditLoadedFigure, liveAuditFindings } from '@/store/loadAudit';
+import { liveAuditFindings } from '@/store/loadAudit';
 import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit, type CreatedNotice2D } from '@/app/submitPipeline';
 import { runViewResolve } from '@/app/resolveView';
 import { narrowingText } from '@/app/narrowingText';
 import { figureStatus, figureStatusParams } from '@/app/figureStatus';
-import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
+import { editJob, setGroupEnabledJob } from '@/app/workerJobs';
 import { subscribeFigureNotes } from '@/app/figureNotes';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
 import { convergeText } from '../shell/converge';
@@ -100,14 +100,15 @@ import { offArcNoticeText, violationText } from '@/i18n/violationText';
 import { circleMenuTitle } from '@/i18n/circleText';
 import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
 import { figureExplainer } from '@/app/studentVocabulary';
-/**
- * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
- * spinner) is only committed to the DOM on the next frame; a blocking SYNCHRONOUS solve started in
- * the same tick would freeze the thread before that paint, so the spinner never appears. Awaiting two
- * animation frames lets React commit and the browser paint first, THEN the heavy work runs visibly
- * behind the spinner. Mirrors the inline double-rAF the "show another configuration" path uses.
- */
-const nextPaint = () => new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res())));
+import { hiddenRowGroups, lonePoints } from '@/app/hideOwnership';
+import { ANOTHER, act, armBasisGuard, jobStore, work } from '@/app/work';
+import { WorkingFace, useShownWorking, useWorking, workingDim } from '../shell/frame/WorkingMark';
+import { NotDecidedNote } from '../shell/frame/NotDecidedNote';
+import { isNotDecided } from '../shell/notDecided';
+
+// #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
+// without the work queue shows up the first time anyone presses it.
+if (import.meta.env.DEV) armBasisGuard((message) => console.error(message));
 
 // The live theorem-discovery feed (Phase 6a/6b) shipped live 2026-07-07, opt-in via a checkbox.
 // #740 (operator 2026-08-18): the SURFACE is disabled for now — "not ready and just confusing".
@@ -117,6 +118,14 @@ const nextPaint = () => new Promise<void>((res) => requestAnimationFrame(() => r
 // Re-enabling is an operator decision: flip this AND delete the lock in
 // src/__tests__/theorems-disabled.test.ts, which exists to keep the surface from returning by accident.
 const THEOREMS_SURFACE: boolean = false;
+
+/** #2893 (ADR-831): which search stopped at its work limit, the round (or, for the audit, the step) to go on from, and the figure it was searched on. */
+interface NotDecidedAt {
+  where: 'another' | 'resolve' | 'audit';
+  round: number;
+  facts: Fact[];
+  seed: number;
+}
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -138,7 +147,6 @@ export default function App() {
     figureExplainer(t, construction, facts)(raw, said, other);
   const facts = useGeoStore((s) => s.facts);
   const selectedId = useGeoStore((s) => s.selectedId);
-  const removeGroup = useGeoStore((s) => s.removeGroup);
   const select = useGeoStore((s) => s.select);
   const figureName = useGeoStore((s) => s.figureName);
   const setFigureName = useGeoStore((s) => s.setFigureName);
@@ -149,8 +157,6 @@ export default function App() {
   const setShowMeasures = useGeoStore((s) => s.setShowMeasures);
   const showCenters = useGeoStore((s) => s.showCenters);
   const setShowCenters = useGeoStore((s) => s.setShowCenters);
-  const rename = useGeoStore((s) => s.rename);
-  const swap = useGeoStore((s) => s.swap);
   const hidden = useGeoStore((s) => s.hidden);
   const toggleHidden = useGeoStore((s) => s.toggleHidden);
   const segStyle = useGeoStore((s) => s.segStyle);
@@ -176,13 +182,9 @@ export default function App() {
   const narrowed = useGeoStore((s) => s.narrowed);
   const detectShapes = useGeoStore((s) => s.detectShapes);
   const clearShapes = useGeoStore((s) => s.clearShapes);
-  const clear = useGeoStore((s) => s.clear);
 
   // The STORE's undo/redo wrappers (E5/STO-5), not raw zundo: they also clear the dialed-radius
   // scratchpad, and the temporal state itself now carries facts + seed so the restored view matches.
-  const undo = useGeoStore((s) => s.undo);
-  const redo = useGeoStore((s) => s.redo);
-  const executeMany = useGeoStore((s) => s.executeMany);
   const canUndo = useStore(useGeoStore.temporal, (s) => s.pastStates.length > 0);
   const canRedo = useStore(useGeoStore.temporal, (s) => s.futureStates.length > 0);
 
@@ -190,18 +192,20 @@ export default function App() {
   const [inputNote, setInputNote] = useState(''); // a problem message under the input (not-understood / built-nothing)
   const [queryText, setQueryText] = useState(''); // #477: the values-panel query box
   const queryRef = useRef<HTMLInputElement | null>(null);
-  const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
-  // Re-entry gate + abort for the submit pipeline (E3/STO-3). `busyRef` is the SYNCHRONOUS truth —
-  // React state lags a render, so two rapid example-chip clicks could both enter `submit` and race
-  // their dry-runs/commits; the ref blocks the second immediately. `llmAbortRef` lets the ~15 s
-  // timeout or the student's cancel abort a hung proxy call instead of a permanent spinner.
-  const busyRef = useRef(false);
+  // #2874 (ADR-W-210): the tool is WORKING on something the student did — the work queue's derived state,
+  // never a flag set here. Every action that re-solves the figure is a job on `work`; the queue counts it
+  // from the click, paints this state before the engine runs, and releases it in a `finally`. The queue is
+  // also the re-entry gate (E3/STO-3): its count is synchronous, so two rapid example-chip clicks cannot
+  // both enter `submit`. `llmAbortRef` lets the ~15 s timeout or the student's cancel abort a hung proxy
+  // call instead of a permanent spinner.
+  const thinking = useWorking(work);
   const llmAbortRef = useRef<AbortController | null>(null);
-  const setBusy = (b: boolean) => {
-    busyRef.current = b;
-    setThinking(b);
-  };
-  const [resampling, setResampling] = useState(false);
+  const resampling = useWorking(work, ANOTHER); // «הציגו תצורה אחרת» is counted on its own lane (see `ANOTHER`)
+  // ADR-W-210 Am. 2 (ruling 2026-11-13): the working look is SHOWN only after about 0.3 s. The two buttons delay
+  // their own look on the compositor (`WorkingFace`); these are the same threshold for 2-D's second signs — the
+  // small line under the box, the search's progress and its ✕ — whose arrival moves the layout.
+  const thinkingShown = useShownWorking(thinking);
+  const resamplingShown = useShownWorking(resampling);
   const [altProgress, setAltProgress] = useState(''); // "show another configuration" search in flight (synchronous; we paint a busy state first)
   const [analysing, setAnalysing] = useState(false); // "view relations" detection in flight (synchronous; paint a busy state first)
   const [computingValues, setComputingValues] = useState(false); // #217: the values panel compute in flight (worker-side)
@@ -217,6 +221,10 @@ export default function App() {
   // #1467 (ADR-769, ADR-W-162): the points the last committed line created by reference, and the row its ✕ removes
   const [createdNotice, setCreatedNotice] = useState<CreatedNotice2D | null>(null);
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
+  // #2893 (ADR-831, ADR-W-210 phase 4): a search that reached its work limit before it decided. The operator's sentence
+  // with «המשיכו לחפש» shows where that search's own answer shows (the press's note, the input's note, the load's audit
+  // note), and only while the figure it was searched on is the one on screen. Never a fact, never in the undo history.
+  const [notDecidedAt, setNotDecidedAt] = useState<NotDecidedAt | null>(null);
   const [fileNote, setFileNote] = useState(''); // transient: why a figure file couldn't be loaded (FR-HS-10)
   // Persistent ADR-242 load-audit findings (issue #24). Unlike `fileNote` (a one-shot string), the audit note
   // must live exactly as long as the rows it flags: it is DERIVED from these findings against the current
@@ -247,6 +255,8 @@ export default function App() {
   // The ADR-242 load-audit note, DERIVED from the persistent findings against the current facts (issue #24):
   // a finding drops the moment its row is deleted / toggled off / ✎ re-lowered, so the note self-clears — no
   // timer, no orphaned banner. Empty ⇒ nothing shown.
+  const notDecidedFor = (where: NotDecidedAt['where']): NotDecidedAt | null =>
+    notDecidedAt && notDecidedAt.where === where && notDecidedAt.facts === facts && (where === 'audit' || notDecidedAt.seed === seed) ? notDecidedAt : null;
   const auditNote = useMemo(() => {
     const live = liveAuditFindings(facts, fileAudit);
     if (live.length === 0) return '';
@@ -350,10 +360,15 @@ export default function App() {
   // refusal keeps the editor open and says why through the aria-live input note.
   // B5-2d/#782: the seam itself lives in `@/app/editPipeline` (CLAUDE.md: submit-path behaviour goes
   // in `src/app/`, never inline in the component). This is the adapter — the two UI concerns it has.
-  function commitEdit(key: string, editText: string): boolean {
+  function commitEdit(key: string, editText: string): Promise<boolean> {
     // #1041: the edit seam launches the post-commit search too — the SAME closure `runSubmit` is given
     // below, so the two commit paths cannot drift again.
-    return runEditCommit(key, editText, { t, setInputNote, resolveAfterCommit, centresShown: () => useGeoStore.getState().showCenters });
+    // #2874: an edit re-solves the figure, so it is a job — the working state is painted first, and the
+    // search it launches belongs to the same job.
+    return work.run((job) =>
+      // #2890 (ADR-830): the edit seam decides and commits in the geometry worker; the page shows its notes and puts it in
+      editJob(key, editText, { t, setInputNote, resolveAfterCommit: () => void job.join(resolveAfterCommit()), centresShown: () => useGeoStore.getState().showCenters }),
+    );
   }
 
   // The text → command[] path: the deterministic parser runs first; anything it
@@ -487,23 +502,26 @@ export default function App() {
   // transient note (input/file/rename/alt/LLM notes + any in-progress inline edit) behind, misrepresenting a
   // cleared session. clearAll resets BOTH: the store figure plus every session-scoped local field. Display /
   // help / fold PREFERENCES are deliberately left untouched — those are not session data.
-  const clearAll = () => {
-    logDebug({ kind: 'action', action: 'clear' }); // #189: so a reported session's replay can follow the wipe
-    clear();
-    setText('');
-    setInputNote('');
-    setFileNote('');
-    setFileAudit([]);
-    setRenameNote('');
-    setAltNote('');
-    setLlmDropped([]);
-    // #1238: clearing is the student saying they are done with this figure, and `clear` wipes the undo
-    // history — so the stored session goes with it. Leaving it would offer back, on the next visit,
-    // exactly the work they just discarded.
-    forgetSession();
-    setOffer(null);
-    // the FactList editor state is the chrome's own (B5-2d) — a clear needs no reset here
-  };
+  // #2874: a clear is ONE job, its whole body: the stored session is forgotten AFTER the figure is cleared,
+  // so a job still waiting ahead of it cannot write the session back.
+  const clearAll = () =>
+    void work.run(() => {
+      logDebug({ kind: 'action', action: 'clear' }); // #189: so a reported session's replay can follow the wipe
+      jobStore().clear();
+      setText('');
+      setInputNote('');
+      setFileNote('');
+      setFileAudit([]);
+      setRenameNote('');
+      setAltNote('');
+      setLlmDropped([]);
+      // #1238: clearing is the student saying they are done with this figure, and `clear` wipes the undo
+      // history — so the stored session goes with it. Leaving it would offer back, on the next visit,
+      // exactly the work they just discarded.
+      forgetSession();
+      setOffer(null);
+      // the FactList editor state is the chrome's own (B5-2d) — a clear needs no reset here
+    });
 
   /**
    * The shared TAIL of every way a figure enters the session — the file picker, a restored session
@@ -520,15 +538,18 @@ export default function App() {
     name: { fileName: string } | { fromEnvelope: true },
   ): Promise<boolean> => {
     // #41 (ADR-290, + the #67 core): a saved heavy figure's ENTIRE load cost is one cold fold (27 s
-    // measured on the #59 file) — computed in the geometry WORKER behind this busy cue, so the smoke
+    // measured on the #59 file) — computed in the geometry WORKER behind the working cue, so the smoke
     // replay and the post-load render both run at tail speed on the main thread.
-    setBusy(true);
-    let out: FigureLoadOutcome;
-    try {
-      out = await load();
-    } finally {
-      setBusy(false);
-    }
+    // #2874: a load is ONE job — the cue is painted before the parse and the prefold start, and it stays
+    // through the rescue search and the audit below, which belong to the same student action.
+    return work.run((job) => loadJob(load, name, job));
+  };
+  const loadJob = async (
+    load: () => Promise<FigureLoadOutcome>,
+    name: { fileName: string } | { fromEnvelope: true },
+    job: { join<T>(more: T): T },
+  ): Promise<boolean> => {
+    const out = await load();
     if (!out.ok) {
       noteFileProblem(
         out.reason === 'newer-version' ? 'file.newerVersion' : out.reason === 'too-large' ? 'file.tooLarge' : 'file.badFile',
@@ -551,8 +572,10 @@ export default function App() {
     // "requirements-failing figure about to display" event, so the operator's saved collapse file
     // re-drew C-on-A on every load, silently. One undo still restores the pre-load session: the
     // resolve's applyView merges into the load's own history entry (temporal paused there).
-    void resolveAfterCommit();
-    const audit = auditLoadedFigure(loaded.facts);
+    void job.join(resolveAfterCommit());
+    const audit = await geoJobs.audit(loaded.facts); // #2890 (ADR-830): in the geometry worker
+    // #2893 (ADR-831): an audit that reached its work limit is not a clean one: «המשיכו לחפש» audits the rest
+    setNotDecidedAt(audit.complete ? null : { where: 'audit', round: audit.resumeAt, facts: loaded.facts, seed: loaded.seed });
     if (audit.findings.length > 0) {
       setFileAudit(audit.findings); // note is DERIVED from these against live facts (issue #24) — self-clears
     } else if (refreshed.length > 0) {
@@ -739,36 +762,48 @@ export default function App() {
   // this wrapper binds the App's real deps. While the search is pending, `resolvePending` keeps the
   // LAST GOOD view on canvas (#573 — the ADR-293 keep-prior slot) instead of painting the failing one.
   const [resolvePending, setResolvePending] = useState(false);
-  const resolveAfterCommit = async () => {
-    setBusy(true);
-    try {
-      await runViewResolve({
-        getState: () => useGeoStore.getState(),
-        meetsRequirements,
-        // #41 (ADR-290): the config search runs in the geometry WORKER — the main thread stays free.
-        autoResolve: (facts, seed) => geoWork.autoResolve(facts, seed),
-        applyView: (found) => {
-          if (found.fold) primeFoldFor(found.facts, found.fold); // transplant — main replays at tail speed
-          // the rewrite belongs to the SAME user action as the commit/load it follows — pause history
-          // so it merges into that entry (E4/STO-4; one undo removes the whole action).
-          const temporal = useGeoStore.temporal.getState();
-          temporal.pause();
-          try {
-            useGeoStore.getState().applyView({ facts: found.facts, seed: found.seed, basis: found.basis });
-          } finally {
-            temporal.resume();
-          }
-        },
-        setPending: setResolvePending,
-        // #566 (ADR-445): an EXHAUSTED search is never silent — the figure stays (keep-prior forever
-        // would hide a committed given); the note says the drawing could not honour everything at once.
-        onExhausted: () => setInputNote(t('figure.noValidConfig')),
-        isCancelled,
-      });
-    } finally {
-      setBusy(false);
-    }
+  // #2874: it is always called from inside a job (a submit, an edit, a toggle, a load), which joins it — so
+  // the working state stays up until the search settles, and it has no busy flag of its own to leave set.
+  const resolveAfterCommit = async (round = 0) => {
+    await runViewResolve({
+      getState: () => useGeoStore.getState(),
+      meetsRequirements,
+      // #41 (ADR-290): the config search runs in the geometry WORKER — the main thread stays free.
+      autoResolve: (facts, seed, r) => geoWork.autoResolve(facts, seed, r),
+      applyView: (found) => {
+        if (found.fold) primeFoldFor(found.facts, found.fold); // transplant — main replays at tail speed
+        // the rewrite belongs to the SAME user action as the commit/load it follows — pause history
+        // so it merges into that entry (E4/STO-4; one undo removes the whole action).
+        const temporal = useGeoStore.temporal.getState();
+        temporal.pause();
+        try {
+          jobStore().applyView({ facts: found.facts, seed: found.seed, basis: found.basis });
+        } finally {
+          temporal.resume();
+        }
+      },
+      setPending: setResolvePending,
+      // #566 (ADR-445): an EXHAUSTED search is never silent — the figure stays (keep-prior forever
+      // would hide a committed given); the note says the drawing could not honour everything at once.
+      onExhausted: () => setInputNote(t('figure.noValidConfig')),
+      // #2893 (ADR-831): reached its work limit — not exhausted. The sentence and «המשיכו לחפש», where that note shows.
+      onNotDecided: (next, basis) => setNotDecidedAt({ where: 'resolve', round: next, facts: basis.facts, seed: basis.seed }),
+      isCancelled,
+    }, round);
   };
+  /** #2893 (ADR-831): «המשיכו לחפש» — one more round of the search that stopped, from where it stopped. */
+  const continueSearch = (nd: NotDecidedAt) => {
+    setNotDecidedAt(null);
+    if (nd.where === 'another') return void runResample(nd.round);
+    if (nd.where === 'resolve') return void work.run(() => resolveAfterCommit(nd.round));
+    void work.run(async () => {
+      const more = await geoJobs.audit(nd.facts, nd.round);
+      if (more.findings.length > 0) setFileAudit((had) => [...had, ...more.findings]);
+      if (!more.complete) setNotDecidedAt({ ...nd, round: more.resumeAt });
+    });
+  };
+  const notDecidedNote = (nd: NotDecidedAt | null, busy: boolean) =>
+    nd && <NotDecidedNote message={t('suite.notDecided.message')} continueLabel={t('suite.notDecided.continue')} onContinue={() => continueSearch(nd)} busy={busy} />;
 
   // The submit orchestration lives in src/app/submitPipeline.ts (S0.4 of docs/24) — extracted so the
   // routing (store-ops / grammar / clarifications / honesty gates / dry-run / LLM second attempt) is
@@ -783,14 +818,12 @@ export default function App() {
         setLlmDropped,
         // #2782 (ADR-810): the box is written as an update of what it holds NOW — the pipeline replaces only the text it submitted
         editText: setText,
-        setBusy,
         setCreatedNotice,
       },
       view: () => ({ construction, positions }),
-      isBusy: () => busyRef.current,
+      work,
       // #2362 (ADR-748): whether the centre letters are on screen as the line is typed
       centresShown: () => useGeoStore.getState().showCenters,
-      nextPaint,
       resolveAfterCommit,
       llmAbortRef,
       explainError,
@@ -820,6 +853,19 @@ export default function App() {
   // GEOMETRY from the displayable state; STATUS/ERROR from the real current state (the step list and the
   // error banner must tell the truth about what just happened).
   const { construction, positions, circles, labels: builtLabels, angleMarks, violations, coincidences, forcedOffArc, degeneracies } = display;
+  /**
+   * #2852 (ADR-825): the tool's letters that may go with a hidden segment, and the rows a hidden segment touches (each
+   * shows «מוסתר»; its click shows the segments again). Decided over the facts, which the renderer cannot see.
+   */
+  const lonePointSet = useMemo(() => lonePoints(facts, construction), [facts, construction]);
+  const hiddenRows = useMemo(
+    () =>
+      hiddenRowGroups(
+        facts,
+        new Map(construction.objects.flatMap((o) => (o.kind === 'segment' && segStyle[o.id]?.hidden ? [[o.id, [o.a, o.b] as [string, string]] as const] : []))),
+      ),
+    [facts, construction, segStyle],
+  );
   /** #1973 (ADR-797): the rings the figure holds now — a row's host tag shows only while its shape is one of them. */
   const polygonRings = useMemo(() => construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), [construction]);
   /** #2305 (ADR-755): how every sentence names a circle of the displayed figure (`circleRefs` → `circleText`). */
@@ -967,7 +1013,7 @@ export default function App() {
     }
     if (!id) return; // A–Z all taken (won't happen in practice)
     // Both lowerings live in `inkCrossings` (ADR-379; #1489) — one seam each, shared with the tests.
-    executeMany(crossingCommands(x, id), crossingUtterance(x, id, he ? 'he' : 'en', construction));
+    void act.executeMany(crossingCommands(x, id), crossingUtterance(x, id, he ? 'he' : 'en', construction));
   }
 
   // Highlight every object introduced by the selected step (all its commands).
@@ -1099,14 +1145,22 @@ export default function App() {
   // "Show another configuration" — lifted out of the JSX (B6-2d moves the button under the canvas,
   // D7). #41 (ADR-290): the seed search runs in the geometry WORKER; ADR-340 (#175): the search
   // returns the whole COMPOSITE view, applied as ONE undo-tracked transition.
-  const runResample = async () => {
-    if (resampling) return;
-    setResampling(true);
+  // #2874: one job on the `ANOTHER` lane — `resampling` is that lane's derived state, and a second press
+  // while the search runs is not taken.
+  const runResample = (round = 0) => work.runIfIdle(() => resampleJob(round), { lane: ANOTHER }) ?? Promise.resolve();
+  const resampleJob = async (round: number) => {
     try {
       const st = useGeoStore.getState();
-      const found = await geoWork.resample(st.facts, st.seed, (k, n) => setAltProgress(`${k}/${n}`));
+      const found = await geoWork.resample(st.facts, st.seed, (k, n) => setAltProgress(`${k}/${n}`), round);
+      // #2893 (ADR-831): the search reached its work limit before it decided — never «אין תצורה אחרת»
+      if (isNotDecided(found)) {
+        setAltNote('');
+        setNotDecidedAt({ where: 'another', round: found.resume.round, facts: st.facts, seed: st.seed });
+        logDebug({ kind: 'action', action: 'show-another', detail: `seed=${st.seed} round=${round}`, result: 'not-decided' });
+        return;
+      }
       const changed = found !== null;
-      if (changed) useGeoStore.getState().applyView(found!);
+      if (changed) jobStore().applyView(found!);
       logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found!.seed : st.seed}`, result: changed ? 'changed' : 'only-config' }); // #84
       // A press that found another view says nothing: the redrawn figure speaks for itself (#1866,
       // ADR-734 — the operator removed ADR-517's varied/kept note).
@@ -1119,7 +1173,6 @@ export default function App() {
     } catch (err) {
       if (!isCancelled(err)) throw err; // cancelled: quiet — the student chose to stop
     } finally {
-      setResampling(false);
       setAltProgress('');
     }
   };
@@ -1305,7 +1358,7 @@ export default function App() {
             onPickIntersection={markIntersection}
             forcedCrossings={crossings?.facts === facts ? crossings.forced : undefined}
             intersectionLabel={t('actions.markIntersection')}
-            onPromotePoint={(id) => useGeoStore.getState().promote(id)}
+            onPromotePoint={(id) => void act.promote(id)}
             promoteLabel={t('actions.promotePoint')}
             labels={labels}
             angleMarks={angleMarks}
@@ -1315,7 +1368,7 @@ export default function App() {
             showMeasures={showMeasures}
             showCenters={showCenters}
             hidden={hiddenSet}
-            onRename={rename}
+            onRename={act.rename}
             // #238: the holder is a STEP ROW the student has no reason to connect to «האות כבר בשימוש» —
             // selecting it lights it up through the machinery that already highlights a fact's objects.
             onHighlightFact={(factId) => {
@@ -1334,9 +1387,10 @@ export default function App() {
               bad: t('pointMenu.bad'),
             }}
             segStyle={segStyle}
+            lonePoints={lonePointSet}
             onToggleSegHidden={toggleSegHidden}
             onToggleSegDashed={toggleSegDashed}
-            onSwap={swap}
+            onSwap={act.swap}
             segMenuText={{
               hide: t('segMenu.hide'),
               show: t('segMenu.show'),
@@ -1366,13 +1420,12 @@ export default function App() {
               file" button. `fileNote` is a transient problem/refreshed message; `auditNote` is the ADR-242
               honesty audit DERIVED from live facts (issue #24), so it self-clears when its rows are fixed
               and carries a × to dismiss this load's note outright. */}
+          {/* #2893 (ADR-831): an audit that reached its work limit says so under that note, with «המשיכו לחפש» */}
+          {(fileNote || auditNote || notDecidedFor('audit')) && (
+            <div style={{ position: 'absolute', top: 48, insetInlineEnd: 8, maxWidth: 260, zIndex: 5, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(fileNote || auditNote) && (
             <div
               style={{
-                position: 'absolute',
-                top: 48,
-                insetInlineEnd: 8,
-                maxWidth: 260,
                 padding: '6px 10px',
                 background: '#fef2f2',
                 border: '1px solid #fca5a5',
@@ -1407,6 +1460,9 @@ export default function App() {
               )}
             </div>
           )}
+          {!fileNote && notDecidedNote(notDecidedFor('audit'), thinking)}
+            </div>
+          )}
         </div>
 
         {/* LEVEL 3 — figure actions UNDER the canvas (D7, B6-2d): things done TO the figure, the
@@ -1424,16 +1480,17 @@ export default function App() {
               return (
                 <button
                   type="button"
+                  className={workingDim(resampling, 0.5)}
                   style={!canCycle || resampling ? rowAccentOffStyle : alt}
                   disabled={!canCycle || resampling}
                   title={t('actions.anotherHint')}
-                  onClick={() => void runResample()}
+                  onClick={() => { setNotDecidedAt(null); void runResample(); }}
                 >
-                  {resampling ? t('input.loading') : t('actions.another')}
+                  <WorkingFace working={resampling} idle={t('actions.another')} busy={t('input.loading')} />
                 </button>
               );
             })()}
-            {resampling && (
+            {resamplingShown && (
               <span style={{ fontSize: 12, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {altProgress && <span>({altProgress})</span>}
                 {/* #41: real preemption — terminate the worker; the in-flight promise rejects {cancelled} */}
@@ -1448,8 +1505,9 @@ export default function App() {
               </span>
             )}
             {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
+            {notDecidedNote(notDecidedFor('another'), resampling)}
             {/* #973: the same choices, as one quiet line beside the button that cycles them — the row notes carry the detail. */}
-            {unstated.length > 0 && !resampling && (
+            {unstated.length > 0 && !resamplingShown && (
               <span data-testid="unstated-choice-cue" style={{ fontSize: 12, color: '#b45309' }} title={unstated.map((c) => unstatedChoiceText(c, t)).join('\n')}>
                 {t('steps.unstatedTitle')}
               </span>
@@ -1457,8 +1515,8 @@ export default function App() {
             {/* #738 — the relations/shapes buttons moved INTO the נתונים panel (operator: the row
                 should match the other tools, which have no such buttons here at all). */}
             <span style={{ flex: 1 }} />
-            <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); undo(); }}>{t('actions.undo')}</button>
-            <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); redo(); }}>{t('actions.redo')}</button>
+            <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); void act.undo(); }}>{t('actions.undo')}</button>
+            <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); void act.redo(); }}>{t('actions.redo')}</button>
             <button type="button" style={facts.length > 0 ? { ...subtleBtn, color: rowDangerInk } : subtleBtnOff} disabled={facts.length === 0} onClick={clearAll}>{t('actions.clear')}</button>
           </div>
         )}
@@ -1500,8 +1558,8 @@ export default function App() {
             >
             {/* No example strip above the box (operator ruling 2026-08-18: "expensive screen
                 space"): the examples live on the CLEAN CANVAS (QuickChips) and in עזרה. */}
-            {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
-            {thinking && llmAbortRef.current && (
+            {thinkingShown && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
+            {thinkingShown && llmAbortRef.current && (
               <button
                 type="button"
                 style={{ fontSize: 12, border: 'none', background: 'none', color: '#64748b', cursor: 'pointer', textDecoration: 'underline' }}
@@ -1513,6 +1571,7 @@ export default function App() {
             {/* role="status" / aria-live (F6): a screen-reader student must HEAR that a step failed or
                 was partial — these appear after the submit completes, outside their focus. */}
             {inputNote && <span role="status" aria-live="polite" data-refusal="gate" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(inputNote)}>{inputNote}</span>}
+            {notDecidedNote(notDecidedFor('resolve'), thinking)}
             {renameNote && <span role="status" aria-live="polite" data-refusal="gate" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(renameNote)}>{renameNote}</span>}
             {llmDropped.length > 0 && (
               <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(llmDropped[0])}>
@@ -1529,7 +1588,7 @@ export default function App() {
               text={t(createdNoticeText(createdNotice.names).key, createdNoticeText(createdNotice.names).params)}
               undoLabel={t(CREATED_NOTICE_KEYS.undo)}
               onUndo={() => {
-                useGeoStore.getState().removeGroup(createdNotice.groupKey);
+                void act.removeGroup(createdNotice.groupKey);
                 setCreatedNotice(null);
               }}
             />
@@ -1662,6 +1721,10 @@ export default function App() {
                     // («AE גובה» · «במשולש ABC»), never inside them — the operator's ruling of 2026-10-10, option C
                     // — while the figure holds that shape (`heldHost`: a muted or edited-away ring names nothing)
                     tag: hostTag(heldHost(g.facts.find((f) => f.host)?.host, polygonRings), t),
+                    // #2852 (ADR-825, ADR-W-207): a row whose segment is hidden on the canvas says so; its click shows it again
+                    ...(hiddenRows.has(g.key)
+                      ? { hidden: { text: t('suite.hiddenRow.mark'), title: t('suite.hiddenRow.title'), onShow: () => hiddenRows.get(g.key)!.forEach((id) => toggleSegHidden(id)) } }
+                      : {}),
                     lead: (
                       <span style={{ fontSize: 12, width: 16, textAlign: 'center', flexShrink: 0 }}>
                         {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : state === 'waiting' ? <span data-testid="waiting-mark" style={{ color: '#2563eb' }}>⧗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
@@ -1721,7 +1784,8 @@ export default function App() {
                   const g = groups.find((x) => x.key === id);
                   // Routed through `src/app/` (#1133): re-enabling a given ADDS a requirement back, so
                   // it searches for a configuration that honours it exactly as a submit does.
-                  if (g) runSetGroupEnabled(id, !g.facts.every((f) => f.enabled), { resolveAfterCommit });
+                  // #2874: a toggle re-solves the figure — a job, and the search it launches belongs to it
+                  if (g) void work.run((job) => setGroupEnabledJob(id, !g.facts.every((f) => f.enabled), { resolveAfterCommit: () => void job.join(resolveAfterCommit()) }));
                 }}
                 toggleLabel={t('actions.toggle')}
                 editValueOf={(id) => {
@@ -1732,7 +1796,7 @@ export default function App() {
                 editLabel={t('actions.edit')}
                 symbols={SYMBOL_SPECS}
                 symbolsToggleTitle={t('values.paletteShow')}
-                onDelete={(id) => { logDebug({ kind: 'action', action: 'delete', detail: id }); removeGroup(id); }}
+                onDelete={(id) => { logDebug({ kind: 'action', action: 'delete', detail: id }); void act.removeGroup(id); }}
                 deleteLabel={t('actions.delete')}
               />
               </>

@@ -36,7 +36,10 @@ duality possible. **Reach for M1 duality before adding a construct.**
 
 **The normalisation seam and case (ADR-3D-039, ADR-3D-223).** `normalize3` is the one boundary every rule
 reads: format controls stripped, primes and minus unified, look-alike glyphs folded, script transitions
-split. **The look-alike glyph fold is the SHARED table** ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329)):
+split. Last, the subject frame comes off ([ADR-3D-479](06b-decisions-3d.md#adr-3d-479), #2062): `normalize3` =
+`subjectFrame3(normalizeText3(s))`, where `readSubjectFrame3` reads «HE_SUBJ X מקיי(ם|מת|מים|מות) :? rest» / "(the)?
+(point)? X satisf(ies|y) :? rest" (behind «נתון כי» too) and gives `rest` only when it names X. `subjectFrameOf3` reads it
+before it comes off, for `unreadParts3`' exemption (the frame's subject is a co-reference to its statement's label). The number gate's bare-number pass (`droppedGivenNumbers3`) takes `−1/n` beside `1/n`, so a minus-signed `x/n` vector term pays its denominator (ADR-3D-479). **The look-alike glyph fold is the SHARED table** ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329)):
 `shell/glyphFold.ts` `foldGlyphs` (⟂ → ⊥, ∡/∢ → ∠, the guarded `<` → ∠, ⁰/º/˚ → °, «שורש N» → √, the infix «‖» / «||» → ∥), called by
 `normalize3` right after `foldPrimes3` and by the ask lane's `parseQuery` — 3-D folded none of them, which is
 why «AC ⟂ AB» was not-understood while «AC ⊥ AB» built (#1912); 2-D's and analytic's boundaries call the same
@@ -118,6 +121,21 @@ per fact against the figure before that fact (so `droppedSoft` / `seated` see re
 crossing, collapse and narrowing passes). `decideCommands3` resolves the line the same way before the honesty gates
 and the twin rule, and words the refusal with the sentence and its taught remedy (`definiteShapeExample3`).
 
+**An unlettered SOLID noun** (#2838, [ADR-3D-486](06b-decisions-3d.md#adr-3d-486)) keeps the parser's default run in
+the fact (the parser stays context-free and the stored commands are unchanged) and is read against the figure by the
+fold: `unletteredSolidRow3` (`store3.ts`) finds a `solid` command whose run the row's text does not type
+(`typesSolidRun3`: the whole run, or its unprimed letters), reads the solid noun's article (`solidNounArticle3`,
+`lexicon/shapePhrase3.ts`, the `shapeNounSpan3` rule over the solid nouns), and asks `resolveUnletteredSolid3`
+(`engine/apply.ts`): definite → the one drawn solid the noun admits (`nounAdmits`, same vertex count), whose kind and
+letters the row takes, or `ambiguous-definite-shape` with `solid` set; indefinite, or definite with none → unchanged
+while no letter of the run is a point, else `freeSolidRun3` (`freeVertexRun3` per letter root, primes following).
+The one letter map renames the WHOLE row (`renameIds3`), so the noun's own relations follow. `expandFact` runs it
+first, before the pyramid readings of ADR-3D-434/436, and records the renamed typed commands in
+`Derived3.relettered`; `decideCommands3` resolves the new line with the same function against the figure as it
+stands and compares it with `relettered` rows, so the twin rule sees «קובייה» · «קובייה» as two cubes. The fold's twin
+pairing (`standingTwins3`) asks the same question through `newShapeEachTime3` — an indefinite flat noun or an
+unlettered, non-definite solid noun is a new shape each time, never a row that stands aside for its twin.
+
 ### Relations as a disposition map
 
 `relationTable.ts` maps each `relation × operand-kind` pair to a status and the actions it licenses
@@ -154,6 +172,21 @@ every pin family that can land elsewhere records its claim: `coords-eq` for the 
 `vec-val` for `inject-vector` and `inject-pair` (one `VecAtom` form), `dot-val` for `dot-given`
 (ADR-3D-284, #1560); and (ADR-3D-285, #1567) `length` → `length-eq`, `seg-angle` → `angle-seg-eq`,
 `vangle` → `vertex-angle-eq`, `length-rel` → `length-rel`, `seg-perp/par-plane` → `perp-plane`/`par-plane`.
+**A coordinate letter is one pin symbol, and the claim judges it** (#2785, [ADR-3D-488](06b-decisions-3d.md#adr-3d-488)). A bare
+letter written for the first time names a free component (ADR-3D-175); written a second time (`coordLetterShared3`: a pin
+symbol, the figure parameter, or a named point component) it is lowered to 1·k (`coordLetterExprs3`) and the earlier
+statement's named component is promoted to the same pin symbol (`promoteNamedComponents3`). The `coords-eq` claim carries
+the symbolic components (`sym`), read at `lettersAt3` — the ONE letter reader ([ADR-3D-472](06b-decisions-3d.md#adr-3d-472) Am. 1): the pivot's
+`pinSymbols`, or, where the pivot does not run, a least-squares read of the letters off the placed points over every
+point pin (`readPinLetters3`, `evaluate.ts`); then every remaining vector-coefficient letter, read jointly over every lettered `vec-eq` (`vecEqSystem3`,
+`solveNormal3`) with the coordinate letters as numbers. A letter a coordinate and a vector relation both carry is one
+pin symbol: `coordLetterShared3` counts a `vec-letter` owner, the vector relation's lowering promotes a named point
+component (`promoteNamedComponents3`), and the `vec-eq` pin reads it at the pivot's `symAt`.
+A NEW point written with letters (#2563, [ADR-3D-489](06b-decisions-3d.md#adr-3d-489)) is a `sym-coord` point unless it is
+ADR-3D-032's one-letter coord-sym: components over the same pool, absolute, own DOF 0, placed from the pivot's pin symbols
+(the override `solvePivot`/`resolve3` thread to `evaluateSolidsAndPoints`) or, where the pivot does not run, from
+`readPinLetters3` with open letters at `pinSymAnchor3` (the pivot's soft-anchor formula, one sampler). A letter only a
+`sym-coord` point writes and no driver reads (`detachedPinLetters3`) holds no pivot slot, so adding the point moves nothing.
 A given's claim carries `given: true`; **the placed-figure rule is claim-level**, at the head of
 `holdsAt`: a `given` claim is judged on a placed figure only, and at the displayed seed the pin-owner guard
 answers (`injection-unsatisfiable` for a coordinate pin, `givens-contradict` otherwise). So
@@ -229,6 +262,14 @@ it does not apply:
    and the rotation question (`evaluate.ts`); one that fixes nothing leaves the placement sampled.
 9. **Marks and surfacing.** A new source of a 90° angle gets its knee. The relation surfaces in the data
    view and the query lane (`dataView.ts`, `queries.ts`): the operator's *"and show that"*.
+   **The point × plane row** ([ADR-3D-480](06b-decisions-3d.md#adr-3d-480), #2062): the mutual universe's point side is
+   every student-introduced point that is no solid's vertex, paired with every planar side it does not define; the
+   relation (`on-plane` / `off-plane`, `distanceBetween` over the figure's extent, `MUTUAL_VERIFY_TOL`-class 1e-4) is
+   pushed only when every knowledge sample agrees. `pointPlaneRowKey3` keys it (a run plane by its letters as a set);
+   `pointPlaneRow3(panel, point, plane)` is the one decision both question surfaces read: `membershipQuestion3`
+   (`parse3.ts`) feeds `readStatement3`'s `answer-in-panel` refusal (category `guided`, never the model) and
+   `parseQuery`'s `membership` kind (`note: 'inPanel'`). App3 opens the panel on a known answer and highlights the row
+   by its `data-row-key`.
 10. **The parameter pin.** When either operand can carry the figure parameter, `paramPinningRels`
     (`operands.ts`, through `claimPinsParam` and `operandCarriesParam`) must admit the relation, with
     what it reads declared: direction or position. `pinningGivens` and `paramRoots` read that one list
@@ -385,7 +426,10 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   letters, with its riders and members; a `concyclic` claim or pin; a right quad pyramid's base): concyclic points are in
   convex position. When the circle is the proof, the facts that stated it (`commandStatesCircle3`) join the blame, so
   a circle or right-pyramid line that completed the contradiction is the one refused; a quad pyramid declares its base
-  ring for the blame too.
+  ring for the blame too. A third sufficient reason since #2813 ([ADR-3D-490](06b-decisions-3d.md#adr-3d-490)):
+  `anglesProveConvex3` — the ring's stated vertex angles (`statedRingCorners3`: a `vertex-angle-eq` claim or `vangle` pin at
+  a corner, below 180°) sum to at least (n − 3)·180°. The facts that state those angles join the blame, and the status
+  carries `angles` (the angle lines, the ring, the other order) so the refusal reads `err.ringContradictsAngles`.
 - **The IMPLIED re-declaration** (#1988, [ADR-3D-326](06b-decisions-3d.md#adr-3d-326)). The same split's other arm
   has ONE outcome: `quadImplies(known, cmd.base)` records the statement in `redundantShapes` and returns the figure
   untouched, so `buildNotices3` says it added nothing. `shape-less-specific` is gone from `EngineError3`. The store's
@@ -506,7 +550,7 @@ already its symbol (`ABCD: π = …`, but a plane named π prints `π = …`, ne
 Every knowledge gate decides "fixed" by agreement across resolves, so it sees only what the resolver varies; the
 funnel freezes rotation about a pinned point or axis (the ADR-3D-101 deferral) and the pivot's eight starts are
 seed-independent, so a turn the givens leave free landed in the same few basins at every seed. Stage 6 of the
-pivot block (`resolve3`) publishes `pivot.placementFreedom()`: lazily, `solvePivot`'s measuring probe takes the
+pivot block (`resolve3`) publishes `pivot.placementFreedom` (read through `placementFreedom3`): lazily, `solvePivot`'s measuring probe takes the
 central-difference Jacobian of the primary residuals — the full construction, plane pins and member pins included,
 over a snapshot of the resolved planes and lines — with respect to the six rigid unknowns in `rigidChart`'s
 coordinates (a world translation in figure scales, a world rotation about the origin; regular everywhere, unlike
@@ -519,6 +563,43 @@ carries a one-entry pool, so `twoConfigurations3` and `branchAgrees` never read 
 configuration. `knowledgeSamples3(c, seeds, { readback: true })` adds one image per sample whose freedom is
 non-zero; `dataView` and every `answerQuery` lane read back, claims and narrowing keep the plain samples, and the
 drawing never walks.
+
+**The read-back stands on every admissible root a free lane has** (#2907, [ADR-3D-498](06b-decisions-3d.md#adr-3d-498)).
+The cold starts spread only the placement, and a free lane (a never-positioned point's coordinates, a rider's offset on
+its line, plane or circle) starts at the seed's one sample in every start, so a pool held the root nearest that sample
+only. `solvePivot`'s **branch fan** (`freeLaneFan`, pooled path only, run per mirror after the walks and only when the
+mirror found a root) takes the first sign-honouring root, holds its placement, measures which fanned points are
+DETERMINED (a point's world position adds no rank to the central-difference Jacobian of the primary rows over the
+non-placement unknowns), and pins each such point just beside every other point of the figure, on its own side and the
+far side (0.1 of the extent), then releases on the anchored rows as a cold start is. An exact, open, member-holding
+result whose fanned point stands somewhere new joins the pool flagged `reach: <point>`. `applySolutions` keeps the pick
+over the unflagged pool (the drawing, `solutions`, «הציגו תצורה אחרת» unchanged), lists the reached roots after it in
+`symRoots` and `pointRoots`, and publishes `pivot.others`, one per reached root (distinct by its point). With
+`{ readback: true }`, `knowledgeSamples3` adds `resolve3(c, s, { configuration: k })` for each, which replays the plain
+pools (`pivotStageMemo3`) and stands the pick on the k-th reached root. Claims, narrowing and the drawing keep the plain
+samples.
+
+### A letter's range is one interval (#1524, [ADR-3D-477](06b-decisions-3d.md#adr-3d-477))
+
+A sign («k חיובי», `t > 0`) and a range (`t ≥ 0`, `2 ≤ k ≤ 5`, «k לפחות 2») are one statement: an interval on a letter
+(`engine/bound3.ts`, `Bound3`). `param-sign` lowers to (0, ∞) / (−∞, 0) at apply and `param-bound` to its own ends; both
+land in `paramSigns` (or `componentSigns`, for a letter naming a free component) through the sign's owner gate. Every
+reader asks `bound3`: `boundHolds3` for the root filters, the pivot's pin-symbol filter, the free-vector check, the
+component check and the store's verifier; `boundWindow3` for a free value's sampled window (the coordinate parameter,
+the vec-def ratio, the free-vector sampler); `boundAnchor3` for an open letter's seed anchor (through the one sampler `pinSymAnchor3`, #2563: the pivot's soft anchor and the no-pivot `sym-coord` placement); `boundReflect3` for the sign
+walk. A letter's statements fold in the order stated (`foldBounds3`), skipping one that would empty the range, so the
+verifier refuses the newer statement. A root filter reads only its own letter's range (`symBound3`). A new reader of a
+stated sign reads the interval, never a boolean.
+
+**Only admitted configurations are knowledge** (#2916, [ADR-3D-533](06b-decisions-3d.md#adr-3d-533)). `knowledgeSamples3`
+keeps a sample only when `admittedConfiguration3` holds on it: every coordinate sign (`signGivens`), named-component sign
+(`componentSignsHold`), letter sign (`paramSigns`, read by `statedLetterValue3`, the store verifier's own reader), plane side
+(`memberships[].side`) and hard requirement (`requirementsHoldOn3`, the seed search's own judgement), at the verifier's
+tolerances. A base seed left with no admitted sample is replaced by its reserve walk (s + k·6089), at most one reserve seed
+per base seed in all, so the gauge keeps its witnesses and the work is bounded. A figure that states no selector
+(`hasStatedSelectors3`) is sampled as before at no cost; one with no admitted sample anywhere breaks a given at its own
+drawing (its row is red), and its plain samples stand. Every lane reads the admitted set: ask, panel, claims, narrowing,
+preferences.
 
 ### Who may introduce a point (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253); #1310, [ADR-3D-397](06b-decisions-3d.md#adr-3d-397))
 
@@ -774,9 +855,232 @@ per resolve and threaded into the residual (`sampledSolidDims`). `rng.ts` export
 The free-line / free-plane resolvers still sample inside the residual.
 
 **One solve per configuration (#863, [ADR-3D-304](06b-decisions-3d.md#adr-3d-304)).** `resolve3` is a pure
-function of `(construction, seed, paramValue)`, memoized at that chokepoint (a WeakMap on the construction's
-identity — `apply` clones, never mutates). Every consumer shares it through `knowledgeSamples3`;
-`resolveStats3` counts resolves and hits.
+function of `(construction, seed, paramValue)`, memoized at that chokepoint (a WeakMap on the construction
+object that stands for its content, next paragraph — `apply` clones, never mutates). Every consumer shares it through
+`knowledgeSamples3`; `resolveStats3` counts resolves and hits.
+
+**Solved content is keyed by content (#2888, [ADR-3D-491](06b-decisions-3d.md#adr-3d-491); [ADR-W-210](06w-decisions-workspace.md#adr-w-210) invariant 4).**
+Every memo of this tree hangs off an object: the derive off the fact array, the solve and everything beside it (the
+pivot's recorded pools, the released constructions, the parts, the ring reach) off the `Construction3`. Each store
+action brings a new array and each fold builds a new construction, so an object is not the figure. `engine/content3.ts`
+gives each CONTENT one object, at the two chokepoints:
+- **`derive3` (the store).** The key is the fact list's content and the configuration: every row's id, text, commands,
+  `enabled` and `held`. A list the session has derived is answered from the memo whichever array carries it: a row edited
+  to what it said, the last row deleted, a row unticked and ticked again. At most `DERIVE_MEMO_ENTRIES` (64) derives are
+  held, the least recently used dropped; nothing else holds a `Derived3`, so the session's undo history no longer keeps
+  every past figure's derives alive.
+- **`resolve3` (the engine).** Its first line asks `figureContent3` for the construction's representative: the first
+  construction object seen with this content. All the per-construction memos are found on it. The construction does not
+  depend on the configuration, so this is what one figure's configurations share: a search that found seed 3 and the
+  redraw at seed 3 are one solve, although the redraw folded the list again. It is also what a list shares with another
+  list that folds to the same figure (a row that stands aside for its twin, a row unticked), and what the unchanged parts
+  of a split figure share from one line to the next. At most `FIGURE_CONTENT_ENTRIES` (64) representatives, least
+  recently used dropped. The resolve memo itself has two tiers: each construction object keeps its OWN answers, as it
+  always did (so an undo, or a derive the store still holds, finds its figure whatever was solved since), over the
+  answers its content shares on the representative (`sharedResolves3`). Each tier holds at most 64 entries per object.
+
+**The source of truth is `(facts, seed)`, and a row carries the first names of its renamed letters (#2894 part 2 B,
+[ADR-3D-497](06b-decisions-3d.md#adr-3d-497); operator, 2026-11-15).** The figure is a function of the fact list and the
+configuration; positions are never stored. Every seeded sample is keyed by a string spelled with the letters of the
+points it samples (`solid-polygon3-ABC`, `t-E-A-B`, `free3-x-P`, `oncircle-th-P`, `freeline-az-ℓ`, …, about forty sites
+through `rng.sample`). A rename or a swap rewrites every letter of the facts (ADR-3D-211), so it used to key every
+sample anew and the drawing jumped. Now:
+- `renameFacts3` / `swapSession3` write, on every row that names a moved letter, `Fact3.as[newLetter] = firstName` (the
+  name the point was first given; dropped when the point is back on it, so a rename undone by renaming back leaves the
+  row as typed). The first names are part of the facts, so undo/redo (zundo), the derive memo's content key, the
+  worker's journal (ADR-3D-493), the save file and the share link (`figureFile3`, the row's optional `as`) carry them
+  with no other change. A file without `as` (every file saved before) is read as it always was.
+- The fold reads them once (`sampleNames3`, store/rename3.ts) into `Construction3.sampleNames`: current letter → sampling
+  name, one-to-one. A letter no rename touched whose own name is a renamed point's first name (A renamed to D, then a
+  new point A) is sampled as `A~`, so two points never share a sample. Absent when no letter was ever renamed: such a
+  construction is the content it always was, and keys, solves and draws exactly as before.
+- `resolve3` solves a construction inside `withSampleNames3(c.sampleNames, …)` (`rng.ts`), and a lazy value computed
+  later runs under the names of the solve that made it (`lazy3`). Inside, `sample()` reads each label token of its key
+  (the rename's own grammar and boundaries) as its sampling name: the rename rewrote exactly those tokens, so the key,
+  and the sample, are the ones the figure had before. A part's seed key (`partKey3`) and the order the pivot ranks a
+  figure's configurations in (`intrinsicShape3`, `bySampleName3`) read the same names, so a split figure's saved part
+  seeds still match and the same configuration is picked.
+- Not covered: the letters the TOOL chooses for an unlettered solid noun or an indefinite shape are chosen again by
+  every fold from the letters free at that row, so a rename that frees a letter re-letters them, and their drawing
+  moves, as on `main`.
+- The solve is not reused across a rename: the renamed construction is another content, and the memos hanging off a
+  representative hold answers in its letters. Keeping the drawing costs nothing; reusing the solve needs a
+  relettering-invariant content key and a relabelling of every memo's answer (ADR-3D-497, *Not built*).
+
+"The same content" is exact, never a digest: a hash picks the candidates and `sameContent3` compares the two graphs node
+by node. Order is content (array items, map and set entries, object keys); primitives are compared as `Object.is` does;
+a key holding `undefined` is not a missing key; SHARING is content (a claim listed in `claims` and in `scaleGivens` is
+one object in both graphs or two in both, so `list.includes(x)` answers alike); and a side table read with the graph's
+objects is content (the pin-origin table `scalarPinOrigin3`, which `resolveHeld3` reads). A graph holding anything else
+(a function, a class instance) has no content and keeps the identity rule. `resolve3` is a pure function of exactly
+that content and the configuration, and nothing a reader takes from a `Resolved3` is compared with the reader's own
+construction objects (its values are keyed by id; its lazy pivot readers return numbers, and the one that returns pins,
+`heldPins`, is read inside `resolve3`), so the representative's answer is the one any object of that content would have
+computed. A representative must never be altered after it is taken, the rule the per-object memos already rested on;
+`ContentTable.changed()` reports a breach and the work-meter gate asserts it stays empty over every fixture's session.
+
+**A seed's verdict is kept too.** The configuration search (`firstSatisfyingSeed3`) asks of each seed whether its
+drawing meets the requirements and the preferences. A figure whose givens force a special case is answered "no" at
+every seed, so the search walks its whole window of 200, and the next action on that figure walks almost the same
+seeds. The resolve memo holds 64 entries per construction, and a resolved figure is the wrong thing to keep for a yes
+or a no. So `meetsRequirements3` and `meetsShapePreferences3` keep their VERDICT (`seedVerdict3`): one boolean per
+representative construction, question, seed (`seedKey3`) and set of preferences asked (each by its place among the
+figure's own), at most `SEED_VERDICTS_PER_FIGURE` (1,024) per construction, the oldest written dropped. It is not a
+limit on the search and changes no answer.
+
+Dropping an entry loses nothing but the sharing, and nothing invalidates: a content key cannot go stale.
+`clearSolveCaches3()` (test-only) is THE ONE CLEAR: the derive memo, the segment-equation readings, the construction
+table, the seed verdicts and the parameter's two older memos. A cache added later is cleared there, so a session the
+work meter starts is cold in every cache ([docs/08](08-testing-strategy.md), "The work meter";
+`src3d/__tests__/work-meter/walk3.ts`).
+
+What is NOT shared, measured in ADR-3D-491: the figure a new row makes is a new content and is solved from its start,
+at the drawn seed and the claim seeds. Starting those solves from the figure already drawn would change which solution
+a solve can reach, so it belongs to the solver, never to a key.
+
+**The pivot's lazy values are plain cells (#2890, [ADR-3D-492](06b-decisions-3d.md#adr-3d-492); [ADR-W-210](06w-decisions-workspace.md#adr-w-210) phase 3).**
+A resolved figure is plain data: `structuredClone` takes it whole, and `RESOLVED_CROSSES3` (`engine/evaluate.ts`)
+fails `tsc` when a function is added to `Resolved3` at any depth. The three values a reader may ask of the pivot's
+outcome after the solve (`scalarConsumed`, `placementFreedom`, `heldPins`) are each a CELL on the figure, the
+marker `{ lazy: true }` (`engine/lazy3.ts`). The value once computed, and how to compute it, are kept BESIDE the
+figure in the heap that solved it, keyed by the cell object. **A cell never holds its value**: a figure must be the
+same data whether or not a reader has asked yet, or a comparison of two figures depends on what was read before (the
+compute-once lock failed on exactly that). A copy of the pivot shares the cell. `heldPins` names each pin by its
+place in `c.scalarPins`, never by the pin object.
+- **One reader**, `lazyValue3`, behind `scalarConsumed3(resolved)` and `placementFreedom3(resolved)`; never read
+  the cell at a call site. In order: the value this heap has in hand; computed here, where this heap solved the figure; the
+  value that FOLLOWED the figure (`keepLazyValue3`), addressed by the construction's content, the resolve key and the
+  name; and last the figure SOLVED AGAIN here, counted (`lazyStats3.solvedAgain`). Never a default: the DOF line's
+  `?? c.scalarPins.length` is for a pivot with no solution, so an absent value read as `undefined` would print a wrong
+  count as a fact.
+- **A figure this heap did not solve** enters its memo through `keepResolved3(figure, home, out)`: the construction's
+  own answers and its content's, an answer already held kept, its cells given the figure's home (representative,
+  resolve key, seed, options, one figure or parts) so that the fourth step knows what to solve. The construction's pin
+  origins are written first: they are part of its content.
+- Nothing is forced before a figure crosses. Forcing every lazy on every figure was measured at 8.4 % of a load's work
+  and up to 1.4 s on one figure, almost all of it `placementFreedom` on samples nobody reads.
+
+**A job's journal, and its adoption (#2890, [ADR-3D-492](06b-decisions-3d.md#adr-3d-492) part 2).** The memos above can
+be filled from outside the heap. `store/journal3.ts`:
+- `recordJournal3()` notes every entry WRITTEN into a content-keyed memo while it is on, in the order written: a
+  derive, a resolved figure (also when a construction object takes its content's answer as its own), a seed's verdict,
+  a ring-reach value, a segment-equation reading, and every lazy value in hand, addressed like its figure (a cell
+  carries none): those of the figures in the take, and those computed since on a figure an earlier take carried.
+  `take()` returns what was written since the take before, as plain data: a job is handed over in stages (the
+  figure, then the values), and a value computed in a later stage on an earlier stage's figure follows by content.
+- `adoptJournal3(journal)` puts each entry into the memo its own function reads, under the key that function builds.
+  An entry already held is kept. Nothing is applied as a result: the adopting heap then runs its OWN store action and
+  readers, and every solve is a hit. An entry that is missing is solved there and counted, never read as a default.
+- **A memo added to this tree joins the journal** (its write noted, its adoption written), or the adopting heap solves
+  what the solving heap solved. The work-meter gate catches it: since ADR-3D-493 it walks every fixture on two heaps
+  (the page and the worker, two module instances, every message cloned), and the page's recorded count is zero.
+- **Beside its entries a journal carries** each construction's pin origins, as an array aligned with `c.scalarPins`
+  in the same message (a clone's pin objects are new, and a construction without its origins is "not settled": it
+  keeps the identity rule and nothing adopted is found under it). **The new row's id is the caller's**
+  (`store.submit(text, newId)`, `submitSteps`, `decideDeterministic3`): it is part of the derive's key, and two heaps
+  running one submit must name the row alike. **One take is one message**: its entries share objects, and a clone keeps
+  that only inside one `structuredClone`.
+- **An adopted answer is not dropped for the memo's bound on arrival.** The solving heap wrote its answers in the
+  order the action asked for them and dropped the oldest; they all arrive at once, after it has finished, and the
+  adopting heap's action then asks from the start. The surplus goes when the next journal arrives
+  (`releaseAdopted3`).
+- The walk is a sequence of steps (`stepsOfFixture3`, `stepsOfLines3`); a new session is a step of its own.
+
+**The page does not solve (#2890 round 2, [ADR-3D-493](06b-decisions-3d.md#adr-3d-493); [ADR-W-210](06w-decisions-workspace.md#adr-w-210) invariant 1).**
+3-D has one worker (`app/worker3.ts`, on the shared host), started with the page (`startWork3`, `main.tsx`), and one
+operation, `act` (`app/ops3.ts`): set the worker's store to the page's data, run the action's steps (a typed line, a
+store action by name, a file / link / session read, a question), read the FIGURE (`app/readers3.ts`: the derive, the
+DOF line, the crossing dots), send its journal as the part `figure`, read the VALUES (the open panel's `dataView` and
+every saved question), and answer with their journal. The page (`app/offPage3.ts`):
+- `offPage3(steps)` posts the job with the page's data and the new rows' ids (`store/rowIds3.ts`: every id a store
+  action or a load draws comes from there, so both heaps name a row alike), adopts the figure's journal, and waits for
+  the values while the student would not see the wait: up to the shell's threshold from the job's start. Then, if the
+  store still holds the figure the job was posted for (the basis), it installs the ids and returns; otherwise it posts
+  again. The caller runs its OWN action (unchanged), then `after()`: the values are marked ready for the figure that
+  action left when their journal is in (`values3`, `useValues3`). A journal for a figure the student has left is
+  adopted (keyed by content: useless, never wrong) and never marked ready.
+- Every route that changes or reads the figure goes through it: `act3` (`work3.ts`, the queue's `around`: toggle,
+  delete, edit, rename, swap; undo and redo run the worker on the figure zundo goes back to), and App3's job bodies
+  (a typed sentence and the model's lines, a named crossing, a load, a link, a restored session, «הציגו תצורה אחרת»,
+  clear). The panel opened on a figure whose values were not read, and a question asked, are jobs on the `values`
+  lane (behind the student's actions; the submit button does not say «חושב…»).
+- App3 reads the values only when they are ready (`dataPanel`, `queryResults`, the canvas coordinate labels); until
+  then the panel shows one grey «בודק…» line, after the shell's threshold (`useShownWorking`). The page's thread is
+  free while the worker solves, so the threshold is counted on it.
+- The meter: the worker's units come back in the envelope; those of the figure's part are before the paint, those of
+  the values after it. The page's count is zero.
+- Where there is no `Worker` (node, the suites), `offPage3` posts nothing and the values are always ready: the page's
+  own action solves, as before. The work-meter gate hands the client an `isolatedExecutor` over a second module
+  instance of `ops3` (the worker's heap).
+- A crashed or replaced worker is handed the figure on screen (`heldJournal3`: the page's derive, its construction's
+  answers and their lazy values, read without solving).
+- `derive3` hands the fold the fact list's REPRESENTATIVE (`factLists3`), so a memo below it keyed by the array (the
+  narrowing notes) is keyed by content: a worker is handed every list as a clone.
+
+**Stated lengths the metric forbids are read off the pins (#2894, [ADR-3D-495](06b-decisions-3d.md#adr-3d-495)).**
+`metricConflict3` (`engine/metricBounds3.ts`) reads the `length` and `length-rel` pins as a weighted union–find over
+segments: every segment whose length the pins fix, with the pins that fix it. Two metric facts are checked: one length per
+segment, and the triangle inequality on every three points whose sides are all fixed. A conflict counts only beyond
+`CONFLICT_MARGIN` (1e-3, relative and absolute), far outside the slack the pivot's acceptance (1e-10 squared) leaves
+its rows, so the pin set is one no start could meet. `solvePivot` returns an empty pool for it before its first start
+(a probe call excepted); every caller already reads the empty pool as "no placement". The store's no-placement refusal
+asks the same function and, when the conflict involves the blamed row, words it as `lengths-impossible` with the
+reason, naming the rows that added the pins taking part (`pinRow`, recorded where each row's pins are added).
+
+**The cold sweep's creep stop and the anchored settle (#2894, [ADR-3D-499](06b-decisions-3d.md#adr-3d-499)).** The
+pivot's cold sweep (the 16 starts, their polish, and the dims widening) passes `leastSquares` a fresh `creepStop()`, asked
+every 8th accepted step with the error. It stops the solve when the point is drawn at a point and exact (ADR-3D-464), or
+when the givens' rows are exact to two orders under the acceptance (`primaryErr < ACCEPT·1e-2`) and the full error fell
+less than 10 % (`CREEP_GAIN`) over those 8 steps. What is left then is the anchors' 1e-4 pull, which used to creep along
+the curved solution set to the 120-iteration bail, and three polish restarts after it, without arriving. A solve the
+creep stop ended goes to `settleAnchored`, which reaches the creep's destination directly. Each round takes the
+Gauss–Newton step of the anchor rows with the givens' rows held (weight `SETTLE_HOLD` = 1e8), projects back onto the
+givens' solution set with a solve of the givens' rows alone, and keeps the point only while the full error falls. It ends
+on a negligible step, when the step's predicted gain (the Gauss–Newton model's g·d) is under `SETTLE_STALL` = 1e-3 of the
+error, or after `SETTLE_ROUNDS` = 12 rounds, and every residual it evaluates is metered. Only unknowns that
+some row reads take part (`SETTLE_LIVE`): an undriven dim's column is zero, and the #518 park places it after the sweep.
+
+The settle has three guards, and each falls back to the solve exactly as before the creep stop (`leastSquares(fSeed, x0,
+120, exactAtPoint)`):
+- **Regular points only** (`regularOnSet`). One minimum-norm Gauss–Newton step of the givens' rows, solved in their row
+  space, must cut their error by `SETTLE_REGULAR` = 1e-4 at least. It does at a regular point of the solution set
+  (quadratic convergence), and never at a tangential one: the exam cube's «A(3,n,p)» forces p² = 0, where a residual of
+  1e-12 leaves p at 1e-3 and the step cuts the error by 16.
+- **Defined trial points.** A trial point where the residuals cannot be evaluated (a rider plane through three collinear
+  points) ends the settle.
+- **The creep's own basin.** A settled point that is degenerate (a collapsed solid, a point off its host) from one that
+  was not is refused.
+
+**Every admitted candidate on the givens' set** (`onSet`, in `collect` only). The full objective's minimum is not on the
+set: the anchors' pull holds the givens' rows at a residual of about 1e-12, so a coordinate the givens fix comes out a few
+1e-7 off, differently at each knowledge sample, and the samples' comparison withheld it or not by chance. Each candidate
+`collect` is offered is projected onto the set by one certifying Gauss–Newton step of the givens' rows, at a certified
+regular point only. The shift is of that order, so the drawing does not move visibly. A quantity the givens fix then agrees
+across the samples, and the panel, the asks and the claims read it as fixed (FR-EQ-4); a free one still differs at its own
+scale. **The search path is never projected:** the sweep's results, and the polish restarts from them, run exactly as LM
+leaves them. Projected there, the restarts fell into other basins and reached fewer of a figure's discrete placements, and
+exact samples turned that into a claimed value (#2368's control read «A'(0, 0, 2)» at 9 of 24 seeds).
+
+**The configuration search is bounded in work (#2893, [ADR-3D-494](06b-decisions-3d.md#adr-3d-494); ADR-W-210 invariant 3).**
+`searchSeed3` (`engine/evaluate.ts`) walks the search's window, `SEARCH_SEEDS3` = 200 seeds from its start, until one
+meets the requirements, under `withWorkLimit` (`shell/workLimit`) of `SEED_SEARCH_LIMIT3` units, checked before each
+seed. Three outcomes: `found`; `none`, the window walked with no seed (a FINISHED search, operator ruling "1a",
+2026-11-15: the callers answer it as they always have); `not-decided` (`shell/notDecided`), the limit reached first,
+carrying `SeedResume3` (the part, the next seed, the fallback, the preferences kept): the next round goes on through the
+window from there. A valid seed met before the limit is an answer. The count (`searchWork3`) is `chargedWork3`
+(`engine/workLedger3.ts`: the meter's executed units, plus what each memo hit on the per-seed path saved: the seed
+verdicts, the resolve memo, the ring reach), plus a floor of `SEED_FLOOR3` per judged seed.
+- The store's callers on `none`: a typed line and an edit refuse with `bound-unsatisfiable`; `resample` draws the next
+  seed; `loadedSeed3` opens at the saved one. On `not-decided`: `decideCommands3` answers the verdict `not-decided`
+  (nothing added, no refusal); `replaceFact` keeps the old statement; `resample` keeps the seed. Each sets
+  `lastNotDecided` (transient, never in the history), which App3 shows with the shell's `NotDecidedNote` where
+  `lastError` shows, while the store holds the figure it was made on. «המשיכו לחפש» is the store action
+  `continueSearch(ask)`, a job like any other (the press's on its lane).
+- The round runs in the worker; the journal carries its OUTCOME (`searches`), which the page's run of the same round
+  takes once (`handedSearches3`).
+- A range no angle can be in (low end ≥ 180°, high end ≤ 0°) is refused by `apply.ts` without a search.
+- The per-seed memos are bounded: the solid draws (1 024 per solid list), the ring reach (1 024 per construction), as
+  the seed verdicts (1 024) and the resolves (64) already were.
 
 **A pin symbol's admissible roots are one set (#1769, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395)).** One
 root predicate decides whether a candidate joins the pool: `collect` admits it only when it is exact on the primary
@@ -829,7 +1133,7 @@ dry run and the mint pass's dry runs all apply the row as read, and `applyComman
 before its own kind (ADR-3D-460). The outermost
 `applyCommand3` then applies it: `'vector'` as the vector command plus an ink arrow (`arrows`) for each pair of the
 sentence; `'length'` as exactly «|XY| = k|ZW|»'s commands (`segment3` + `length-rel`); `'ask'` or no reading as
-`ambiguous-vector-length`, which carries the pairs except at `k = 1`. `decideCommands3` answers `already-stated` for
+`ambiguous-vector-length`, which carries the pairs except at `k = 1`. `decideCommands3` answers a held `record` (ADR-3D-484) for
 a two-reading line whose reading `verifyClaim` finds true in every sample of the figure before it (T45).
 The fact row reads the same record (Am. 2): `App3` hands `Derived3.readings[f.id]` to `factRowText3` / `FactRowText3`
 (`render/FactRow3.tsx`), and a `'length'` row bypasses the command-kind vector gate — `factDisplay3` returns
@@ -838,9 +1142,9 @@ wrapped in bars («AA'=3BC» → «|AA'|=3|BC|»), composed from the command whe
 
 **Stated numbers restated** (ADR-3D-423, #2341). `numbersRestatementTwin3` is the third test of the twin rule, after `sameStatement` and `ringRestatementTwin3`. `statedNumbers3` reads what a command states as numbers, of what: a point's coordinates (`point3`, the `coords-eq` claim) or a segment's length in either letter order (the `length-eq` claim). It compares them at `CLAIM_REL_TOL`, and the twin must already draw the line's `segment3` ink. A line with no stated numbers to match has no twin, so a coordinate answer or a first length stays a row. A plane's equation is read as the plane it names ([ADR-3D-429](06b-decisions-3d.md#adr-3d-429), #1542): the `plane-eq` claim under its letters in any order, a `plane3` with no parameter under its name, each as a unit normal with its first nonzero coefficient positive, so a multiple of the equation is the same numbers.
 
-**A statement the figure already holds** (ADR-3D-449, #2341). `impliedByPrior3` is the last test of the twin step in `decideCommands3`, after `knownSegmentEquationTwin3`, on the grammar lane only. It reads the candidate fold the decision already paid against the figure before the row: (1) no construction part outside `STATEMENT_PARTS3` (claims, pins, mutual requirements, memberships, the statement's own segments and point-run planes) changes size, the line states something, declares no shape (`solid`), and touches no default (`touchesDefault3`, which reads the fold's own defaults-yield registry through `yieldEntry3`: a soft right angle, a soft equal pair, a trapezoid's pair); (2) every `knowledgeSamples3` sample at every claim seed places every point, plane and line where the prior one did, and every earlier row keeps its status; (3) a mutual requirement holds at every claim seed (`meetsRequirements3`). Signs and angle bounds are outside `STATEMENT_PARTS3`, so they always commit. The verdict is `already-stated`, its twin the latest enabled row naming every point of the line (`knownTwin3`). It costs the prior samples, memoised per construction, and only after (1).
+**A statement the figure already holds** (ADR-3D-449, #2341; outcome [ADR-3D-484](06b-decisions-3d.md#adr-3d-484), #2790). `impliedByPrior3` is the last test of the twin step in `decideCommands3`, after `knownSegmentEquationTwin3`, on the grammar lane only. It reads the candidate fold the decision already paid against the figure before the row: (1) no construction part outside `STATEMENT_PARTS3` (claims, pins, mutual requirements, memberships, the statement's own segments and point-run planes) changes size, the line states something, declares no shape (`solid`), and touches no default (`touchesDefault3`, which reads the fold's own defaults-yield registry through `yieldEntry3`: a soft right angle, a soft equal pair, a trapezoid's pair); (2) every `knowledgeSamples3` sample at every claim seed places every point, plane and line where the prior one did, and every earlier row keeps its status; (3) a mutual requirement holds at every claim seed (`meetsRequirements3`). Signs and angle bounds are outside `STATEMENT_PARTS3`, so they always commit. Statement parts include the statement's own marks (`angleMarks`, `lengthMarks`) and the apply-time `redundantShapes` flag. Since ADR-3D-484 every twin test leads to a `record` verdict with `held: true` (the store's `already-held` notice, `suite.notice.alreadyHeld`); a muted twin is `retick`. Before the fold, `standingTwins3` (`derive3Uncached`, ADR-3D-484 Am. 1) pairs every enabled row with the first earlier enabled row that does not itself stand aside and that the submit decision's own twin tests pair it with (`sameStatement`, `ringRestatementTwin3`, `numbersRestatementTwin3`): the row is folded as muted, so a repeated definition (a plane's equation in another spelling, «D על המעגל» again, a pyramid typed twice) never reads `already-defined` / `not-on-circle`, and it then reads its twin's status. The pairing is read from the list on every fold, so undo, save and load keep it; untick or delete the twin and the row applies itself. Rows the twin tests do not pair apply, and a repeated pin is left out of the solve by ADR-3D-483. It costs the prior samples, memoised per construction, and only after (1).
 
-**A row's lead** (ADR-3D-429, ADR-3D-431, #1542). Since ADR-3D-449 no submit records a claim the figure already held, so the ✓ is reached only by a row saved before it. `factLead3` is the row's whole rule: ✓ for an `ok` row holding a claim, except a row `claimGivens3` names, which keeps the status dot. That read asks `verifyClaim` of the construction before the row: a claim that did not hold on every sample of it is the row that made it true. Each row's answer is memoised on a trie keyed on the fact objects, and asked at seed 0, so a commit pays for its own row and a press pays nothing. It is a view read, memoised in `App3` on `(facts, seed)`, and never part of `derive3`, so a seed search pays nothing and a row with no plane equation costs nothing.
+**A row's lead** (ADR-3D-429, ADR-3D-431, #1542; [ADR-3D-484](06b-decisions-3d.md#adr-3d-484), #2790). Every row leads with its status dot: every claim row is a given (ADR-W-200, sr-19), so the ✓ lead, `factLead3` and `claimGivens3` are gone.
 
 **One plane head** (ADR-3D-429). `planeByEquation` and `planeEqClaim` read `PLANE_DEF_NOUN` through `matchDefHead`; the "equation of" lead (`EQ_OF_HE`, `EQ_OF_EN`) is shared with `parametricLine`, and `defBody` is the one separator reader. The space of «π 1» belongs to the index in `PLANE_NAME`.
 
@@ -914,7 +1218,7 @@ locks totality: every `c.*Pins` / `figure*(c)` family `solve3.ts` reads is a row
 
 **The leftover turn and size are measured, then drawn (#2378, #2504, [ADR-3D-379](06b-decisions-3d.md#adr-3d-379)).**
 The funnel still decides what the SOLVE may move and freezes a partial rotation (a turn about a pinned point or
-axis). After the solve, resolve stage 6 reads the rank probe (`pivot.placementFreedom()`, below) for any solid whose
+axis). After the solve, resolve stage 6 reads the rank probe (`pivot.placementFreedom`, below) for any solid whose
 rotation is anchored (`rotationAnchored3`: an absolute-frame object or a stated vector) and whose placement is not
 already sampled: it parks a free size at the seed's target (`freedom: 'size'`), then turns the figure by a seeded
 angle over the full turn about a seeded axis of the leftover turn (`freedom: 'turn'`), both in `originChart` (about
@@ -996,6 +1300,17 @@ existing `givens-contradict`. `applyBoundPyramid3` asks the claim verifier wheth
 the line (`verifyClaim` concyclic, every claim seed × branch, M3) and stamps `SolidObj.boundCyclic`; then neither the
 `base-constrained` note nor a narrowing cause is read off the pyramid (`rowClass3` takes the folded figure), since it
 narrowed nothing (Q-2490d).
+
+### A held pin is left out of the solve (#2795, [ADR-3D-483](06b-decisions-3d.md#adr-3d-483))
+
+A restatement («זווית ABC = זווית ACB» after «AB = AC») is a scalar pin whose rows lie in the span of the
+others'. It removes no freedom but changes the least-squares path, so it used to move the figure about 1e-3. Each
+driving pin carries its provenance (`scalarPinOrigin3`: the claim it drives, set by `recordClaim3`; the fact that
+stated it, set by the fold). Each pivot solution measures lazily (`heldPins`) which facts' pins are held: newest fact
+first, a fact's pins are held when leaving their rows out keeps the rank of the Jacobian of the pin rows over every
+unknown. `resolveHeld3` (inside `resolve3`'s memo, around the joint rung) then solves the figure without them, which
+is the figure as it was before that fact, and keeps that solution only when every left-out claim holds there
+(`claimHoldsAt3`). A left-out pin stays a checked claim; once its earlier twin is gone it is no longer held and drives.
 
 ### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
 
@@ -1223,7 +1538,9 @@ renderer orients faces of a solid that may be non-convex by a consistent winding
 (`statedConcyclic3`, #2810, [ADR-3D-467](06b-decisions-3d.md#adr-3d-467)) — a circle through the letters, a cyclic fix, a
 right pyramid's base: concyclic letters have no concave drawing, and the `concyclic` claim verifies in-order
 concyclicity — coplanar, diagonals crossing, opposite angles supplementary — so a dart can no longer verify the circle
-(the solver pin keeps its sign-crossing descent form). **The ring preference** — a seed whose
+(the solver pin keeps its sign-crossing descent form). Since #2813 ([ADR-3D-490](06b-decisions-3d.md#adr-3d-490)) a stated
+interior angle restricts the seat too: a vertex with a stated angle at its corner in any declared ring over the letters is never
+the reflex one, and letters whose stated angles prove convex position (`anglesProveConvex3`) get no concave seat. **The ring preference** — a seed whose
 declared rings (`declaredRings3`, the one enumeration this loop and the seed search share) are all simple joins
 `meetsShapePreferences3`'s tier in `firstSatisfyingSeed3`, so a forced crossing still resolves at today's fallback seed.
 **The reach** — an unpinned coordinate letter whose default draw crosses a declared ring over its point is re-drawn at
@@ -1258,6 +1575,21 @@ flat-polygon arm, in the mixed run when a known corner is itself free, and in `q
 ring with exactly ONE placeholder corner first yields it to ARM 2 (the family's own corner: closed form for the
 parallelogram family and the kite, a plane rider otherwise), keeping the point's original slot in the order
 (`keepPointSlot3`) so its dependents still follow it.
+
+### Letters in a vector equation over placed points (#1551, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472))
+
+A `vec-eq` given may carry lettered coefficients (`VecTerm.letter`: coefficient = `coeff + p·sym`). Its letters are
+never pivot unknowns. At any drawing the equation is `R = Σₛ s·Dₛ` with numbers R and Dₛ, so `vecEqLetters3`
+(`vecExpr.ts`) solves the letters by linear least squares and returns the residual no letter can absorb. That residual
+is the pin's three rows in the pivot (the free shape moves until the relation can hold; scale-covariant like the
+numeric `vec-eq`, so the `invariantOnly` lane and the rank probe need no change, and the probe charges the box only
+for the residual's rank), the drive's measure. The verifier, the panel's `vec-letter` owner and the claims' number reader read the letters
+through `lettersAt3` (ADR-3D-472 Am. 1): jointly over every lettered equation, so one letter has one value in every
+relation that writes it; the `vec-eq` claim is judged at those values (the span residual for a letter the drawing
+leaves open). A value given to a letter («a = 1/2») substitutes; dependent letter
+directions leave the letters undetermined (`a = ?`). A definition with several letters (`vecDefs[].symbols`, each term
+naming its letter in `SymTerm.sym`) samples each letter as a one-letter ratio is sampled, and `vecDefLetterAt3` reads
+the letters back through the same least squares.
 
 ### Claims
 
@@ -1326,7 +1658,7 @@ change to LM start noise cannot move which configuration a seed draws.
 ### The submit decision (#1394, [ADR-3D-258](06b-decisions-3d.md#adr-3d-258))
 
 `store3.submit` decides nothing: `decideSubmit3(state, utterance)` returns a `Verdict3` (rename ·
-not-understood · refused · already-stated · record) and `submit` dispatches it. The decision is pure, so
+not-understood · refused · retick · record, a record carrying `held` for a line the figure already holds) and `submit` dispatches it. The decision is pure, so
 #1358's register can ask "would you accept this line?". The statement seams share `readStatement3` (the
 grammar plus the #866 repair and the #516 typed refusals), `lostGivens3` (the honesty gates) and
 `decideCommands3` (gates → twin → derive → search), where the LLM lane's `submitSteps` also ends. The twin is

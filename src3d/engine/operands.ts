@@ -15,6 +15,7 @@
  * solved with the gauge frozen is decided by `isAbsolute` over its operands, never by its pin kind.
  */
 
+import { boundHolds3 } from './bound3';
 import type { Claim3, ComponentTarget, Construction3, Id, MutualRel3, OnLineCommand, OnPlanesCommand, Operand3 } from './types';
 import type { ResolvedLine, ResolvedPlane } from './evaluate';
 import { centroid3, cross3, dist3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
@@ -997,7 +998,7 @@ export const positionalComponentSigns3 = (c: Construction3): Construction3['comp
 export const componentSignsHold = (c: Construction3, at: (id: Id) => Vec3 | undefined): boolean =>
   positionalComponentSigns3(c).every((g) => {
     const v = componentValue(c, g.target, g.axis, at);
-    return v === undefined ? false : g.positive ? v > 1e-9 : v < -1e-9;
+    return v === undefined ? false : boundHolds3(g.bound, v); // #1524: a sign or a range
   });
 
 

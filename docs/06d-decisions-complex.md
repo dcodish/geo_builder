@@ -4529,3 +4529,210 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Locks.** `src-complex/__tests__/already-drawn-1990.test.ts` drives the shared table (`HELD_CASES_COMPLEX`) through the real `submitLine`: one row, the note, no point moving at 4 seeds, and, with the earlier row muted and then deleted, the row carrying the relation alone; controls. Re-based on ADR-W-200's authority: `entailed-noop-2268`, `triage-replay-cx-2241`, `sibling-phrasings`, `app/__tests__/acceptance-gate`.
 
 **Behaviour change for a student:** in complex, «|z1| = 5» after «z1 = 3+4i» (and every exact restatement) is listed as its own row, and the tool says «זה כבר קיים באיור — נוסף כנתון נפרד.» instead of adding nothing.
+
+## ADR-CX-090 — A line read is a counted unit of work, and a line is read once per content: complex's part of "compute once" (#2888)
+
+**Status:** accepted · 2026-11-14 · debt (P2, complex) · branch `debt/2888-compute-once-complex` · phase 2 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (invariant 4), and the decision its Amendment 1 left to this phase · **LADDER stage:** none is added or moved; the memo sits in front of stage 0b (`parse()`), [LADDER-CX](LADDER-CX.md)
+**Operator:** 2026-11-13, in chat: *"I dont want local optimization - i want overall optimization so we dont end up fixing one issue just to discover later we have an issue somewhere else."* · 2026-11-14, in chat: *"go ahead with next phases"*
+
+**Requirements:** none (internal): no line, verdict, drawing or message changes · **Design:** [04d](04d-design-complex.md) § "Compute once: the line read and its memo"; [docs/08](08-testing-strategy.md) "The work meter" (the complex unit); [LADDER-CX](LADDER-CX.md) stage 0b
+
+**Measured before anything was built** (`main` @ `9cd61315`, the dev PC, node 24).
+
+Where the time goes: a CPU profile of `2b-capstone` walked 200 times (500 µs sampling, 14.5 s sampled), the share of sampled time under each function:
+
+| Function | Inclusive share |
+|---|---|
+| `parseLineV2` (`parser/rules.ts`), the read of one line | **81.5 %** |
+| of which `rx` (`parser/lexicon.ts`), a `new RegExp` on every call | 43.0 % (self time) |
+| of which `normalize` | 15.3 % |
+| `foldConstraints` (`replay/derive2.ts`), the whole fold | 12.9 % |
+| of which `exactSolve`, the unit the meter counted | 3.3 % |
+
+The read is reached through `complexScopeOf` (50.2 % of the time: it reads every line to find the declared letters, and the fold, the gate, the ask routing and the render each call it), `lowerLines` (35.1 %), `parseInFigure` (7.8 %) and `parseAsk` (4.0 %). The 112-line synthetic figure of the #2867 map (the probe `scale:rchain-48+refuse`: 112 accepted lines, then «|z1| = -5», refused as impossible after the gate's differential blame) spends 72.0 % of its 2.8 s in the read and 24.7 % in its 234 folds.
+
+How often a line is read: every read, every fold and every `new RegExp` counted over the gate's walk of the 45 fixtures (305 recorded actions), with the content each call was made for.
+
+| Over the 45 fixtures | Executed | Distinct content inside its action | Distinct content inside its session (one fixture's walk) |
+|---|---|---|---|
+| line reads (`parseLineV2`, by text and declared letters) | 8 076 | 1 042 | 177 |
+| `complexScopeOf` calls (by line list) | 2 141 | 578 | 213 |
+| `lowerLines` calls (by line list and declared letters) | 1 297 | 578 | 213 |
+| folds (`deriveLines`, by line list, configuration, seed, questions and chips) | 1 069 | 719 | 322 |
+| `new RegExp` in `rx` | 252 738 (31 per read) | — | — |
+
+So 87 % of the reads repeat a read already made inside the same action, and 98 % one made in the same session. The dearest recorded action, `2b-capstone|load`, reads its 13 lines 427 times and folds 23 times, 13 of them distinct. On the synthetic 113-line session one line is read 1 669 times, and the session makes 93 000 reads of 115 distinct lines and 3.1 million regular expressions.
+
+**Root cause.** `parseLineV2(raw, scope)` is a pure function of the line's text and of the letter families the figure declares complex, and nothing kept its result: every fold, every scope scan and every gate probe read every line again, and each read rebuilt each rule's regular expression from its source text. The cost of an action therefore grows with the square of the number of lines. **Class:** a pure function of content recomputed per call, in the one builder that had no cache at all.
+
+**Decision 1 — a line read is a counted unit.** ADR-W-210 Amendment 1 found that the complex meter counted 3 % of the builder's time (one exact solve per fold) and left open whether line lowering should be counted too. It is, from this change: `parseLineV2` charges one unit per EXECUTED read, beside the unit `exactSolve` already charges. A count of an action is now its executed line reads plus its exact solves.
+- *Why the read, and why at `parseLineV2`.* The amendment proposed one unit per `lowerLines` call. The measurement above says `lowerLines` is under half of the reads: `complexScopeOf`, the gate's own probes, the ask reader and the parameter note read lines without lowering them. `parseLineV2` is the one function every read goes through, so the count sees a read wherever it is made, and a change that makes each fold read its lines twice now fails the gate, as a change that doubles the folds always did.
+- *Why not a unit per fold or per lowering.* A fold's cost is its reads plus its solve; counting reads and solves separately is what lets the count show a memo's effect, and it keeps the entailment gate (two solves, no fold) in the count.
+- *Two kinds of work in one count.* A read and an exact solve cost about the same order (a read about 0.09 ms before this change, a whole fold about 0.1 ms on the fixtures), and a count is only ever compared with the same action of the same figure, so the sum is meaningful where it is used. Analytic's count mixes residual evaluations of three routines in the same way.
+- *A memo hit is not charged.* The meter counts executed work, as 2-D's does (ADR-W-210 Amendment 1). Complex has no work budget and no code reads the count to decide anything, so docs/17 §7's fifth rule (a budget charges a hit the work it saved) has nothing to apply to here.
+
+The unit changed, so the baseline was re-recorded once with `--accept-rise`, in its own commit, before any memo existed. Every one of the 305 recorded actions rose, by exactly its line reads; no exact-solve count moved.
+
+| Recorded actions (45 fixtures) | Phase 0 unit: exact solves | New unit: line reads + exact solves, no memo |
+|---|---|---|
+| total = page = before the paint | 1 231 | 9 307 |
+| submit (134) | 584 | 4 196 |
+| load (45) | 321 | 2 437 |
+| edit (45) | 185 | 1 521 |
+| another (45) | 95 | 824 |
+| delete (36) | 46 | 329 |
+| the dearest, `2b-capstone` load | 23 | 450 |
+| `2b-capstone` submit#13 «המרובע Oz2z3z4» | 3 | 146 |
+| `symbolic-cartesian-forced-1365` load | 19 | 161 |
+
+The gate's determinism held under the new unit before the memo: the record, a check, `--order reverse` and `--order shuffle:7` gave the same 305 counts.
+
+**Decision 2 — a line is read once per content, a figure is folded once per content, a pattern is compiled once.** Three memos, all made by one small table, `src-complex/value/contentMemo.ts`: from a content key to a frozen value, bounded, the least recently used entry out first.
+
+| Memo | Holds | Key | Lives | Bound | Cleared by |
+|---|---|---|---|---|---|
+| `readings` | the `ParseOutcome` of one line read | `parseKey`: the declared letter families as a sorted set, then the line as typed | `parser/rules.ts`, inside `parseLineV2`, so every caller of the read shares it | 1 024 entries; a reading holds about 4 KB with the atoms it registers, a full table 4.2 MB | `clearComplexCaches` |
+| `figures` | the `Derived2` of one fold | `deriveKey`: the configuration index, the seed, and the line list, the questions and the sorted chip set as JSON | `app/deriveLines.ts`, inside `deriveLines`, the one place the parser and the fold are composed | 256 entries; the heaviest fixture's figure holds 12.5 KB (3.2 MB full), a 112-line synthetic one 34.8 KB (8.9 MB full) | the same |
+| `patterns` | one compiled `RegExp` | the flags and the pattern's source | `parser/lexicon.ts`, inside `rx` | 512 entries; the grammar has 44 patterns | the same |
+
+- **The key of a reading is its whole input, found by reading what the parse reads.** `parseLineV2(raw, scope)` reads the text and the declared families, the families by membership alone (`isComplexName`). It reads nothing else: the grammar reads Hebrew and English in one rule list, so the interface language is not an input; and it is stateless per line by design ([ADR-CX-024](#adr-cx-024)), so no earlier line is an input. The readings that do depend on order (which of ADR-CX-005's modes `X^n = …` has, a selection's candidates, a reserved letter) are decided by `lowerLines`, which runs per fold over the memoized readings and is not memoized. The text is keyed as typed, before normalization. The scope part of a key is JSON, which cannot hold a raw NUL, and a NUL separates it from the text, so no text can imitate a scope.
+- **The read has one side effect, and the memo is sound with it.** Reading a literal registers its exact pair in the value layer's atom registries (`value/angle.ts`: `LITERAL_ATOMS`, `CERTIFIED_ATOMS`), which the fold reads back. A hit skips the read and so the registration. The registries are add-only, keyed by a name derived from the exact value, and never cleared, so the entry the first read made is there for every hit. They existed before this change (with `PRIME_CACHE` in `value/gaussian.ts`, a table of a pure function); they are not content memos of results and `clearComplexCaches` leaves them alone, which is the safe order.
+- **The key of a figure.** The fold is a pure function of its five arguments (no clock, no random source, no language: the seed is an argument). Order is meaning, so the lists are keyed in order with their boundaries; each number keeps its own spelling.
+- **A stored value is frozen and shared.** A hit returns the same object to every caller. `ParsedLine`'s channels became `readonly` arrays (nothing in the tree wrote to one: `tsc` is clean), and `deepFreeze` makes a write throw at the place it is made, in production as in the suite.
+- **A global or sticky pattern is never kept.** It carries `lastIndex` between calls. `rx` builds those fresh, as before (five call sites, all on a rule's matched path).
+- **Nothing is keyed by a clock, and there is no budget to charge.** A memo returns what the function would compute and nothing else decides a verdict.
+
+**What a walk now does differently.** The gate's walk (`__tests__/work-meter/walkCx.ts`) starts each figure from empty memos and then stays warm, as one student session does, and it empties them again before the `load`, which stays a cold load. The delete follows the load in that second session. So a recorded count now means: the work this action executes in a session that has done the figure's earlier actions and nothing else. **The `edit` is the walk's last action and has a session of its own** (one definition for all four builders, #2888): a student who has built rows 1..n changes the LAST row; the rows before it are solved in the session, the edited row's content is not. A memo is keyed by content and cannot forget one row, so the driver builds that state (`editLastRowCx`): the memos emptied, rows 1..n-1 put in the store and rendered unmeasured, then all n rows put in the store with nothing solved, then the measured edit of the last row to its own text through `editLine`, as before. The rows are the loaded session's, taken before the delete changes it; a one-row figure has an empty prefix and a cold edit. The timing harness (`scripts/perf/complex/harness.ts`) runs the same order and the same edit per corpus item. The gate's determinism lock is untouched.
+
+**Measured after, with the first walk** (commit `d0651b30`: the `edit` still re-typed the last row in the session that had just solved it, so it reads 0; the final `edit` and totals are in the next section. The same 305 recorded actions; record, then a check in the recorded order, `--order reverse`, `--order shuffle:7` and `--order shuffle:11`, each a fresh process, all identical).
+
+| Recorded actions (45 fixtures) | New unit, no memo | With the memos | Fall |
+|---|---|---|---|
+| total = page = before the paint | 9 307 | **1 043** | −88.8 % |
+| of which executed line reads | 8 076 | 354 | −95.6 % |
+| of which exact solves | 1 231 | 689 | −44.0 % |
+| submit (134) | 4 196 | 566 | −86.5 % |
+| load (45) | 2 437 | 383 | −84.3 % |
+| edit (45) | 1 521 | 0 | −100 % |
+| another (45) | 824 | 54 | −93.4 % |
+| delete (36) | 329 | 40 | −87.8 % |
+
+All 305 actions fell; none rose and none stayed. The 354 reads are the 177 distinct readings of the corpus (a line under one set of declared letters), each made once while its figure is typed and once in the cold load. Folds fell from 1 069 to 527. The ten largest falls:
+
+| Action | No memo | With the memos |
+|---|---|---|
+| `2b-capstone` load | 450 | 26 |
+| `2b-capstone` submit#13 «המרובע Oz2z3z4» | 146 | 3 |
+| `symbolic-cartesian-forced-1365` edit | 143 | 0 |
+| `symbolic-cartesian-forced-1365` submit#3 «b = 4» | 155 | 19 |
+| `symbolic-cartesian-forced-1365` load | 161 | 26 |
+| `2b-capstone` submit#12 «z1, z2, z4 סדרה הנדסית» | 133 | 3 |
+| `symbolic-cartesian-forced-1365` another#1 | 125 | 3 |
+| `2b-capstone` submit#10 «שטח Oz1z2z3 הוא 150r^2» | 118 | 3 |
+| `2b-capstone` submit#9 | 105 | 3 |
+| `param-modulus-1366` edit | 99 | 0 |
+
+**The `edit`, redefined, and the final baseline.** Re-typing the last row in the session that had just solved it executed nothing, so the first walk's `edit` sized no edit, and its count would have read as "nothing on the page" where a student who changes a row's text makes the page solve the whole new row. The definition above was recorded with `--accept-rise`, for the `edit` lines only: 44 of the 45 rose, and no `submit`, `another`, `load` or `delete` line moved.
+
+| `edit` (45 fixtures) | Count |
+|---|---|
+| phase 0 unit (exact solves) | 185 |
+| new unit, no memo (with no memo the session's state changes nothing, so this is the new definition's count too) | 1 521 |
+| memos, the first walk | 0 |
+| memos, the edit in its own session | **162** (−89.3 % against no memo) |
+
+| Recorded actions (45 fixtures), final | New unit, no memo | Final | Fall |
+|---|---|---|---|
+| total = page = before the paint | 9 307 | **1 205** | −87.1 % |
+| submit (134) | 4 196 | 566 | −86.5 % |
+| load (45) | 2 437 | 383 | −84.3 % |
+| edit (45) | 1 521 | 162 | −89.3 % |
+| another (45) | 824 | 54 | −93.4 % |
+| delete (36) | 329 | 40 | −87.8 % |
+
+Record, a check, `--order reverse`, `--order shuffle:7` and `--order shuffle:11` give the same 305 counts. The edit against the submit of the same row, per fixture (162 against 210 in all): equal in 16, lower in 26 (by 2 in 17, by 3 in 4, by 1 in 5) and higher by 1 in 3. Three things make the difference, alone or together. A typed line pays the entailment gate's two exact solves and an edit does not (`editLine` never asks whether the line was already held). The first line of a figure also folds the empty figure before it, which the edit's set-up has already made (one-row figures). And where a question was typed after the row, the edit's render folds the figure once more with the question, which the submit's session did not have yet (the three that are higher). One edit reads 0 and so does its submit, `declare-complex-after-1405` «u מספר מרוכב»: the teaching note on «u^5 = 32» had already run the gate on exactly that declaration, so the session has solved it before the student types it.
+
+Wall time, the dev PC with the other builders' suites running on it (two alternating rounds of before and after, minutes apart), before = this branch's first commit (the unit change, no memo), best of the runs shown:
+
+| Workload | Before | After |
+|---|---|---|
+| the 45 fixtures, every action, walked 20 times | 12.97 s | 2.42 s |
+| `2b-capstone`, every action, walked 200 times (the heaviest real fixture) | 12.38 s (62 ms a walk) | 1.82 s (9 ms a walk) |
+| the 112-line synthetic figure: typing its 113 lines (one is refused) | 4.30 s | 0.45 s |
+| … its last accepted line | 67.9 ms | 5.4 ms |
+| … «|z1| = -5», refused after 234 folds (the #2867 map's 3.3 s case) | 2.76 s | 0.82 s |
+| the three dearest recorded actions (`scripts/perf/complex/harness.ts`, the best of five fresh processes): `2b-capstone` load · `symbolic-cartesian-forced-1365` load · its submit#3 «b = 4» | 24.8 ms · 9.8 ms · 11.5 ms | 6.0 ms · 3.9 ms · 4.1 ms |
+
+Each memo was also switched off alone, in the same minutes. Without the fold memo `2b-capstone`'s 200 walks take 2.26 s (1.81 s with it), the synthetic figure's typing 0.77 s (0.43 s) and its last accepted line 14.1 ms (5.2 ms): the reads are already kept, so this is the fold memo's own share. Without the freeze the 200 walks take 1.73 s, so the freeze costs 4–5 %. Neither changes the synthetic refusal (0.78–0.84 s in all three states), whose folds are all different.
+
+**What one long session holds** (measured with a forced collection): every fixture typed in ONE session with its press, load, edit and delete and never a clear: 128 readings, 254 figures, 43 patterns, 3.4 MB. With the 112-line synthetic session and its refused line on top: 240 readings, 256 figures (the bound), 9.8 MB in all.
+
+**Nothing a student sees changed, and how that was checked.** No expectation of an existing test, fixture or scenario was changed; the only test files touched are the work meter's own (the gate's unit text, the walk's starting state, the baseline). And one transcript was taken twice: 45 fixtures and 24 hand-written sessions (the harness's probes, late declarations, every refusal kind), each driven through `submitLine`, three presses of «הציגו תצורה אחרת», `hydrateSession`, two edits, a mute, a restore, a delete and a retype, twice over in opposite orders in one process, writing after every step the store, the folded figure, the chips, the scene, the answers, the notes and the coincidences. 2 486 steps, 23.7 MB of text. On the product files as they were before the memos and as they are now it is the same bytes (sha256 `5d774762…2282590d`).
+
+**Not built, with the measurement.** The part of a fold that does not depend on the configuration, `lowerLines` and `exactSolve`, is executed once per distinct fold. Of the 689 exact solves left, 310 (45 %) solve a line list the session already solved: another seed or configuration of it, the same figure with the questions, or the entailment gate's two solves of the lists the gate's own folds just solved. Sharing them needs the lowering kept by content and a seam into `foldConstraints`. After the two memos `exactSolve` is 12.5 % of the walk's time and `lowerLines` 5.7 %, so the repeat is about 8 % of what is left, some 0.05 ms an action. It is left for the meter to rank, with phase 5.
+
+**Known limits.**
+- **The walk's `edit` edits the row to its own text.** It sizes an edit of the last row whose content the session has not solved; it does not walk an edit that is refused, or one of an earlier row.
+- **The synthetic refusal is still 0.82 s.** Its 234 folds are 234 different line lists (the gate's differential blame, one earlier line removed at a time), so nothing is solved twice; what is left is the fold. That is ADR-W-210's third cause (a line that cannot hold costs more than one that can) and belongs to phase 5.
+- **A cold load recompiles the patterns** in the walk, because the one clear function empties that table too. A real session pays it once per page.
+- **The timings were taken while other suites used the machine.** The counts are exact; the times are the best of several runs and are comparable with each other only.
+
+**Sibling audit.** The same class in the other three builders is their own part of #2888. `server/adminConfig.ts` reads featured commands through `parseLineV2`: it now shares the memo, bounded as above.
+
+**Files changed outside tests and docs:** `src-complex/value/contentMemo.ts` (new); `src-complex/parser/rules.ts` (the memo, the unit, `ParsedLine`'s read-only channels); `src-complex/parser/lexicon.ts` (`rx`); `src-complex/app/deriveLines.ts` (the fold memo, `clearComplexCaches`); `scripts/perf/complex/harness.ts` (the same starting state as the walk).
+
+**Locks.** `src-complex/value/__tests__/content-memo-2888.test.ts`; `src-complex/__tests__/compute-once-2888.test.ts` (one read and one fold per content; the key is complete in each of its parts; cold equals warm for every corpus line under five sets of declared letters, and for every step of every fixture at the student's entry points; the bounds; the clear); the work-meter gate and its re-recorded baseline.
+
+**What the student will see.**
+- [asked] Nothing but speed: no line, verdict, drawing or message changes. *"go ahead with next phases"* (operator, 2026-11-14)
+
+## ADR-CX-091 — Complex stays on the page's thread under a work ceiling: 256 units an action, asserted by its gate (#2890)
+
+**Status:** accepted · 2026-11-14 · feature (P2, workspace; this entry is complex's part) · branch `feat/2890-shell-client` · round 1 of phase 3 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (its Amendment 4), invariant 1's stated exception · **LADDER stage:** none is added or moved ([LADDER-CX](LADDER-CX.md)): nothing on the path from a line to the figure changes, only where an action's work is measured
+**Operator:** 2026-11-13, in chat: *"we must fix this for all tools. user should know the engine is working and not frozen"* · 2026-11-14, in chat: *"go ahead with next phases"*
+
+**Requirements:** none (internal): no line, verdict, drawing or message changes · **Design:** [04d](04d-design-complex.md) § "The work ceiling"; [04w](04w-design-shell.md) § "The worker client" (the page-lane executor, `pageLaneCeiling`); [docs/08](08-testing-strategy.md) "The work meter"
+
+**What ADR-W-210 left open.** Invariant 1 says the page never solves, and names complex as the exception: its fold is exact and cheap, so it "keeps the UI thread under a work ceiling and gets no worker until the meter says otherwise". No ceiling existed: nothing would have noticed a change that made a complex action a hundred times dearer, as long as each count stayed under its own baseline line by re-recording.
+
+**Measured** (the gate's walk of the 45 fixtures, the unit of [ADR-CX-090](#adr-cx-090): one executed line read or one exact solve): 305 recorded actions, 1 205 units, every one of them page work. Per action the median is 3, the 99th percentile 17, the maximum 26 (`2b-capstone` and `symbolic-cartesian-forced-1365`, both `load`). By kind the dearest is: load 26, submit 19, edit 17, another 3, delete 3. The slowest single action of the walk took 12 ms. The one loop that grows with the figure is the gate's differential blame on a refused line, two folds per earlier line: at the 64-statement cap of a saved file (`shell/save.ts`) that is 128 solves and at most 65 new reads, and ADR-CX-090 measured the 112-line synthetic refusal at 234 folds in 0.82 s.
+
+**Decision.**
+1. **The ceiling is 256 units for one student action** (`CEILING_CX`, `src-complex/app/workCx.ts`): ten times the dearest recorded action, above the blame loop at the file cap, and by ADR-CX-090's synthetic figure under about a second of page time. **Not measured:** a session at the cap was not walked; the number rests on the recorded corpus and that one synthetic figure.
+2. **The gate asserts it.** `src-complex/__tests__/work-meter-gate.test.ts` fails any walked action whose page count is above the ceiling, by figure, action and typed line, before the baseline comparison. So a rise that a re-record would accept still cannot pass the ceiling. A second row asserts the comparison is of real work: the dearest action charged the page, and every unit of every action is page work.
+3. **On the page an action over the ceiling is reported and never cut.** Every job of complex's work queue is measured WHOLE on the page lane, from its turn to its release after the paint that shows its result (the queue's `span`, `pageLaneCeiling` in `shell/workerExecutor`), because most of an action's work is in the App's own decision functions and in the render, not in the store action. In development the page logs the fault with the lane and the count, as the basis guard does (`armCeilingCx`, `App.tsx`). Nothing is stopped: the work is done by then, and stopping an exact fold honestly needs the "not decided" outcome of phase 4, which also bounds the blame loop.
+4. **The routed store actions run through the shared page-lane executor** (`pageLaneExecutor`, by reference, no clone, the same store and order of effects): `actCx` is the same table, routed as every builder's actions are, with the executor that fits a builder with no worker.
+
+**Before and after, on the meter.** The same 305 lines, to the unit: 1 205 total, 1 205 on the page, 1 205 before the paint. No baseline line moved.
+
+**Checked that the assertion bites.** With the ceiling lowered to 20 the gate fails on the two 26-unit loads, by name.
+
+**Locks.** `src-complex/__tests__/work-meter-gate.test.ts` (the ceiling over the corpus; the comparison is not of zeros). `src-complex/__tests__/work-ceiling.test.ts` (an action over the ceiling is reported with its count and still finishes; one at the ceiling, and a job of another lane under it, say nothing; a routed store action runs on the page lane with the store's own result). The shared half: `shell/__tests__/worker-client.test.ts` ("the page-lane work ceiling is a span of one action").
+
+**Is `figures` where a worker's result would be adopted?** Yes, if complex ever gets one (measured in the design pass on #2890: the folded figure clones as data on 45 of 45 fixtures, equal after the clone, 1 216 B at the median). Two things would have to travel with it: the clone is not frozen (the memo freezes what it stores), and a read registers its exact literals in two add-only registries the value layer reads back (`value/angle.ts`), which a worker would fill in its own heap. Nothing is adopted today, because nothing leaves the thread.
+
+**Not changed.** Any line, verdict, drawing, message or timing of the complex builder, apart from the one ruled line below.
+
+**What the student will see.**
+- [ruled] «הציגו תצורה אחרת» pressed while another action runs waits its turn and then searches the figure that action left. ADR-W-210 Am. 2, question 1 (operator, 2026-11-13: an action pressed while the tool works waits its turn); the plan on #2890 records it. It is built for all four builders in ADR-W-210 Am. 4; in complex an action is over in milliseconds, so the case can hardly be produced by hand.
+
+## ADR-CX-092 — The gate's blame loop has a work limit, and a gate that reaches it says so: complex's part of phase 4 (#2893)
+
+**Status:** built · 2026-11-14 · feature (P2, workspace; this entry is complex's part) · branch `feat/2893-limits-2d` · phase 4 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) (invariant 3: bounded and honest) · **LADDER stage:** none is added or moved ([LADDER-CX](LADDER-CX.md)): the gate decides what it decided, under a bound
+**Operator:** 2026-11-13, in chat: *"we should say honestly that a solution was not found and if we should continue searching"*, *"10s is an ok number"* · 2026-11-14, the four questions of #2893 (below)
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-LN-6 (new) · **Design:** [04d](04d-design-complex.md) § "The work ceiling" ("What happens over it"); [04w](04w-design-shell.md) § "The work limit and "not decided""
+
+**What was unbounded.** The gate (`acceptLine` for a typed line, `gateChange` for a toggle and an edit, `app/submit.ts`) tries eight configurations, then asks which earlier line, removed, lets the new one in: two folds per earlier line, so its cost grows with the figure and nothing bounded it. It is exact and it always finished. Complex has no clock to replace.
+
+**Measured** (the dev PC, 2026-11-14, `acceptLine` on a figure of n lines whose new line conflicts with the first, so the blame runs to its end): a blame over 10, 40 and 120 earlier lines charges 22, 41 and 91 units in 38, 23 and 82 ms: 570 to 1 760 units a second, because a line read once per content (ADR-CX-090) is cheap to ask again. The gate's walk records 26 units for the dearest action, and the page's ceiling is 256 (ADR-CX-091).
+
+**Decision.**
+- **The limit.** `GATE_WORK_LIMIT_CX` units of the work meter (complex's unit, ADR-CX-090), counted by the shared `withWorkLimit` (`shell/workLimit`); the blame's loop asks `limitReached()` before each earlier line. It is 10 000: ten seconds at the measured rates is 6 000 to 17 000 units, and the dearest gate recorded is two orders of magnitude below it.
+- **Reached, the gate is "not decided"**, never a refusal: `Verdict` gains `{ ok: false, notDecided }` with the next line to ask about (`resume.from`). A typed line is not added and stays in the box; a toggle leaves the row muted; an edit leaves the row's text. The store holds the question (`notDecided`, outside the undo history like `lastError`) and the page shows the operator's sentence with «המשיכו לחפש» where the refusal banner shows; the button runs the same action again from `resume.from`. Another step, or typing something else, dismisses it. A load restores the student's saved lines rather than answer a search the student waits on, so its gate goes on round after round until it decides (the blame is exact and finite); a saved line is never left undecided.
+- **No switch.** The suites run the same limit.
+
+**Not changed.** Every verdict, refusal, drawing and message of the complex builder: no recorded figure comes near the limit.
+
+**What the student will see.**
+- Nothing today: no figure reaches the limit (measured above). [ruled] If one ever does: «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with «המשיכו לחפש» (operator, 2026-11-14, #2893 question 1: *"«עדיין לא נמצא פתרון…» (Recommended)"*), the button searching the same amount again from where it stopped (question 2: *"Another ~10 s round (Recommended)"*), and the typed line staying in the box, not added (question 3: *"Stays in the box, not added (Recommended)"*). The limit counted in work (*"10s is an ok number"*, 2026-11-13).

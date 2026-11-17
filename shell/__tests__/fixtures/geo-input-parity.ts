@@ -134,7 +134,9 @@ export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
     products: ['analytic', '3d'],
     mustRefuse: ['2d'],
     topic: true,
-    patterns: [/פרמטר/, /^\s*[a-z]\s*[<>]/, /^\s*[a-z]\s*=\s*[\d/]+\s*$/, /^\s*\d+\s*<\s*[a-z]\s*</],
+    // #1524 (ADR-3D-477): a ONE-sided bound in its other spellings — «t ≥ 0», «k ≤ 3», «t גדול מ-2», «k לפחות 2» — is
+    // the sign's sibling, so it joins the sign's family; a two-sided one stays a parity row (letter-bound-closed-1524)
+    patterns: [/פרמטר/, /^\s*[a-z]\s*[<>≤≥]/, /^\s*[a-z]\s+(?:גדול|קטן|לפחות|לכל היותר)/, /^\s*[a-z]\s*=\s*[\d/]+\s*$/, /^\s*\d+\s*<\s*[a-z]\s*</],
   },
   X6: {
     title: 'coordinate components and distance notation',
@@ -275,8 +277,6 @@ export function gapState(g: KnownGap): GapState {
  */
 export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>> = {
   '#2458': 'open', // 3-D reading «A_1» and the glyph (#2075's sibling half)
-  '#2811': 'open', // #2810 (ADR-3D-467): 2-D accepts the circle-last order «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» crossed
-  '#2812': 'open', // #2810 (ADR-3D-467): analytic accepts a second order over a cyclic quadrilateral's letters, drawn crossed
   '#2226': 'open', // was #1171, merged into #2226 by the #2654 family sweep 2026-11-01
   '#1448': 'closed',
   '#1677': 'icebox',
@@ -864,6 +864,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'flat-polygon-1849-538', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', note: '5 + 3 = 8: only a flat triangle' },
   { id: 'flat-polygon-1849-538-rev', family: 'lengths', steps: ['משולש ABC', 'AC = 8', 'BC = 3', 'AB = 5'], expect: 'refused' },
   { id: 'flat-polygon-1849-448', family: 'lengths', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused' },
+  // ── #2894 (ADR-835, ADR-3D-495): a length the rest of the figure already forces, stated otherwise — refused at once, with
+  // the reason in one sentence across builders («הנתונים סותרים זה את זה — … נותנים לקטע AC שני אורכים שונים …»)
+  { id: 'lengths-forced-square-diag-2894', family: 'lengths', steps: ['ריבוע ABCD', 'AB = 3', 'AC = 10'], expect: 'refused', note: 'the square forces |AC| = 3√2' },
+  { id: 'lengths-forced-rect-diag-2894', family: 'lengths', steps: ['מלבן ABCD', 'AB = 3', 'BC = 4', 'AC = 7'], expect: 'refused', note: 'the right angle at B forces |AC| = 5' },
+  { id: 'lengths-forced-equilateral-2894', family: 'lengths', steps: ['משולש שווה צלעות ABC', 'AB = 3', 'BC = 5'], expect: 'refused', note: 'the equal sides force |BC| = 3' },
+  { id: 'lengths-triangle-plain-2894', family: 'lengths', steps: ['משולש ABC', 'AB = 3', 'BC = 4', 'AC = 10'], expect: 'refused', note: 'the triangle inequality: |AB| + |BC| = 7 < 10 — the same sentence in every builder (ADR-835 Am. 1)' },
   { id: 'flat-polygon-1849-coincide', family: 'polygons', steps: ['מרובע ABCD', 'AB מתלכד עם CD'], expect: 'refused', exception: 'X7', note: 'two sides of one quadrilateral on one line (T31); «מתלכד» is 3-D vocabulary (X7)' },
   { id: 'flat-polygon-1849-thin-control', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9'], expect: 'builds', note: 'thin but a real triangle — the control' },
   // #2292 / #2344 (ADR-W-146; 3-D ADR-3D-372) — givens that hold only in the LIMIT where a declared polygon collapses
@@ -889,6 +895,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'proof-target-show-1666', family: 'frame', steps: ['משולש ABC', 'הראו כי AB = AC'], expect: 'refused' },
   // #1658 / ADR-562 — a bound on a letter is recorded as waiting in 2-D, as analytic records it
   { id: 'letter-bound-1658', family: 'lengths', steps: ['משולש ABC', '0 < k < 6'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  // #1524 (ADR-3D-477): 3-D's catalog now advertises the closed two-sided bound; on a figure with no such letter 3-D
+  // still refuses it as an unknown letter, the same gap as the open bound above
+  { id: 'letter-bound-closed-1524', family: 'lengths', steps: ['משולש ABC', '2 ≤ t ≤ 5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
 
   // ── 3-D's plane sentences on a solid's letters: 2-D and analytic type the letters free, 3-D types its pyramid ──
   { id: 'pyr-equal-lengths', family: 'lengths', steps: ['מרובע ABCD', 'נקודה S', 'אורך AS שווה לאורך AB'], contextFor: { '3d': ['פירמידה SABCD שבסיסה ריבוע'] }, expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }] },
@@ -1389,9 +1398,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #2625 (ADR-AG-454): a parabola has no centre, so «AB קוטר בפרבולה» is refused with its reason, never sent to the model
   { id: 'parabola-diameter-2625', family: 'topic', steps: ['AB קוטר בפרבולה'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it `parabola-no-diameter`. Neither sibling has a parabola: 2-D BUILDS the sentence, dropping the noun; 3-D hands it to the model (both found in round #2822)' },
   // #2625 (ADR-AG-454 Am. 1): the parabola's centre, the same reason, every spelling the centre role reads
-  { id: 'parabola-centre-named-2625', family: 'topic', steps: ['O מרכז הפרבולה'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it parabola-no-centre (ADR-AG-454 Am. 1, ruling Q-2625b (a)); neither sibling has a parabola and both hand it to the model' },
-  { id: 'parabola-centre-first-2625', family: 'topic', steps: ['מרכז הפרבולה הוא O'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it parabola-no-centre (ADR-AG-454 Am. 1, ruling Q-2625b (a)); neither sibling has a parabola and both hand it to the model' },
-  { id: 'parabola-centre-en-2625', family: 'topic', steps: ['O is the centre of the parabola'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it parabola-no-centre (ADR-AG-454 Am. 1, ruling Q-2625b (a)); neither sibling has a parabola and both hand it to the model' },
+  { id: 'parabola-centre-named-2625', family: 'topic', steps: ['O מרכז הפרבולה'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it parabola-no-centre (ADR-AG-454 Am. 1, ruling Q-2625b (a)), teaching the vertex sentence since #2835 (ADR-AG-470); neither sibling has a parabola and both hand it to the model' },
+  { id: 'parabola-centre-first-2625', family: 'topic', steps: ['מרכז הפרבולה הוא O'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it parabola-no-centre (ADR-AG-454 Am. 1, ruling Q-2625b (a)), teaching the vertex sentence since #2835 (ADR-AG-470); neither sibling has a parabola and both hand it to the model' },
+  { id: 'parabola-centre-en-2625', family: 'topic', steps: ['O is the centre of the parabola'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it parabola-no-centre (ADR-AG-454 Am. 1, ruling Q-2625b (a)), teaching the vertex sentence since #2835 (ADR-AG-470); neither sibling has a parabola and both hand it to the model' },
+  // #2835 (ADR-AG-470): the parabola's vertex is a role point, the focus's twin (operator ruling 2026-11-10 on #2835)
+  { id: 'parabola-vertex-2835', family: 'topic', steps: ['V קודקוד הפרבולה'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'builds', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic names and draws the vertex (ADR-AG-470); neither sibling has a parabola' },
   { id: 'coordinate-restriction-param-control-1832', family: 'topic', steps: ['y = ax + 1, a > 0'], expect: 'builds', exception: 'X2', note: 'a genuine parameter keeps its domain' },
   { id: 'letter-bound-x-1832', family: 'lengths', steps: ['משולש ABC', 'AB = 3x', 'x > 2'], contextFor: { analytic: ['y = 2x + 1'] }, expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: "2-D bounds its length letter x; in analytic x is the plane's coordinate, so the bound is refused (#1832)" },
   // #1849 (ADR-W-115, operator ruling 2026-10-07): a DECLARED polygon the givens force flat is REFUSED in every builder — a flat line is not a triangle
@@ -1486,12 +1497,21 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #2810 (ADR-3D-467): letters a stated circle passes through have ONE simple order, so a second order over them is
   // refused on the line that completes it — the ring, or the circle. 2-D refuses the circle-first spellings; 3-D now
   // refuses all of them (it drew the second ring crossed, or a dart under a circle that missed a vertex).
-  { id: 'crossed-ring-2810-01', family: 'polygons', steps: ['מרובע ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2812' }], note: 'the reported case' },
-  { id: 'crossed-ring-2810-02', family: 'polygons', steps: ['מרובע ABCD', 'המרובע ABCD חסום במעגל', 'מרובע ABDC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2812' }] },
-  { id: 'crossed-ring-2810-03', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABDC'], expect: 'refused', knownGap: [{ product: '2d', issue: '#2811' }, { product: 'analytic', issue: '#2812' }], note: 'the circle line completes the contradiction' },
+  { id: 'crossed-ring-2810-01', family: 'polygons', steps: ['מרובע ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC'], expect: 'refused', note: 'the reported case' },
+  { id: 'crossed-ring-2810-02', family: 'polygons', steps: ['מרובע ABCD', 'המרובע ABCD חסום במעגל', 'מרובע ABDC'], expect: 'refused' },
+  { id: 'crossed-ring-2810-03', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABDC'], expect: 'refused', note: 'the circle line completes the contradiction' },
   { id: 'crossed-ring-2810-04', family: 'polygons', steps: ['דלתון ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC'], expect: 'refused', note: 'a kite with its circle is a right kite: no dart' },
   { id: 'crossed-ring-2810-05', family: 'polygons', steps: ['מחומש ABCDE', 'מעגל חוסם את ABCDE', 'מחומש ABDCE'], expect: 'refused', knownGap: [{ product: 'analytic' }], note: 'analytic does not read a circle through a pentagon (its context line is not-handled): an unscheduled cell' },
   { id: 'crossed-ring-2810-06', family: 'polygons', steps: ['מרובע ABCD', 'מעגל חוסם את ABCD'], expect: 'builds', note: 'one ring and its circle — the control' },
+  // ── #2811 (ADR-826): a later line that puts the letters on one circle completes the contradiction (four points on one circle have one simple order)
+  { id: 'crossed-ring-2811-01', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABCD'], expect: 'refused', note: 'R4: 2-D drew ABDC crossed before ADR-826' },
+  { id: 'crossed-ring-2811-02', family: 'polygons', steps: ['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD', 'מרובע ABDC'], expect: 'refused', note: 'R12: a rider completes the circle' },
+  { id: 'crossed-ring-2811-03', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC'], expect: 'builds', note: 'C1: two orders with no circle, a concave quadrilateral' },
+  // ── #2813 (ADR-823 / ADR-AG-471 / ADR-3D-490, operator rulings 2026-11-10 (b) and 2026-11-12 B): a stated polygon angle is the
+  // interior angle, so stated angles summing to (n − 3)·180° or more put the ring in convex position, and a second order crosses
+  { id: 'stated-angle-interior-2813-01', family: 'polygons', steps: ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°', 'מרובע ABDC'], expect: 'refused', note: 'the reported case: every builder drew ABDC crossed before #2813' },
+  { id: 'stated-angle-interior-2813-02', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', '∠DAB = 70°', '∠BCD = 110°'], expect: 'refused', note: 'the angle line completes it' },
+  { id: 'stated-angle-interior-2813-03', family: 'polygons', steps: ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°'], expect: 'builds', note: 'the control: convex at every view' },
 
   // #1987 (ADR-622) / #1986: four FREE points read in a second order. 2-D draws the CONCAVE quadrilateral — which
   // vertex is reflex is a configuration axis, not a fixed default — and analytic draws it too; since #1986 (ADR-3D-418)
@@ -1543,6 +1563,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'unread-name-square-1919', family: 'polygons', steps: ['ריבוע ДЖФИ'], expect: 'refused' },
   { id: 'unread-name-arabic-1919', family: 'polygons', steps: ['משולש ابج'], expect: 'refused', note: 'any script the label grammar cannot read, not only Cyrillic' },
   { id: 'unread-name-point-1919', family: 'points-incidence', steps: ['משולש ABC', 'נקודה Ж על AB'], expect: 'refused', note: 'anywhere in the line, not only a shape’s vertex list' },
+  // #2062 (ADR-819, ADR-AG-460, ADR-3D-479; operator ruling 2026-10-14, card d14b-2062-frame A): the exam's subject frame
+  // «הנקודה M מקיימת …» is read in front of any statement about M, in every builder
+  { id: 'subject-frame-2062', family: 'frame', steps: ['משולש ABC', 'M על AB', 'הנקודה M מקיימת AM = 3'], expect: 'builds', note: 'the bagrut wording (03572 Q2): the frame names the statement’s point' },
+  { id: 'subject-frame-colon-2062', family: 'frame', steps: ['משולש ABC', 'M על AB', 'הנקודה M מקיימת: AM = MB'], expect: 'builds', note: 'the colon after the verb' },
+  { id: 'subject-frame-masc-2062', family: 'frame', steps: ['משולש ABC', 'M על AB', 'M מקיים AM = MB'], expect: 'builds', note: 'the masculine «מקיים» (final mem), found in round' },
+  { id: 'subject-frame-en-2062', family: 'frame', steps: ['משולש ABC', 'M על AB', 'the point M satisfies AM = MB'], expect: 'builds', note: 'the English frame' },
+  { id: 'subject-frame-angle-2062', family: 'frame', steps: ['משולש ABC', 'M אמצע BC', 'הנקודה M מקיימת ∠AMB = 90'], expect: 'builds', note: 'in front of an angle statement' },
+  { id: 'subject-frame-unrelated-2062', family: 'frame', steps: ['משולש ABC', 'הנקודה D מקיימת AB = 3'], expect: 'not-handled', knownGap: [{ product: 'analytic' }], note: 'a frame whose statement does not mention its point is not this sentence: D would vanish, so the line keeps its pre-#2062 verdict. analytic refuses it with the one-input-per-line message (split-statements) where 2-D and 3-D hand it to the model — measured, older than #2062' },
   { id: 'unread-word-1919', family: 'frame', steps: ['треугольник ABC'], expect: 'refused', note: 'a WORD in another language takes the other ruled sentence' },
   { id: 'unread-greek-vertex-1919', family: 'polygons', steps: ['משולש ΓΔΘ'], expect: 'not-handled', note: 'Greek is math (the ruling), so a Greek vertex name goes to the model as in 2-D — 3-D recorded A, B, C before #1919' },
   { id: 'unread-lookalike-1919', family: 'polygons', steps: ['משולש КМО'], expect: 'builds', note: 'the Cyrillic look-alikes fold to K, M, O (the ruling: «fold them silently») — 2-D always did; 3-D recorded A, B, C and analytic read nothing' },
@@ -1846,7 +1874,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'radius-ratio-unnamed-2388', family: 'circles', steps: ['נתון מעגל שמרכזו M(0,0) ורדיוסו r', 'נתון מעגל שמרכזו N(9,0) ורדיוסו R', 'היחס בין אורכי הרדיוסים של המעגלים הוא 1:2'], contextFor: { '2d': ['מעגל M', 'מעגל N'] }, expect: 'builds', exception: 'X8', knownGap: [{ product: '2d' }], note: '2-D asks which circle (ambiguous-circle-ref)' },
 
   // ── #2391 (ADR-AG-315): the exam's own two-circle and centre sentences, each read as its canonical twin ──
-  { id: 'satisfies-2391', family: 'lengths', steps: ['נקודה A', 'נקודה B', 'M מקיימת MA = MB'], contextFor: { '3d': ['A(0,0,0)', 'B(4,0,0)'] }, expect: 'builds', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic did not read «מקיימת» before ADR-AG-315; 2-D escalates it to the model' },
+  { id: 'satisfies-2391', family: 'lengths', steps: ['נקודה A', 'נקודה B', 'M מקיימת MA = MB'], contextFor: { '3d': ['A(0,0,0)', 'B(4,0,0)'] }, expect: 'builds', note: 'analytic did not read «מקיימת» before ADR-AG-315; 2-D and 3-D read it since #2062 (ADR-819, ADR-3D-479)' },
   { id: 'underscore-index-2391', family: 'points-incidence', steps: ['נקודה N_2'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'analytic did not read `N_2` before ADR-AG-315 (it is `N₂` there; 2-D reads it as `N2`)' },
   // ── #1138 (ADR-AG-340): «P נקודה (כלשהי) על …» is the incidence — 2-D reads both, analytic did not ──
   { id: 'point-noun-on-side-1138', family: 'points-incidence', steps: ['משולש ABC', 'P נקודה על הצלע AB'], expect: 'builds', knownGap: [{ product: '3d' }] },
@@ -1886,6 +1914,17 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2477 (ADR-761): a diameter stated about «המעגל» is drawn on the drawn circle, and beside two it asks which ──
   { id: 'diameter-of-the-circle-2477', family: 'chords-arcs', steps: ['מעגל O', 'AB הוא קוטר של המעגל'], expect: 'builds', exception: 'X8', note: '2-D drew a second circle P on AB beside O, green, before ADR-761; analytic already drew AB on O' },
   { id: 'diameter-of-the-circle-two-asks-2477', family: 'chords-arcs', steps: ['מעגל O', 'מעגל P', 'AB הוא קוטר של המעגל'], expect: 'asks', exception: 'X8', note: '2-D drew a third circle M, green, before ADR-761; analytic already asked' },
+  // ── #2502 (ADR-AG-468): the copula and the construct state «קוטר/מיתר המעגל»; analytic answered not-handled before ──
+  { id: 'copula-diameter-2502', family: 'chords-arcs', steps: ['מעגל O', 'AB הוא קוטר המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'copula-chord-2502', family: 'chords-arcs', steps: ['מעגל O', 'CD הוא מיתר של המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'copula-diameter-two-circles-2502', family: 'chords-arcs', steps: ['מעגל O', 'מעגל P', 'AB הוא קוטר המעגל'], expect: 'asks', exception: 'X8' },
+  { id: 'construct-diameter-2502', family: 'chords-arcs', steps: ['מעגל O', 'AB קוטר המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'construct-diameter-first-2502', family: 'chords-arcs', steps: ['מעגל O', 'קוטר המעגל AB'], expect: 'builds', exception: 'X8' },
+  { id: 'construct-chord-2502', family: 'chords-arcs', steps: ['מעגל O', 'AB מיתר המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'construct-chord-first-2502', family: 'chords-arcs', steps: ['מעגל O', 'מיתר המעגל AB'], expect: 'builds', exception: 'X8' },
+  { id: 'chord-of-the-circle-2502', family: 'chords-arcs', steps: ['מעגל O', 'מיתר AB של המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'construct-chord-two-circles-2502', family: 'chords-arcs', steps: ['מעגל O', 'מעגל P', 'AB מיתר המעגל'], expect: 'asks', exception: 'X8' },
+  { id: 'construct-diameter-no-circle-2502', family: 'chords-arcs', steps: ['AB קוטר המעגל'], expect: 'builds', exception: 'X8' },
   // ── #2257 (ADR-767): an inscription whose inner shape is already drawn moves THAT shape into the container ──
   { id: 'inscribe-existing-square-named-2257', family: 'inscribed', steps: ['ריבוע ABCD', 'משולש EFG', 'הריבוע ABCD חסום במשולש EFG'], expect: 'builds', exception: 'X8', note: '2-D refused «would be flat» before ADR-767; analytic already put A–D on the sides' },
   { id: 'inscribe-existing-square-definite-2257', family: 'inscribed', steps: ['ריבוע ABCD', 'משולש EFG', 'הריבוע חסום במשולש EFG'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }], note: '2-D drew a second square HIJK, green, before ADR-767; analytic does not read the unnamed inscription (not-handled)' },

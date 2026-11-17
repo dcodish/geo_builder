@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-12T08:09:18.559Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משוואת המישור π היא x+y+z=1",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π",
+          "plane": {
+            "cx": {
+              "k": 1,
+              "p": 0
+            },
+            "cy": {
+              "k": 1,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -1,
+              "p": 0
+            },
+            "src": "x+y+z=1"
+          }
+        }
+      ],
+      "enabled": false
+    },
+    {
+      "utterance": "המישור π: x+y+z-1=0",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π",
+          "plane": {
+            "cx": {
+              "k": 1,
+              "p": 0
+            },
+            "cy": {
+              "k": 1,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -1,
+              "p": 0
+            },
+            "src": "x+y+z-1=0"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "D על המעגל",
+      "cmds": [
+        {
+          "type": "point-on-circle3",
+          "point": "D",
+          "circle": ""
+        }
+      ],
+      "enabled": false
+    },
+    {
+      "utterance": "D נמצאת על המעגל",
+      "cmds": [
+        {
+          "type": "point-on-circle3",
+          "point": "D",
+          "circle": ""
+        }
+      ]
+    }
+  ]
+}

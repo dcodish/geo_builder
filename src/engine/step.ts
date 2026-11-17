@@ -16,12 +16,14 @@ import { lower } from './lower';
 import { circlesTouch, oneCommonPointError } from './evaluate';
 import { circlesStatedTangent } from './structure';
 import { carrierParams, crossingBranchCount, evaluate, evaluateTightened, gateDefects, newCrossingTangency, resolveDriven, resolveDrivenMemo, drivenConstraintsOf, setCarrierVals, unstatedFreeVertex } from './evaluate';
-import type { EvalResult } from './evaluate';
+import type { EvalErr, EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, isRingDiagonal, sub } from './geometry';
-import { budgetExceeded } from './solveBudget';
+import { budgetExceeded, measuredRun, serveRun, type ChargedRun } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { componentOf, minimalComponentOf } from './components';
 import { reachImpossibility } from './reachFeasibility';
+import { explainLengthConflict, metricClosureImpossibility, type LengthConflict } from './metricClosure';
+import { exactFormOf, formatExactText, formatMeasure } from '../format';
 import {
   angleSumImpossibility,
   angleSumImpossibilityError,
@@ -43,7 +45,7 @@ import { degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, LENGTH_
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
 import { reseatExtensions } from './extensionSide';
-import { collapsibleTermPairs, constraintKey, constraintRefs, describeConstraint, isSatisfied, residualRefs, solvedOnSegmentCandidates } from './solve';
+import { collapsibleTermPairs, constraintKey, constraintRefs, describeConstraint, isSatisfied, residualRefs, solvedOnSegmentCandidates, toleranceScale } from './solve';
 
 export interface StepOk {
   ok: true;
@@ -817,7 +819,130 @@ function brokenEarlierGivens(prev: Construction, next: Construction, primary: Ev
   return out;
 }
 
-function runFailureLadder(
+/**
+ * #2894 (ADR-833): no rung of the failure ladder can find a figure for `next` — the metric closure proves its lengths
+ * hold in no configuration, the prior figure's do (a proof already true of `prev` is never this step's), and no
+ * rung's evaluate can stop at a tangent crossing (a line or circle crossing a circle, or an on-circle point a
+ * collinearity could drive): that refusal would outrank the over-constraint's.
+ */
+/** #2894 (ADR-833): off only in the lock that the proven refusal reads exactly as the climbed one. */
+export const ladderProofConfig = { exit: true };
+function provenUnreachable(prev: Construction, next: Construction): boolean {
+  if (!ladderProofConfig.exit) return false;
+  if (next.objects.some((o) => o.kind === 'line-circle' || o.kind === 'circle-circle')) return false;
+  if (next.objects.some((o) => o.kind === 'on-circle') && [...next.constraints, ...drivenConstraintsOf(next)].some((k) => k.type === 'collinear')) return false;
+  return metricClosureImpossibility(next) !== null && metricClosureImpossibility(prev) === null;
+}
+
+/** #2894 (ADR-835): a length as the student reads it — exact when it is one (3√2, 5/2), else two decimals. */
+const lengthText = (x: number): string => {
+  const ex = exactFormOf(x);
+  return ex && !ex.pi ? formatExactText(ex) : formatMeasure(x);
+};
+/** #2894 (ADR-835): the closure's reason as the error bank's variant. */
+function lengthsError(w: LengthConflict): Parameters<typeof engineErrorDebugText>[0] {
+  // the support travels as one token (no whitespace); the fold turns it into the statements' indices (`with #i, #j`)
+  const using = `support ${encodeURIComponent(JSON.stringify({ c: w.support.cons.map(constraintKey), o: [...new Set(w.support.objs)] }))}`;
+  if (w.kind === 'value') return { code: 'lengths-value', seg: w.seg.join(''), forced: lengthText(w.forced), stated: lengthText(w.stated), using };
+  return { code: 'lengths-triangle', tri: w.tri.join(''), long: w.long.join(''), longLen: lengthText(w.longLen), a: w.a.join(''), b: w.b.join(''), sum: lengthText(w.sum), using };
+}
+
+/**
+ * #2912 — A FAILURE LADDER ALREADY CLIMBED TO A REFUSAL IS SERVED, AND CHARGED AS IF IT WERE CLIMBED AGAIN.
+ *
+ * Class: one submit asks the SAME failing step more than once — the prefold's fold, then the submit gate's
+ * unstated-choice rescue (`choiceRescue`), whose assignment re-folds a fact list that reaches the identical step (a
+ * variant that changes nothing before the failing fact), and the classifier's and the drop-one search's re-attempts.
+ * Each paid the whole ladder again: measured on #1768's last line, two climbs of 2 564 211 units each, bit-identical
+ * inputs, the same refusal. The ladder is a pure function of its inputs (the step's constructions, the prior positions,
+ * the primary evaluation, the stage prefix and the solver's tolerance scale), so a refusal it reached is the refusal a
+ * second climb reaches.
+ *
+ * Kept by the inputs' exact content (every number by its bits: −0, NaN and ±∞ kept apart), only for a refusal that
+ * kept the caller's own figure, and only for a climb no limit cut ({@link measuredRun}). A hit is charged what the climb
+ * charged ({@link serveRun}: `work.done`, `work.executed` and the ledger frame advance as if it ran), so every work
+ * budget, cap and verdict reads what it read before; a hit whose charge would cross an armed limit is refused and the
+ * ladder climbs, cut exactly where it was cut. A call handed any of the very OBJECTS the recorded climb was handed climbs
+ * instead: the engine's memos inside the climb are keyed by object identity (`evaluate`, the baked construction, the
+ * artefact table), so such a climb is answered by them and charges less than the first (measured over the fixture walk:
+ * 0 and 93 598 units against a recorded 262 359), and serving it the recorded charge would move a work budget. A call
+ * on content-equal NEW objects (another fold reaching the same step) shares none of those cells, climbs them all, and
+ * charges what the first climb charged — the case served. The served refusal carries the caller's own construction and positions,
+ * and its trace steps are replayed onto the caller's trace. Bounded (the newest {@link LADDER_MEMO_MAX} climbs).
+ */
+interface LadderRefusal {
+  error: string;
+  /** what the climb pushed onto the caller's trace, and the tokens its refusal appended after it */
+  pushed: string[];
+  tail: string[];
+  degenerate: boolean;
+}
+const LADDER_MEMO_MAX = 32;
+/** The objects the recorded climb was handed: a call handed any of the SAME objects is climbed, never served (below). */
+const ladderMemo = new Map<string, { run: ChargedRun<LadderRefusal>; inputs: WeakSet<object> }>();
+/** Does this call hand the climb any object the recorded climb was handed? */
+const sameObjects = (a: WeakSet<object>, prev: Construction, next: Construction, prevPositions: Map<Id, Vec>, primary: EvalResult): boolean =>
+  a.has(prev) || a.has(next) || a.has(prevPositions) || a.has(primary);
+/** #2912: off only in the lock that a served climb is the climb (it compares the two). */
+export const ladderMemoConfig = { serve: true };
+export const ladderMemoStats = { climbs: 0, served: 0 };
+function exactJson(...xs: unknown[]): string {
+  return JSON.stringify(xs, (_k, v) => {
+    if (typeof v === 'number') return Number.isFinite(v) && !Object.is(v, -0) ? v : `#${Object.is(v, -0) ? '-0' : String(v)}`;
+    if (v instanceof Map) return { '#map': [...v.entries()] };
+    return v;
+  });
+}
+function runFailureLadder(prev: Construction, next: Construction, newCons: Constraint[], prevPositions: Map<Id, Vec>, primary: EvalResult, trace: string[], prefix: 'main' | 'm1' | 'coupled'): StepResult {
+  ladderMemoStats.climbs++;
+  if (!ladderMemoConfig.serve) return runFailureLadderClimb(prev, next, newCons, prevPositions, primary, trace, prefix);
+  let key: string;
+  try {
+    key = exactJson(prev, next, newCons, prevPositions, primary, prefix, toleranceScale, ladderProofConfig.exit);
+  } catch {
+    return runFailureLadderClimb(prev, next, newCons, prevPositions, primary, trace, prefix);
+  }
+  const hit = ladderMemo.get(key);
+  if (hit && !sameObjects(hit.inputs, prev, next, prevPositions, primary) && serveRun(hit.run)) {
+    ladderMemoStats.served++;
+    ladderMemo.delete(key);
+    ladderMemo.set(key, hit);
+    const v = hit.run.value;
+    trace.push(...v.pushed);
+    return { ok: false, error: v.error, construction: prev, positions: prevPositions, ladder: [...trace, ...v.tail], ...(v.degenerate ? { degenerate: true as const } : {}) };
+  }
+  const t0 = trace.length;
+  const run = measuredRun(() => runFailureLadderClimb(prev, next, newCons, prevPositions, primary, trace, prefix));
+  const r = run.value;
+  if (!r.ok && run.whole && r.construction === prev && r.positions === prevPositions) {
+    const pushed = trace.slice(t0);
+    const lad = r.ladder ?? [];
+    const keys = Object.keys(r).filter((k) => !['ok', 'error', 'construction', 'positions', 'ladder', 'degenerate'].includes(k));
+    if (!keys.length && lad.length >= trace.length && trace.every((t, i) => lad[i] === t)) {
+      const inputs = new WeakSet<object>([prev, next, prevPositions, primary]);
+      ladderMemo.set(key, { run: { ...run, value: { error: r.error, pushed, tail: lad.slice(trace.length), degenerate: r.degenerate === true } }, inputs });
+      if (ladderMemo.size > LADDER_MEMO_MAX) ladderMemo.delete(ladderMemo.keys().next().value!);
+    }
+  }
+  return r;
+}
+/**
+ * #2894 (ADR-833, ADR-835) — the ladder's proven refusal: the metric closure proves no figure holds `next`'s lengths.
+ * #2894 (ADR-835, operator ruling 2026-11-15 «The clearer reason everywhere»): the refusal says WHICH lengths and why,
+ * in 3-D's sentence; the fold's drop-one search still names the statement it contradicts. No reading → the plain one,
+ * which blames the primary solve's own failure — so without a primary (#2912: asked BEFORE the primary solve) a proof
+ * with no reading answers null and the step solves as before.
+ */
+function provenRefusal(prev: Construction, next: Construction, prevPositions: Map<Id, Vec>, trace: string[], prefix: 'main' | 'm1' | 'coupled', primary?: EvalErr): StepErr | null {
+  if (!provenUnreachable(prev, next)) return null;
+  const added = addedConstraints(prev, next);
+  const why = explainLengthConflict(next, added);
+  if (!why && !primary) return null;
+  const error = why ? engineErrorDebugText(lengthsError(why)) : blameNewStatement(primary!.error, added, primary!.violated);
+  return { ok: false, error, construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:proven`, `${prefix}:refuse`] };
+}
+
+function runFailureLadderClimb(
   prev: Construction,
   next: Construction,
   newCons: Constraint[],
@@ -826,6 +951,16 @@ function runFailureLadder(
   trace: string[],
   prefix: 'main' | 'm1' | 'coupled',
 ): StepResult {
+  // #2894 ([ADR-833](../../docs/06-decisions.md#adr-833)): the ladder's own refusal, at once, when no rung can succeed.
+  // The metric closure proves that NO figure holds `next`'s lengths (its obligations and its objects' parameter-free
+  // structure, with margins wider than the solver's acceptance), so every rung's evaluate fails and none sees a
+  // solution to refuse as not a figure: the climb would end at the refusal below with nothing found, which is this
+  // one, word for word. A figure in which a rung's evaluate could meet a tangent crossing is left to the climb (that
+  // rung's tangent refusal would be the reason instead).
+  if (!primary.ok) {
+    const proven = provenRefusal(prev, next, prevPositions, trace, prefix, primary);
+    if (proven) return proven;
+  }
   // THE PRESERVATION GATE (issue #258, [ADR-402](../../docs/06-decisions.md#adr-402)) — a rescue stage
   // may not LOSE an obligation `next` carried. The rescue stages bake, replace, and re-point carriers,
   // and an obligation whose ONLY copy lives inside a carrier (driveOrCheck case (1) embeds without
@@ -1170,6 +1305,29 @@ function commitDrawnFreeVertices(r: StepResult): StepResult {
 }
 
 /**
+ * #2795 ([ADR-821](../../docs/06-decisions.md#adr-821), H2) — is a `collinear-order`'s SIGN entailed by what the prior
+ * figure already STATES? Structural, never sampled: (a) the prior holds the same order, in either direction (an exact
+ * repeat, «D על המשך AB» twice); or (b) for three points [a, x, b], x is BETWEEN a and b by riders — an interior
+ * `on-segment` rider of a→b, or of a segment whose two ends are themselves a, b or between them («D על BA» after
+ * «D על AB»; «E על AB» after «D על הקטע AB» · «E על הקטע AD»). Anything else is a new region and keeps its carrier.
+ */
+function orderEntailedByPrior(prev: Construction, prevCons: readonly Constraint[], con: Extract<Constraint, { type: 'collinear-order' }>): boolean {
+  const same = (p: readonly Id[]) => p.length === con.points.length && (p.every((id, i) => id === con.points[i]) || p.every((id, i) => id === con.points[con.points.length - 1 - i]));
+  if (prevCons.some((k) => k.type === 'collinear-order' && same(k.points))) return true;
+  if (con.points.length !== 3) return false;
+  const byId = new Map(prev.objects.map((o) => [o.id, o] as const));
+  const between = (x: Id, a: Id, b: Id, depth: number): boolean => {
+    const o = byId.get(x);
+    if (!o || o.kind !== 'on-segment' || o.extension || depth > 4) return false;
+    if (!o.free && !(o.t > 0 && o.t < 1)) return false;
+    const within = (y: Id) => y === a || y === b || between(y, a, b, depth + 1);
+    return (o.a === a && o.b === b) || (o.a === b && o.b === a) || (o.a !== o.b && within(o.a) && within(o.b));
+  };
+  const [a, x, b] = con.points;
+  return between(x, a, b, 0);
+}
+
+/**
  * THE RE-STATED GIVEN YIELDS (#1943/#1819, [ADR-623](../../docs/06-decisions.md#adr-623)) — the mirror of
  * {@link ensureOwnership}, at the same seam.
  *
@@ -1248,6 +1406,10 @@ function releaseImpliedOwnership(prev: Construction, r: StepResult): StepResult 
     // order row (a bound) has no equality half to prove and keeps today's answer.
     if (isOrderConstraint(con)) {
       if (con.type !== 'collinear-order' || con.points.length < 3) return r;
+      // its SIGN must be entailed by the prior's own statements, never read off sampled layouts: an order is a
+      // region, and a sign that holds at every sample of THIS prior can stop holding once a later line frees what
+      // it rode on (#2545's incircle set-lines, found in round #2822)
+      if (!orderEntailedByPrior(prev, prevCons, con)) return r;
       const [p0, ...rest] = con.points;
       const pn = rest[rest.length - 1];
       const halves = rest.slice(0, -1).map((q): Constraint => ({ type: 'collinear', a: q, b: p0, c: pn }));
@@ -1363,6 +1525,9 @@ function sideSeated(r: StepResult): StepResult {
  *  the redefinition arm and #2089's rider-foot re-reading (ADR-728). */
 function solveReinterpreted(prev: Construction, constrained: Construction, prevPositions: Map<Id, Vec>, trace: string[]): StepResult {
   const newCons = constrained.constraints.slice(prev.constraints.length);
+  // #2912: a proven refusal is the refusal the primary solve and the ladder would reach — asked first (see applyStepLadder)
+  const proven = provenRefusal(prev, constrained, prevPositions, trace, 'm1');
+  if (proven) return proven;
   const r = evaluate(constrained);
   if (r.ok && stepAccepted(constrained, r.positions, newCons)) {
     const owned = ensureOwnership(constrained, newCons, r.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF
@@ -1412,7 +1577,11 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   if (positionErr) return { ok: false, error: positionErr, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   const metricErr = metricImpossibility(probed.constraints);
   if (metricErr) {
-    return { ok: false, error: metricImpossibilityError(metricErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+    // #2894 (ADR-835 Am. 1, ruling 2026-11-15 «The clearer reason everywhere»): the same sentence as every other length
+    // conflict — the closure reads the same triangle; a longer path no triangle states keeps its own sentence.
+    const why = explainLengthConflict(probed, probed.constraints.slice(prev.constraints.length));
+    const error = why ? engineErrorDebugText(lengthsError(why)) : metricImpossibilityError(metricErr);
+    return { ok: false, error, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
   // #1329 (ADR-538): the angle twin — a declared polygon's stated interior angles summing past
   // (n − 2)·180° is impossible in the plane. Without this the solver found nothing, the step failed on
@@ -1583,12 +1752,18 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   // fitted to them (non-degenerate composition, ADR-013) rather than keeping
   // absolute template defaults.
   const next = applyCommand(prev, ncmd, prevPositions);
-  const res = evaluate(next);
-
   // For a shape built on an existing edge, also consider its mirror (the other
   // side of that edge) and choose the valid placement that sits *away* from
   // existing geometry — a textbook look, and never stacking nodes (ADR-013/017).
   const mirrored = mirrorComposition(prev, ncmd, next, prevPositions);
+  // #2912: THE PROOF BEFORE THE SOLVE. When the metric closure proves that no figure holds `next`'s lengths, the primary
+  // solve fails (its acceptance sits inside the closure's margins, ADR-833) and the failure ladder's first act is this
+  // same proof and this same refusal — so they are reached without the primary's multi-start, which was most of a
+  // proven refusal's cost (#2359's «המחומש משוכלל» over two unequal sides: ~5 s of a ~8 s wait). A composition with a
+  // mirror keeps its order (its side choice is made by evaluating both), and a proof with no reading of its own
+  // solves as before (its sentence blames the primary's failure). The rider re-reads below still run on a refusal.
+  const proven = mirrored ? null : provenRefusal(prev, next, prevPositions, trace, 'main');
+  const res: EvalResult = proven ? { ok: false, error: proven.error } : evaluate(next);
   if (mirrored) {
     const alt = evaluate(mirrored);
     const choice = chooseComposition(prev, ncmd, prevPositions, next, res, mirrored, alt);
@@ -1619,7 +1794,7 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
     // A constraint its direct carrier alone can't satisfy ("cannot place F on AB so |DE|=|DF|" — F is
     // stuck on the segment) may still hold if the figure's OTHER free DOFs move too (ADR-028, extended):
     // the unified failure ladder (S1.1) — orphan re-home → settle → recruit → scale → honest refusal.
-    const failed = runFailureLadder(prev, next, newConsMain, prevPositions, res, trace, 'main');
+    const failed = proven ?? runFailureLadder(prev, next, newConsMain, prevPositions, res, trace, 'main');
     if (failed.ok) return failed;
     // #2089 (ADR-728): «XP ⟂ CD» about a rider P of CD that no rescue of the ⟂ form can satisfy is the foot statement
     // «XP גובה לצלע CD» — re-read through the foot placement's own M1 path (the free vertex X may then yield), and
@@ -1711,6 +1886,9 @@ function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult
   // #2099 (ADR-651): a coupled run can complete a circle through three points on one line as well as one statement can.
   const lineCircle = collinearCircleImpossibility(prev, next);
   if (lineCircle) return { ok: false, error: collinearCircleError(lineCircle), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  // #2912: a proven refusal is the refusal the joint solve and the ladder would reach — asked first (see applyStepLadder)
+  const proven = provenRefusal(prev, next, prevPositions, trace, 'coupled');
+  if (proven) return proven;
   const res = evaluate(next);
   if (res.ok && stepAccepted(next, res.positions, newCons)) {
     const owned = ensureOwnership(next, newCons, res.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF

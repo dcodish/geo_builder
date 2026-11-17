@@ -1,0 +1,1775 @@
+{
+  "$comment": "The teaching units and every question that belongs to each, transcribed or not (#2868 Addition A, ADR-W-209). Dates: the operator's roadmap calendar (30 Oct 2026). Questions: assigned by a session from docs/sample questions/ on 2026-11-13. member = the repo transcription a measure replays; null = not transcribed yet. scripts/ops/readiness.mjs measures it into ops/readiness.json.",
+  "note": "Made 2026-11-13 by reading every question of the 572 Logify booklet (16 exams, 2021–2025: Q1 analytic, Q2 3-D vectors, Q3 complex — all 48 enumerated; Q4+ are calculus, skipped), all 40 exercises on the 10 ellipse-book pages, and the 471 inventory (46 questions, Q4–Q5 of 23 exams). Skipped as out of scope: the 571 booklet (5-unit first paper: plane geometry, trig, sequences, probability, calculus — no analytic/vectors/complex; not opened page by page), the summer worksheet (calculus, plane geometry, trig — TOC checked), the screenshots and WhatsApp images (2-D plane geometry / trig). Unit assignment of 572 Q1 is by what the question mainly needs; a question needing both ellipse and parabola sits in parabola (the later unit). Questions with a note field say where a part belongs elsewhere. locus is thin (2 questions): the 572 booklet has no pure locus question; the locus parts of 572/7, 10, 14 sit in ellipse/parabola. The book the class uses for locus (and for parabola) is not in docs/sample questions — those exercises are missing, not omitted. lines-circles holds 44 of the 46 corpus471 entries (4/5 and 5/4 are pure synthetic plane geometry, dropped), plus 572/6 and two operator exam questions. 471 is the 4-unit booklet; whether it is the class booklet for this unit is unconfirmed. member: corpus471/corpus572 → the entry in src-analytic/__tests__/fixtures/corpus{471,572}.json by id (green = derive(confirmTaught(lines)) with no faults, as the ratchet tests measure). fixture → that file (green = the builder's fixtures net replays it clean). test → a test file (and describe name) that replays the question; it has no per-question verdict file, so a script must run that describe. otherMembers lists further fixtures for the same question (parts, wordings); a question should count green only when member and every otherMember are green — to be decided. A member often covers only some parts (see note): a green member means those parts build, not the whole question. Complex members are part-א only. Members matched by content rather than by an exam-marked name (3-D 572/2, 572/15, 572/10; complex 572/10) are confidence medium and fall outside the EXAM_NAME corpus filter. Not listed: the complex corpus exams sampled in docs/archive/27 (2020 קיץ, 2018, 2015, 2013, 2011) — not in the booklets and with no fixture.",
+  "units": [
+    {
+      "id": "lines-circles",
+      "name": "ישרים, מצולעים ומעגלים",
+      "builder": "analytic",
+      "from": "2026-09-01",
+      "to": "2026-10-26",
+      "questions": [
+        {
+          "id": "471/1/4",
+          "title": "נתון טרפז ישר זווית ABCD (AB ∥ CD, AB ⊥ AD)",
+          "where": "דוגמה – מבחן מספר 1, שאלה 4, עמ' 16 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "1/4"
+          },
+          "note": "מסומנת X בחוברת (כנראה מחוץ לתוכנית)"
+        },
+        {
+          "id": "471/1/5",
+          "title": "מרובע ABCD חסום במעגל שמשוואתו (x−2)² + (y+2)² = 100",
+          "where": "דוגמה – מבחן מספר 1, שאלה 5, עמ' 17 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "1/5"
+          }
+        },
+        {
+          "id": "471/2/4",
+          "title": "במלבן ABCD, הנקודה E נמצאת על הצלע DC",
+          "where": "דוגמה – מבחן מספר 2, שאלה 4, עמ' 23 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "2/4"
+          }
+        },
+        {
+          "id": "471/2/5",
+          "title": "במעגל שמרכזו M חסום משולש חד זוויות ABC",
+          "where": "דוגמה – מבחן מספר 2, שאלה 5, עמ' 24 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "2/5"
+          }
+        },
+        {
+          "id": "471/3/4",
+          "title": "בטרפז ABCD (CD ∥ AB)",
+          "where": "דוגמה – מבחן מספר 3, שאלה 4, עמ' 30 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "3/4"
+          },
+          "note": "מסומנת X בחוברת (כנראה מחוץ לתוכנית)"
+        },
+        {
+          "id": "471/3/5",
+          "title": "המשולש AOB הוא ישר זווית",
+          "where": "דוגמה – מבחן מספר 3, שאלה 5, עמ' 31 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "3/5"
+          }
+        },
+        {
+          "id": "471/4/4",
+          "title": "משולש ABC חסום במעגל שקוטרו AC",
+          "where": "דוגמה – מבחן מספר 4, שאלה 4, עמ' 38 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "4/4"
+          }
+        },
+        {
+          "id": "471/5/5",
+          "title": "נתון מעגל שמרכזו M(7;6)",
+          "where": "דוגמה – מבחן מספר 5, שאלה 5, עמ' 47 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "5/5"
+          }
+        },
+        {
+          "id": "471/6/4",
+          "title": "AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה",
+          "where": "דוגמה – מבחן מספר 6, שאלה 4, עמ' 54 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "6/4"
+          }
+        },
+        {
+          "id": "471/6/5",
+          "title": "הישרים AB ו-CD שבציור מקבילים זה לזה",
+          "where": "דוגמה – מבחן מספר 6, שאלה 5, עמ' 54 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "6/5"
+          }
+        },
+        {
+          "id": "471/7/4",
+          "title": "במשולש OBC העבירו גבהים OD ו-BE לצלעות BC ו-OC בהתאמה",
+          "where": "קיץ תש\"ף 2020 מועד א (מבחן מספר 7), שאלה 4, עמ' 62 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "7/4"
+          }
+        },
+        {
+          "id": "471/7/5",
+          "title": "במעגל שמרכזו M המיתרים AB ו-BC שווים (ראה סרטוט)",
+          "where": "קיץ תש\"ף 2020 מועד א (מבחן מספר 7), שאלה 5, עמ' 62 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "7/5"
+          }
+        },
+        {
+          "id": "471/8/4",
+          "title": "במקבילית ABCD נקודה F היא אמצע הצלע AD",
+          "where": "קיץ תש\"ף 2020 מועד ב (מבחן מספר 8), שאלה 4, עמ' 69 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "8/4"
+          }
+        },
+        {
+          "id": "471/8/5",
+          "title": "מרובע ABCD חסום במעגל",
+          "where": "קיץ תש\"ף 2020 מועד ב (מבחן מספר 8), שאלה 5, עמ' 69 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "8/5"
+          }
+        },
+        {
+          "id": "471/9/4",
+          "title": "במלבן ABCD",
+          "where": "חורף תשפ\"א, 2021, שאלה 4, עמ' 75 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "9/4"
+          }
+        },
+        {
+          "id": "471/9/5",
+          "title": "המרובע ABCD חסום במעגל שמרכזו M",
+          "where": "חורף תשפ\"א, 2021, שאלה 5, עמ' 76 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "9/5"
+          }
+        },
+        {
+          "id": "471/10/4",
+          "title": "המרובע ABCO הוא טרפז ישר זווית (∢C = 90°, AB ∥ OC)",
+          "where": "קיץ תשפ\"א, מועד א, 2021, שאלה 4, עמ' 84 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "10/4"
+          }
+        },
+        {
+          "id": "471/10/5",
+          "title": "מרובע ABCD חסום במעגל",
+          "where": "קיץ תשפ\"א, מועד א, 2021, שאלה 5, עמ' 84 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "10/5"
+          }
+        },
+        {
+          "id": "471/11/4",
+          "title": "במקבילית ABCD הצלע AD נמצאת על ציר ה-x",
+          "where": "קיץ תשפ\"א, מועד מיוחד, 2021, שאלה 4, עמ' 90 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "11/4"
+          }
+        },
+        {
+          "id": "471/11/5",
+          "title": "במעגל המיתרים AC ו-BD נפגשים בנקודה E, כמתואר בציור",
+          "where": "קיץ תשפ\"א, מועד מיוחד, 2021, שאלה 5, עמ' 91 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "11/5"
+          },
+          "note": "מסומנת X בחוברת (כנראה מחוץ לתוכנית)"
+        },
+        {
+          "id": "471/12/4",
+          "title": "במלבן ABCD הצלע AB חותכת את ציר ה-x בנקודה E, כמתואר בציור",
+          "where": "קיץ תשפ\"א, מועד ב, 2021, שאלה 4, עמ' 96 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "12/4"
+          }
+        },
+        {
+          "id": "471/12/5",
+          "title": "משולש ABC חסום במעגל שמרכזו M",
+          "where": "קיץ תשפ\"א, מועד ב, 2021, שאלה 5, עמ' 97 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "12/5"
+          }
+        },
+        {
+          "id": "471/13/4",
+          "title": "בסרטוט שלפניך מתואר משולש ABC",
+          "where": "חורף תשפ\"ב, מועד א, 2022, שאלה 4, עמ' 104 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "13/4"
+          }
+        },
+        {
+          "id": "471/13/5",
+          "title": "בסרטוט שלפניך מתואר מעגל שמרכזו M",
+          "where": "חורף תשפ\"ב, מועד א, 2022, שאלה 5, עמ' 105 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "13/5"
+          }
+        },
+        {
+          "id": "471/14/4",
+          "title": "במשולש ABC הקודקוד B מונח על ציר ה-y",
+          "where": "חורף תשפ\"ב, נבצרים, 2022, שאלה 4, עמ' 112 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "14/4"
+          }
+        },
+        {
+          "id": "471/14/5",
+          "title": "ABC הוא משולש ישר זווית (AB ⊥ BC)",
+          "where": "חורף תשפ\"ב, נבצרים, 2022, שאלה 5, עמ' 112 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "14/5"
+          }
+        },
+        {
+          "id": "471/15/4",
+          "title": "המרובע ABCD שלפניכם חסום במעגל (ראו סרטוט)",
+          "where": "קיץ תשפ\"ב, מועד א, 2022, שאלה 4, עמ' 120 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "15/4"
+          }
+        },
+        {
+          "id": "471/15/5",
+          "title": "נתון ריבוע ABCD",
+          "where": "קיץ תשפ\"ב, מועד א, 2022, שאלה 5, עמ' 121 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "15/5"
+          }
+        },
+        {
+          "id": "471/16/4",
+          "title": "בסרטוט שלפניכם מתואר מעגל, העובר דרך הנקודות O, C, A",
+          "where": "קיץ תשפ\"ב, מועד ב, 2022, שאלה 4, עמ' 130 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "16/4"
+          }
+        },
+        {
+          "id": "471/16/5",
+          "title": "במשולש ABC הקודקוד A מונח על ציר ה-x",
+          "where": "קיץ תשפ\"ב, מועד ב, 2022, שאלה 5, עמ' 130 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "16/5"
+          }
+        },
+        {
+          "id": "471/17/4",
+          "title": "במשולש ישר זווית ABC (∢ABC = 90°)",
+          "where": "חורף תשפ\"ג, 2023, שאלה 4, עמ' 137 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "17/4"
+          }
+        },
+        {
+          "id": "471/17/5",
+          "title": "מעגל שמרכזו M משיק לציר ה-x בנקודה E",
+          "where": "חורף תשפ\"ג, 2023, שאלה 5, עמ' 137 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "17/5"
+          }
+        },
+        {
+          "id": "471/18/4",
+          "title": "המרובע ABCD הוא טרפז (AB ∥ CD)",
+          "where": "קיץ תשפ\"ג, מועד א, 2023, שאלה 4, עמ' 146 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "18/4"
+          }
+        },
+        {
+          "id": "471/18/5",
+          "title": "המשולש ABC חסום במעגל שמרכזו M",
+          "where": "קיץ תשפ\"ג, מועד א, 2023, שאלה 5, עמ' 146 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "18/5"
+          }
+        },
+        {
+          "id": "471/19/4",
+          "title": "אלכסוני המקבילית ABCD נפגשים בנקודה E",
+          "where": "קיץ תשפ\"ג, מועד מיוחד, 2023, שאלה 4, עמ' 153 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "19/4"
+          }
+        },
+        {
+          "id": "471/19/5",
+          "title": "נתון מעגל שמרכזו M(6,10)",
+          "where": "קיץ תשפ\"ג, מועד מיוחד, 2023, שאלה 5, עמ' 153 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "19/5"
+          }
+        },
+        {
+          "id": "471/20/4",
+          "title": "במקבילית OABC הקודקוד B מונח על ציר ה-y",
+          "where": "קיץ תשפ\"ג, מועד ב, 2023, שאלה 4, עמ' 161 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "20/4"
+          }
+        },
+        {
+          "id": "471/20/5",
+          "title": "במעגל חסום משולש חד זווית ABC",
+          "where": "קיץ תשפ\"ג, מועד ב, 2023, שאלה 5, עמ' 162 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "20/5"
+          }
+        },
+        {
+          "id": "471/21/4",
+          "title": "נתון טרפז ישר זווית ABCD (AD ⊥ AB, AB ∥ DC)",
+          "where": "חורף תשפ\"ד, 2024, שאלה 4, עמ' 170 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "21/4"
+          }
+        },
+        {
+          "id": "471/21/5",
+          "title": "נתון מעגל שמרכזו M נמצא על החלק החיובי של ציר ה-y",
+          "where": "חורף תשפ\"ד, 2024, שאלה 5, עמ' 171 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "21/5"
+          }
+        },
+        {
+          "id": "471/22/4",
+          "title": "בסרטוט שלפניכם טרפז ישר זווית ABCD (AB ∥ DC, ∢D = 90°)",
+          "where": "קיץ תשפ\"ד, מועד א, 2024, שאלה 4, עמ' 179 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "22/4"
+          }
+        },
+        {
+          "id": "471/22/5",
+          "title": "הקטע AB הוא קוטר במעגל שמרכזו M",
+          "where": "קיץ תשפ\"ד, מועד א, 2024, שאלה 5, עמ' 180 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "22/5"
+          }
+        },
+        {
+          "id": "471/23/4",
+          "title": "נתון דלתון ABCD (CB = CD, AB = AD)",
+          "where": "קיץ תשפ\"ד, מועד ב, 2024, שאלה 4, עמ' 188 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "23/4"
+          }
+        },
+        {
+          "id": "471/23/5",
+          "title": "המשולש ABC חסום במעגל",
+          "where": "קיץ תשפ\"ד, מועד ב, 2024, שאלה 5, עמ' 189 בקובץ",
+          "source": "חוברת בגרויות 471 2025.pdf",
+          "member": {
+            "kind": "corpus471",
+            "ref": "23/5"
+          }
+        },
+        {
+          "id": "572/6/1",
+          "title": "שני מעגלים משיקים מבחוץ M(a, 0), N(13, 0), יחס רדיוסים 1:2; משיקים משותפים",
+          "where": "מבחן 6 | קיץ 2022, שאלה 1, עמ' 19 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "6"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2391-q2-exam-wording.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2391-q2-centres.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2379-q2-printed-order-2397.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2379-q2-b-all-common-tangents-2390.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2379-q2-c-touch-tangent-2390.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2379-q2-two-tangents-2395.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2380-q2-two-tangent-circles.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2382-q2-centre-radius.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2387-q2-equation-circles.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2387-q2-section-he.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2388-q2-exam-equations.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2388-q2-relations.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2394-q2-d-paired.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2425-t27-common-tangent.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "op/2379-q3",
+          "title": "מעגל שמרכזו M(8, −3) משיק ל-4x + 3y + 2 = 0 ב-A; שני מעגלים ברדיוס 10 המשיקים ב-A; משיק משותף",
+          "where": "שאלה 2 בדף המבחן של המפעיל (#2379 «Q3»), מקור הבגרות לא מזוהה",
+          "source": "analytic-exam-q3-tangent-circles.png",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/exam-2379-q3-route-2392.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2379-q3-c-named-tangent-2392.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2379-q3-distinct-2395.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2381-q3-exam-centres.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2382-q3-tangent-circles.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2391-q3-two-circles.analytic.json"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "id": "op/2552-q6",
+          "title": "שני מעגלים שרדיוסם 5, O₁(−3, 1), O₂(9, 10); משיק משותף חיצוני; נקודות השקה",
+          "where": "«שאלה 6, משיק משותף לשני מעגלים שווים» (#2552, #2553)",
+          "source": "מבחן של המפעיל (prod, 2026-10-25; לא בתיקייה)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/exam-2553-q6-external-tangent.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2552-q6-pair-split.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2552-q6-pair-joined.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2553-q6-same-side.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2553-q6-touch-points.analytic.json"
+            }
+          ],
+          "note": "השאלה המלאה אינה בתיקיית השאלות; הפיקסצ׳רים מכסים סעיפים ב-ד",
+          "confidence": "medium"
+        }
+      ]
+    },
+    {
+      "id": "locus",
+      "name": "מקום גיאומטרי",
+      "builder": "analytic",
+      "from": "2026-10-26",
+      "to": "2026-11-13",
+      "questions": [
+        {
+          "id": "572/1/1",
+          "title": "מקום גיאומטרי של נקודות השוות מרחק מנקודה ומישר (שני מקומות), חיתוכם, ומרובע",
+          "where": "מבחן 1 | קיץ 2021, שאלה 1, עמ' 4 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "1"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2021s-q1-two-parabolas-2664.analytic.json"
+            }
+          ],
+          "note": "המקומות יוצאים פרבולות, אך השאלה כולה נפתרת בכלי המקום הגיאומטרי; אפשר גם ליחידת הפרבולה"
+        },
+        {
+          "id": "572/12/1",
+          "title": "שני מעגלים, משיקים מ-A ומ-B נחתכים ב-M; המקום MA = MB הוא ישר; שטח KLM; משיק לפרבולה",
+          "where": "מבחן 12 | קיץ 2024, שאלה 1, עמ' 41 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "12"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2391-q1-exam-wording.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2379-q1-above-kl-2386.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2379-q1-named-perpendicular-2431.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2379-q1-perpendicular-kl-2429.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2383-q1-locus-line.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2383-q1-redundant-line.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2384-q1-area-locus.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2424-split-answer-t21.analytic.json"
+            }
+          ],
+          "note": "סעיף ד נוגע בפרבולה; עיקר השאלה מקום גיאומטרי ומעגלים"
+        }
+      ]
+    },
+    {
+      "id": "ellipse",
+      "name": "אליפסה",
+      "builder": "analytic",
+      "from": "2026-11-14",
+      "to": "2026-11-27",
+      "questions": [
+        {
+          "id": "572/7/1",
+          "title": "מקום מרכזי המעגלים שהקטע AB מיתר בהם; מעגל M ואליפסה שמוקדיה על ציר x; יחס שטחי משולשים",
+          "where": "מבחן 7 | מועד ב 2022, שאלה 1, עמ' 23 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "7"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2733-crossing-on-p.analytic.json"
+            }
+          ],
+          "note": "סעיף א מקום גיאומטרי (ישר); עיקר השאלה אליפסה"
+        },
+        {
+          "id": "572/8/1",
+          "title": "אליפסה x²/9 + y²/b² = 1 שמוקדיה וקודקודיה יוצרים ריבוע; מקום M הוא מעגל; הזזה וכיווץ",
+          "where": "מבחן 8 | חורף 2023, שאלה 1, עמ' 28 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "8"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2734-winter23-surd-centre.analytic.json"
+            }
+          ],
+          "note": "סעיף ג: הזזה וכיווץ של עקום — שאלת המתיחה פתוחה אצל המפעיל"
+        },
+        {
+          "id": "572/10/1",
+          "title": "מקום AC² + BC² = 1250 (מעגל), הזזה, אליפסה דרך E ו-G, מעגלים המשיקים לישר ולצירים",
+          "where": "מבחן 10 | מועד ב 2023, שאלה 1, עמ' 35 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "10"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2023b-q1-four-circles-2731.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "572/15/1",
+          "title": "מעגל x² − 6x + y² + t = 0 משיק ל-y = x; הזזה; מקום P על מיתר הוא אליפסה; משולש CKF",
+          "where": "מבחן 15 | קיץ 2025, שאלה 1, עמ' 51 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "15"
+          }
+        },
+        {
+          "id": "572/16/1",
+          "title": "אליפסה x²/(25k²) + y²/(16k²) = 1, מעגל שמרכזו במוקד, D על BF, משיק, ריבוע שצלעו 15",
+          "where": "מבחן 16 | מועד ב 2025, שאלה 1, עמ' 55 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "16"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/answer-in-parameter-q16-2735.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "ellipse-book/p1-3",
+          "title": "אליפסה קנונית מהצירים 12 ו-8",
+          "where": "עמוד 1 (page-01.png), תרגיל 3",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p1-3-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p1-4",
+          "title": "ציר גדול 20 ומרחק בין המוקדים 10",
+          "where": "עמוד 1 (page-01.png), תרגיל 4",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p1-4-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p1-5",
+          "title": "ציר קטן √20 ומרחק בין המוקדים √60",
+          "where": "עמוד 1 (page-01.png), תרגיל 5",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p1-5-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p1-6",
+          "title": "ציר גדול 6 ונקודה (2, −5/3)",
+          "where": "עמוד 1 (page-01.png), תרגיל 6",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p1-6-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p1-7",
+          "title": "ציר קטן 10 ומרחק המוקד הימני מהקודקוד הימני 1",
+          "where": "עמוד 1 (page-01.png), תרגיל 7",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p1-7-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p1-8",
+          "title": "אליפסה דרך (3, √2) ו-(√6, −2)",
+          "where": "עמוד 1 (page-01.png), תרגיל 8",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p1-8-2619.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/ellipse-book-p1-8-2616.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "ellipse-book/p1-9",
+          "title": "מוקד (√10, 0) ונקודה (−3, 2)",
+          "where": "עמוד 1 (page-01.png), תרגיל 9",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p1-9-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p1-10",
+          "title": "מרחקי הקודקוד הימני והמוקד הימני מהישר y = 2x",
+          "where": "עמוד 1 (page-01.png), תרגיל 10",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p1-10-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p2-11",
+          "title": "ציר גדול על ציר y, דרך (√2, 6) ו-(−√18, 2)",
+          "where": "עמוד 2 (page-02.png), תרגיל 11",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p2-11-2619.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/ellipse-book-p2-11-2616.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "ellipse-book/p2-12",
+          "title": "נקודות על x² + 5y² = 45 שמרחקן מהמוקד הימני √5",
+          "where": "עמוד 2 (page-02.png), תרגיל 12",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p2-12-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p2-13",
+          "title": "ציר גדול על ציר y; מרחק הנקודה מהמוקד התחתון 4⅓",
+          "where": "עמוד 2 (page-02.png), תרגיל 13",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p2-13-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p2-14",
+          "title": "נקודות על 5x² + 9y² = 180, מרחק מהמוקד השמאלי גדול ב-5⅓",
+          "where": "עמוד 2 (page-02.png), תרגיל 14",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p2-14-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p2-15",
+          "title": "ישר מקביל לציר x חותך אליפסה, מרחקים 6 ו-10 מהמוקדים; ישר במרחק √52",
+          "where": "עמוד 2 (page-02.png), תרגיל 15",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p2-15-2616.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/ellipse-book-p2-15-2621.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "ellipse-book/p2-16",
+          "title": "נקודה (3, 1), מרחק מהמוקד השמאלי פי 5; חיתוך שתי האליפסות",
+          "where": "עמוד 2 (page-02.png), תרגיל 16",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p2-16-2616.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p3-21",
+          "title": "A(2.5, 4.5) על האליפסה, שיפוע F₁B; הקצה השני של המיתר דרך F₁",
+          "where": "עמוד 3 (page-03.png), תרגיל 21",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p3-21-2616.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2615-p3-21-chord.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "ellipse-book/p3-22",
+          "title": "קוטר באורך 10 ושיפוע חיובי ב-x² + 5y² = 45; קוטר צמוד",
+          "where": "עמוד 3 (page-03.png), תרגיל 22",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p3-22a.analytic.json"
+          },
+          "note": "הפיקסצ׳ר מכסה סעיף א בלבד; סעיף ב (מכפלת שיפועים) נפסק כלא-נבנה (2026-10-30)",
+          "confidence": "medium"
+        },
+        {
+          "id": "ellipse-book/p4-24",
+          "title": "מעוין שהיקפו 20 ושטחו 24 חסום באליפסה; מעגל קנוני חותך בארבע נקודות; שיפוע משיק",
+          "where": "עמוד 4 (page-04.png), תרגיל 24",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p4-24a.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/rhombus-long-diagonal-p4-24a-2621.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/ellipse-book-p4-24-2619.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/ellipse-book-p4-24c-2621.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "ellipse-book/p5-26",
+          "title": "מעוין שצלעו 5 וגובהו 4.8 על הצירים; אליפסה; מעגלים חסומים",
+          "where": "עמוד 5 (page-05.png), תרגיל 26",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p5-26b.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/rhombus-height-p5-26a-2621.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/ellipse-book-p5-26b-around.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/ellipse-book-p5-26b-inscribed.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "ellipse-book/p5-27",
+          "title": "משולש שווה צלעות חסום ב-7x² + 9y² = 63; משולש מוקדים ששטחו 4",
+          "where": "עמוד 5 (page-05.png), תרגיל 27",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p5-27a.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/ellipse-book-p5-27-2616.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "ellipse-book/p5-28",
+          "title": "משולש 13-14-15 חסום באליפסה קנונית",
+          "where": "עמוד 5 (page-05.png), תרגיל 28",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p5-28.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/triangle-sides-p5-28-2621.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "ellipse-book/p6-1",
+          "title": "מעגל x² + y² = 36 מכווץ ב-2/3 לאליפסה; מלבן חסום",
+          "where": "עמוד 6 (page-06.png), תרגיל 1",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p6-1b.analytic.json"
+          },
+          "note": "הכיווץ («הכפילו את שיעור y») פתוח אצל המפעיל; הפיקסצ׳ר מכסה את סעיף ב",
+          "confidence": "medium"
+        },
+        {
+          "id": "ellipse-book/p6-2",
+          "title": "מעגל x² + y² = 20 מכווץ לאליפסה; ישר מאונך לציר x חותך את שניהם",
+          "where": "עמוד 6 (page-06.png), תרגיל 2",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/direction-line-p6-2b-2621.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/side-of-origin-p6-2b-2621.analytic.json"
+            }
+          ],
+          "note": "הכיווץ פתוח אצל המפעיל; הפיקסצ׳רים מכסים את סעיף ב",
+          "confidence": "medium"
+        },
+        {
+          "id": "ellipse-book/p6-3",
+          "title": "מעגל x² + y² = R² שמכפילים את y שלו → 9x² + 16y² = 576; רדיוס והגורם",
+          "where": "עמוד 6 (page-06.png), תרגיל 3",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": null,
+          "note": "כולו שאלת מתיחה — פתוח אצל המפעיל (#2622)"
+        },
+        {
+          "id": "ellipse-book/p7-10",
+          "title": "הזזת המעגל x² + y² + 4x − 6y − 23 = 0 למעגל קנוני ומתיחתו לאליפסה",
+          "where": "עמוד 7 (page-07.png), תרגיל 10",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": null,
+          "note": "הזזה ומתיחה — פתוח אצל המפעיל"
+        },
+        {
+          "id": "ellipse-book/p7-11",
+          "title": "הנקודה (6, 4.8) על האליפסה וסכום המרחקים 20; מתיחה פי k",
+          "where": "עמוד 7 (page-07.png), תרגיל 11",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p7-11-2616.analytic.json"
+          },
+          "note": "הפיקסצ׳ר מכסה סעיף א; סעיפים ב-ג הם מתיחה",
+          "confidence": "medium"
+        },
+        {
+          "id": "ellipse-book/p8-1",
+          "title": "מצב הדדי: y = −x + 5 ו-x² + 4y² = 20",
+          "where": "עמוד 8 (page-08.png), תרגיל 1",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p8-1.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p8-2",
+          "title": "מצב הדדי: y = x − 1 ו-x² + 2y² = 6",
+          "where": "עמוד 8 (page-08.png), תרגיל 2",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": null
+        },
+        {
+          "id": "ellipse-book/p8-3",
+          "title": "מצב הדדי: y = −x + 7 ו-3x² + 4y² = 84",
+          "where": "עמוד 8 (page-08.png), תרגיל 3",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p8-3.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p8-4",
+          "title": "מצב הדדי: y = x/2 + 3 ו-2x² + 8y² = 35",
+          "where": "עמוד 8 (page-08.png), תרגיל 4",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": null
+        },
+        {
+          "id": "ellipse-book/p8-5",
+          "title": "מצב הדדי: y = x + 2 ו-3x² + 5y² = 10",
+          "where": "עמוד 8 (page-08.png), תרגיל 5",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": null
+        },
+        {
+          "id": "ellipse-book/p8-6",
+          "title": "מצב הדדי: y = −0.75x + 2.5 ו-3x² + 8y² = 20",
+          "where": "עמוד 8 (page-08.png), תרגיל 6",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p8-6.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p8-7",
+          "title": "ערכי k: y = kx + 3 ו-x²/6 + y²/3 = 1",
+          "where": "עמוד 8 (page-08.png), תרגיל 7",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p8-7.analytic.json"
+          },
+          "note": "הפיקסצ׳ר מכסה את סעיף ב (משיק) בלבד",
+          "confidence": "medium"
+        },
+        {
+          "id": "ellipse-book/p8-8",
+          "title": "ערכי k: y = 2x + k ו-x²/18 + y²/9 = 1",
+          "where": "עמוד 8 (page-08.png), תרגיל 8",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p8-8.analytic.json"
+          },
+          "note": "הפיקסצ׳ר מכסה את סעיף ב (משיק) בלבד",
+          "confidence": "medium"
+        },
+        {
+          "id": "ellipse-book/p8-9",
+          "title": "ערכי k: y = x/2 + 4 ו-kx²/32 + y²/8 = 1",
+          "where": "עמוד 8 (page-08.png), תרגיל 9",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p8-9.analytic.json"
+          },
+          "note": "הפיקסצ׳ר מכסה את סעיף ב (משיק) בלבד",
+          "confidence": "medium"
+        },
+        {
+          "id": "ellipse-book/p8-10",
+          "title": "ערכי k: y = −x + 5 ו-x²/(k²−k) + 4y²/(k²−k) = 1",
+          "where": "עמוד 8 (page-08.png), תרגיל 10",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p8-10.analytic.json"
+          },
+          "note": "הפיקסצ׳ר מכסה את סעיף ב (משיק) בלבד",
+          "confidence": "medium"
+        },
+        {
+          "id": "ellipse-book/p9-5",
+          "title": "מקום: מרחק מ-(2, 0) קטן פי 2 מהמרחק מ-x = 8 (אליפסה)",
+          "where": "עמוד 9 (page-09.png), תרגיל 5",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p9-5-2620.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p9-6",
+          "title": "מקום: סכום ריבועי המרחקים מ-y = −2 ומ-(0, 2) הוא 16",
+          "where": "עמוד 9 (page-09.png), תרגיל 6",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p9-6-2620.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p9-7",
+          "title": "A ו-B על הצירים, סכום ריבועי מרחקיהן מ-y = x/2 הוא 4; מקום המפגש; מלבן חסום",
+          "where": "עמוד 9 (page-09.png), תרגיל 7",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p9-7-sum-2620.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/ellipse-book-p9-7-2620.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-2672-line-through-and-perp.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "ellipse-book/p10-8",
+          "title": "מקום: אורך המשיק למעגל קטן פי 3 מהמרחק מ-x = 9",
+          "where": "עמוד 10 (page-10.png), תרגיל 8",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/ellipse-book-p10-8-2620.analytic.json"
+          }
+        },
+        {
+          "id": "ellipse-book/p10-9",
+          "title": "P על האליפסה, ℓ₁ ∥ PO דרך N, ℓ₂ ∥ ציר x; מקום המפגש; AA′ = 8",
+          "where": "עמוד 10 (page-10.png), תרגיל 9",
+          "source": "ellipse-book (ספר האליפסה, עמודי הספר של המפעיל)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-analytic/__tests__/fixtures/issue-2613-p10-9-locus.analytic.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/prime-names-p10-9b-2621.analytic.json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "parabola",
+      "name": "פרבולה",
+      "builder": "analytic",
+      "from": "2026-11-28",
+      "to": "2026-12-12",
+      "questions": [
+        {
+          "id": "572/2/1",
+          "title": "K על y² = 4px, KF = 20; שתי פרבולות; מקום אמצעי AB",
+          "where": "מבחן 2 | קיץ מיוחד 2021, שאלה 1, עמ' 7 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "2"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2021-special-q1-parabola-2731.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "572/3/1",
+          "title": "פרבולה y² = 2ax ומעגל; ישר דרך נקודות החיתוך; מקום: אורך משיק שווה למרחק מ-x = −4",
+          "where": "מבחן 3 | מועד ב 2021, שאלה 1, עמ' 10 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "3"
+          }
+        },
+        {
+          "id": "572/4/1",
+          "title": "מוקד משותף (t, 0) לפרבולה ולאליפסה; המדריך חותך את האליפסה; ארבע נקודות על מעגל",
+          "where": "מבחן 4 | חורף 2022, שאלה 1, עמ' 13 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "4"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/ellipse-above-2732.analytic.json"
+            }
+          ],
+          "note": "משלבת אליפסה ופרבולה; שובצה בפרבולה כי היא צריכה את שתיהן"
+        },
+        {
+          "id": "572/5/1",
+          "title": "מיתר AB בפרבולה y² = 36x, אמצעו (x, 7.5); מוקד ומדריך",
+          "where": "מבחן 5 | חורף נבצרים 2022, שאלה 1, עמ' 16 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "5"
+          }
+        },
+        {
+          "id": "572/9/1",
+          "title": "אליפסה עם פרמטר k; פרבולה שמוקדה F₁, AF₁ = 10k; מעגל שקוטרו AF₁ משיק לישר",
+          "where": "מבחן 9 | קיץ 2023, שאלה 1, עמ' 32 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "9"
+          },
+          "note": "משלבת אליפסה ופרבולה; שובצה בפרבולה כי היא צריכה את שתיהן"
+        },
+        {
+          "id": "572/11/1",
+          "title": "משולש ישר זווית ABC, A(a, 0); מקום אמצע BC (פרבולה); משיק; מעגל משיק",
+          "where": "מבחן 11 | חורף 2024, שאלה 1, עמ' 38 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "11"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2024w-locus-1138.analytic.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2024w-locus-param-1138.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "572/13/1",
+          "title": "מעוין על הצירים, מעגל חסום, M נקודת השקה; מקום G הוא פרבולה; מעגלים שמרכזם N",
+          "where": "מבחן 13 | מועד ב 2024, שאלה 1, עמ' 45 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "13"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/exam-2024sB-locus-1138.analytic.json"
+            }
+          ]
+        },
+        {
+          "id": "572/14/1",
+          "title": "מקום P עם ∢APB = 90° (מעגל); שטח מקסימלי; פרבולה שמוקדה באמצע AB; משיקים מקבילים",
+          "where": "מבחן 14 | חורף 2025, שאלה 1, עמ' 48 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "corpus572",
+            "ref": "14"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "src-analytic/__tests__/fixtures/issue-1186-winter25-in-a.analytic.json"
+            }
+          ],
+          "note": "סעיף א מקום גיאומטרי (מעגל); שובצה בפרבולה כי סעיפים ג-ד צריכים פרבולה"
+        }
+      ]
+    },
+    {
+      "id": "vectors3d",
+      "name": "וקטורים במרחב",
+      "builder": "3d",
+      "from": "2026-12-01",
+      "to": null,
+      "questions": [
+        {
+          "id": "572/1/2",
+          "title": "פירמידה SABCD שבסיסה מעוין, SA ⊥ לבסיס, SE = t·SC; ED ⊥ EB; שיעורי S ו-D, מישור SAB",
+          "where": "מבחן 1 | קיץ 2021, שאלה 2, עמ' 4 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/2/2",
+          "title": "מנסרה ישרה ABCA'B'C', AA' = (k−1, k−7, k+1); הישרים AC ו-BC; מישור A'B'C', זווית, מרכז מעגל חוסם",
+          "where": "מבחן 2 | קיץ מיוחד 2021, שאלה 2, עמ' 7 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "fixture",
+            "file": "fixtures3/prism-eq-first-815.geo3.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "fixtures3/prism-sym-pair-794.geo3.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "fixtures3/prism-pin-driven-803.geo3.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "fixtures3/prism-sym-line-801.geo3.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "fixtures3/symbolic-line-equation-863.geo3.json"
+            }
+          ],
+          "note": "שמות הפיקסצ׳רים לא מציינים את הבחינה; זוהו לפי הנתונים (AA'=(k−1,k−7,k+1)) ולכן אינם בקורפוס הבחינות (EXAM_NAME)",
+          "confidence": "medium"
+        },
+        {
+          "id": "572/3/2",
+          "title": "משולש ABC, D אמצע AB, AE:EC = 2:1, F מפגש BE ו-CD; המישור 4x + 2y + z − 12 = 0; נפח FAOE",
+          "where": "מבחן 3 | מועד ב 2021, שאלה 2, עמ' 10 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/4/2",
+          "title": "מישורים π₁: z − 3 = 0, π₂: ay + z − 8 = 0 בזווית 45°; אנך AB; ישר החיתוך ℓ; שטח ABC",
+          "where": "מבחן 4 | חורף 2022, שאלה 2, עמ' 13 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "fixture",
+            "file": "fixtures3/planes-2022-q2.geo3.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "test",
+              "file": "src3d/__tests__/scenarios3.test.ts",
+              "name": "GATE — 2022 חורף Q2 (the algebraic lane: planes, parameter, feet, ℓ, area)"
+            }
+          ]
+        },
+        {
+          "id": "572/5/2",
+          "title": "מנסרה ישרה ABCDA'B'C'D' שבסיסה מעוין, F על מישור ACD', DF ⊥ למישור; נפח; שיעורי F",
+          "where": "מבחן 5 | חורף נבצרים 2022, שאלה 2, עמ' 16 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/6/2",
+          "title": "A(4, p, −1), B, C, D במישור אחד; ABCD ריבוע; פירמידה SABCD, S על ישר, נפח 81; זווית בין מישורים",
+          "where": "מבחן 6 | קיץ 2022, שאלה 2, עמ' 19 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/7/2",
+          "title": "פירמידה OABC עם |u| = |v| = |w| וזוויות ישרות; OH גובה, M מפגש תיכונים; P על הגובה; משוואת ABC",
+          "where": "מבחן 7 | מועד ב 2022, שאלה 2, עמ' 24 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/8/2",
+          "title": "מישורים π₁, π₂ עם פרמטר k; ישר החיתוך ℓ₁ ∥ ℓ₂; P על מישור yz; שטח APB",
+          "where": "מבחן 8 | חורף 2023, שאלה 2, עמ' 29 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/9/2",
+          "title": "קובייה ABCDA'B'C'D', CA' ⊥ BC'D, E מפגש תיכונים; A(4, n, p); ישר ℓ ומישור",
+          "where": "מבחן 9 | קיץ 2023, שאלה 2, עמ' 32 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "fixture",
+            "file": "fixtures3/cube-2023-q2.geo3.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "test",
+              "file": "src3d/__tests__/scenarios3.test.ts",
+              "name": "GATE — 2023 קיץ א Q2 א–ב (cube, perpendicular-to-plane + centroid + collinearity)"
+            }
+          ]
+        },
+        {
+          "id": "572/10/2",
+          "title": "פירמידה ABCD, DC ⊥ ABC, E אמצע AD, DF = (k/2)DB + kDC; EF ∥ ABC; שיעורים, נפח",
+          "where": "מבחן 10 | מועד ב 2023, שאלה 2, עמ' 35 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "test",
+            "file": "src3d/__tests__/v7-t2.test.ts"
+          },
+          "note": "מכוסה בקובץ בדיקה (v7-t2, «the 2023-ב chain») ולא בפיקסצ׳ר; הקובץ אינו ברשימת קורפוס הבחינות",
+          "confidence": "medium"
+        },
+        {
+          "id": "572/11/2",
+          "title": "ישר ℓ: x = (−1, 5, −11) + t(m−1, 5−m, −2) ומישור π עם פרמטר m; ℓ ⊥ π; נקודת חיתוך A",
+          "where": "מבחן 11 | חורף 2024, שאלה 2, עמ' 38 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "fixture",
+            "file": "fixtures3/param-line-2024-q2.geo3.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "test",
+              "file": "src3d/__tests__/scenarios3.test.ts",
+              "name": "GATE — 2024 חורף Q2 (parameters in lines: the parametric ℓ, the ⟂ pin, the cut point, the ד investigation)"
+            }
+          ]
+        },
+        {
+          "id": "572/12/2",
+          "title": "ישרים ℓ₁, ℓ₂ עם פרמטר k, cos α = 3√2/5; מישור π; משולש שווה שוקיים AOB; פירמידה SAOB",
+          "where": "מבחן 12 | קיץ 2024, שאלה 2, עמ' 42 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/13/2",
+          "title": "פירמידה SABCD שבסיסה ריבוע, SE גובה, F אמצע BC, |u| = 7, BA = (−3, 4, 5); זווית SB עם הבסיס",
+          "where": "מבחן 13 | מועד ב 2024, שאלה 2, עמ' 45 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/14/2",
+          "title": "פירמידה SABC, E אמצע BC, |u+v| = |u−v|, SE גובה 16; F על SC, FM ∥ AC חותך את ABS",
+          "where": "מבחן 14 | חורף 2025, שאלה 2, עמ' 48 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/15/2",
+          "title": "פירמידה SABCD שבסיסה מקבילית, SA גובה, M אמצע BD, SM ⊥ DB; מישור דרך AC ∥ SD",
+          "where": "מבחן 15 | קיץ 2025, שאלה 2, עמ' 52 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "fixture",
+            "file": "fixtures3/pyramid-sign-branch-818.geo3.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "fixture",
+              "file": "fixtures3/pyramid-named-comp-814.geo3.json"
+            },
+            {
+              "kind": "fixture",
+              "file": "fixtures3/pyramid-two-branch-827-2814.geo3.json"
+            }
+          ],
+          "note": "זוהה לפי הנתונים (S(0,0,6), B(0,5,0), D(3,p,0)); הפיקסצ׳רים מכסים את סעיף ג בלבד ואינם בקורפוס הבחינות",
+          "confidence": "medium"
+        },
+        {
+          "id": "572/16/2",
+          "title": "מנסרה ישרה AOBA'O'B', ∢AOB = 90°, K אמצע AB, O'E = ⅓O'B, AN = ¾AE; מישור A'KB', נפח",
+          "where": "מבחן 16 | מועד ב 2025, שאלה 2, עמ' 56 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null,
+          "note": "ב-scenarios3 (#116) יש רק שתי השורות הראשונות מסשן prod — לא נחשב חבר"
+        },
+        {
+          "id": "3d/2020-summer-q2",
+          "title": "מנסרה ישרה משולשת, M אמצע B'C', AK = 2KA', פירוק AM ו-KP",
+          "where": "שאלה 2",
+          "source": "בגרות 2020 קיץ (לא באוסף 572, שמתחיל ב-2021)",
+          "member": {
+            "kind": "fixture",
+            "file": "fixtures3/prism-2020-q2.geo3.json"
+          },
+          "otherMembers": [
+            {
+              "kind": "test",
+              "file": "src3d/__tests__/scenarios3.test.ts",
+              "name": "GATE — 2020 קיץ Q2 א–ב (prism, geometric-vector lane)"
+            }
+          ]
+        },
+        {
+          "id": "3d/2019-summer-q2",
+          "title": "ישר דרך נקודות החותך מישור נקודות; יחס וזווית",
+          "where": "שאלה 2",
+          "source": "בגרות 2019 קיץ (לא באוסף)",
+          "member": {
+            "kind": "test",
+            "file": "src3d/__tests__/scenarios3.test.ts",
+            "name": "GATE — 2019 קיץ Q2 (V5: line through points cutting a point-plane, ratio + angle answers)"
+          },
+          "confidence": "medium"
+        },
+        {
+          "id": "3d/2026-B-q2",
+          "title": "פירמידה ABCDS שבסיסה ריבוע; |EN|; מישור ENB; נפחי SENB ו-CENB",
+          "where": "שאלה 2",
+          "source": "בגרות 2026 מועד ב (לא באוסף)",
+          "member": {
+            "kind": "test",
+            "file": "src3d/__tests__/exam-2026-2.test.ts"
+          }
+        },
+        {
+          "id": "3d/box-exam-adr-3d-032",
+          "title": "תיבה, מישור A'B'C'D', B(0,7,6), הישר AB, M(k,1,3), זווית 60°",
+          "where": "סעיפים ג-ד",
+          "source": "מבחן התיבה של המפעיל (2026-07-09; שנה לא ידועה)",
+          "member": {
+            "kind": "test",
+            "file": "src3d/__tests__/adr-3d-032.test.ts"
+          },
+          "confidence": "medium"
+        },
+        {
+          "id": "3d/bagrut-03572-q2-box",
+          "title": "תיבה ABCDA'B'C'D', E אמצע BB', BM = ⅙u − ⅔v + 1/12w, האם M במישור AEC",
+          "where": "שאלה 2",
+          "source": "בגרות 03572 שאלה 2 (שנה לא מזוהה; #2062)",
+          "member": {
+            "kind": "fixture",
+            "file": "fixtures3/bagrut-03572-q2-wording-2062.geo3.json"
+          },
+          "confidence": "medium"
+        }
+      ]
+    },
+    {
+      "id": "complex",
+      "name": "מספרים מרוכבים",
+      "builder": "complex",
+      "from": null,
+      "to": null,
+      "questions": [
+        {
+          "id": "572/1/3",
+          "title": "z⁴ = −16, מצולע במישור גאוס; כפל ב-(1+i)/√2; zⁿ = c ושטח המצולע",
+          "where": "מבחן 1 | קיץ 2021, שאלה 3, עמ' 5 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/2/3",
+          "title": "w² − 4iw − 4 + 2i = 0; z³ = a + bi; z³ = 2(w₁ + w₂) משולש; הזזה ב-u = di",
+          "where": "מבחן 2 | קיץ מיוחד 2021, שאלה 3, עמ' 8 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/3/3",
+          "title": "z⁴ − 2z² + 4 = 0 ושטח המצולע; (az² + b)(z + 1) = 0, פתרונות מדומים על מעגל",
+          "where": "מבחן 3 | מועד ב 2021, שאלה 3, עמ' 11 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/4/3",
+          "title": "z₁, z₂ עם פרמטר a צמודים; w₁, w₂ חזקות ממשי/מדומה; מעגל |z − p| = m",
+          "where": "מבחן 4 | חורף 2022, שאלה 3, עמ' 14 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "fixture",
+            "file": "src-complex/__tests__/fixtures/exam-2022w-a-quadratic-1818.complex.json"
+          },
+          "note": "הפיקסצ׳ר מכסה את סעיף א",
+          "confidence": "medium"
+        },
+        {
+          "id": "572/5/3",
+          "title": "(z + i)² − 2 − 2√3i = 0; מקומות |z − ia| = √3; הישר y = x; z³ = w₁w̄₁w₂w̄₂",
+          "where": "מבחן 5 | חורף נבצרים 2022, שאלה 3, עמ' 17 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/6/3",
+          "title": "z² + zz̄ = z + 2z̄ + 9 + 7i; ריבוע חסום במעגל; סיבוב וכפל, מרובע חדש",
+          "where": "מבחן 6 | קיץ 2022, שאלה 3, עמ' 20 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/7/3",
+          "title": "z = R cis α ברביע השלישי, z/z̄ = −½ + (√3/2)i; w⁹ = z³/27; משולש שווה שוקיים, שטח ABOC",
+          "where": "מבחן 7 | מועד ב 2022, שאלה 3, עמ' 25 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/8/3",
+          "title": "w⁶ = −27; (z + (√3/2)i)⁶ = −27 על מעגל; משולש ומרובע",
+          "where": "מבחן 8 | חורף 2023, שאלה 3, עמ' 29 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/9/3",
+          "title": "z³ = 1/z³, z₀ ברביע הרביעי; A, B, C עם פרמטר d, שטח 5d + 6; w ו-wⁿ",
+          "where": "מבחן 9 | קיץ 2023, שאלה 3, עמ' 33 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "fixture",
+            "file": "src-complex/__tests__/fixtures/exam-2023a-quadrant-selection.complex.json"
+          },
+          "note": "הפיקסצ׳ר (z⁶ = 1, בחירת הרביע) מכסה את סעיף א",
+          "confidence": "medium"
+        },
+        {
+          "id": "572/10/3",
+          "title": "סדרה הנדסית מרוכבת: z₁³ = z₃, −2z₁ = z̄₃, z₁ ברביע הראשון; סכום",
+          "where": "מבחן 10 | מועד ב 2023, שאלה 3, עמ' 36 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": {
+            "kind": "fixture",
+            "file": "src-complex/__tests__/fixtures/607-exact-family.complex.json"
+          },
+          "note": "זוהה לפי הנתונים; שם הפיקסצ׳ר לא מציין בחינה",
+          "confidence": "medium"
+        },
+        {
+          "id": "572/11/3",
+          "title": "מקום |6 − z̄ − 8i|² − |10i| = |9 + 12i| הוא מעגל; A ו-M באותו ארגומנט; סדרה הנדסית",
+          "where": "מבחן 11 | חורף 2024, שאלה 3, עמ' 39 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/12/3",
+          "title": "מעוין ABCD במישור גאוס, BD = 2AC; ההפכיים 1/z מרובע; w¹¹ = w̄",
+          "where": "מבחן 12 | קיץ 2024, שאלה 3, עמ' 43 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/13/3",
+          "title": "z⁶ + 64i = 0; ארבעה פתרונות — ריבוע; סיבוב בזווית α",
+          "where": "מבחן 13 | מועד ב 2024, שאלה 3, עמ' 46 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/14/3",
+          "title": "w = r cis θ, 1/w, שטח AOB = √2/4; z⁸ = w⁸ ו-z⁸ = (ww̄)⁴ מצולע",
+          "where": "מבחן 14 | חורף 2025, שאלה 3, עמ' 49 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/15/3",
+          "title": "מקום |z| = |z − (2 + 2i)|; z² − z(2 + 2i) + 4i = 0; ריבוע מסובב; zⁿ = b",
+          "where": "מבחן 15 | קיץ 2025, שאלה 3, עמ' 52 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "572/16/3",
+          "title": "z₁z₂ = −19 + 4i, z₁ = 2 + 3i; w³ = z₁ + z₂; z = 2cis θ על ישר עם z³; מצולע",
+          "where": "מבחן 16 | מועד ב 2025, שאלה 3, עמ' 57 בקובץ",
+          "source": "אוסף בגרויות 572 Logify 2026.pdf",
+          "member": null
+        },
+        {
+          "id": "cx/2021-winterB-1895",
+          "title": "z² − (1+i)z + 2i + 2 = 0; A ברביע הרביעי; מעגל שמרכזו O ורדיוסו |B|",
+          "where": "שאלה 3 (#1895)",
+          "source": "בגרות 2021 (חורף/מועד ב; לא באוסף 572)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-complex/__tests__/fixtures/exam-2021wB-circle-1895.complex.json"
+          },
+          "confidence": "medium"
+        },
+        {
+          "id": "cx/operator-capstone",
+          "title": "arg z₁ − arg z₂ = 90, |z₁| = 9r, |z₂| = 12r; מרובע Oz₁z₂z₃; סדרה הנדסית",
+          "where": "§2b",
+          "source": "דוגמת ההוראה של המפעיל (docs/archive/27 §2b)",
+          "member": {
+            "kind": "fixture",
+            "file": "src-complex/__tests__/fixtures/2b-capstone.complex.json"
+          },
+          "note": "לא שאלת בגרות; דוגמה שהמפעיל מלמד",
+          "confidence": "medium"
+        }
+      ]
+    }
+  ]
+}

@@ -28,8 +28,8 @@ describe('#384 — the data panel reports plane pairs (stated or holding)', () =
     submit("תיבה ABCDA'B'C'D'");
     submit("המישור ABC מקביל למישור A'B'C'");
     expect(state().lastError).toBeNull();
-    expect(state().facts).toHaveLength(1);
-    expect(state().lastNotice).toEqual({ code: 'already-stated' });
+    expect(state().facts).toHaveLength(2);
+    expect(state().lastNotice).toEqual({ code: 'already-held' });
   });
 
   it('«המישור ABC מאונך למישור ABD» on a tetra (driven, play test 1) → a perpendicular row', () => {
@@ -77,8 +77,8 @@ describe('#396 — a relation between two ABSOLUTE objects gets the redundancy n
     submit('המישור π2: x = 0');
     submit('π1 ניצב ל-π2');
     expect(state().lastError).toBeNull();
-    expect(state().facts).toHaveLength(2);
-    expect(state().lastNotice).toEqual({ code: 'already-stated' });
+    expect(state().facts).toHaveLength(3);
+    expect(state().lastNotice).toEqual({ code: 'already-held' });
   });
 
   it('…and the same row, saved before #2341, loads with the notice naming both', () => {
@@ -140,8 +140,8 @@ describe('#396 — a relation between two ABSOLUTE objects gets the redundancy n
     const rows = state().facts.length;
     submit('π1 ניצב ל-π2');
     expect(state().lastError).toBeNull();
-    expect(state().facts).toHaveLength(rows);
-    expect(state().lastNotice).toEqual({ code: 'already-stated' });
+    expect(state().facts).toHaveLength(rows + 1); // #2790 (ADR-3D-484): held — its own row, with the notice
+    expect(state().lastNotice).toEqual({ code: 'already-held' });
   });
 });
 

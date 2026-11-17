@@ -40,7 +40,8 @@ const SWEEP: ReadonlyArray<{ why: string; session: string; now: Now; detail: str
   { why: 'a proof target on a figure that has the points', session: 'פירמידה SABC ⏎ הוכיחו כי SA ⊥ BC', now: 'guided', detail: 'scope:proof-target' },
   { why: '#866: one angle meets at A — repaired and BUILT', session: 'משולש ABC ⏎ AD חוצה את זווית A', now: 'built', detail: 'bisector-ray' },
   { why: '#866: several angles meet at A — the student is asked', session: 'פירמידה SABC ⏎ AD חוצה את זווית A', now: 'clarify', detail: 'ambiguous-angle-vertex' },
-  { why: '#613: a restated fact adds nothing', session: 'משולש ABC ⏎ משולש ABC', now: 'built-nothing', detail: 'already-stated' },
+  // #2790 (ADR-3D-484): a restated fact is its own row (held), so the replay builds it
+  { why: '#2790: a restated fact is its own row', session: 'משולש ABC ⏎ משולש ABC', now: 'built', detail: 'solid' },
   { why: 'a line that records with nothing positioned yet is BUILT (the App records it)', session: 'המישור π1: z = 1', now: 'built', detail: 'plane3' },
   { why: '#353: the lowercase nudge', session: 'פירמידה sabcd', now: 'guided', detail: 'scope:lowercase-labels' },
   { why: 'ADR-3D-040: the guidance register', session: 'פירמידה', now: 'guided', detail: 'scope:bare-solid' },
@@ -108,7 +109,7 @@ describe('#1692 — the replay agrees with the REAL store on every swept line', 
       expect(st.lastError).toBeNull();
       expect(st.facts.length).toBe(before + 1);
     } else if (now === 'built-nothing') {
-      expect(st.lastNotice?.code).toBe('already-stated');
+      expect(st.lastNotice?.code).toBe('already-held');
       expect(st.facts.length).toBe(before);
     } else if (now === 'not-handled' || (detail.startsWith('scope:') && detail !== 'scope:proof-target')) {
       // the store says not-understood; the App then consults its registers (guided) or escalates (gap)

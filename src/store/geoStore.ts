@@ -28,9 +28,10 @@ import type { FigureFile } from './figureFile';
 // S1.2 (docs/24): the replay layer moved to src/replay/core.ts — re-exported here so every
 // existing consumer path ('@/store/geoStore') keeps working; the store is now a thin stateful shell.
 export * from '@/replay/core';
+import { isNotDecided } from '../../shell/notDecided';
 export * from '@/replay/naming';
 import { nameCentreFacts, reletterHiddenFacts, relabelHost, relabelUtterance, renameFacts, renameInCommand, resolveBinds, type RenameResult } from '@/replay/naming';
-import { replay, groupKey, foldCommand, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
+import { replay, groupKey, foldCommand, meetsRequirements, findValidConfigRound, searchAnotherViewRound, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
 import type { DetectAllResult, Determinacy, Fact } from '@/replay/core';
 import type { RingNote } from '../../shell/narrowing';
 import type { CevianHost } from '../../shell/cevianHost';
@@ -265,6 +266,13 @@ export interface GeoState {
    *  view applies only while the store still holds the `basis` it was searched on; a result that
    *  arrives after an undo, redo, clear, edit or new line is dropped. Returns whether it applied. */
   applyView: (patch: { facts?: Fact[]; seed: number; basis: ViewBasis }) => boolean;
+  /**
+   * #2890 ([ADR-830](docs/06-decisions.md#adr-830)) — THE ONE SINK of an action decided in the geometry worker: the
+   * store fields the worker changed, put in as ONE transition (one undo entry), only while the store still holds the
+   * figure the job started on (`basis`). Returns whether it applied. A stale result is dropped whole (ADR-812's rule
+   * for a search, for every action).
+   */
+  adopt: (slice: Partial<GeoState>, basis: ViewBasis) => boolean;
   /** Show/hide measure labels on the figure (ADR-031). */
   setShowMeasures: (show: boolean) => void;
   /** Show/hide every circle's centre + label (ADR-059). */
@@ -680,12 +688,19 @@ export const useGeoStore = create<GeoState>()(
         // The composite search (ADR-340): branch/variant steps are part of the SEARCHED candidate, never a
         // post-hoc mutation — the applied view is always validated as a whole.
         const { facts: was, seed: wasSeed } = get();
-        const found = searchAnotherView(was, wasSeed);
-        if (found === null) return false; // determined (or nothing valid/shape-different in budget)
+        const found = searchAnotherViewRound(was, wasSeed);
+        // determined, nothing valid/shape-different, or (#2893) not decided within the work limit: nothing applied
+        if (found === null || isNotDecided(found)) return false;
         set({
           ...(found.facts !== was ? { facts: found.facts } : {}),
           seed: found.seed,
         });
+        return true;
+      },
+
+      adopt: (slice, basis) => {
+        if (isStaleBasis(basis, get())) return false;
+        set(slice);
         return true;
       },
 
@@ -707,12 +722,12 @@ export const useGeoStore = create<GeoState>()(
         if (meetsRequirements(facts, seed)) return true; // already meets every requirement — nothing to search
         // #364 (ADR-510): the sweep starts from the student's CURRENT seed, not 0 — the figure they are
         // looking at is preferred over any other valid one (the M2 stability property, a parameter).
-        const found = findValidConfig(facts, seed);
-        if (found) {
+        const found = findValidConfigRound(facts, seed);
+        if (found && !isNotDecided(found)) {
           set({ facts: found.facts, seed: found.seed });
           return true;
         }
-        return false; // no fully-valid configuration found in budget — keep the current figure (shown amber)
+        return false; // none found, or (#2893) not decided within the work limit — keep the current figure (shown amber)
       },
 
       setShowMeasures: (show) => set({ showMeasures: show }),

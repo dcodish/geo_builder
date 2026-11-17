@@ -22,7 +22,7 @@
  * clauses before it — what a one-per-line student would type — with an offending clause cut where its
  * reading stops (`cutAtReading`).
  */
-import { augmentParseCtx, normalizeUtterance, parse, rightAngledAtVertex } from '@/parser';
+import { augmentParseCtx, normalizeUtterance, parse, rightAngledAtVertex, subjectFrameOf } from '@/parser';
 import type { ParseContext } from '@/parser';
 import { endsWithSceneNoun, referencedContextLabels } from '@/parser/labelAccounting';
 import type { AnyCommand } from '@/engine';
@@ -103,11 +103,16 @@ export function unreadParts(utterance: string, commands: readonly AnyCommand[], 
   const reader = readerIn(ctx);
   const lowering = loweringKey(commands);
   let context: Set<string> | null = null;
+  // #2062 (ADR-819): the SUBJECT of a frame «הנקודה M מקיימת AM = 3» names the point its statement is about — a
+  // co-reference to the M inside «AM» (or to a lone M after it), which the shell's co-reference rule cannot see. The
+  // frame comes off only when its statement mentions the subject, so the reading never depends on it by design.
+  const frameSubject = subjectFrameOf(utterance)?.subject;
   const occ = readLabelRuns(utterance, lowering, {
     ...reader,
     figureLabels: ctx.points ?? [],
     // a SCENE NAME («במשולש ABC», «במעגל O»): context the label accountant already reads, never a given
     exempt: (o) => {
+      if (frameSubject !== undefined && o.text === frameSubject) return true;
       if (!endsWithSceneNoun(utterance.slice(0, o.at))) return false;
       context ??= referencedContextLabels(normalizeUtterance(utterance), [...commands], {
         existingPoints: ctx.points ?? [],

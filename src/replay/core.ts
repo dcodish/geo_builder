@@ -17,7 +17,7 @@ import { indexedNameText, GLUED_NAME_G, GLUED_NAME_WHOLE } from '../../shell/ind
 import { givenText } from '../../shell/literal';
 import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GeoObject, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
-import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
+import { angleSumImpossibility, pinnedAngleWedges, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { reachImpossibility } from '@/engine/reachFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
@@ -27,18 +27,22 @@ import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { pinnedLowering, statedOnCommonTangents } from './statedOnCommonTangents';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities, isShapeCarrier } from '@/engine';
-import { carrierParams, setCarrierVals, CIRCLES_TOUCH_REL } from '@/engine/evaluate';
+import { carrierParams, setCarrierVals, CIRCLES_TOUCH_REL, adoptEvaluate, adoptResolved, evaluate as evaluateMemo, resolveDrivenMemo } from '@/engine/evaluate';
+import { adoptDofCount, freeDofCount as freeDofCountMemo, samplesNothing } from '@/engine/sample';
 import { circlePairVariantCase } from '@/engine/variants';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, statedSizeCircles } from '@/engine';
 import { crossingPastSecond } from '@/engine/extensionSide';
-import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
+import { budgetSpent, chargeHit, computeWithCell, flatLedger, ledgerTotal, registerLedger, work, withExecutedCap, withSearchLimit, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
+import { limitReached, unitsLeft } from '../../shell/workLimit';
+import { isNotDecided, notDecided, type NotDecided } from '../../shell/notDecided';
+import { workLane } from '../../shell/workMeter';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
 import { DOUBLE_ROOT_SPLIT } from '@/engine/geometry';
-import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, isSatisfied, declaredRingsHold, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
+import { solveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, isSatisfied, declaredRingsHold, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
 import { resolveBinds } from './naming';
-import { narrowingNotes2D, type RowNouns } from './narrowing';
+import { clearNarrowingMemo, narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
 import type { CevianHost } from '../../shell/cevianHost';
 import { Structure, pairKey, ringOnOneCircle } from '@/engine/structure';
@@ -481,6 +485,12 @@ interface FoldNode {
 const cutObservers: Set<string>[] = [];
 /** The fold key of the cut fold a memoized replay came from (a replay-memo hit never reaches the fold memo). */
 const cutKeyOf = new WeakMap<Derived, string>();
+/**
+ * #2894 ([ADR-834](docs/06-decisions.md#adr-834)): the fold a Derived was drawn from (its ROOT, before the HOIST rescue
+ * chain's per-seed choice), when that fold ran whole. A fold a budget cut is not recorded: it is not THE fold of these
+ * facts, so nothing may be proven from it.
+ */
+const foldOfDerived = new WeakMap<Derived, FoldNode>();
 function noteReattemptCut(key: string): void {
   for (const s of cutObservers) s.add(key);
 }
@@ -501,10 +511,68 @@ export function observeReattemptCuts<T>(fn: () => T): { value: T; cutKeys: Set<s
  * was measured at ~75 s on a hard figure (issue #59) and is identical for every seed, every dry-run
  * trial array, and every sweep candidate — this cache is what turns an 80 s-per-candidate seed search
  * into one fold + a ~1 s tail per candidate.
+ *
+ * #2888 ([ADR-827](docs/06-decisions.md#adr-827)): least recently used out, at a measured bound. It held 8 entries,
+ * first in first out, so one «הציגו תצורה אחרת» search's candidates pushed out the fold of the figure on screen and
+ * the next read folded it again, and a load's audit folded again the prefixes its refresh had just folded.
  */
 const foldCache = new Map<string, FoldNode>();
-const FOLD_CACHE_MAX = 8;
+/**
+ * #2888 ([ADR-827](docs/06-decisions.md#adr-827)) — THE BOUNDS OF THIS LAYER'S TWO CONTENT MEMOS, per heap. Measured,
+ * not chosen (the ADR has the tables): the access trace of the 171 fixture walks and of ten long sessions (8–12 typed
+ * lines, «הציגו תצורה אחרת» after every fourth line and at the end, an edit, a delete and its undo) was replayed
+ * through a least-recently-used memo of every size.
+ * - `folds` — the fold memo. The most distinct folds one session asked for is 29, and at 12 entries no walk asks for a
+ *   fold the bound had evicted (at the old 8, first in first out, the fixture walks folded 5.4 M units twice). 64 is
+ *   twice the largest working set; a fold holds about 20–40 KB with what hangs off it.
+ * - `samples` — the sampled-construction table ({@link sampledOnce}). The largest session asks for 790 distinct
+ *   samples between two clears; at 512 that session solves 1.55 M units again, at 1024 none. About 1.6 KB a sample.
+ * Together a long session's memos hold 2.3–4.2 MB (it was 2.1–3.8 MB). `samples: 0` turns the table off; a test may
+ * lower either bound to exercise the eviction. #2893 (ADR-831): a budget reads the whole memo, charged by ledger
+ * (ADR-582); ADR-827's emulation of the old 8 entries inside a budget is gone with the clocks.
+ */
+export const replayMemoConfig = { folds: 64, samples: 1024 };
 export const foldStats = { computes: 0, resumes: 0 };
+/** The fold memo's entry for `key`, marked as the most recently used. */
+function foldCacheGet(key: string): FoldNode | undefined {
+  const node = foldCache.get(key);
+  if (node !== undefined) {
+    foldCache.delete(key);
+    foldCache.set(key, node);
+  }
+  return node;
+}
+/** Store a fold as the most recently used, evicting the least recently used ones past the bound. */
+function foldCachePut(key: string, node: FoldNode): void {
+  // a fold folded again keeps the lanes that held it: in a browser each heap holds its own copy
+  const before = foldCache.get(key);
+  if (before && before !== node) for (const lane of foldLanes.get(before) ?? []) noteFoldHeld(node, lane);
+  noteFoldHeld(node);
+  foldCache.delete(key);
+  while (foldCache.size >= Math.max(1, replayMemoConfig.folds)) foldCache.delete(foldCache.keys().next().value as string);
+  foldCache.set(key, node);
+}
+/** The lanes (`workLane()`: the page, a worker) that folded or read a fold: the heaps that hold it in a browser. */
+const foldLanes = new WeakMap<FoldNode, Set<string>>();
+function noteFoldHeld(node: FoldNode, lane: string = workLane()): void {
+  const lanes = foldLanes.get(node);
+  if (lanes) lanes.add(lane);
+  else foldLanes.set(node, new Set([lane]));
+}
+/**
+ * #2888 (ADR-827), #2893 ([ADR-831](docs/06-decisions.md#adr-831)) — WHO MAY READ A HELD FOLD: the lane that folded or
+ * read it ({@link foldLanes}). In a browser a heap is one lane and this rule is idle; under node the page and the two
+ * workers are one module instance, and a fold one lane computed is not a hit for another, as it is not in a browser.
+ *
+ * ADR-827 kept, beside this, the old memo's 8-entry key list and let a work budget, or a spent ladder, read only that
+ * list, so that no budgeted verdict moved while the memo grew. Phase 4 of ADR-W-210 re-bases every budget in work units
+ * (ADR-831): a budget charges a held fold the work it saved, once per epoch (ADR-582), so a warm memo and a cold one
+ * stop it at the same unit, and the emulation is removed.
+ */
+function foldVisible(key: string): boolean {
+  const node = foldCache.get(key);
+  return node !== undefined && (foldLanes.get(node)?.has(workLane()) ?? false);
+}
 function foldKey(facts: Fact[]): string {
   const groupIdx = new Map<string, number>();
   const parts: string[] = [];
@@ -541,23 +609,181 @@ function translateFold(node: FoldNode, permToOrig: number[]): FoldNode {
  * that content runs at TAIL speed and the tab never pays the cold fold.
  */
 export type { FoldNode };
-/** Test-only: forget every memoized replay, fold and pool (a COLD measurement on demand). The replay cache is
- *  identity-keyed, so a fresh facts array is already cold there. */
+/**
+ * #2888 ([ADR-827](docs/06-decisions.md#adr-827)) — THE SAMPLED CONSTRUCTION OF A FOLD IS BUILT ONCE, SO ITS SOLVE IS TOO.
+ *
+ * The fold is keyed by content, but everything a seed adds to it was rebuilt per call: {@link runTail} built a new
+ * sampled construction for every facts ARRAY (a submit's gates each fold their own trial array of one content, and the
+ * commit makes another), and every sample pool built its own `applySeed(c, s)` per job. `evaluate` is memoized by the
+ * identity of the construction it is given, so each rebuilt object was solved again: at a seed other than 0 one typed
+ * line solved the same sampled figure once per array (measured: 4 % of that line's work over the fixtures, up to 58 %
+ * on one figure), and a pool re-solved the samples an earlier pool of the same figure had solved.
+ *
+ * This table keeps the sampled object, keyed by the construction it was sampled FROM (a fold's own, which lives in the
+ * content-keyed fold memo, or a sampled one of this table) and by a slot: the tail's seed, a pool job's seed, the
+ * tail's warm start. A second request gets the same object, so `evaluate`, the DOF count and every other memo keyed by
+ * a construction answer from what they hold. Nothing is stored that the pure functions `applySeed`, the reflections
+ * and `warmStartCarriers` would not rebuild identically: the table decides only WHICH object, never what it holds.
+ *
+ * - **Where it lives.** Beside the solver, in whichever heap runs it: the page, the interactive worker and the detect
+ *   worker each have their own. Under node those three are one module instance, so the slot carries the work meter's
+ *   lane: a sample the worker lane solved is never a hit for the page lane, as it is not in a browser.
+ * - **A work budget counts what it counted** ([ADR-558](docs/06-decisions.md#adr-558), ADR-582). `evaluate` charges a
+ *   hit the work it saved, once per work epoch, and a hit of this table is charged what BUILDING the object cost (a
+ *   mirrored seed reads a solve), once per epoch: a second request inside the epoch is served free, as a cold run serves
+ *   it from the table it just filled, so the count is the same cold or warm. (ADR-827 handed out a freshly built object
+ *   there instead, so that an epoch counted exactly what it counted before the table existed; #2893, ADR-831, re-bases
+ *   every budget in work units and removes that emulation, which made every search under a limit solve its samples
+ *   again: +30 % to +55 % executed work measured on the #566 searches.) A hit a work budget cannot afford is built, and
+ *   cut, as it always was.
+ * - **Under a budget with nothing left it is not read** (`budgetSpent`: the indefinite-shape probe's spent ladder,
+ *   ADR-757, or a work budget at its limit): a solve there is cut on purpose, and it must be cut exactly as it was.
+ * - **A cut solve is never kept.** The table holds constructions, not results: `evaluate` refuses to memoize a solve
+ *   a clock or a work budget cut short, as before, and an object whose BUILD a budget cut is not stored.
+ * - **Never inside a fold.** The fold's re-attempt cap counts executed work (ADR-583); nothing in `computeFold` reads
+ *   this table.
+ * - **Bound.** One table per heap, at most {@link replayMemoConfig}`.samples` entries in all, least recently used out.
+ *   The key names its source construction by a number, never by the object, so the table keeps no fold alive: the
+ *   samples of a fold the fold memo has let go are never asked for again, and leave as newer ones arrive.
+ */
+const sampledMemo = new Map<string, Construction>();
+/** A number per source construction, so one bounded table serves every fold (the key never holds the object). */
+let sampledSourceIds = new WeakMap<Construction, number>();
+let nextSampledSource = 1;
+/** What BUILDING a stored object cost: a reflection reads a solve of the construction it mirrors (`applyReflections`). */
+const sampledBuildCells = new WeakMap<Construction, WorkCell>();
+registerLedger((c) => sampledBuildCells.get(c as Construction));
+function sampledOnce(from: Construction, slot: string, build: () => Construction): Construction {
+  // off, or under a budget with nothing left (a solve there is cut, and must be cut as it always was)
+  if (replayMemoConfig.samples <= 0 || budgetSpent()) return build();
+  let source = sampledSourceIds.get(from);
+  if (source === undefined) sampledSourceIds.set(from, (source = nextSampledSource++));
+  const key = `${source}:${workLane()}:${slot}`;
+  const hit = sampledMemo.get(key);
+  if (hit) {
+    // The hit is charged what building it cost, once per epoch (#2893, ADR-831), and one a work budget cannot afford is
+    // built, and cut, as it always was.
+    if (!chargeHit(sampledBuildCells.get(hit))) return build();
+    sampledMemo.delete(key);
+    sampledMemo.set(key, hit);
+    return hit;
+  }
+  const aborts0 = solveBudget.aborts;
+  const { value: built, cell } = computeWithCell(build);
+  if (built === from) return built; // nothing to sample (seed 0, a determined figure): the construction itself
+  if (solveBudget.aborts !== aborts0) return built; // a budget cut the solve the build reads: never kept
+  sampledBuildCells.set(built, cell);
+  while (sampledMemo.size >= replayMemoConfig.samples) sampledMemo.delete(sampledMemo.keys().next().value as string);
+  sampledMemo.set(key, built);
+  return built;
+}
+
+/** How many entries each content-keyed memo of this layer holds now (the bound's lock reads it). */
+export function replayMemoSizes(): { folds: number; searchFolds: number; samples: number } {
+  return { folds: foldCache.size, searchFolds: searchFoldCache.size, samples: sampledMemo.size };
+}
+/** Test-only: forget every memoized replay, fold, pool and narrowing note (a COLD measurement on demand). The replay
+ *  cache is identity-keyed, so a fresh facts array is already cold there. EVERY content-keyed memo of this layer is
+ *  cleared here: the work meter's counts (#2873, ADR-W-210) are reproducible only because nothing survives it. */
 export function clearReplayCaches(): void {
   foldCache.clear();
   searchFoldCache.clear();
+  sampledMemo.clear();
+  sampledSourceIds = new WeakMap();
   sampleMemo = null;
+  clearNarrowingMemo();
+  solutionCycleMemo.clear(); // #2831 (ADR-824): the show-another cycle is a replay memo like the rest
+}
+/**
+ * #2890 ([ADR-830](docs/06-decisions.md#adr-830), ADR-W-210 phase 3) — THE SETTLED VIEW of a figure: everything the
+ * page's readers ask of `(facts, seed)`, computed in the heap that solves (a worker), with every lazily solved value
+ * forced, as plain data that survives `structuredClone`:
+ *   - the replay (`Derived`) and the work it cost (its ledger's total, for the adopted entry's flat ledger);
+ *   - the fold, for the page to keep (a restarted worker is handed it back, the detect worker is handed it);
+ *   - the evaluation and the baked construction of the drawn construction (`configurationAxes` → `branchCount` →
+ *     `evaluate`), and its DOF count (`freeDofCount`): the three identity-keyed engine memos the render reads.
+ * Measured in the design pass on #2890: adopting all of it, the page's render readers and its resolve gate count 0
+ * units on 1 156 of 1 156 handed-over actions; without the DOF count they do not.
+ */
+export interface SettledView {
+  facts: Fact[];
+  seed: number;
+  derived: Derived;
+  work: number;
+  fold: FoldNode | null;
+  ev: ReturnType<typeof evaluateMemo> | null;
+  resolved: Construction | null;
+  dof: number | null;
+}
+export function settleView(facts: Fact[], seed: number): SettledView {
+  const derived = replay(facts, seed);
+  const cell = cellOf.get(derived);
+  const usable = viewUsable(derived);
+  return {
+    facts,
+    seed,
+    derived,
+    work: cell ? ledgerTotal(cell) : 0,
+    fold: getFoldFor(facts),
+    // the render reads these only of a drawable view (`viewUsable`), so only those are forced
+    ev: usable ? evaluateMemo(derived.construction) : null,
+    resolved: usable ? resolveDrivenMemo(derived.construction) : null,
+    dof: usable ? freeDofCountMemo(derived.construction) : null,
+  };
+}
+/**
+ * Adopt a settled view received from another heap, under the identity of ITS facts array: the array the page then
+ * puts in its store. Every reader of the page that asks of that `(facts, seed)` (the render, the resolve gate) is then
+ * a memo hit. An adopted entry carries a flat ledger of the work it saved, as a transplanted fold does (ADR-584), so a
+ * budget that meets one charges it. Nothing an entry the page already holds is overwritten.
+ */
+export function adoptSettled(v: SettledView): void {
+  if (v.fold) primeFoldFor(v.facts, v.fold);
+  let entry = replayCache.get(v.facts);
+  const fresh = entry && entry.snapshot.length === v.facts.length && entry.snapshot.every((f, i) => f === v.facts[i]);
+  if (!entry || !fresh) {
+    entry = { snapshot: v.facts.slice(), bySeed: new Map() };
+    replayCache.set(v.facts, entry);
+  }
+  const key = `${v.seed}`;
+  if (!entry.bySeed.has(key)) {
+    cellOf.set(v.derived, flatLedger(v.work));
+    entry.bySeed.set(key, v.derived);
+  }
+  const c = entry.bySeed.get(key)!.construction;
+  if (c === v.derived.construction) {
+    if (v.ev) adoptEvaluate(c, v.ev);
+    if (v.resolved) adoptResolved(c, v.resolved);
+    if (v.dof !== null) adoptDofCount(c, v.dof);
+  }
+}
+/** The fold this heap holds for the CONTENT of `facts`, read without solving and without touching the memo's order or
+ *  what a budget sees (#2890: the page hands it to the detect worker). */
+export function peekFoldFor(facts: Fact[]): FoldNode | null {
+  return foldCache.get(foldKey(resolveBinds(facts))) ?? null;
+}
+/** Whether this heap already holds the replay of `(facts, seed)`: a read of the memo that never solves. */
+export function hasReplay(facts: Fact[], seed: number): boolean {
+  const entry = replayCache.get(facts);
+  if (!entry || entry.snapshot.length !== facts.length || !entry.snapshot.every((f, i) => f === facts[i])) return false;
+  return entry.bySeed.has(`${seed}`);
+}
+/** The replay of `(facts, seed)` this heap holds, or undefined: never solves. */
+export function peekReplay(facts: Fact[], seed: number): Derived | undefined {
+  return hasReplay(facts, seed) ? replayCache.get(facts)!.bySeed.get(`${seed}`) : undefined;
 }
 export function getFoldFor(facts: Fact[]): FoldNode | null {
-  const node = foldCache.get(foldKey(resolveBinds(facts))) ?? null;
+  // #2893 (ADR-831): the fold this lane holds (a fold handed across the worker boundary is one the worker has just replayed)
+  const key = foldKey(resolveBinds(facts));
+  const node = (foldVisible(key) ? foldCacheGet(key) : undefined) ?? null;
   const cell = node ? cellOf.get(node) : undefined;
   if (node && cell) node.work = ledgerTotal(cell);
   return node;
 }
 export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
   if (fold.work !== undefined) cellOf.set(fold, flatLedger(fold.work)); // #1671: charged like a fold computed here
-  if (foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
-  foldCache.set(foldKey(resolveBinds(facts)), fold);
+  const key = foldKey(resolveBinds(facts));
+  foldCachePut(key, fold);
 }
 
 /**
@@ -705,8 +931,10 @@ function computeReplay(raw: Fact[], seed = 0): Derived {
   // #1697 (ADR-588): a naming by use is a FACT of the line that made it — applied here, to the facts before it
   const facts = resolveBinds(raw);
   const key = foldKey(facts);
-  let fold = foldCache.get(key);
+  let fold = foldVisible(key) ? foldCacheGet(key) : undefined;
   if (fold && !chargeHit(cellOf.get(fold))) fold = undefined; // #1605: unaffordable under the budget → recompute
+  if (fold) noteFoldHeld(fold);
+  let whole = true;
   if (!fold) {
     const abortsBefore = solveBudget.aborts;
     const { value, cell } = computeWithCell(() => computeFold(facts));
@@ -716,11 +944,11 @@ function computeReplay(raw: Fact[], seed = 0): Derived {
     // content — memoizing it would pin the degraded figure for every later, unbudgeted replay.
     if (solveBudget.aborts === abortsBefore) {
       cellOf.set(fold, cell);
-      if (!foldCache.has(key) && foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
-      foldCache.set(key, fold);
-    }
+      foldCachePut(key, fold);
+    } else whole = false;
   }
   const out = tailChoice(fold, facts, seed);
+  if (whole) foldOfDerived.set(out, fold);
   if (fold.reattemptCut) {
     noteReattemptCut(key); // #1770 (ADR-586)
     cutKeyOf.set(out, key);
@@ -983,7 +1211,10 @@ function attemptFact(cur: Construction, cmds: Command[], seat?: () => Constructi
       return { ok: false, error: hit.error, degenerate: hit.degenerate };
     }
   }
-  const unarmed = solveBudget.deadlineAt === null && work.limitAt === null;
+  // #2893 (ADR-831): a re-attempt that no budget cut is complete whatever budget is armed, so it is memoized under a work
+  // limit too (every search now runs under one; requiring NO budget here made each search's folds repeat their
+  // re-attempts). A cut one never is (`aborts`), nor one with the ladder spent.
+  const unarmed = !solveBudget.ladderSpent;
   const aborts0 = solveBudget.aborts;
   let exhausted = false;
   const e0 = work.executed;
@@ -1379,10 +1610,11 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
   // pre-scan signature above says the appended facts change nothing about how the prefix folded. Then
   // the fold starts from the cached construction and pays only the NEW facts. Conservative by design:
   // any doubt (a new symbol, a new explicit equality, a mixed group…) falls back to the full fold.
-  let resumeFrom: { node: FoldNode; count: number } | null = null;
+  let resumeFrom: { node: FoldNode; count: number; key: string } | null = null;
   if (hoistDepth === 0 && foldCache.size) {
     const fullKey = foldKey(facts);
     for (const [k, node] of foldCache) {
+      if (!foldVisible(k)) continue; // #2888 (ADR-827)
       if (!fullKey.startsWith(`${k}\n`)) continue;
       const count = k.split('\n').length;
       if (resumeFrom && count <= resumeFrom.count) continue;
@@ -1390,12 +1622,16 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       if (node.retriedCreating) continue; // #1411: a creating fact landed AFTER later facts — resume would reorder it
       if (node.statusByIndex.some((s) => s !== 'ok' && s !== 'disabled')) continue;
       if (node.prescanSig !== prescanSigFor(count)) continue;
-      resumeFrom = { node, count };
+      resumeFrom = { node, count, key: k };
     }
     // #1605 (ADR-582): resuming IS a memo hit on the prefix node — charged its work, and declined (a full
     // fold instead) when an armed work budget cannot afford it, exactly as a cold fold would have run.
     if (resumeFrom && !chargeHit(cellOf.get(resumeFrom.node))) resumeFrom = null;
-    if (resumeFrom) foldStats.resumes++;
+    if (resumeFrom) {
+      foldStats.resumes++;
+      foldCacheGet(resumeFrom.key); // the prefix a fold resumed from is in use
+      noteFoldHeld(resumeFrom.node);
+    }
     if (resumeFrom?.node.reattemptCut && attemptScope) attemptScope.cut = true; // #1770: the prefix's cut is ours
   }
   // Build the construction by folding the enabled facts. `forced` maps a fact id to a status string that
@@ -2278,6 +2514,46 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
   }
 
   if (attribute && hoistDepth === 0) tagEqualNested(true); // #2239 / #2206: after the drop-one search (above)
+  /**
+   * #2894 ([ADR-835](docs/06-decisions.md#adr-835) Am. 1) — WHICH STATEMENTS A LENGTH CONFLICT RESTS ON. The engine's
+   * `lengths-value` / `lengths-triangle` refusal carries the obligations and objects its reading used (`support …`); the
+   * fold, which knows who committed each, turns them into those statements' indices (`with #i, #j`, the group's first
+   * row, in fact order, the refused statement itself left out), so the display names every line whose lengths take part,
+   * as 3-D and analytic do. The `[vs #i]` blame is untouched.
+   */
+  {
+    const SUPPORT = / support (\S+)(?= cannot hold)/;
+    const rewritten = new Map<string, string>();
+    for (const f of facts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = SUPPORT.exec(st);
+      if (!m) continue;
+      let out = rewritten.get(st);
+      if (out === undefined) {
+        let named: number[] = [];
+        try {
+          const sup = JSON.parse(decodeURIComponent(m[1]!)) as { c: string[]; o: Id[] };
+          const own = groupKey(f);
+          const owners = new Set<number>();
+          for (const k of sup.c) { const fi = ownerByConKey.get(k); if (fi !== undefined) owners.add(fi); }
+          for (const id of sup.o) { const fi = ownerByObjId.get(id); if (fi !== undefined) owners.add(fi); }
+          const firsts = new Set<number>();
+          for (const fi of owners) {
+            const g = facts[fi];
+            if (!g || groupKey(g) === own) continue;
+            firsts.add(facts.findIndex((x) => groupKey(x) === groupKey(g)));
+          }
+          named = [...firsts].filter((x) => x >= 0).sort((a, b) => a - b);
+        } catch {
+          named = [];
+        }
+        out = st.replace(SUPPORT, named.length ? ` with ${named.map((x) => `#${x}`).join(', ')}` : '');
+        rewritten.set(st, out);
+      }
+      status[f.id] = out;
+    }
+  }
   const buildError = !pending && failedFacts.length ? (status[failedFacts[failedFacts.length - 1].id] as string) : null;
   return {
     cur,
@@ -2325,12 +2601,16 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   //    and re-shape the figure, coupling the (independent) shape DOF to the side choice. Reflecting them
   //    after leaves the sampled shape intact and only flips the side.
   // mask 0 — every ordinary seed — leaves the construction untouched, so this is free for normal figures.
-  const helpers = new Set(directionHelperFreePoints(cur));
-  const refl = reflectableFreePoints(cur);
-  const fullMask = reflectMaskOf(seed);
-  let preMask = 0, postMask = 0;
-  refl.forEach((id, i) => { if (fullMask & (1 << i)) (helpers.has(id) ? (postMask |= 1 << i) : (preMask |= 1 << i)); });
-  const sampled = applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
+  // #2888 (ADR-827): the sampled construction is a function of the fold's construction and the seed, so it is built
+  // once per fold and seed ({@link sampledOnce}): a second facts array of the same content is solved from the memo.
+  const sampled = sampledOnce(cur, `tail:${seed}`, () => {
+    const helpers = new Set(directionHelperFreePoints(cur));
+    const refl = reflectableFreePoints(cur);
+    const fullMask = reflectMaskOf(seed);
+    let preMask = 0, postMask = 0;
+    refl.forEach((id, i) => { if (fullMask & (1 << i)) (helpers.has(id) ? (postMask |= 1 << i) : (preMask |= 1 << i)); });
+    return applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
+  });
   let figure = sampled;
   let e = evaluate(figure);
   // #359 ([ADR-400](docs/06-decisions.md#adr-400)): per-seed BASIN RETRY. The fold's ladder (recruit /
@@ -2343,7 +2623,9 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   // that evaluates clean never reaches this and previously-green seeds are bit-identical; the sampled
   // non-driven DOFs keep their sampled values, so genuine variety is untouched.
   if (!e.ok) {
-    const warmed = warmStartCarriers(figure, cur);
+    const from = figure;
+    const warmStart = sampledOnce(from, 'warm', () => warmStartCarriers(from, cur) ?? from);
+    const warmed = warmStart === from ? null : warmStart;
     if (warmed) {
       const w = evaluate(warmed);
       if (w.ok) {
@@ -2534,7 +2816,11 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   const flat = e.ok && lastError === null ? degeneratePolygons(figure, e.positions) : [];
   const degeneracies: DegenerateNotice[] = flat.length ? nameDegeneracies(facts, seed, flat) : [];
   const concluded = new Set<string>(facts.filter((_, i) => fold.concludedByIndex?.[i]).map((f) => f.id));
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc, degeneracies, sampledFailure, concluded };
+  // #2888 (ADR-827): a sampled figure's solve is now shared by every replay of its content at this seed, but a
+  // replay's positions map stays ITS OWN, as it was when each replay solved its own object: the sample pools tag a
+  // positions map by identity with a pool's own seed index (`seedOfSample`), and two pools must not share a tag.
+  const positions = !e.ok ? new Map<Id, Vec>() : figure === cur ? e.positions : new Map(e.positions);
+  return { construction: figure, positions, circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc, degeneracies, sampledFailure, concluded };
 }
 
 /** The (a, b, id, circle) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto `circle` at id"). */
@@ -2985,27 +3271,63 @@ function reflectMaskForFailing(fig: Derived, facts: Fact[] = []): number {
 }
 
 /**
- * Wall-clock budget for the synchronous config searches (E2 / STO-2). The search loops run replay after
- * replay on the UI thread behind a spinner; on a pathologically slow figure (~1.5 s/replay was measured,
- * ADR-123) an unbounded sweep froze the tab for tens of seconds. Past the deadline the search returns
- * what it has — the caller keeps the current figure, honestly amber, instead of freezing. Tests run with
- * NO deadline (vitest sets MODE 'test') so seed choices stay machine-independent and deterministic; the
- * deadline path itself is unit-tested by passing an explicit budget.
+ * #2893 ([ADR-831](docs/06-decisions.md#adr-831), ADR-W-210 phase 4) — EVERY SEARCH IS BOUNDED IN WORK, NEVER IN SECONDS.
+ *
+ * The searches used to stop on a wall clock: 2.5 s on the page, 12 s in the worker ([ADR-296](docs/06-decisions.md#adr-296)),
+ * 5 s for the submit gates' sample pool, 4 s and 3 s for a load's refresh and audit, and NO clock under vitest. So the
+ * suite ran every search to its end, a browser cut it where its machine happened to be, and a search that was cut said
+ * what a search that finished says («אין תצורה אחרת — הצורה נקבעה», "no valid configuration", no audit finding).
+ *
+ * Now each is bounded by a number of WORK UNITS (`evaluateCore` calls, charged as ADR-582 charges them: a memo hit costs
+ * the work it saved, so a warm cache and a cold one stop at the same unit), the same in the suite and the browser, and a
+ * search that reaches its limit without an answer says so ("not decided", `shell/notDecided`; the operator's wording,
+ * 2026-11-14, #2893). The operator set the size: about 10 s on the dev PC (*"10s is an ok number"*, 2026-11-13).
+ *
+ * MEASURED on the dev PC (2026-11-14, vitest under node, one process, cold caches; `src/__tests__/tmp-calib`, deleted):
+ * «הציגו תצורה אחרת» on `issue-1771-semicircle-three-vertices` 6 778 367 units in 18.2 s (372 k/s); the same press on
+ * `hexagon-regular-by-angles-2797` 2 584 301 in 9.4 s (274 k/s); the configuration search on that hexagon, from seed 7,
+ * 28 625 671 in 105 s (272 k/s); its fold 3 358 924 in 11.9 s (282 k/s); the 1771 fold 376 546 in 0.88 s (426 k/s); the
+ * hexagon's load refresh 396 586 in 1.27 s (312 k/s). In a browser (phase 3's probes): 360–450 k/s executed. A limit counts
+ * CHARGED units (a memo hit costs what it saved), which run ahead of executed ones: the #566 seat rescue on one circle
+ * charges 3 839 924 units in 6.6 s cold (580 k/s), on two circles 11 629 517 in 28.7 s (405 k/s). So ten seconds is
+ * 2.7 M to 5.8 M charged units under node.
+ *
+ * THE CALIBRATION IS THE BROWSER'S (2026-11-15, the dev PC, the page on :5180 with ADR-832's served repeats, through the
+ * browser harness): «הציגו תצורה אחרת» on «ABC משולש ישר זוית · AC=15 · BC=10 · חצי מעגל שקוטרו AB העובר דרך C», a search
+ * that solves almost everything it touches, reached a 4 M limit after 5.19 s and 5.17 s (two runs): 770 k charged units a
+ * second: ten seconds was 7.7 M. (At 7.7 M that press finishes in one round, 8.7 s.)
+ *
+ * THE LIMIT IS 12 M BY THE OPERATOR'S RULING (2026-11-15, #2893: *"2 b"*): large enough that every corpus search but the
+ * #1768 kite's decides in one round, the smallest round number that does. Measured over the 171 fixtures and the slow
+ * corpus, every search run to its end (`searchLimitStats.maxSpent`): the most any search but the kite's charges is
+ * 11 629 515 (#572's configuration search; then the hexagon press 10 095 301, #572's press 9 710 496); the kite's
+ * charge 14 445 116 and 12 451 719, past it. At ~770 k charged units a second a search that solves what it touches
+ * reaches 12 M after about 15 s in the browser. A search that reads
+ * most of what it needs from the memos charges faster: after the #566 two-circle line the configuration search reached
+ * 7.7 M in 2.1 s (main, with no limit, finishes it in 0.3 s: most of its 11.6 M charged units are memo hits). A
+ * figure whose units are slow (heavy joint solves: #207's ladder runs ~50 k units/s) takes longer to reach it; a unit
+ * is one `evaluateCore`, and nothing inside one is counted.
+ *
+ * One constant per search kind, all the same size by the ruling (one limit "the same in every tool"); each is named so
+ * a later calibration can move one kind without touching the others.
  */
-const SEARCH_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 2500;
-
+export const TEN_SECONDS_OF_WORK = 12_000_000;
+/** The configuration searches: «הציגו תצורה אחרת» (`searchAnotherView`) and the post-commit search (`findValidConfig`). */
+export const SEARCH_WORK_LIMIT = TEN_SECONDS_OF_WORK;
 /**
- * The budget for a config search that runs OFF the main thread in the geometry worker (issue #87 /
- * [ADR-296](docs/06-decisions.md#adr-296)). `SEARCH_BUDGET_MS` (2500) was sized to protect the MAIN
- * THREAD from the page-unresponsive dialog (E2); since ADR-290 the searches (`resample` / `autoResolve` →
- * `findValidConfig`) run in the worker, where the tab never blocks and the UI already shows a "thinking"
- * state (resample also has progress + a ✕ cancel). So the worker gets a generous budget — a findable
- * configuration on a heavy figure (the CEFO figure's `findValidConfig` returned null cold at ~2743 ms,
- * one bad seed past 2500) is now found on the FIRST submit instead of only after an idempotent re-submit
- * warmed the worker's caches. Finite (not ∞) so the same value is meaningful when a test passes it
- * explicitly; the worker is never instantiated under vitest (no `Worker`/`document`), so the main-thread
- * sync fallback keeps `SEARCH_BUDGET_MS`. */
-export const WORKER_SEARCH_BUDGET_MS = 12_000;
+ * The submit door's searches: the gates' sample pool («כבר קיים», a forced crossing, a forced side) with ADR-605's walk
+ * over the unvaried choices, and the commit's variant settle (#2294). They kept their clock until #2893.
+ */
+export const GATE_WORK_LIMIT = TEN_SECONDS_OF_WORK;
+
+/** Round `round` (0 first) of a search that «המשיכו לחפש» continues: the limit is the rounds' sum, so the round goes on
+ *  from where the last one stopped (what that round solved is read back from the memos, charged as it was). */
+export const roundLimit = (limit: number, round = 0): number => limit * (round + 1);
+/** What a configuration search hands back with "not decided": the rounds run so far. */
+export interface SearchResume {
+  round: number;
+}
+
 
 /**
  * The first seed whose replay BUILDS and satisfies the configuration requirements — every "המשך" extension
@@ -3014,9 +3336,9 @@ export const WORKER_SEARCH_BUDGET_MS = 12_000;
  * REFLECTION (high seed bits, {@link withReflectMask}). A point on a circle whose secant must extend onto
  * another circle, and an apex whose side decides whether two segments cross, are both placements only a
  * subset of configurations satisfies — we SAMPLE one rather than drive across a degeneracy. Used to auto-pick
- * the default configuration after a step and to gate "show another configuration". Bounded by `budgetMs`
- * of wall-clock (E2): past the deadline it returns the best seed seen so far, else `from` — keep the
- * current view, amber if short.
+ * the default configuration after a step and to gate "show another configuration". Bounded by `limit`
+ * units of work (#2893, ADR-831; it was a wall clock): at the limit it returns the best seed seen so far, else `from` —
+ * keep the current view, amber if short. Inside `findValidConfig` the caller's limit governs it.
  */
 /**
  * #194 (ADR-474) — the DISPLAY-QUALITY preference, as a predicate over an already-computed figure.
@@ -3046,8 +3368,10 @@ const spreadScore = (fig: Derived): number => (fig.lastError === null ? tightest
  *  configuration — it never searches longer than this beyond the seed it would have returned. */
 const SPREAD_EXTRA_TRIES = 24;
 
-export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budgetMs = SEARCH_BUDGET_MS): number {
-  const deadline = Date.now() + budgetMs;
+export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, limit = SEARCH_WORK_LIMIT): number {
+  return withSearchLimit(limit, () => firstSatisfyingSeedUnder(facts, from, budget), 'firstSatisfyingSeed').value;
+}
+function firstSatisfyingSeedUnder(facts: Fact[], from: number, budget: number): number {
   const hasExt = extensionTriples(facts).length > 0;
   const base0 = replay(facts, from);
   const reflectable = reflectableFreePoints(base0.construction);
@@ -3074,6 +3398,9 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // #194 (ADR-474): the current view is kept only when it is BOTH satisfying and legible — otherwise it
   // is remembered as the strict fallback and the sweep looks for one that is also well spread.
   if (ok(base0) && spreadOk(base0)) return from;
+  // #2894 (ADR-834): no seed can satisfy a figure whose failure no sampled freedom reaches — the sweep below would
+  // try every candidate and return `from`; it returns it now.
+  if (!ok(base0) && failsAtEverySeed(facts, base0, 'build')) return from;
   // Candidate seeds in priority order. When a segment-meet is off its segment the cause is almost always an
   // apex pointing the wrong way, which plain re-seeding rarely fixes — so try the REFLECTION seeds first
   // (targeted mask = mirror exactly the failing apexes, then the other non-empty subsets), each over a small
@@ -3095,12 +3422,11 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // #942: acceptable but stacked — used only if no separated candidate is found at all.
   let coincidentOnly = ok(base0) && !separatedView(base0) ? from : -1;
   let sinceStrict = 0; // candidates examined since the first acceptable answer (SPREAD_EXTRA_TRIES)
-  // The same deadline is ARMED inside the solve ladder (engine/solveBudget.ts): the between-replay check
-  // below caps the sweep, and the in-ladder consult caps a single pathological candidate (issue #59 —
-  // one replay used to blow through 32 budgets before this line ever ran again).
-  return withSolveBudget(deadline, () => {
+  // The limit is ARMED inside the solve ladder too (`withSearchLimit` arms the work budget): the between-replay check
+  // below caps the sweep, and the in-ladder consult caps a single pathological candidate (issue #59).
+  {
     for (const s of seeds) {
-      if (Date.now() > deadline) break; // out of budget — settle for the best seen so far
+      if (limitReached()) break; // at the limit — settle for the best seen so far
       if (strictOnly >= 0 && ++sinceStrict > SPREAD_EXTRA_TRIES) break; // bounded improvement, then settle
       const fig = replay(facts, s);
       if (ok(fig) && !separatedView(fig)) {
@@ -3116,11 +3442,53 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
         }
       }
     }
-    // Past the sweep or the deadline: settle for the best tier seen, exactly as before the preference
+    // Past the sweep or the limit: settle for the best tier seen, exactly as before the preference
     // existed. A figure with no well-spread configuration lands on the same seed it used to.
     // #942 (ADR-486): a stacked-but-satisfying seed comes last — worse than any separated view.
     return strictOnly >= 0 ? strictOnly : coincidentOnly >= 0 ? coincidentOnly : from;
-  });
+  }
+}
+
+/**
+ * #2894 ([ADR-834](docs/06-decisions.md#adr-834), ADR-W-210 phase 5 item E) — SHARED FAILURE MEMORY: does a view that
+ * failed at one seed fail at EVERY seed, provably?
+ *
+ * A seed enters a replay only in its tail ({@link runTail}): the fold — every status, the build error, the pending
+ * classification — is computed from the fact list alone, and the tail samples the fold's construction at the seed
+ * (`applySeed`, the reflections of the seed's high bits) and evaluates it once. So a failure is the same at every seed
+ * when no sampled degree of freedom can reach it, and two shapes of that are read exactly, never estimated:
+ *  - the FOLD fails the bar: its build error is set (a tail never clears it), or a row the fold filed as failed is
+ *    one the bar reads (a tail turns a row from ok to failed, never back) — `bar` names which of the two a search's
+ *    acceptance reads;
+ *  - the fold's construction has NOTHING to sample: `applySeed` returns it unchanged at every seed (its own early
+ *    return: no free point, no free on-circle or on-line point, no free shape scalar) and no point is reflectable,
+ *    so every seed's tail evaluates the same construction and the view at another seed is this one.
+ * The HOIST rescue chain ({@link tailChoice}) picks per seed: a rescue fold that is clean could be the one drawn at
+ * another seed, so the proof needs every rescue fold to be one the choice never takes (its build error set, or
+ * pending), or to have nothing to sample itself.
+ *
+ * The searches that scan seeds over ONE fact list (`firstSatisfyingSeed`, `findValidConfig`'s seed and reflection
+ * tiers, each candidate of `choiceRescue`, the branch tier and «הציגו תצורה אחרת») stop retrying such a list: the
+ * seeds they skip are seeds that fail. Which view a search returns is unchanged; it gets there with less work.
+ */
+export type FailureBar = 'build' | 'statuses';
+export function failsAtEverySeed(facts: Fact[], fig: Derived, bar: FailureBar): boolean {
+  const root = foldOfDerived.get(fig);
+  if (!root) return false;
+  const nothingToSample = (n: FoldNode): boolean => samplesNothing(n.cur) && reflectableFreePoints(n.cur).length === 0;
+  for (let n = root.rescue; n; n = n.rescue) if (n.buildError === null && !n.pending && !nothingToSample(n)) return false;
+  if (root.buildError !== null) return true;
+  if (bar === 'statuses' && root.statusByIndex.length === facts.length) {
+    const waiting = factsWaitingForLetter(facts);
+    if (facts.some((f, i) => f.enabled && root.statusByIndex[i] !== 'ok' && !waiting.has(f.id))) return true;
+  }
+  return nothingToSample(root);
+}
+/** {@link meetsRequirements} at `seed`, and whether its `false` holds at every seed ({@link failsAtEverySeed}). */
+function meetsAt(facts: Fact[], seed: number): { ok: boolean; everySeed: boolean } {
+  const fig = replay(facts, seed);
+  const ok = figureMeetsRequirements(facts, fig);
+  return { ok, everySeed: !ok && failsAtEverySeed(facts, fig, 'statuses') };
 }
 
 /** Branchable derived-point command types — the discrete "alternatives" a figure can have (which of two
@@ -3182,7 +3550,10 @@ export function factsWaitingForLetter(facts: readonly Fact[]): Set<string> {
  * it's waiting for more givens, ADR-104 — so there is nothing to search for).
  */
 export function meetsRequirements(facts: Fact[], seed = 0): boolean {
-  const fig = replay(facts, seed);
+  return figureMeetsRequirements(facts, replay(facts, seed));
+}
+/** {@link meetsRequirements} of a figure already replayed from `facts`. */
+function figureMeetsRequirements(facts: Fact[], fig: Derived): boolean {
   const waiting = factsWaitingForLetter(facts);
   return (
     fig.lastError === null &&
@@ -3273,31 +3644,62 @@ export const separatedView = (fig: Derived): boolean => fig.coincidences.length 
  * Before drawing, VERIFY the figure meets every requirement and, if not, LOOP over alternative
  * configurations — continuous (seeds) AND discrete (branch choices: which intersection / arc side / root) —
  * for one that does ([ADR-106](docs/06-decisions.md#adr-106)). Returns the chosen facts (branches set) +
- * seed, or null if none is found within budget (the caller keeps the current figure, flagged amber). The
+ * seed; null when the search FINISHED and found none (the caller keeps the current figure, flagged amber); or
+ * #2893 (ADR-831) "not decided" when it reached its work limit first, never reported as "none found". The
  * CURRENT branch assignment is tried first and most widely; the combinatorics of alternative branches are
- * bounded. Deterministic.
+ * bounded. Deterministic: the limit is counted in work, the same on every machine.
  */
 /** #566 (ADR-445 Am. 1) — dev instrumentation, the S0.2 `lastLadderStage` pattern: WHICH tier of
  *  `findValidConfig` produced the last returned config. Lets a test assert the tier ORDERING
  *  deterministically — a wall-clock assertion on the real worker budget flaked at 28 s under the
- *  suite's CPU contention (5 s solo), which is exactly why `SEARCH_BUDGET_MS` is Infinity in tests. */
+ *  suite's CPU contention (5 s solo); since #2893 the limit is work, the same in the suite. */
 export let lastConfigTier: 'current' | 'sweep' | 'seat' | 'variant' | 'reflect' | 'branch' | null = null;
 
-export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_BUDGET_MS): { facts: Fact[]; seed: number } | null {
+export function findValidConfig(facts: Fact[], fromSeed = 0, limit = SEARCH_WORK_LIMIT): { facts: Fact[]; seed: number } | null {
+  return decidedOrThrow(findValidConfigRound(facts, fromSeed, 0, limit));
+}
+/**
+ * #2893 (ADR-831): the configuration search as the worker runs it — its THREE outcomes: a view, null (it finished and
+ * found none), or "not decided" (it reached its limit first). «המשיכו לחפש» runs round `round` from the resume it got,
+ * whose limit is the rounds' sum (`roundLimit`).
+ */
+export function findValidConfigRound(facts: Fact[], fromSeed: number, round = 0, limit = SEARCH_WORK_LIMIT): { facts: Fact[]; seed: number } | null | NotDecided<SearchResume> {
   lastConfigTier = null;
-  const deadline = Date.now() + budgetMs;
-  const timeLeft = () => Math.max(0, deadline - Date.now());
+  const r = withSearchLimit(roundLimit(limit, round), () => findValidConfigUnder(facts, fromSeed), 'findValidConfig');
+  return r.value === null && r.reached ? notDecided({ round: round + 1 }, r.spent) : r.value;
+}
+
+/**
+ * #2893 (ADR-831): what a caller that knows only two outcomes is handed. A search cut by its limit is NOT "none found",
+ * so it is never answered as null: this throws instead. The page's paths call the `…Round` forms, which return it.
+ */
+export class SearchNotDecidedError extends Error {
+  constructor(readonly outcome: NotDecided<SearchResume>) {
+    super('the search reached its work limit before it decided (#2893): not decided, which is not "none found"');
+  }
+}
+function decidedOrThrow<T>(r: T | NotDecided<SearchResume>): T {
+  if (isNotDecided(r)) throw new SearchNotDecidedError(r as NotDecided<SearchResume>);
+  return r as T;
+}
+function findValidConfigUnder(facts: Fact[], fromSeed: number): { facts: Fact[]; seed: number } | null {
+  // #2813 (ADR-823 Am. 1): a stored reflex seat a later stated angle rules out is moved structurally, before any sample
+  facts = reflexSeatsYieldToStatedCorners(facts);
   // First the targeted extension/reflection search (ADR-098/ADR-166): it explores the discrete apex
   // REFLECTION DOF (high seed bits) that the plain seed sweep below can't reach, so a segment-meet whose
   // apex points the wrong way is brought onto the segments in a handful of tries instead of by luck.
-  const s0 = firstSatisfyingSeed(facts, fromSeed, 120, timeLeft());
+  const s0 = firstSatisfyingSeedUnder(facts, fromSeed, 120); // under this search's limit
   // #194 (ADR-474): a requirement-meeting config that draws a squashed wedge is REMEMBERED rather than
   // returned — the sweep below gets a chance to find one that is also legible, and this seed is what it
   // settles for when none exists. Behaviour is therefore identical on every figure that has no
   // better-spread configuration, which is the ADR-052 guarantee: valid stays drawable.
   let meetingOnly: number | null = null;
   let meetingScore = -1;
-  if (meetsRequirements(facts, s0)) {
+  // #2894 (ADR-834): a failure at s0 that no sampled freedom reaches fails at every seed and every reflection mask, so
+  // the seed sweep and the reflection tier (seeds of these same facts) are skipped; the tiers that REWRITE the facts
+  // (seat, variant, branch) still run, in their order.
+  const at0 = meetsAt(facts, s0);
+  if (at0.ok) {
     const fig0 = replay(facts, s0);
     // #942 (ADR-486): a stacked view never short-circuits the search — it is remembered the same way a
     // squashed one is, so the tiers below get their chance to find a seating that separates the labels.
@@ -3312,18 +3714,18 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     lastConfigTier = 'current';
     return { facts, seed: s0 };
   }
-  // The deadline is also ARMED inside the solve ladder (engine/solveBudget.ts, issue #59): the branch
+  // The limit is also ARMED inside the solve ladder (`withSearchLimit`, issue #59): the branch
   // tier below builds NEW fact content (branch rewrites), whose folds can hit the expensive recruit
   // ladder — the between-replay checks alone couldn't stop a single 30 s candidate.
-  return withSolveBudget(deadline, () => {
-    for (let s = fromSeed; s < fromSeed + 40; s++) {
-      if (Date.now() > deadline) {
-        // #194: out of budget — a remembered meeting-but-squashed config still beats amber.
+  {
+    for (let s = fromSeed; s < fromSeed + (at0.everySeed ? 0 : 40); s++) {
+      if (limitReached()) {
+        // #194: at the limit — a remembered meeting-but-squashed config still beats amber.
         if (meetingOnly !== null) {
           lastConfigTier = 'current';
           return { facts, seed: meetingOnly };
         }
-        return null; // caller keeps the current figure, amber
+        return null; // at the limit: "not decided" (the caller, above)
       }
       if (meetsRequirements(facts, s)) {
         const fig = replay(facts, s);
@@ -3362,24 +3764,24 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     // ~5 s ordered here; the suite's Infinity budget masked exactly this, which is why the
     // production-budget lock in scenarios-props-budget.test.ts carries the figure). Cost when no
     // unpinned right-triangle exists: zero (the list is empty).
-    const seatFound = seatRescue(facts, deadline);
+    const seatFound = seatRescue(facts);
     if (seatFound) {
       lastConfigTier = 'seat';
       return seatFound;
     }
-    if (Date.now() > deadline) return null;
+    if (limitReached()) return null;
     // #1711 (ADR-573): the VARIANT dimension — every unstated configuration choice a fact carries (a
     // sine's acute/obtuse root, an isosceles apex, a kite axis, an inscribed seating, a circle pair's
     // position, a common tangent's basin). Before this tier the search never left the variants the facts
     // already held, so a figure whose CURRENT variant a later given made impossible was refused although
     // another variant draws it — «sin∢ACB = 3/4» then «זווית ACB קהה». Seed-invariant like the seat
     // (a wrong root fails at every seed), so it runs here, before the mask × seed product.
-    const variantFound = choiceRescue(facts, { deadline });
+    const variantFound = choiceRescue(facts, 'under-limit');
     if (variantFound) {
       lastConfigTier = 'variant';
       return variantFound;
     }
-    if (Date.now() > deadline) return null;
+    if (limitReached()) return null;
     // Discrete REFLECTION alternatives (#441). The sweep above varies only the CONTINUOUS jitter — the
     // base seed — while the reflection mask lives in the seed's HIGH bits (`REFLECT_STRIDE`). So a
     // requirement that needs a MIRROR configuration is unreachable by that sweep however many seeds it
@@ -3388,10 +3790,10 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     // extension/segment bars, not the full requirement set — so nothing was searching this dimension
     // against `meetsRequirements`. General, not convexity-specific: the ADR-166 apex-side family gains
     // the same coverage.
-    const reflectable = reflectableFreePoints(replay(facts).construction).length;
+    const reflectable = at0.everySeed ? 0 : reflectableFreePoints(replay(facts).construction).length;
     for (let m = 1; m < 1 << Math.min(reflectable, REFLECT_MAX); m++) {
       for (let s = fromSeed; s < fromSeed + 6; s++) {
-        if (Date.now() > deadline) return null;
+        if (limitReached()) return null;
         const sm = withReflectMask(m, s);
         if (meetsRequirements(facts, sm)) {
           lastConfigTier = 'reflect';
@@ -3411,45 +3813,50 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     let combos: number[][] = [[]];
     for (const { count } of branchy) combos = combos.flatMap((c) => Array.from({ length: count }, (_, b) => [...c, b]));
     for (const combo of combos.slice(0, 16)) {
-      if (Date.now() > deadline) return null;
+      if (limitReached()) return null;
       // skip the current assignment (already swept above)
       const fc = facts.map((f, idx) => {
         const k = branchy.findIndex((x) => x.i === idx);
         return k >= 0 ? ({ ...f, cmd: { ...f.cmd, branch: combo[k] } } as Fact) : f;
       });
-      for (let s = 0; s < 6; s++)
-        if (meetsRequirements(fc, s)) {
+      for (let s = 0; s < 6; s++) {
+        const at = meetsAt(fc, s);
+        if (at.ok) {
           lastConfigTier = 'branch';
           return { facts: fc, seed: s };
         }
+        if (at.everySeed) break; // #2894 (ADR-834): this assignment fails at every seed
+      }
     }
     return null;
-  });
+  }
 }
 
 /** Outcome of dry-running a parsed step on top of the current facts (see {@link dryRunOutcome}). */
 /**
  * The "show another configuration" SEARCH, extracted PURE (#41 / [ADR-290](docs/06-decisions.md#adr-290))
  * so a geometry worker can run it off the main thread; the store's `resample` action applies its result.
- * Semantics unchanged: a wall-clock budget (2026-07-06 review hotspot #3 — past the deadline, return what
- * we have; tests run deadline-free), the shared `meetsRequirements` acceptance bar, and the
- * similarity-invariant fingerprint (a same-shape-resized view is not "another configuration"). The
- * deadline is also armed inside the solve ladder (engine/solveBudget.ts, issue #59) so a single
+ * Semantics unchanged: a bounded search (2026-07-06 review hotspot #3; a work limit since #2893, ADR-831: at the
+ * limit it returns what it has, and a caller under a limit asks `limitReached()` whether a null was a cut), the
+ * shared `meetsRequirements` acceptance bar, and the similarity-invariant fingerprint (a same-shape-resized view is
+ * not "another configuration"). The limit is also armed inside the solve ladder (issue #59) so a single
  * pathological candidate can't blow through the between-candidate checks. `onProgress` reports the
  * candidate index (the worker forwards it to the UI's "still searching…" cue).
  */
-export function searchResample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void, budgetMs = SEARCH_BUDGET_MS): number | null {
+export function searchResample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void, limit = SEARCH_WORK_LIMIT): number | null {
+  return withSearchLimit(limit, () => searchResampleUnder(facts, seed, onProgress), 'searchResample').value;
+}
+function searchResampleUnder(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): number | null {
   const cur = replay(facts, seed);
   if (freeDofs(cur.construction).length === 0) return null; // fully determined — nothing to vary
   const curFp = shapeFingerprint(cur.construction, cur.positions, cur.circles);
   let s = seed;
-  const deadline = Date.now() + budgetMs;
   /** #194: the first requirement-meeting but squashed candidate — the answer when nothing better shows. */
   let squashed = -1;
-  for (let k = 0; k < CONFIG_SEEDS && Date.now() <= deadline; k++) {
+  for (let k = 0; k < CONFIG_SEEDS && !limitReached(); k++) {
     onProgress?.(k + 1, CONFIG_SEEDS);
     s += 1;
-    const r = withSolveBudget(deadline, () => replay(facts, s));
+    const r = replay(facts, s);
     // Accept only a view that MEETS EVERY REQUIREMENT — the SAME bar the initial display uses — AND is a
     // genuinely DIFFERENT drawing (see the class notes above; the Q8 two-right-triangles lock).
     if (!shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions, r.circles))) continue;
@@ -3563,21 +3970,29 @@ function reflexAxes(facts: Fact[], c: Construction): ChoiceAxis[] {
   const seatable = new Set(c.objects.filter((o) => o.kind === 'free-point' && !o.pinned).map((o) => o.id));
   const yields = convexityYields(facts);
   const out: ChoiceAxis[] = [];
+  let corners: StatedCorner[] | undefined;
   facts.forEach((f, i) => {
     if (!f.enabled || f.cmd.type !== 'quadrilateral') return;
     const cmd = f.cmd as Extract<AnyCommand, { type: 'quadrilateral' }>;
     if (!yields.has(ringKey(cmd.ids)) && cmd.reflex === undefined) return;
     if (!cmd.ids.some((id) => seatable.has(id))) return; // no vertex is ours to seat — the ring has no reflex choice
-    const k = cmd.ids.length; // 4 reflex choices + the convex default
-    const cur = cmd.reflex === undefined ? 0 : (((cmd.reflex % k) + k) % k) + 1;
+    const k = cmd.ids.length;
+    // #2813 (ADR-823 Am. 1): a vertex a stated interior angle rules out is never offered as the reflex one — its digit
+    // could only be rejected by the floor, after a replay. Digit 0 stays the convex default; digit m+1 seats allowed[m].
+    const ruledOut = statedReflexExclusions(facts, cmd.ids, corners ??= statedRingCorners(facts));
+    const allowed = [...Array(k).keys()].filter((v) => !ruledOut.has(cmd.ids[v]));
+    const stored = cmd.reflex === undefined ? undefined : ((cmd.reflex % k) + k) % k;
+    const at = stored === undefined ? -1 : allowed.indexOf(stored);
+    if (stored !== undefined && at < 0) allowed.push(stored); // a stored seat stays reachable as `cur`, so the axis can leave it
+    const cur = stored === undefined ? 0 : allowed.indexOf(stored) + 1;
     out.push({
       kind: 'reflex',
       i,
-      n: k + 1,
+      n: allowed.length + 1,
       cur,
       set: (target, d) => {
         const { reflex: _prev, ...rest } = target as Extract<AnyCommand, { type: 'quadrilateral' }>;
-        return (d === 0 ? rest : { ...rest, reflex: d - 1 }) as AnyCommand;
+        return (d === 0 ? rest : { ...rest, reflex: allowed[d - 1] }) as AnyCommand;
       },
     });
   });
@@ -3644,16 +4059,32 @@ function withAssignment(facts: Fact[], axes: ChoiceAxis[], assignment: number[])
   });
 }
 
-/** How many odometer steps one press of «הציגו תצורה אחרת» may try (the deadline bounds it too). */
+/** How many odometer steps one press of «הציגו תצורה אחרת» may try (the work limit bounds it too). */
 const SEARCH_AXIS_STEPS_MAX = 63;
 
 export function searchAnotherView(
   facts: Fact[],
   seed: number,
   onProgress?: (k: number, n: number) => void,
-  budgetMs = SEARCH_BUDGET_MS,
+  limit = SEARCH_WORK_LIMIT,
 ): { facts: Fact[]; seed: number } | null {
-  const deadline = Date.now() + budgetMs;
+  return decidedOrThrow(searchAnotherViewRound(facts, seed, 0, onProgress, limit));
+}
+/**
+ * #2893 (ADR-831): the press as the worker runs it. A press that reached the limit with nothing found is "not decided",
+ * never «אין תצורה אחרת»; its «המשיכו לחפש» runs round `round`, whose limit is the rounds' sum (`roundLimit`).
+ */
+export function searchAnotherViewRound(
+  facts: Fact[],
+  seed: number,
+  round = 0,
+  onProgress?: (k: number, n: number) => void,
+  limit = SEARCH_WORK_LIMIT,
+): { facts: Fact[]; seed: number } | null | NotDecided<SearchResume> {
+  const r = withSearchLimit(roundLimit(limit, round), () => searchAnotherViewUnder(facts, seed, onProgress), 'searchAnotherView');
+  return r.value === null && r.reached ? notDecided({ round: round + 1 }, r.spent) : r.value;
+}
+function searchAnotherViewUnder(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): { facts: Fact[]; seed: number } | null {
   const cur = replay(facts, seed);
   // #1600 (ADR-593): the discrete space is the PRODUCT of every registered axis — every cyclable branch, the
   // composition side, every variant (#1711, ADR-573) and the seat — walked as ONE odometer from the current
@@ -3665,6 +4096,16 @@ export function searchAnotherView(
   const total = axes.reduce((p, a) => p * a.n, 1);
   const hasDofs = freeDofs(cur.construction).length > 0;
   const steps = Math.min(total - 1, SEARCH_AXIS_STEPS_MAX);
+  /*
+   * #2831 (ADR-824, ADR-W-206 — operator 2026-11-12, *"2831 - A"*): on a figure whose SHAPE is determined, the
+   * press walks the solution cycle — each new solution before another placement of one already shown.
+   */
+  if (total > 1 && freeDofCount(cur.construction) === 0) {
+    // The gathering gets half of the work left (ADR-W-210 invariant 3: counted in work, never seconds), so a press it
+    // cuts still has the odometer's half to answer with.
+    const next = solutionCycleStep(facts, seed, axes, unitsLeft() / 2);
+    if (next) return next;
+  }
   const candidates = Array.from({ length: Math.max(0, steps) }, (_, k) => withAssignment(facts, axes, advanceAssignment(axes, k + 1)));
 
   /**
@@ -3676,27 +4117,188 @@ export function searchAnotherView(
   let k = 0;
   const totalWork = candidates.length * (hasDofs ? 4 : 1) + (hasDofs ? CONFIG_SEEDS : 0);
   for (const fc of candidates) {
-    if (Date.now() > deadline) break;
+    if (limitReached()) break;
     // Fresh seeds first (the legacy press resampled AND flipped), the current seed as the in-combo fallback.
     const seeds = hasDofs ? [seed + 1, seed + 2, seed + 3, seed] : [seed];
-    for (const s of seeds) {
-      if (Date.now() > deadline) break;
+    for (let j = 0; j < seeds.length; j++) {
+      const s = seeds[j];
+      if (limitReached()) break;
       onProgress?.(++k, totalWork);
-      if (withSolveBudget(deadline, () => meetsRequirements(fc, s))) {
+      const at = meetsAt(fc, s);
+      if (at.ok) {
         // #942: separated wins outright; coincident is remembered and only used if nothing else turns up.
-        if (withSolveBudget(deadline, () => separatedView(replay(fc, s)))) return { facts: fc, seed: s };
+        if (separatedView(replay(fc, s))) return { facts: fc, seed: s };
         if (!coincident) coincident = { facts: fc, seed: s };
+      } else if (at.everySeed) {
+        // #2894 (ADR-834): this candidate fails at every seed — its remaining seeds are skipped (progress counts them)
+        k += seeds.length - 1 - j;
+        break;
       }
     }
   }
   // The plain seed resample (no discrete step) — shape-diff gated, existing semantics.
-  if (hasDofs && Date.now() <= deadline) {
-    const s = searchResample(facts, seed, (kk, n) => onProgress?.(Math.min(k + kk, totalWork), Math.max(totalWork, k + n)), Math.max(0, deadline - Date.now()));
+  if (hasDofs && !limitReached()) {
+    const s = searchResampleUnder(facts, seed, (kk, n) => onProgress?.(Math.min(k + kk, totalWork), Math.max(totalWork, k + n)));
     if (s !== null) return { facts, seed: s };
   }
   // #942 (ADR-486): the coincident view is offered only now, with every separated option exhausted —
   // "only when there is no other config".
   return coincident;
+}
+
+/** The assignment at position `idx` of the odometer counted from the all-default assignment (the first axis fastest). */
+function assignmentAt(axes: readonly { n: number }[], idx: number): number[] {
+  let rest = idx;
+  return axes.map((a) => {
+    const d = rest % a.n;
+    rest = Math.floor(rest / a.n);
+    return d;
+  });
+}
+
+/** Two shape fingerprints within the solver's agreement: one shape, whatever the turn, shift or mirror. */
+const SAME_SHAPE_TOL = 1e-3;
+function sameShape(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((x, i) => Math.abs(x - b[i]) <= SAME_SHAPE_TOL * Math.max(1, Math.abs(x), Math.abs(b[i])));
+}
+
+/**
+ * THE SOLUTION CYCLE OF A DETERMINED SHAPE (#2831, [ADR-824](docs/06-decisions.md#adr-824), the workspace rule
+ * [ADR-W-206](docs/06w-decisions-workspace.md#adr-w-206); operator 2026-11-12, *"2831 - A"*: a mirror image of a drawing is
+ * the SAME solution placed differently, and «הציגו תצורה אחרת» shows new solutions first, Q-2731c (b)).
+ *
+ * The odometer ({@link advanceAssignment}) turns the first axis fastest, and an axis that only PLACES the figure — the
+ * tangent from A touching at either of two mirror points — turns faster than one that changes the answer (which vertex
+ * holds the right angle), so every new solution waited one press per placement axis: measured, «מנקודה A הוציאו משיק
+ * למעגל בנקודה B · … · משולש ישר זווית ABD · BD = 6» showed its three triangles on presses 0, 2 and 4.
+ *
+ * On a figure with no shape freedom left (`freeDofCount` 0; the placement may still be sampled) the axis space is
+ * finite, so it is gathered whole: every assignment, counted from the all-default one, that meets every requirement at
+ * the press's seed (the shape is determined, so the seed only places it; a press keeps its seed). They are grouped by shape ({@link shapeFingerprint}: the same
+ * drawing up to a turn, a shift, a scale or a mirror — one solution), #942's separated drawings first within a group,
+ * and the groups are interleaved round-robin in order of first appearance: g0#0, g1#0, g2#0, …, g0#1, g1#1, …. A press
+ * moves to the successor of the assignment on the screen; one that is not in the cycle starts it. The cycle depends
+ * only on the facts with their axis digits and the seed, so nothing new is stored and undo cannot desync.
+ *
+ * `null` — keep the odometer: the cycle has nothing but the drawing on the screen, or its work limit cut the gathering
+ * (the next press resumes it, so the limit decides only when the cycle takes over, never what it is).
+ */
+function solutionCycleStep(
+  facts: Fact[],
+  seed: number,
+  axes: ChoiceAxis[],
+  units: number,
+): { facts: Fact[]; seed: number } | null {
+  const here = axes.reduce((idx, a, k) => idx + a.cur * axes.slice(0, k).reduce((p, b) => p * b.n, 1), 0);
+  const zeroed = withAssignment(facts, axes, axes.map(() => 0));
+  const key = JSON.stringify(zeroed.map((f) => [f.enabled, f.cmd]));
+  let entry = solutionCycleMemo.get(key);
+  if (!entry) {
+    entry = { seed, members: [], next: 0, cycle: undefined, cut: 0, cells: [] };
+    if (solutionCycleMemo.size >= SOLUTION_CYCLE_MEMO_SIZE) solutionCycleMemo.delete(solutionCycleMemo.keys().next().value!);
+    solutionCycleMemo.set(key, entry);
+  }
+  if (!gatherSolutionCycle(entry, facts, axes, units)) return null;
+  const cycle = entry.cycle;
+  if (!cycle) return null;
+  const at = cycle.findIndex((m) => m.idx === here);
+  const next = at < 0 ? cycle[0] : cycle[(at + 1) % cycle.length];
+  if (next.idx === here) return null;
+  return { facts: withAssignment(facts, axes, assignmentAt(axes, next.idx)), seed: entry.seed };
+}
+
+/** One drawing of a solution cycle: its odometer position from the all-default assignment, its shape and whether it is separated. */
+interface CycleMember {
+  idx: number;
+  fp: number[];
+  separated: boolean;
+}
+/** A cycle being gathered (`members` so far, `next` the assignment to try) and, once complete, the cycle (`null`: none). */
+interface CycleEntry {
+  /** The seed the cycle is drawn at: the seed of the press that began gathering it. */
+  seed: number;
+  members: CycleMember[];
+  next: number;
+  cycle: CycleMember[] | null | undefined;
+  /** How many presses the clock cut while solving assignment `next`. */
+  cut: number;
+  /** The work each press's gathering did, as ledger cells: what a later press is charged for the cycle it is served. */
+  cells: WorkCell[];
+}
+/**
+ * The cycle per figure (docs/17 §7): keyed by the facts with every axis digit zeroed, for the last few figures, and
+ * drawn at the seed of the press that began gathering it (the shape is determined, so the seed only places it; every
+ * member and every press then keeps that seed). A press after the first is served the cycle and CHARGED the work its
+ * gathering cost, as every memo hit is (`chargeHit`, ADR-831 / ADR-W-210 invariant 5): a press counts what it would from
+ * empty caches, so a warm heap and a cold one count the same. A gathering its work limit cuts
+ * keeps what it found and the next press resumes it (the odometer answers meanwhile, and may move the seed: the
+ * cycle keeps its own), so on a figure whose solves are slow the clock decides when the cycle takes over.
+ */
+const solutionCycleMemo = new Map<string, CycleEntry>();
+const SOLUTION_CYCLE_MEMO_SIZE = 8;
+
+/**
+ * Gather (or resume gathering) the cycle into `entry` under a work limit of `units` (inside the press's own: whichever
+ * is reached first stops it); `false` when the limit cut it. First the press is charged what earlier presses gathered
+ * (it would have computed that from empty caches: the memo-hit rule, ADR-831), so a press served a whole cycle counts the
+ * cold gathering, and a resumed gathering counts its earlier stretches too; a charge the limit cannot afford is a cut.
+ */
+function gatherSolutionCycle(entry: CycleEntry, facts: Fact[], axes: ChoiceAxis[], units: number): boolean {
+  return withSearchLimit(
+    units,
+    () => {
+      if (entry.cells.length > 0 && !chargeHit({ own: 0, deps: entry.cells, charged: 0 })) return false;
+      if (entry.cycle !== undefined) return true;
+      const { value, cell } = computeWithCell(() => gatherSolutionCycleUnder(entry, facts, axes));
+      entry.cells.push(cell);
+      return value;
+    },
+    'solutionCycle',
+  ).value;
+}
+function gatherSolutionCycleUnder(entry: CycleEntry, facts: Fact[], axes: ChoiceAxis[]): boolean {
+  const seed = entry.seed;
+  const total = Math.min(
+    axes.reduce((p, a) => p * a.n, 1),
+    SEARCH_AXIS_STEPS_MAX + 1,
+  );
+  for (; entry.next < total; entry.next++) {
+    if (limitReached()) return false;
+    const idx = entry.next;
+    // The shape is determined, so the seed only places it: every member is drawn at the cycle's seed. The drawing on
+    // the screen is judged like every other: one that breaks a given is not a member (a press from it starts the cycle).
+    const fc = withAssignment(facts, axes, assignmentAt(axes, idx));
+    const aborts = solveBudget.aborts;
+    const ok = meetsRequirements(fc, seed);
+    if (solveBudget.aborts !== aborts || limitReached()) {
+      // Cut mid-solve: the next press retries this assignment once; cut again, it is read as the odometer reads a
+      // candidate its limit cuts — not offered — so one pathological solve cannot keep the cycle from forming.
+      entry.cut += 1;
+      if (entry.cut < 2) return false;
+      entry.cut = 0;
+      continue;
+    }
+    entry.cut = 0;
+    if (!ok) continue;
+    const r = replay(fc, seed);
+    entry.members.push({ idx, fp: shapeFingerprint(r.construction, r.positions, r.circles), separated: separatedView(r) });
+  }
+  const members = entry.members;
+  if (members.length < 2) {
+    entry.cycle = null;
+    return true;
+  }
+  const groups: CycleMember[][] = [];
+  for (const m of members) {
+    const g = groups.find((x) => sameShape(x[0].fp, m.fp));
+    if (g) g.push(m);
+    else groups.push([m]);
+  }
+  for (const g of groups) g.sort((x, y) => Number(y.separated) - Number(x.separated)); // stable: found order within a tier
+  const cycle: CycleMember[] = [];
+  for (let round = 0; cycle.length < members.length; round++) for (const g of groups) if (round < g.length) cycle.push(g[round]);
+  entry.cycle = cycle;
+  return true;
 }
 
 /** #85 ([ADR-293](docs/06-decisions.md#adr-293)) — is this derived state DRAWABLE? Positions exist and
@@ -3775,10 +4377,11 @@ function advanceAssignment(axes: readonly { n: number; cur: number }[], steps: n
  * reflection tier), so tier ORDER — and with it every default drawing — is unchanged. Zero cost when no fact
  * carries a cyclable variant and no composition recorded a side choice.
  */
-export function choiceRescue(facts: Fact[], limit: { deadline: number } | { workCap: number }): { facts: Fact[]; seed: number } | null {
+export function choiceRescue(facts: Fact[], limit: 'under-limit' | { workCap: number }): { facts: Fact[]; seed: number } | null {
   const mayHaveSide = facts.some((f) => f.enabled && 'ids' in f.cmd);
   if (!mayHaveSide && variantAxes(facts).length === 0) return null;
-  if ('deadline' in limit) return choiceSweep(facts, () => Date.now() > limit.deadline);
+  // #2893 (ADR-831): the configuration search's tier runs under that search's work limit (it was its clock)
+  if (limit === 'under-limit') return choiceSweep(facts, limitReached, true);
   // #1857 (ADR-709): the submit gate's rescue is bounded by WORK, in charged units (every memo hit charged the
   // work it saved, ADR-582) — the seat sweep's ADR-584 shape — so whether the cure for an unstated choice
   // counts is the same on every device and cold or warm. The axes' own fold is read inside the epoch, so it is
@@ -3789,7 +4392,7 @@ export function choiceRescue(facts: Fact[], limit: { deadline: number } | { work
     return withWorkBudget(limit.workCap, () => {
       const at = work.done + limit.workCap;
       const aborts0 = solveBudget.aborts;
-      const cured = choiceSweep(facts, () => work.done > at || solveBudget.aborts !== aborts0);
+      const cured = choiceSweep(facts, () => work.done > at || solveBudget.aborts !== aborts0, false);
       if (cured) {
         choiceRescueStats.cured++;
         choiceRescueStats.maxCuredCharged = Math.max(choiceRescueStats.maxCuredCharged, work.done - d0);
@@ -3801,7 +4404,13 @@ export function choiceRescue(facts: Fact[], limit: { deadline: number } | { work
     choiceRescueStats.charged += work.done - d0;
   }
 }
-function choiceSweep(facts: Fact[], stop: () => boolean): { facts: Fact[]; seed: number } | null {
+/**
+ * `skipProven` (#2894, ADR-834): stop trying an assignment at further seeds once it failed at one for a reason no
+ * sampled freedom reaches ({@link failsAtEverySeed}). Only under a configuration search's limit: the submit gate's
+ * work cap decides whether a line is refused or kept waiting, and a sweep made cheaper could finish where the cap
+ * used to cut it, which would change that verdict.
+ */
+function choiceSweep(facts: Fact[], stop: () => boolean, skipProven: boolean): { facts: Fact[]; seed: number } | null {
   // #1987 (ADR-622): the `reflex` axis joins this tier — a convexity default that YIELDED (ADR-613) is an
   // unstated choice exactly as a variant is, so a figure the convex seat cannot draw belongs here, not in a
   // refusal. Zero cost on a figure with no yielding ring ({@link reflexAxes} registers no axis).
@@ -3816,9 +4425,10 @@ function choiceSweep(facts: Fact[], stop: () => boolean): { facts: Fact[]; seed:
     const fc = withAssignment(facts, axes, assignment);
     for (let s = 0; s < 6; s++) {
       if (stop()) return null;
-      const ok = meetsRequirements(fc, s);
+      const at = skipProven ? meetsAt(fc, s) : { ok: meetsRequirements(fc, s), everySeed: false };
       if (stop()) return null; // a fold the budget cut mid-ladder is not THE fold: it can neither cure nor refute
-      if (ok) return { facts: fc, seed: s };
+      if (at.ok) return { facts: fc, seed: s };
+      if (at.everySeed) break;
     }
   }
   return null;
@@ -3842,8 +4452,8 @@ export const choiceRescueConfig = { cap: CHOICE_RESCUE_WORK_CAP };
  * submit gate's seat-curable test (`dryRunOutcome`), so the two can never disagree about which
  * failures belong to the unstated seat. Zero cost when no unpinned right-triangle exists.
  */
-export function seatRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
-  return seatSweep(facts, { deadline }).cured;
+export function seatRescue(facts: Fact[]): { facts: Fact[]; seed: number } | null {
+  return seatSweep(facts, 'under-limit').cured; // #2893 (ADR-831): under the configuration search's work limit
 }
 
 /** #1671 ([ADR-584](docs/06-decisions.md#adr-584)): the rewritten fact lists the seat sweep tries — every
@@ -3875,11 +4485,11 @@ export const seatSweepStats = { sweeps: 0, complete: 0, cured: 0, cut: 0, execut
  * failure — the submit gate may then refuse it ({@link deferralWorthwhile}); a sweep its budget cut proved
  * nothing, and the line keeps the ADR-104 route as before. The submit gate bounds it by a fixed amount of WORK
  * in charged units ({@link SEAT_SWEEP_WORK_CAP}, operator ruling 2026-10-04), so the verdict is the same on
- * every device and cold or warm; the configuration search's seat tier keeps its wall-clock deadline (an
- * interactive view search, ADR-558). The submit path also warms the rotated folds off the main thread first
+ * every device and cold or warm; the configuration search's seat tier runs under that search's work limit
+ * (#2893, ADR-831; it was its wall clock). The submit path also warms the rotated folds off the main thread first
  * ({@link seatSweepWarmup}), so the wait sits in the worker.
  */
-export function seatSweep(facts: Fact[], limit: { deadline: number } | { workCap: number }): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
+export function seatSweep(facts: Fact[], limit: 'under-limit' | { workCap: number }): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
   const rotations = seatRotations(facts);
   if (rotations.length === 0) return { cured: null, complete: true };
   seatSweepStats.sweeps++;
@@ -3887,14 +4497,14 @@ export function seatSweep(facts: Fact[], limit: { deadline: number } | { workCap
   const d0 = work.done;
   try {
     const { value: r, cutKeys } = observeReattemptCuts(() => {
-      if ('deadline' in limit) return withWorkEpoch(() => sweepRotations(rotations, () => Date.now() > limit.deadline));
+      if (limit === 'under-limit') return withWorkEpoch(() => sweepRotations(rotations, limitReached, true));
       // #1671 (ADR-584): the submit gate's sweep is bounded by WORK, in charged units (every memo hit charged
       // the work it saved, ADR-582) — the same verdict on every device and cold or warm. A ladder the cap cut
       // mid-fold ends the sweep as incomplete: a cut fold is not THE fold, so it can neither cure nor refute.
       return withWorkBudget(limit.workCap, () => {
         const at = work.done + limit.workCap;
         const aborts0 = solveBudget.aborts;
-        return sweepRotations(rotations, () => work.done > at || solveBudget.aborts !== aborts0);
+        return sweepRotations(rotations, () => work.done > at || solveBudget.aborts !== aborts0, false);
       });
     });
     // #1770 (ADR-586): a sweep that read a rotation whose fold had a re-attempt cut by the ADR-583 cap has not
@@ -3911,7 +4521,8 @@ export function seatSweep(facts: Fact[], limit: { deadline: number } | { workCap
     seatSweepStats.charged += work.done - d0;
   }
 }
-function sweepRotations(rotations: Fact[][], stop: () => boolean): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
+/** `skipProven`: {@link choiceSweep}'s, for the same reason (the gate's cap decides a verdict). */
+function sweepRotations(rotations: Fact[][], stop: () => boolean, skipProven: boolean): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
   const d0 = work.done;
   for (const fc of rotations) {
     for (let s = 0; s < 6; s++) {
@@ -3919,12 +4530,13 @@ function sweepRotations(rotations: Fact[][], stop: () => boolean): { cured: { fa
         seatSweepStats.cut++;
         return { cured: null, complete: false };
       }
-      const ok = meetsRequirements(fc, s);
+      const at = skipProven ? meetsAt(fc, s) : { ok: meetsRequirements(fc, s), everySeed: false };
       if (stop()) {
         seatSweepStats.cut++;
         return { cured: null, complete: false };
       }
-      if (ok) {
+      if (at.everySeed) break; // #2894 (ADR-834)
+      if (at.ok) {
         seatSweepStats.cured++;
         seatSweepStats.maxCuredCharged = Math.max(seatSweepStats.maxCuredCharged, work.done - d0);
         return { cured: { facts: fc, seed: s }, complete: true };
@@ -4034,7 +4646,7 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
       const named = new Set(added.flatMap((con) => constraintRefs(con)));
       if (newObjects.some((o) => objectParents(o).some((id) => !named.has(id)))) return false;
     }
-    const pool = sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS }); // the UI-thread gate: on the clock (ADR-558)
+    const pool = sharedSamples(facts, { gate: true }); // the submit gate's pool, under GATE_WORK_LIMIT (#2893, ADR-831)
     if (!pool.determined && pool.samples.length < IMPLIED_MIN_SAMPLES) return false;
     if (pool.samples.length === 0) return false;
 
@@ -4064,13 +4676,15 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
     // passed the pool pays for it — exactly the lines that answered «כבר קיים» before.
     const alternatives = choiceAlternatives(facts, before.construction, pool);
     if (alternatives === null) return false; // over the cap: the choice space cannot be walked — fail open
-    const deadline = Date.now() + SAMPLE_BUDGET_MS;
-    for (const alt of alternatives) {
-      if (Date.now() > deadline) return false; // not established in time — fail open
-      if (!meetsRequirements(alt, seed)) continue; // not a configuration of the figure (the pool's own bar, ADR-558)
-      if (!holdsAt(replay(alt, seed).positions)) return false;
-    }
-    return true;
+    // #2893 (ADR-831): bounded in work, as the pool is (it was a 5 s clock, #2294); at the limit it fails open, as before
+    return withSearchLimit(GATE_WORK_LIMIT, () => {
+      for (const alt of alternatives) {
+        if (limitReached()) return false; // not established within the limit — fail open
+        if (!meetsRequirements(alt, seed)) continue; // not a configuration of the figure (the pool's own bar, ADR-558)
+        if (!holdsAt(replay(alt, seed).positions)) return false;
+      }
+      return true;
+    }, 'impliedAlternatives').value;
   } catch {
     return false; // fails open, always
   }
@@ -4146,7 +4760,7 @@ export function forcedCrossedRing(facts: Fact[], commands: AnyCommand[], seed = 
         ringProperlyCrossed(ids.map((id) => placed.get(id) as Vec)), // the prefilter: simple on screen ⇒ simple somewhere
     );
     if (rings.length === 0) return null;
-    const pool = sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS }); // the UI-thread gate, as `impliedByPrior`
+    const pool = sharedSamples(facts, { gate: true }); // the submit gate's pool, as `impliedByPrior`
     if (pool.samples.length === 0) return null;
     if (!pool.determined && pool.samples.length < FORCED_RING_MIN_SAMPLES) return null;
     let trial: Fact[] | null = null;
@@ -4257,7 +4871,7 @@ export function impossibleExtensionSide(facts: Fact[], commands: AnyCommand[], s
     };
     for (const c of stated) {
       const seat = seatOf(c);
-      if (seat && beyond(fig.positions, c, seat) === false && offEverywhere(sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS, atSeed: seed }), c, seat)) return { a: c.a, b: c.b, id: c.id };
+      if (seat && beyond(fig.positions, c, seat) === false && offEverywhere(sharedSamples(facts, { gate: true, atSeed: seed }), c, seat)) return { a: c.a, b: c.b, id: c.id };
     }
     const before = replay(facts, seed).positions;
     for (const { c, utterance } of standing) {
@@ -4693,7 +5307,10 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean; atSeed?: num
   const configs = variantConfigs(facts);
   // #2518 (ADR-784): `atSeed` skips the display-seed search. A gate asking about a figure with an unmet requirement
   // pays the whole futile sweep there (3 s on a five-line figure), for a base construction it does not need.
-  const settled = (vf: Fact[]) => opts.atSeed ?? firstSatisfyingSeed(vf);
+  // #2893 (ADR-831): the pool's display seed is found to the end of its sweep, as the suite always found it (it was the
+  // worker's 12 s clock in a browser). Under a search limit it was cut on the #572 figure, which moved the pool's seed and
+  // with it the knowledge verdicts; the pool itself is bounded by POOL_WORK_CAP (ADR-558).
+  const settled = (vf: Fact[]) => opts.atSeed ?? firstSatisfyingSeedUnder(vf, 0, 120);
   const seed0 = configs.length === 1 ? settled(facts) : 0;
   const constructions = configs.map((vf) => replay(vf, configs.length === 1 ? seed0 : settled(vf)).construction);
   // #434 (ADR-509): a DETERMINED figure's pool is its ADMISSIBLE SET, not one sample. `freeDofCount === 0`
@@ -4714,7 +5331,8 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean; atSeed?: num
     ? []
     : constructions.flatMap((c) =>
         Array.from({ length: N }, (_, s) => () => {
-          const r = evaluate(applySeed(c, s));
+          // #2888 (ADR-827): the sample of (c, s) is one object for every pool of this figure, so it is solved once
+          const r = evaluate(sampledOnce(c, `pool:${s}`, () => applySeed(c, s)));
           if (r.ok) {
             raw.push(r.positions);
             circlesOfSample.set(r.positions, r.circles);
@@ -4898,10 +5516,10 @@ export function figureDeterminacy(shared: Pick<SharedSamples, 'samples' | 'deter
 
 // Sample collection is budgeted like every other search loop (E2): a failing seed's solve costs ~10× a
 // converging one (all restarts run to exhaustion) and is then DROPPED by convergedSamples anyway — on the
-// ADR-123 heavy figure the unbudgeted loop was ~50 s of mostly-discarded work. Past the deadline, detection
+// ADR-123 heavy figure the unbudgeted loop was ~50 s of mostly-discarded work. At the limit, detection
 // proceeds on the samples in hand (a smaller ground-truth pool — `samplesUsed` reports it); the FIRST job
-// always runs so there is never an empty pool for a buildable figure. Tests run deadline-free (E2).
-const SAMPLE_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 5000;
+// always runs so there is never an empty pool for a buildable figure. The submit gate's pool had a 5 s clock
+// (none under vitest); since #2893 (ADR-831) it is bounded by GATE_WORK_LIMIT, the same in the suite.
 /**
  * #1601/#1599 (ADR-558): the KNOWLEDGE pool's budget, in work units (`evaluateCore` calls), never seconds.
  * The wall clock above made the same figure print «AC = 2x» on one run and nothing on the next; a work
@@ -4914,9 +5532,9 @@ export const POOL_WORK_CAP = 4_000_000;
 /**
  * The shared sample pool (M3 — one sampler). The knowledge consumers (the detect sweep, the values panel)
  * call it bare and get the work-bounded pool, `complete` when every job finished inside the cap. The typed
- * submit gate's «כבר קיים» test runs on the UI thread and keeps a WALL-CLOCK bound (`deadlineMs`) — an
- * interactive check, which the ruling leaves on the clock; it fails open, so a cut pool only skips the
- * courtesy note. A pool cut short is never served from the memo as if it were complete.
+ * submit gate's tests («כבר קיים», a forced crossing, a forced side) ask for the narrow pool (`gate`), bounded by
+ * GATE_WORK_LIMIT (#2893, ADR-831; it was a wall clock, #2294); they fail open, as before. A pool cut short is never
+ * served from the memo as if it were complete.
  */
 /**
  * #1599 (ADR-558): a sample is EVIDENCE only if it satisfies the figure's givens more tightly than the
@@ -4977,7 +5595,7 @@ export function sampleSubset(facts: Fact[], counterexample?: (pos: Map<Id, Vec>)
 /** #1996: how many sampling jobs the counterexample probe of {@link sampleSubset} runs before the full pool. */
 const SUBSET_PROBE_JOBS = 4;
 
-export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number; atSeed?: number } = {}): SharedSamples {
+export function sharedSamples(facts: Fact[], opts: { gate?: boolean; atSeed?: number } = {}): SharedSamples {
   // #1605 (ADR-582): the work-bounded pool is now a function of the input alone (every memo hit inside it is
   // charged — engine/solveBudget.ts), so a pool the cap cut is served from the memo like a complete one: the
   // values op after the detect sweep reuses it instead of recomputing the whole pool, and the status line and
@@ -4986,12 +5604,12 @@ export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number; atSeed
   if (hit) return hit;
   return withWorkEpoch(() => samplePool(facts, opts));
 }
-function samplePool(facts: Fact[], opts: { deadlineMs?: number; atSeed?: number }): SharedSamples {
+function samplePool(facts: Fact[], opts: { gate?: boolean; atSeed?: number }): SharedSamples {
   sampleStats.sweeps++;
   // The UI-thread gate samples the NARROW set (ADR-509's three seeds, no extra button seeds): measured while
   // building ADR-558, the widened set doubled its main-thread cost on a determined figure (0.67 s → 1.32 s
   // on a 3-4-5 restatement). Its narrow pool never replaces the knowledge memo.
-  const narrow = opts.deadlineMs !== undefined;
+  const narrow = opts.gate === true;
   // The budget bounds the JOBS, so the same input stops at the same job on every run. The setup (the
   // display-seed search and the base replays) runs in the same work EPOCH but before the cap is armed: what
   // it touches is charged once there, so a job re-reading the figure's own fold pays nothing — as on a cold
@@ -5020,11 +5638,10 @@ function samplePool(facts: Fact[], opts: { deadlineMs?: number; atSeed?: number 
     const cut = [...observed.cutKeys, ...cutKeys].some((k) => k !== base);
     return finish(ran === jobs.length && solveBudget.aborts === aborts0 && !cut);
   };
-  if (opts.deadlineMs !== undefined) {
-    const deadline = Date.now() + opts.deadlineMs;
-    // Armed inside the solve ladder too (engine/solveBudget.ts, issue #59): a variant job builds NEW fact
+  if (narrow) {
+    // Armed inside the solve ladder too (`withSearchLimit`, issue #59): a variant job builds NEW fact
     // content whose fold can hit the recruit ladder — the between-job check alone couldn't stop it.
-    const pool = withSolveBudget(deadline, () => runJobs(() => Date.now() > deadline));
+    const pool = withSearchLimit(GATE_WORK_LIMIT, () => runJobs(limitReached), 'gatePool').value;
     sampleMemo = memoBefore; // the narrow pool is this gate's alone
     return pool;
   }
@@ -5368,7 +5985,9 @@ export { ringKey };
  * Not a carve-out by shape: a square, rectangle, rhombus, parallelogram or trapezoid is convex whenever it is
  * simple, so yielding lets nothing new through for them and the crossed ring stays crossed in every
  * configuration (ADR-608 still refuses it); the kite and the general quadrilateral can be darts, and now are
- * when the student's own rings ask for it. A ring STATED convex («קמור») never yields: the statement wins.
+ * when the student's own rings ask for it. A ring STATED convex («קמור») never yields: the statement wins. Nor, since #2811
+ * ([ADR-826](docs/06-decisions.md#adr-826)), does a ring any other statement PROVES convex ({@link ringConvexityProofs}: a
+ * circle through its letters) — the partner order is then held to the simple floor against a convex ring, so no view draws it.
  *
  * @returns the `ringKey`s of the rings that yield.
  */
@@ -5387,6 +6006,7 @@ function convexityYields(facts: Fact[], extra: Id[][] = []): Set<string> {
     rings.push(...declaredRings(f.cmd).filter((r) => r.convex).map((r) => r.ids));
   }
   rings.push(...extra);
+  for (const p of ringConvexityProofs(facts)) statedConvex.add(ringKey(p.ring)); // #2811 (ADR-826): a proof is a statement too
   const out = new Set<string>();
   for (const r of rings) {
     const key = ringKey(r);
@@ -5399,6 +6019,291 @@ function convexityYields(facts: Fact[], extra: Id[][] = []): Set<string> {
     }
   }
   return out;
+}
+
+/**
+ * #2811 ([ADR-826](docs/06-decisions.md#adr-826)) — the ONE-CIRCLE memberships a fact STATES: which letters it puts on
+ * which circle. Read off the commands (structural, never positions): a circumcircle's three points, a circle through a
+ * point, a rider on a circle, a point a line or another circle crosses it at, an arc's midpoint, an extension's far end,
+ * a diameter's ends; and a `set-concyclic` (a cyclic statement with no circle object) is a circle of its own. A circle
+ * that covers a letter only through a DERIVED point fails open (no membership read), as the plan accepted.
+ */
+function circleMemberships(cmd: AnyCommand): { circle: string; ids: Id[] }[] {
+  switch (cmd.type) {
+    case 'circumcircle': return [{ circle: cmd.id, ids: [cmd.a, cmd.b, cmd.c] }];
+    case 'circle-through': return [{ circle: cmd.id, ids: [cmd.through] }];
+    case 'point-on-circle':
+    case 'line-circle-intersection':
+    case 'arc-midpoint':
+    case 'extend-onto-circle':
+      return [{ circle: cmd.circle, ids: [cmd.id] }];
+    case 'circle-circle-intersection': return [{ circle: cmd.circle1, ids: [cmd.id] }, { circle: cmd.circle2, ids: [cmd.id] }];
+    case 'diameter': return [{ circle: cmd.circle, ids: [cmd.id1, cmd.id2] }];
+    case 'set-concyclic': return [{ circle: `~concyclic:${[...cmd.points].sort().join('')}`, ids: [...cmd.points] }];
+    default: return [];
+  }
+}
+
+/**
+ * #2813 ([ADR-823](docs/06-decisions.md#adr-823), operator ruling 2026-11-10 (b): *"a stated polygon angle is always the
+ * interior angle"*) — the angle WEDGES the student STATED, each with the fact that states it. Read off the fact list,
+ * never off the construction (a stated angle may have become a carrier's drive), in every spelling
+ * {@link pinnedAngleWedges} reads: a `set-angle` (not an arc measure) and a `set-perpendicular` whose two segments meet
+ * at one corner (90° there; a structurally implied one is not a statement). Only a wedge strictly between 0° and 180°
+ * is kept: that is the only value a wedge can name, and the one this reading constrains.
+ */
+export interface StatedCorner {
+  v: Id;
+  p: Id;
+  q: Id;
+  deg: number;
+  fact: Fact;
+}
+export function statedRingCorners(facts: Fact[]): StatedCorner[] {
+  const out: StatedCorner[] = [];
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    const c = f.cmd;
+    const con: Constraint | null =
+      c.type === 'set-angle' && !c.arcOf ? { type: 'angle', vertex: c.vertex, ray1: c.ray1, ray2: c.ray2, value: c.value }
+      : c.type === 'set-perpendicular' && !c.implicit ? { type: 'perpendicular', a: c.a, b: c.b, c: c.c, d: c.d }
+      : null;
+    if (!con) continue;
+    for (const w of pinnedAngleWedges([con])) if (w.deg > 0 && w.deg < 180 - 1e-6) out.push({ ...w, fact: f });
+  }
+  return out;
+}
+
+/**
+ * #2813 (ADR-823 Am. 1) — the vertices a STATED interior angle rules out as the reflex corner of a ring over `ids`' letters.
+ * The dent's corner is the point inside the other three — the same point in every simple order of the letters — so a
+ * corner stated in ANY declared ring over the same letters rules its vertex out.
+ */
+function statedReflexExclusions(facts: Fact[], ids: Id[], corners: StatedCorner[]): Set<Id> {
+  const out = new Set<Id>();
+  if (corners.length === 0) return out;
+  const letters = [...ids].sort().join();
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    for (const r of declaredRings(f.cmd)) {
+      if (r.ids.length !== ids.length || [...r.ids].sort().join() !== letters) continue;
+      for (const { corner } of cornersOfRing(r.ids, corners)) out.add(corner.v);
+    }
+  }
+  return out;
+}
+
+/**
+ * #2813 ([ADR-823](docs/06-decisions.md#adr-823) Am. 1) — A STORED REFLEX SEAT YIELDS TO A LATER STATED ANGLE (M4: a
+ * default yields to a statement). ADR-622's `quadrilateral.reflex` is an unstated configuration choice, persisted by the
+ * search that found it. When a later line states the angle at THAT vertex, the ruling (2026-11-10 (b)) says it is the
+ * interior angle, so no seed can make the stored seat valid — and the seed tiers of {@link findValidConfig}, which turn
+ * before the `reflex` axis, would each pay a failing replay first (measured: «מרובע ABCD · מרובע ABDC · ∠DAB = 70°»
+ * re-seated only after the whole seed sweep, long enough in the worker that the next Enter met the busy gate). The
+ * stored digit moves to the next vertex no statement rules out, structurally and before any sample; with none left the
+ * seat is dropped (the convex default). Returns the SAME array when nothing changes.
+ */
+export function reflexSeatsYieldToStatedCorners(facts: Fact[]): Fact[] {
+  if (!facts.some((f) => f.enabled && f.cmd.type === 'quadrilateral' && (f.cmd as { reflex?: number }).reflex !== undefined)) return facts;
+  const corners = statedRingCorners(facts);
+  if (corners.length === 0) return facts;
+  let out: Fact[] | null = null;
+  facts.forEach((f, i) => {
+    if (!f.enabled || f.cmd.type !== 'quadrilateral') return;
+    const cmd = f.cmd as Extract<AnyCommand, { type: 'quadrilateral' }>;
+    if (cmd.reflex === undefined) return;
+    const k = cmd.ids.length;
+    const r = ((cmd.reflex % k) + k) % k;
+    const ruledOut = statedReflexExclusions(facts, cmd.ids, corners);
+    if (!ruledOut.has(cmd.ids[r])) return;
+    let next: number | undefined;
+    for (let j = 1; j < k; j++) if (!ruledOut.has(cmd.ids[(r + j) % k])) { next = (r + j) % k; break; }
+    const { reflex: _prev, ...rest } = cmd;
+    out ??= facts.slice();
+    out[i] = { ...f, cmd: (next === undefined ? rest : { ...rest, reflex: next }) as AnyCommand };
+  });
+  return out ?? facts;
+}
+
+/** The stated corners of ring `ids` — a wedge at a vertex between its two ring neighbours, in either ray order. */
+function cornersOfRing(ids: Id[], corners: StatedCorner[]): { index: number; corner: StatedCorner }[] {
+  const n = ids.length;
+  const out: { index: number; corner: StatedCorner }[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = ids[(i + n - 1) % n], v = ids[i], next = ids[(i + 1) % n];
+    for (const w of corners)
+      if (w.v === v && ((w.p === prev && w.q === next) || (w.p === next && w.q === prev))) out.push({ index: i, corner: w });
+  }
+  return out;
+}
+
+/**
+ * #2813 (ADR-823): does every STATED corner of a simple ring turn the ring's way? A corner whose turn opposes the ring's
+ * orientation (its signed area) is the reflex corner of a dent — 360° minus the wedge inside — which the ruling says a
+ * stated angle never is. The view floor's half of the interior reading: a ring held only to simplicity (a yielding
+ * ring, a stated-concave ring, a top-level `polygon`) still never seats a stated corner reflex.
+ */
+function statedCornersTurnWithRing(ids: Id[], pts: Vec[], corners: StatedCorner[]): boolean {
+  if (corners.length === 0) return true;
+  const stated = cornersOfRing(ids, corners);
+  if (stated.length === 0) return true;
+  const n = ids.length;
+  let area = 0;
+  for (let i = 0; i < n; i++) area += pts[i].x * pts[(i + 1) % n].y - pts[(i + 1) % n].x * pts[i].y;
+  const orient = Math.sign(area);
+  if (orient === 0) return true; // a degenerate ring — the simple floor's concern, never this one's
+  for (const { index } of stated) {
+    const o = pts[(index + n - 1) % n], a = pts[index], b = pts[(index + 1) % n];
+    const turn = (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    if (Math.sign(turn) === -orient) return false;
+  }
+  return true;
+}
+
+/**
+ * #2813 (ADR-823) — the STATED INTERIOR ANGLES LEAVE NO ROOM: a simple n-gon's interior angles sum to (n − 2)·180°, so
+ * a reflex corner leaves the others less than (n − 3)·180°. Stated corners (each below 180°, by the ruling and the floor
+ * above) that already sum to at least that prove the ring convex. The twin of the angle-sum prover (ADR-538/658), which
+ * reads the same wedges against the same bound. The smallest stated value at a corner is read, so the proof stays sound.
+ * @returns the facts that prove it, or null.
+ */
+function anglesLeaveNoRoom(ids: Id[], corners: StatedCorner[], facts: Fact[]): Fact[] | null {
+  const best = new Map<number, StatedCorner>();
+  for (const { index, corner } of cornersOfRing(ids, corners)) {
+    const had = best.get(index);
+    if (!had || corner.deg < had.deg) best.set(index, corner);
+  }
+  const sum = [...best.values()].reduce((s, w) => s + w.deg, 0);
+  if (best.size === 0 || sum < (ids.length - 3) * 180 - 1e-6) return null;
+  const proving = new Set([...best.values()].map((w) => w.fact));
+  return facts.filter((x) => proving.has(x));
+}
+
+/** A ring's convex position, proved structurally by stated facts (#2811 ADR-826; #2813 ADR-823). */
+export interface RingConvexityProof {
+  ring: Id[];
+  /** what proves it: a stated «קמור», one circle through every letter (#2811), or stated interior angles (#2813) */
+  reason: 'stated-convex' | 'circle' | 'angles';
+  /** the facts that prove it, in fact-list order */
+  facts: Fact[];
+}
+
+const ringProofsMemo = new WeakMap<Fact[], RingConvexityProof[]>();
+
+/**
+ * #2811 ([ADR-826](docs/06-decisions.md#adr-826)) — WHICH DECLARED RINGS ARE PROVED TO BE IN CONVEX POSITION, by the
+ * student's own statements, with no figure. Points in convex position have exactly ONE simple cyclic order, so a proved
+ * ring is convex whenever it is simple, and any other declared order of its letters crosses in every configuration. The
+ * sufficient reasons, each a fact the student stated:
+ * - a stated `set-polygon-convexity` convex («המרובע ABCD קמור»);
+ * - **one circle through every letter** ({@link circleMemberships}): a circle the ring is inscribed in, or one circle
+ *   whose memberships — its circumcircle points, riders, crossings — cover all the letters. Four points on one circle are
+ *   in convex position, so «מעגל חוסם את ABDC» after «מרובע ABCD · מרובע ABDC» leaves one of the two orders crossed;
+ * - #2813 ([ADR-823](docs/06-decisions.md#adr-823)): **stated interior angles that leave no room for a reflex corner**
+ *   ({@link anglesLeaveNoRoom}: Σ ≥ (n − 3)·180°) — «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°» is convex.
+ * A noun that is convex whenever simple keeps its existing path (ADR-608/613), unchanged. Memoized on the fact list.
+ */
+export function ringConvexityProofs(facts: Fact[]): RingConvexityProof[] {
+  const memo = ringProofsMemo.get(facts);
+  if (memo) return memo;
+  const out: RingConvexityProof[] = [];
+  const statedConvex = new Map<string, Fact>();
+  const onCircle = new Map<string, Map<Id, Fact>>(); // circle → letter → the first fact that put it there
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    if (f.cmd.type === 'set-polygon-convexity' && (f.cmd as { convex: boolean }).convex) {
+      const key = ringKey((f.cmd as { ids: Id[] }).ids);
+      if (!statedConvex.has(key)) statedConvex.set(key, f);
+    }
+    for (const { circle, ids } of circleMemberships(f.cmd)) {
+      const members = onCircle.get(circle) ?? new Map<Id, Fact>();
+      for (const id of ids) if (!members.has(id)) members.set(id, f);
+      onCircle.set(circle, members);
+    }
+  }
+  const seen = new Set<string>();
+  const corners = statedRingCorners(facts);
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    for (const { ids } of declaredRings(f.cmd)) {
+      const n = ids.length;
+      if (n < 4 || new Set(ids).size !== n) continue;
+      const key = ringKey(ids);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const byAngles = corners.length ? anglesLeaveNoRoom(ids, corners, facts) : null;
+      if (byAngles) {
+        out.push({ ring: ids, reason: 'angles', facts: byAngles });
+        continue;
+      }
+      const convex = statedConvex.get(key);
+      if (convex) {
+        out.push({ ring: ids, reason: 'stated-convex', facts: [convex] });
+        continue;
+      }
+      for (const members of onCircle.values()) {
+        if (!ids.every((id) => members.has(id))) continue;
+        const proving = new Set(ids.map((id) => members.get(id)!));
+        out.push({ ring: ids, reason: 'circle', facts: facts.filter((x) => proving.has(x)) });
+        break;
+      }
+    }
+  }
+  ringProofsMemo.set(facts, out);
+  return out;
+}
+
+/** A second declared order over a proved ring's letters (#2811, ADR-826): what {@link ringOrderContradiction} returns. */
+export interface RingOrderContradiction {
+  /** the ring proved convex */
+  ring: Id[];
+  /** the other declared order, which must cross */
+  other: Id[];
+  /** why the ring is convex, and the facts that say so */
+  proof: RingConvexityProof;
+}
+
+/**
+ * #2811 ([ADR-826](docs/06-decisions.md#adr-826)) — A RING PROVED CONVEX AND ANOTHER DECLARED ORDER OF ITS LETTERS:
+ * structural, pool-free, asked of the TRIAL figure. A declared ring over some of a proved ring's letters (four or more)
+ * that orders them differently — `convexityYields`' relation — crosses in every configuration. Blamed on the LATEST of the
+ * two declarations and the proof facts (ADR-3D-322's rule, as ADR-3D-467 does in 3-D): only when that is a fact this line
+ * adds is the line refused, so a figure that already holds the contradiction (a saved one) is never refused on an
+ * unrelated line. «מעגל חוסם את ABDC» after the two orders, and «מרובע ABDC» after the circle, are the same contradiction.
+ *
+ * **Fails open**: any throw → `null`.
+ */
+export function ringOrderContradiction(facts: Fact[], commands: AnyCommand[]): RingOrderContradiction | null {
+  try {
+    if (commands.length === 0) return null;
+    const trial = trialFacts(facts, commands);
+    const added = new Set(trialChanges(facts, trial));
+    if (added.size === 0) return null;
+    const proofs = ringConvexityProofs(trial);
+    if (proofs.length === 0) return null;
+    const at = new Map(trial.map((f, i) => [f, i] as const));
+    const rings: { ids: Id[]; fact: Fact }[] = [];
+    for (const f of trial) {
+      if (!f.enabled) continue;
+      for (const { ids } of declaredRings(f.cmd)) if (ids.length >= 4 && new Set(ids).size === ids.length) rings.push({ ids, fact: f });
+    }
+    for (const proof of proofs) {
+      const own = new Set(proof.ring);
+      const declaring = rings.filter((r) => ringKey(r.ids) === ringKey(proof.ring)).map((r) => r.fact);
+      for (const q of rings) {
+        if (!q.ids.every((id) => own.has(id))) continue;
+        const sub = new Set(q.ids);
+        if (ringKey(proof.ring.filter((id) => sub.has(id))) === ringKey(q.ids)) continue; // the ring's own order
+        const involved = [q.fact, ...declaring, ...proof.facts];
+        const latest = involved.reduce((a, b) => ((at.get(b) ?? -1) > (at.get(a) ?? -1) ? b : a));
+        if (!added.has(latest)) continue;
+        return { ring: proof.ring, other: q.ids, proof };
+      }
+    }
+    return null;
+  } catch {
+    return null; // fails open, always
+  }
 }
 
 export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean {
@@ -5418,6 +6323,7 @@ export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean 
     if (!c.convex) statedConcave.add(ringKey(c.ids));
   }
   const yields = convexityYields(facts);
+  let corners: StatedCorner[] | undefined;
   for (const f of facts) {
     if (!f.enabled) continue;
     // #443: the rings the fact DECLARES — directly, or through the macro it expands into.
@@ -5428,6 +6334,9 @@ export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean 
       const pts0 = ids.map((id) => positions.get(id));
       if (pts0.some((p) => !p)) continue;
       if (!ringSimple(pts0 as Vec[])) return false;
+      // #2813 (ADR-823, operator ruling 2026-11-10 (b)): a stated angle at a ring corner is its INTERIOR angle, so that
+      // corner turns with the ring — a view that seats it as the reflex corner of a dent is not a drawing of it
+      if (!statedCornersTurnWithRing(ids, pts0 as Vec[], corners ??= statedRingCorners(facts))) return false;
       continue;
     }
     const pts = ids.map((id) => positions.get(id));
@@ -5549,10 +6458,13 @@ function shapeDiffers(a: number[], b: number[]): boolean {
  * Settling happens ONCE, at commit — the parser is the only producer of the default, a student can only
  * CYCLE afterwards — so the persisted variant is authoritative from then on, "show another configuration"
  * cycles verbatim from it, and the corner square stays REACHABLE (with its notice), never the default.
- * Returns the SAME array when nothing changed (undo/memo hygiene). Budgeted like the seed search.
+ * Returns the SAME array when nothing changed (undo/memo hygiene). Bounded by GATE_WORK_LIMIT units of work (#2294,
+ * #2893, ADR-831: it was the seed search's wall clock); at the limit it keeps the best variant seen so far, as before.
  */
-export function settleVariantDefaults(facts: Fact[], isNew: (f: Fact) => boolean, seed: number, budgetMs = SEARCH_BUDGET_MS): Fact[] {
-  const deadline = Date.now() + budgetMs;
+export function settleVariantDefaults(facts: Fact[], isNew: (f: Fact) => boolean, seed: number, limit = GATE_WORK_LIMIT): Fact[] {
+  return withSearchLimit(limit, () => settleVariantDefaultsUnder(facts, isNew, seed), 'settleVariantDefaults').value;
+}
+function settleVariantDefaultsUnder(facts: Fact[], isNew: (f: Fact) => boolean, seed: number): Fact[] {
   let out = facts;
   for (let idx = 0; idx < out.length; idx++) {
     const f = out[idx];
@@ -5572,7 +6484,7 @@ export function settleVariantDefaults(facts: Fact[], isNew: (f: Fact) => boolean
     const candidate = (v: number) => out.map((x, i) => (i === idx ? { ...x, cmd: withVariant(x.cmd, v) } : x));
     let best = { v: v0, s: score(replay(out, seed)) };
     if (best.s[0] === 0 && best.s[1] === 0 && best.s[2] === 0) continue; // the parsed default is already clean
-    for (let dv = 1; dv < n && Date.now() < deadline; dv++) {
+    for (let dv = 1; dv < n && !limitReached(); dv++) {
       const v = (v0 + dv) % n;
       const s = score(replay(candidate(v), seed));
       // Strictly better lexicographically wins; ties keep the earlier (most-canonical) variant.

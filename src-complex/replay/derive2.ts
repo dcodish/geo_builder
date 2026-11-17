@@ -24,6 +24,7 @@
  * times over.
  */
 
+import { meterWork } from '../../shell/workMeter';
 import { fmtNum } from '../../shell/format';
 import { typedCartesian, typedDecimalReadings, typedPolar } from './typedSpelling';
 import { valueOptionsOf, type ValueOptions } from '../../shell/valueOptions';
@@ -469,6 +470,10 @@ interface ExactSolve {
  * the lowered statements, independent of the seed and of the configuration index.
  */
 function exactSolve(input: Omit<FoldInput, 'configIndex' | 'seed'>): ExactSolve {
+  // #2873 (ADR-W-210): one exact solve is one unit of work — every `foldConstraints` makes exactly one, and
+  // `entailedBy` two, so a fold and the entailment gate are counted in the same unit. The other unit is one executed
+  // line read (`parseLineV2`, #2888, ADR-CX-090).
+  meterWork();
   const { constraints: given, atoms: givenAtoms, assertions = [], objects = [], measures = [], realTyped = [] } = input;
   const realLetters = new Set(realTyped);
   /**

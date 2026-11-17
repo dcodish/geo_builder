@@ -109,9 +109,10 @@ describe('#349 — «המנסרה ישרה» straightens ANY oblique prism (the 
   });
 
   it('re-declaring the SAME prism as right is the M1 statement, not a dropped given (#199 shape)', () => {
-    submit('מנסרה שבסיסה משולש');
+    // #2838 (ADR-3D-486): named by its letters — an unlettered noun typed again is a NEW prism
+    submit("מנסרה שבסיסה משולש ABCA'B'C'");
     const obliqueDof = dof();
-    submit('מנסרה ישרה שבסיסה משולש'); // same kind + ids, tilt now stated
+    submit("מנסרה ישרה שבסיסה משולש ABCA'B'C'"); // same kind + ids, tilt now stated
     expect(state().lastError).toBeNull();
     expect(dof()).toBe(obliqueDof - 2); // straightened, NOT silently ignored
   });

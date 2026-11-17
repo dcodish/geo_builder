@@ -36,6 +36,16 @@ source of givens** ([02c](02c-requirements-analytic.md) P2/P3).
 (`y = mx + 8`), with no symbolic algebra. **`conic.ts` — equation → curve, plus the canonicity gate.** **`curves.ts` —
 curve geometry**: resolution, membership residuals and the renderer's polylines, pure.
 
+**A free conic's direction** ([ADR-AG-467](06c-decisions-analytic.md#adr-ag-467), #2853). A bare «פרבולה» is a curve fact
+with a `turn` (`CurveTurn`: the same parabola opening along the other axis, its own equation and text). M1 keeps the turn
+on the curve object and opens a region `choice` of two `opens-along` selectors (x first). `resolvedAt` reads the
+assignment like every other discrete axis (`discreteAxes.ts`), and `turnedObjects` puts the turn in the curve's place
+when the configuration took `y`, so every consumer of the resolved construction sees ONE curve. The selector holds by
+construction. The sign of the free `p` is the direction along the axis, so four directions are two digits' worth.
+`freshLetters` renames the turn's letters with the curve's. «משוואת ה(אליפסה|פרבולה) היא …» is `contextual` like the circle's and lowers to
+`the-conic`. M1 binds the one conic of that kind, and a `toolLetters` conic takes the stated equation under its id. The
+letters, the turn and the direction choice are then dropped.
+
 **The conic's frame** ([ADR-AG-455](06c-decisions-analytic.md#adr-ag-455), #2664). `classify` completes the square, so a
 parabola or an ellipse with axes parallel to the coordinate axes is read anywhere: `NumCurve` carries `h`, `k` (the
 centre or vertex) and, for a parabola opening along y, `axis: 'y'`. The fields are ABSENT on a curve at the origin
@@ -282,6 +292,17 @@ unlettered end into `ellipse-dist`, and drops the segment and declaration such a
 joined by «ו» are split on an enumerated joiner. The ask (`ellipseRoleAnswer`, `app/ask.ts`) reads the same closed
 form off `knownCurve`.
 
+**The parabola's role points** ([ADR-AG-470](06c-decisions-analytic.md#adr-ag-470), #2835). One rule, `parabola-point
+{curve, role: 'focus' | 'vertex'}` (`engine/derived.ts`, the `ellipse-point` pattern; it replaced `parabola-focus`), whose
+closed form is `parabolaRolePoint` (`engine/conicFrame.ts`): `toWorld(c, p/2, 0)` and `toWorld(c, 0, 0)`, so the
+translated and the y-axis parabolas need nothing more; `curves.ts`'s `parabolaFocus` and the ask read the same function.
+The vertex role has two hosts: `RoleRef['vertex'].host` and `vertex-of.host` (`'parabola' | 'ellipse'`, the focus's
+shape); «הקודקוד שלה» names none, and M1 (`apply.ts` `vertex-of`) then takes the figure's one parabola or ellipse, as
+`focus-of` does. A parabola host resolves THE parabola (`noHost` for none or several); a side or an axis word on it is
+`out-of-scope`. The ask (`roleAnswer`) answers the parabola's vertex beside its focus; on a parabola it cannot read as
+a known curve it first asks `parabolaRoleKnown` (each printed number through `isKnowledge`: the vertex of «y² = 2px» is
+(0, 0) in every configuration), then the letters (`roleInLetters`).
+
 **The one-letter pin.** `parseParamRelation` reads an equation over one letter; M1's used-symbol gate stays the judge,
 and a relation linear in its letter goes to `bindSymbol` (`onePinValue`), a non-linear one stays a `param-rel`.
 `sizeLetters` (`engine/carriers.ts`) gives an ellipse's semi-axis letters (`semiAxisLetters`: moving the letter
@@ -379,7 +400,8 @@ that rewrite to the twin's own text, so no second lowering exists: `circleCentre
 named by its centre with an equation), `centresRespectivelyClauses` (two namings paired by the shared `respectively`
 helper), `namedCirclesClauses` (a plural subject distributed over its named members), the copula/construct forms in
 `centreClauses` and `diameterClauses`, and `satisfiesClause` (taken in `readLine` only when the statement's facts name
-the point; the point is then declared). `circleCentreClauses` keeps the A2 ordinal («M מרכז המעגל האחד EQ»; English "one of
+the point; the point is then declared; the colon after the verb and the masculine «מקיים» since ADR-AG-460, #2062 — the
+spelling 2-D's `readSubjectFrame` and 3-D's `readSubjectFrame3` share). `circleCentreClauses` keeps the A2 ordinal («M מרכז המעגל האחד EQ»; English "one of
 the circles" / "the other circle"), which `centreOfCircle` reads off the tail (`PAIR_ORDINAL`) as `centre-of { ofPair }`
 ([ADR-AG-322](06c-decisions-analytic.md#adr-ag-322), #2397). `orthography` folds a capital's underscored digit index into the subscript
 glyph (`SUB_INDEX`), and `unwrap`'s glued «ש-» after a given-word never takes the first letter of a cardinal
@@ -809,7 +831,9 @@ constraint records.
 #### Incidence in every order ([ADR-AG-164](06c-decisions-analytic.md#adr-ag-164), #1281, #1495)
 
 `parseIncidence` normalises any order into the canonical sentence (`viaCanonical`); a coordinate point is a
-`MINT_PREFIX` placeholder named by `derive.resolveMints` (`Derivation.minted`). `incidenceOn` is the one operand
+`MINT_PREFIX` placeholder named by `derive.resolveMints` (`Derivation.minted`). The letters it treats as taken are
+those of the lines up to the mint's own, never a later line's ([ADR-AG-464](06c-decisions-analytic.md#adr-ag-464), #2848): a later
+line that types the minted name refers to that point, and one that defines another point under it is a name clash. `incidenceOn` is the one operand
 resolver ([ADR-AG-168](06c-decisions-analytic.md#adr-ag-168)); an equation operand (`eqSrc`/`eq`) resolves by
 `resolveCurveByEq`, so `curve-anon` ids never reach a refusal. Crossing spellings go through
 `intersectionSpellings` and `meetingSpelling` ([ADR-AG-230](06c-decisions-analytic.md#adr-ag-230); `CONCURRENCY_HE`);
@@ -1059,6 +1083,13 @@ and «קודקודי ה<noun> XYZW נמצאים על <host>» (`VERTICES_ON_HE/E
 `conicInscribedFacts` on a conic. A conic takes no name or centre tail: the fact carries its kind as
 `host?: ConicHost` beside `circle?`, absent for the circle.
 
+**The host phrase's three spellings** ([ADR-AG-468](06c-decisions-analytic.md#adr-ag-468), #2502). After the chord or the diameter
+the host is «ב(ה)…», «של ה…» or the construct state «ה…» with no preposition: `CHORD_HOST_HE` for the one chord (the same
+three groups as `CHORD_CIRCLE_HE`, which the pair and list readers keep), and a `(?=ה)` alternative to the preposition
+group in `DIAM_HE` / `DIAM_NOUN_FIRST_HE` (no group added, so the define rule — «של מעגל» with no article — is unchanged).
+The host BEFORE the ends («קוטר האליפסה AB», «מיתר המעגל AB») is `hostBeforeEnds`, a rewrite to «קוטר AB של האליפסה» at
+the entry of `parseCircleThru` and `parseChord`, so the two orders cannot lower apart.
+
 **Apply: one resolver.** `curveHost(c, host, name, src)` is `circleNamed` with no host, and otherwise the figure's ONE
 curve of that kind (`noHost` for none or several). `tangent-of`, `tangent-line-at`, `tangent-eq` (through `tangent-of`),
 `tangent-through` and `diameter-of` read it. A chord's and an inscribed vertex's incidence is `on-kind { kind: host }`,
@@ -1302,7 +1333,11 @@ feeds the panel's «זוויות».
 `carrierSystem(c, env, { params })` builds the vector the solve moves — the free vertices (`ids`), then every register
 parameter (`syms`) — and every residual is evaluated at `envAt(x)`, so a given can pin a parameter
 (`(k+1)x+2y−12+5k=0`). **Two stages**: vertices with parameters at their sample first; parameters join only when that
-does not converge, walked in the student's order, with an `accept` predicate for declared domains. The freedom cue is
+does not converge, walked in the student's order, with an `accept` predicate for declared domains. The walks of one
+content (attempts, sign re-seeds, the discrete options tried at a seed) are one continuation: a prefix solve is keyed by
+the resolved construction, the prefix, the environment, the start to the last bit and the tolerance, solved once and
+served after (`walkSteps`, [ADR-AG-482](06c-decisions-analytic.md#adr-ag-482)); a served step is a finished piece and
+charges the work limit nothing. The freedom cue is
 rank over the joint vector (`figureDofOf`, `reportedDof`); the locus tracer asks for `params: 'fixed'`. The membership
 residual (`curves.ts`) is signed; `solveLM` stops on a stall; `evaluate` is memoised per (construction, seed);
 `figureSignature` signs used parameters (`usedSymbols`). A free direction (`Direction.free`) is a `line-at` angle; a
@@ -1327,6 +1362,15 @@ start — over stage one's own vector when a line replays the earlier figure. Di
 trace, repairs) pass no anchor.
 
 *Identifiers:* `ANCHOR_LAMBDA` · `ANCHOR_WINDOW` · `NEWTON_RATIO` · `ANCHOR_MIN_PULL` · `ANCHOR_RAISES` · `POLISH_ITER`
+
+**One solve never evaluates one point twice ([ADR-AG-480](06c-decisions-analytic.md#adr-ag-480), #2894).** `solveLM`'s
+residual function is wrapped in `servingRepeatedPoints`: within the one solve, residuals already computed at a point bit
+for bit equal to the one asked are returned again. That serves the residuals at the iterate (the cost takes them, then
+the top of the next iteration asked again), the whole central-difference Jacobian after a rejected step (the iterate has
+not moved: 3-D's `leastSquares` caches its Jacobian for the same reason, ADR-3D-210) and the finish's re-reads. Measured,
+31.9 % of every evaluation was such a repeat. The residual functions are pure in the point and no caller writes into a
+returned vector, so the iterates and the result are unchanged; the table is the solve's own. `freeRank` and the finish's
+own `solveLM` are separate solves with their own tables.
 
 ### The legibility bound (sr-25) ([ADR-AG-359](06c-decisions-analytic.md#adr-ag-359), ADR-W-175)
 
@@ -1459,6 +1503,139 @@ the other root, and a ring is offered only on the piece, its sentence saying «�
 
 ## Evaluate and the configuration pool
 
+### Solved content is keyed by content ([ADR-AG-476](06c-decisions-analytic.md#adr-ag-476), #2888; ADR-W-210 invariant 4)
+
+`derive(lines, at, seedNames, pins)` is a pure function of its four arguments, and it is remembered as one, in two layers.
+
+- **A line list folds once.** `foldLines` (parse, `resolveToolLetters`, `resolveMints`, `nameCanonicalCentres`, `fold`)
+  does not depend on the configuration. Its result is kept in `derive.ts`'s store under
+  `JSON.stringify([lines, seedNames, pins])` (the maps sorted by key), so every configuration of a line list is solved on
+  ONE `Construction` object.
+- **A configuration derives once.** `deriveAt` (the drawable walk, the refusals and their attribution, the stated
+  measures, the drawn configuration) is kept per `configurationKey(at)`: seed, reach, wide and the parts' landings. A
+  re-lettered construction (`followObjects`) is one object per lettering of its line list (`letteredAs`).
+- **What a caller receives is its own.** A fresh `Derivation` object per call whose `construction` is a VIEW of the kept
+  one (`content.ts` `viewOf`: a shallow copy, mapped back by `contentOf`). React's identity checks and the per-derivation
+  memos (`narrowingNotesOf`) behave as before. The lists inside a derivation are shared and frozen.
+
+**The solver memos.** Every memo that was a `WeakMap<Construction, …>` in `evaluate.ts`, `carriers.ts` and
+`components.ts` is a `ContentCache` (the same weak map, read through `contentOf`), so the views of one line list share
+one set of solves for as long as the store holds it. `evaluate`, `drawableAt` and `partsOf` work on the content, so
+nothing a solve keeps (a part's `whole`, the prior figure) is one caller's view; `partsOf` still answers a one-part figure
+with the very object it was given.
+
+**What is not shared.** `poolCache` stays keyed by the view: `deferred` and `pendingShown` are how ONE reader treats a
+figure. And a pool reads what was asked through its own construction (`askedOf`, noted by `drawableAt`), never what the
+shared memo holds. A derivation's views start from what its body asked (`recordAsks`, `adoptAsks`); `distinctConfigSeeds`
+replays its walk's asks on a memo hit, and a filled pool re-notes its seeds while a derivation is being computed. So a
+deferred pool's «בודק…» and the option walk that fills the pool before the paint happen exactly where they did from cold.
+Only the cost of an ask depends on what is solved.
+
+**The bound.** `BoundedStore`: `LINE_LISTS_MAX` (64) line lists, least recently used first; a line list asked for more
+than `CONFIGURATIONS_MAX` (96) configurations is folded again. The memos are weak, so a dropped line list's solves go
+with it. `clearAnalyticCaches()` (test-only) empties the store and every `ContentCache`: the work meter's walk calls it
+where a session starts (`newSession`: each sequence, each load, and the session an edit is measured in,
+`beforeLastRowEdit`, which has solved the rows before the edited one and not that row), and a test that measures a cold
+derivation calls it first.
+
+**Two readers of the page are memos too** ([ADR-AG-477](06c-decisions-analytic.md#adr-ag-477), #2890). `app/locusChip.ts`
+`locusChips` keeps a figure's chips under the construction and the configuration drawn (at most `LOCUS_CHIPS_KEPT` = 96
+per figure), with the two figures they were read from, compared by identity. `engine/locus.ts` `locusOf` keeps a traced
+locus under the point, the two configurations and the frame (at most `LOCI_KEPT` = 64 per figure), together with what
+the trace asked of the figure, which it replays on a hit. The chips ask the figure before they look in their memo. So
+the page's pool has read the same configurations whether an answer was computed or remembered. The ask lane's ANSWER is
+not kept: it is worded for a locale and may be pending; the trace under it is the solver work.
+
+**Adding a memo.** A pure function of a construction is memoised in a `ContentCache`, never a bare `WeakMap`, or it is
+cold on every `derive`. Anything that says how one reader treats a figure (a mode, a "shown" flag) is keyed by the
+object, like the pool. A memo that outlives an action and is NOT reached through a construction is a `BoundedStore`, so
+the clear function and the bound cover it.
+
+### The page never solves: the analytic worker, and the figure before its values ([ADR-AG-478](06c-decisions-analytic.md#adr-ag-478), #2890; ADR-W-210 phase 3)
+
+Every solve of this builder runs in its worker (`app/analyticWorker.ts`, the shared host `shell/workerHost`), started with
+the page (`main.tsx`). The operations are one table, `app/opsAn.ts`: the decisions (`submit`, `edit`, `toggle`,
+`another`, `letter`, `audit`, `fallbackExisting`, `fallbackJudge`), each the function the page called before, and
+`show`, a figure and its values. Each answers plain data with the content it solved (`engine/settle.ts`), which the
+page's client (`app/workerAn.ts`) adopts before it hands the verdict on.
+
+**Figure first** (operator ruling 2026-11-14). `show` sends the FIGURE as a part: the derivation and what the render's
+readers solve with the configuration pool HELD (`pool.hold()`: every gate pending, no seed evaluated for a gate, no
+reader fills the pool). Then it completes the pool, one configuration per `ctx.tick()`, giving way to a newer request
+(`complete: false`: kept, handed over, asked again while that figure is still shown), runs every reader again with the
+questions asked and the two notes of the paint, and answers the VALUES. The readers are one list,
+`app/figureReaders.ts`, read by the operations and by the work meter's driver; `App.tsx` calls each from its own memos.
+
+**The page renders what it holds** (`app/useShownFigure.ts`): the last store state whose figure is adopted, so rows,
+canvas and panel change together; at stage `figure` the derivation's pool is held and every value is pending, at stage
+`values` the pool is complete. A question is a value: its row is pending until the worker answered it on that figure.
+A pending word «בודק…» is revealed after `WORKING_SHOWN_AFTER_MS` by an opacity animation (`app/PendingText.tsx`).
+Every job ends after the figure of the store's new basis is drawn (`figureOfStore`); the values follow outside it.
+Where no worker serves (node, the suites, an old browser) the figure stage runs in the render's own task
+(`figureNow`) and the values from the same client; the load's audit is the caller's (`loadAnalyticSession(…, AUDIT_LATER)`).
+
+**The meter's walk** runs every operation through an executor (`useDriverExecutor`); the gate hands `shell`'s isolated
+executor over a second module instance (`__tests__/heapsAn.ts`), so its `page` count is a browser page's.
+
+### The work limit, and "not decided" ([ADR-AG-479](06c-decisions-analytic.md#adr-ag-479), #2893; ADR-W-210 phase 4)
+
+Every decision operation of `app/opsAn.ts` runs under `SEARCH_LIMIT_AN` (`engine/workLimitAn.ts`: 3.8 M charged units,
+about ten seconds in the browser on the dev PC), opened with `shell/workLimit`'s `withWorkLimit` by `decideWithin`. The check is
+`solverUnit()`, which replaced `meterWork()` at the four places a unit is counted (`solveLM`, `freeRank`,
+`jacobianRank`, `scanRoots`): past an open limit it throws a symbol that unwinds the search, and `decideWithin` answers
+`NotDecided { resume: { round }, spent }` (`shell/notDecided`). A `catch` on a solve's path must rethrow it
+(`isLimitSignal`). The limit counts on its own counter (`chargeUnit` / `readCharged`): every evaluation asked for, a repeat
+`solveLM` serves (ADR-AG-480) included, so a served repeat skips the meter but never moves the stop. Every memo is written once its value is whole, so a stop leaves nothing half-written and hands the
+page nothing to adopt. The next round («המשיכו לחפש», `round` + 1) finds what the last one finished in the worker's
+content memos (a hit counts no unit) and spends its limit on the rest. A round progresses only if one piece fits in it
+(measured: under 0.16 M units, against 3.8 M). The page keeps the stop in React state (`stopped` in `App.tsx`,
+`NotDecidedNote` in the input zone; the letter popover's own note through `letterOffer`'s `not-decided` answer):
+never a fact, never an undo step. `show` and `figure` (the figure and its values) run with no limit.
+
+### A settled result, and its adoption ([ADR-AG-477](06c-decisions-analytic.md#adr-ag-477), #2890; ADR-W-210 phase 3)
+
+The page may not solve (ADR-W-210 invariant 1). The route is "settle, then hand over": the heap that solved hands the
+page what it solved as plain data, the page adopts it into its own memos, and its synchronous readers find their answers
+there. `engine/settle.ts` is both halves. Nothing on the page calls it yet.
+
+- **`settling(fn)`** runs an action and reports the keys of the line lists `derive` was asked for.
+- **`settledOf(keys)`** reads those lists from the store of the heap it runs in and returns ONE object graph: the
+  store's entries under `lineListKey`; every named `ContentCache`'s entry for every construction reachable from them
+  (found by walking the memo values for constructions: parts, prior figures, locus parts, lettered copies); and the three
+  figure-keyed side tables (`evaluatedAt`, `partConfigOf`, `mergedSample`) as `[figure, tags]` pairs
+  (`figureTagsOf`).
+- **`adoptSettled(clone)`** installs a structured clone of that graph: the lists (`adoptLineList`, which freezes their
+  derivations again), each memo entry under its construction, the tags (`tagFigure`). `derive` of those lines is then a
+  lookup and returns a view of the ADOPTED construction, so every gate reads the adopted memos.
+- **`cloneLoss(value)`** lists what a structured clone would refuse, flatten or leave behind. A clone of a figure never
+  throws and is never whole: the four lazy rank readers (`DROPPED_BY_A_CLONE`) are non-enumerable and stay behind. That
+  is by design, since only `deriveAt` and the walk read them. Anything else hidden, any function, class instance or
+  accessor in a result is a failure of the lock.
+
+**One graph, one clone.** A memo's key is the construction its line list holds, `figure.unsatisfied[i]` is a constraint
+of that construction, and `construction.rowLine` is keyed by constraints. Sent apart, each of those identities breaks.
+Sent together they survive, which is why a result is the lists AND the memos AND the tags, never a figure alone.
+
+**The store is one per lane.** `derive.ts` keeps a `BoundedStore` for the page's lane and one for the worker's
+(`shell/workMeter.ts` `workLane()`). Every solver memo is reached only through a construction, and a construction only
+through the store, so two lanes are two heaps: nothing a worker's lane solves is readable from the page's until it is
+adopted from a clone. A browser's page and worker are two module instances with one lane each. Under node, a test runs
+both in one process (`__tests__/settle-heaps.ts`). A memo reached by a STRING (a future `BoundedStore`) must be per lane
+too, or the two heaps meet there.
+
+**What is not carried.** A reader's asks and its pool's mode stay its own. The page's view of an adopted figure defers
+its pool and asks seeds exactly as it does today; each ask is a lookup. So the hand-over decides nothing about what is
+shown as «בודק…»: the page does, from the same configurations.
+
+**The memos are named.** `new ContentCache<V>('name')`: the name is the memo's identity across heaps, and two memos may
+not share one. An unnamed memo is not sent, so its answers would be solved again on the page: every memo of the product
+is named, and a lock scans for one that is not.
+
+**What will run off the page imports no page.** The decisions (`app/submit`, `another`, `rename`, `loadAudit`), the
+readers that force a lazy and all of `engine/` reach neither the store, nor React, nor a component by any value import
+(`__tests__/off-page-graph.test.ts`). The load's audit is `app/loadAudit.ts` for that reason: `loadSession.ts` restores
+the store and calls it.
+
 ### Independent parts are evaluated and walked apart ([ADR-AG-425](06c-decisions-analytic.md#adr-ag-425), #2737)
 
 A figure whose statements share no unknown is several independent PARTS. `components.ts` `partsOf` finds them with a
@@ -1513,6 +1690,16 @@ notice after the narrowing notes, per render.
 
 *Identifiers:* `crossings.apart()` · `a > 0`
 *ADRs:* ADR-486.
+
+**The solution cycle of a determined figure ([ADR-AG-473](06c-decisions-analytic.md#adr-ag-473), #2831).** When the
+drawing on the screen has `carrierDof` 0, `anotherConfiguration` (`app/another.ts`) walks a cycle instead of the next
+differing seed: the configurations `derive(lines, s)` draws for `s < TRIES` (drawn from the one folded construction,
+`drawingConstructionOf`, so the lines fold once), admitted ones only, a picture already gathered (`looksTheSame`)
+dropped; grouped by `sameSolution` (`engine/evaluate.ts`: the points and each curve's characteristic points in the
+figure's own frame, the mirror folded, plus the used letters' values); interleaved round-robin in order of first
+appearance. A press moves to the successor of the drawing on the screen; one outside the cycle starts it. Any admitted
+configuration with freedom left, or a cycle of one, keeps the seed walk. The cycle is memoised per (lines, seed
+names, pins) for the last few figures.
 
 ### A noun's exclusive condition is part of its ring ([ADR-AG-189](06c-decisions-analytic.md#adr-ag-189), #1627)
 
@@ -1578,8 +1765,14 @@ Seeding a derived point's region through its parents; exact root enumeration.
 
 `derive` raises faults in a fixed order and gives a line one message, so the ring arm (#1170) runs after the vacancy
 loop and skips lines already in `faults`. A collapse the givens force is `polygon-collapsed`
-([ADR-AG-247](06c-decisions-analytic.md#adr-ag-247): `Figure.collapsedRings`, `collapsedByGivens(c, seed)`,
+([ADR-AG-247](06c-decisions-analytic.md#adr-ag-247): `Figure.collapsedRings`, `collapsedByGivens(c, at)`,
 `errPolygonCollapsed`). A fault is also the refusal: `decideSubmit` refuses when one lands on the new line.
+`collapsedByGivens` and its pair twin `pairsMetByGivens` read **the walk's own window** (`walkWindow`: the requested
+configuration, then each later seed at reach 1 with the request's `wide`), so on the refusal path every figure they read
+is one `drawableAt` already evaluated ([ADR-AG-481](06c-decisions-analytic.md#adr-ag-481)).
+Stated lengths no figure can have (`metricBounds.ts`, 3-D's `metricBounds3`: one segment given two lengths, or the
+triangle inequality broken by three fixed sides) skip the solve in `evaluate` and are refused `lengths-impossible` on the
+newest of their rows, naming the others, before the drop-one probe ([ADR-AG-483](06c-decisions-analytic.md#adr-ag-483)).
 
 **The vacancy arm reads the OBJECT's freedom, and a stated collinearity is a proof** ([ADR-AG-296](06c-decisions-analytic.md#adr-ag-296), #1963).
 A `vacant` object is refused `does-not-exist` when `Figure.freedomOfRead` over its inputs (`inputsOf`, `carriers.ts`:
@@ -1612,7 +1805,18 @@ the constraints' tangent space, tolerance relative to the read's own scale — a
 freedom). An affine map keeps every proper crossing, so 0 proves it. The arm adds those `crossed` faults; `decideSubmit`
 re-attributes a fault that appeared to the submitted line, so the ring-first order refuses the shape line.
 
-**…or STRUCTURALLY, with no figure at all** ([ADR-AG-261](06c-decisions-analytic.md#adr-ag-261), #1991). The walk's evidence
+**A stated corner is the interior corner** ([ADR-AG-471](06c-decisions-analytic.md#adr-ag-471), #2813). `ringFaultsOf`
+reports a simple ring that seats a STATED corner (`statedCornersAg`: an `angle` constraint of any measure, or a corner
+`perpendicular`, between the vertex's two ring neighbours) against the ring's orientation as the hard `reflex-corner` fault,
+so `drawableAt` never draws it. `ringConvexityProofAg` (rings.ts, 2-D's `ringConvexityProofs` copied) returns the
+constraints whose stated degrees sum to at least (n − 3)·180°, a proof of convex position that `ringOrderFault` reads beside
+the noun (below): the angle lines join the blame and the fault is `ring-contradicts-angles` (`polygon`, `pair`, `declared`).
+
+**…or STRUCTURALLY, with no figure at all** ([ADR-AG-261](06c-decisions-analytic.md#adr-ag-261), #1991; the proof is
+`ringConvexityProofAg` in rings.ts since #2812, [ADR-AG-475](06c-decisions-analytic.md#adr-ag-475): the noun, or ONE CIRCLE
+through every letter — a `circle-thru`'s through points, or an `on-curve` constraint on a circle object for each other letter,
+which is what «מעגל חוסם את ABCD» and a rider «D על המעגל» lower to; rings of four or more; the lines that made the circle
+and its riders join the blame, so the circle line that completes it is the one refused). The walk's evidence
 needs a candidate whose GIVENS hold, and a second ring's own noun can be exactly what cannot hold — «ריבוע ABCD» ·
 «מקבילית ACBD» leaves `forcedCrossed` empty and the crossed ring's `ringDof` at 4, so both arms above are silent and
 «לא נמצאה תצורה» spoke for an order mistake. `derive`'s `ringOrderFault`, computed before the drop-one probe's arms,
@@ -1732,7 +1936,7 @@ choice seed, root) is the one on the screen (#2633).
 
 #### One configuration pool, completed after the render ([ADR-AG-180](06c-decisions-analytic.md#adr-ag-180), #1473)
 
-Every gate reads **`configurationPool(c)`** — seeds 0..23, one per construction. On the page,
+Every gate reads **`configurationPool(c)`** — seeds 0..23, one per construction object a reader holds (a view; the solves behind it are shared by content, [ADR-AG-476](06c-decisions-analytic.md#adr-ag-476)). On the page,
 `configurationPool(d.construction).defer()` makes an unconfirmed value **pending** (`settled(fn)`, `askSettled`,
 «בודק…»), and `app/poolScheduler.ts` completes the pool one seed per macrotask (never `requestIdleCallback`). The perf
 lock counts `evaluateStats.uncached`; `curveFromEquation` is memoised (`__setConicMemo(false)`).
@@ -1947,23 +2151,39 @@ optional envelope field cleaned by `cleanAnnotations`, so an old file loads with
 (re-keyed by `relabelCurveStyle`, now generic over the value). The fold never reads it, so it is never a given or a
 question. A key whose object is gone is kept and ignored. **How the later surfaces plug in:** #1211 adds a `coords`
 facet keyed by a point id and written from the point's click menu; #1121 adds a `line` facet (equation, slope) keyed
-by a line id, drawn BESIDE the name (2026-10-09 answer 4) through the same placement; #1752 adds the focus mark's click
-(naming it), which records a sentence through `decideSubmit` as the centre offer does — the mark itself is this one.
+by a line id, drawn BESIDE the name (2026-10-09 answer 4) through the same placement; #1752's focus click is built
+(#2851, ADR-AG-465, "The focus offer" below) — it records a sentence through `decideSubmit`, so it is no facet.
 Each is a facet, a reader in `cleanAnnotations`, and a projection into `SceneKnowledge`; no store or envelope field.
 
 **The chip.** `app/conicMarks.ts` `conicChips(d, annotations)`: one per STATED parabola or ellipse, on its
-`objectLine` row, in the givens row's `trail` seat after the locus chips; `state` and `next` from
-`CONIC_CYCLE` (none → directrix → focus → both). The label key is `conicChip.<kind>.<next>`. A press is
+`objectLine` row, in the givens row's `trail` seat after the locus chips; `state` and `next` from the kind's cycle
+(#2709, [ADR-AG-466](06c-decisions-analytic.md#adr-ag-466)): a parabola's `CONIC_CYCLE` (none → directrix → focus → both),
+an ellipse's `ELLIPSE_CYCLE` (none → focus). `stateOn` is the ONE read of the map for the chip and the marks: a state
+the kind lacks (a saved `both` / `directrix` on an ellipse) folds to `focus` / `none`; the map is never rewritten. The label key is `conicChip.<kind>.<next>`. A press is
 `setAnnotations(withConic(map, id, next))`: one undo entry, nothing submitted.
 
 **The marks.** `conicMarksOf(d, annotations, hidden)` returns world-space marks from the closed forms
-(`parabolaFocus`, `parabolaDirectrix`, `ellipseFoci`, `ellipseDirectrices` — new, `x = ±a²/c` or `y = ±b²/c`, null
-when a = b). Labels: the book's letter unless a student's point holds it (`F₁` ≡ `F1`), plus `(x, y)` through
+(`parabolaFocus`, `parabolaDirectrix`, `ellipseFoci`; an ellipse draws no directrix, #2709, and `ellipseDirectrices`
+is gone). Labels: the book's letter unless a student's point holds it (`F₁` ≡ `F1`), plus `(x, y)` through
 `fmtAnalytic` only when `knownCurve` holds; a directrix's `roleLineOf` (the panel's `roleLineText`) only when known;
 nothing at all where a student's point stands at the focus. A hidden curve (#2238) draws none. `buildScene` takes them
 as `SceneKnowledge.roleMarks` and returns `scene.roles`: foci as dots, directrices clipped to the view box by
 `polylines`, their labels as requests in the ONE `placeSceneLabels` call (priority 2, after angles and lengths),
 through `lbl`. The frame takes them in: `markAnchors` feeds `drawnBox`'s extra points (a focus; where a directrix crosses its axis). `Figure.tsx` paints them in `analytic-roles`: dashed 1.25px directrices, blue dots, ink labels.
+
+**The focus offer** ([ADR-AG-465](06c-decisions-analytic.md#adr-ag-465), #2851). A shown focus mark no student point stands on
+carries `offer: { id: 'focus:<k>:<curve>', letter, title }`; `focusSentenceOf(d, id, letter)` composes its sentence
+(«<letter> מוקד הפרבולה», «<letter> מוקד <side> של האליפסה», words from `parser/conicRoleWords.ts`, the side read against
+the ellipse's centre), null when stale or when two curves of that kind make «האליפסה» ambiguous. `buildScene` passes the
+offer through `roles.foci`; `Figure.tsx` draws the `OFFER_RING` (the crossing / centre offer's dashed ring, one constant) around each offered focus (`analytic-focus-offers`,
+`data-noexport`, under the points) when `onFocus` is given. `App.tsx` opens `LetterPopover` with `initialValue` =
+the letter; the decision runs in the analytic worker like the centre's (#2890: the letter op's `focusName` / `focusSwap`
+requests, `opsAn.letter`, applied on the page by `applyCentreName` / `applyCentreSwap`). `decideFocusName` / `decideFocusSwap`
+(`app/centreName.ts`; `focusPopoverOps` is their in-process pair for the locks) run the centre's decision with this composer — `normalizePointName`,
+`nameInUse` + holder, `decideSubmit`, `commitRecord` — and its swap is the centre's (`decideOfferSwap`: record under the
+automatic letter, then `decideSwap`), with `label` = that automatic letter. `rename.ts`'s `tokenRe` matches an indexed
+id in every spelling (`F₁` · `F1` · `F_1` · `F_{1}`) and `keyOf` maps the occurrence back to the id, so a letter typed «F1»
+renames and swaps (found in round #2855).
 
 **The circle case.** `isCircleShaped(c, id)` — `(a − b)/max(1, a, b)` read through `isKnowledge`, zero in every
 configuration. Such an ellipse has no chip and no marks; `SceneKnowledge.circleShaped` gives it a circle's centre cross
@@ -2024,7 +2244,13 @@ envelope and the persist trigger. A curve click resolves through `app/curveDispl
 conic, `solid` / `none` for a circle (a hidden circle also drops its centre cross). A letter change re-keys it by POSITION
 (`relabelCurveStyle(style, before, after)` over the two derivations' drawn curves), because a curve id may carry letters or a hash.
 
-*Identifiers:* `serialize` · `{hidden?, dashed?}` · `shell` · `cleanSegDisplay` · `knows.segStyle` · `SceneSegment` · `key` · `ink` · `solid` · `dashed` · `ghost` · `measurablesOf` · `centreOf` · `onCentre(offerId, screen)` · `onCrossing` · `nameInUse` · `centreSentenceOf(figure, offerId, letter)` · `centreLabelOf` · `label` · `decideSwap(auto, taken)`
+**What a hidden segment takes** ([ADR-AG-474](06c-decisions-analytic.md#adr-ag-474), #2852). `buildScene` reads the scene
+into `shell`'s `hiddenWith`: ghost segments, `stated.lengths`, `stated.rights`, `stated.equalLengths`, and the points every
+other stated mark touches. A ghost carries no label, the stated layer is drawn from what is left, and a lone point (and
+its dashed extension) is not drawn. `app/hideOwnership.ts` decides the lone points (`lonePoints`: minted, used by no other
+line, built into nothing but a segment or polygon) and the rows that show «מוסתר» (`hiddenRowLines`).
+
+*Identifiers:* `serialize` · `{hidden?, dashed?}` · `shell` · `cleanSegDisplay` · `knows.segStyle` · `knows.lonePoints` · `hiddenWith` · `hiddenRowLines` · `SceneSegment` · `key` · `ink` · `solid` · `dashed` · `ghost` · `measurablesOf` · `centreOf` · `onCentre(offerId, screen)` · `onCrossing` · `nameInUse` · `centreSentenceOf(figure, offerId, letter)` · `centreLabelOf` · `label` · `decideSwap(auto, taken)`
 
 ## The app: submit, ask, locus
 
@@ -2246,7 +2472,7 @@ range tail read here only when it is selectors (any other tail is the condition 
 
 #### The way in: the chip and the guide row ([ADR-AG-352](06c-decisions-analytic.md#adr-ag-352), #1177; the only way in since [ADR-AG-381](06c-decisions-analytic.md#adr-ag-381), #2673)
 
-`locusChips(d)` (`app/locusChip.ts`) returns one chip per figure point for which the engine's `hasLocus` holds at `d.seed`, started from `drawableAt`'s free positions (`locusOf`'s start). It sits on the line `Construction.objectLine` names — #1687's line provenance (ADR-AG-348), the fold's per-object attribution (the first commit whose construction holds the id, mapped to its line); one record serves the solve's fit and the chip (ADR-AG-352 Am. 1). The chip carries the sentence «המקום הגיאומטרי של X». `App.tsx` renders it in `FactRow.trail`; a click is `pressChip` (`app/answers.ts`), the measure menu's ADR-AG-067 lifetime (`toggleDrawn`) over a record marked `AskedQuestion.via: 'chip'`, and its label follows `chipState` (`'off' | 'drawn' | 'hidden'`; a later state is a new member and a new arm). A record is identified by its sentence AND its `via` (`isQuery`), so the chip's question and the same words typed are two rows. The page answers a record by `askSettled(d, sentence, fmt, kindWord, q.via)`, and `askOne`'s one gate, where `LOCUS_OF` has matched and before the name is looked up, answers every record not `via: 'chip'` with `Answer.chipOnly`, worded `askLocusByChip` (the chip named by `locusChipShow`). `askLocus(d, id, …)` (`app/locusChip.ts`) is the chip's entry point for tests and corpus checks. A chip-only whole is split like a `missing` one (`splitAsk`), so a conjoined question keeps its other parts. The guide's locus row is `lane: 'chip'` in category `locus`: its example is the chip's label, its description (`guideLocusChip`) its `needs` and its `point`, and it has no «try». The construction lane is `!e.lane` in every consumer: the LLM vocabulary, the parse and build guards, and the corpus. The one-line point is arm 4 of the lost-part refusal (`declinedPointProperty`): taught only when both parts record.
+`locusChips(d)` (`app/locusChip.ts`) returns one chip per figure point for which the engine's `hasLocus` holds at `d.seed`, started from `drawableAt`'s free positions (`locusOf`'s start), and `onFixedCarrier` does not ([ADR-AG-472](06c-decisions-analytic.md#adr-ag-472), #2849): a point stated on a carrier that holds still (`on-curve`, `on-line`, `on-line-2pt`) has that carrier for its locus, already drawn. `onFixedCarrier` (`engine/locus.ts`) reads the point's part (`locusPartAt`) with the parameters fixed, as `hasLocus` does; the carrier holds still when no point it is built from (`inputsOf`) moves along any free direction of the part (`jacobianRank`'s null basis, central differences, `MOVES`). The chip is decided in that one loop; the ask answers a chip's record and never re-decides it. It sits on the line `Construction.objectLine` names — #1687's line provenance (ADR-AG-348), the fold's per-object attribution (the first commit whose construction holds the id, mapped to its line); one record serves the solve's fit and the chip (ADR-AG-352 Am. 1). The chip carries the sentence «המקום הגיאומטרי של X». `App.tsx` renders it in `FactRow.trail`; a click is `pressChip` (`app/answers.ts`), the measure menu's ADR-AG-067 lifetime (`toggleDrawn`) over a record marked `AskedQuestion.via: 'chip'`, and its label follows `chipState` (`'off' | 'drawn' | 'hidden'`; a later state is a new member and a new arm). A record is identified by its sentence AND its `via` (`isQuery`), so the chip's question and the same words typed are two rows. The page answers a record by `askSettled(d, sentence, fmt, kindWord, q.via)`, and `askOne`'s one gate, where `LOCUS_OF` has matched and before the name is looked up, answers every record not `via: 'chip'` with `Answer.chipOnly`, worded `askLocusByChip` (the chip named by `locusChipShow`). `askLocus(d, id, …)` (`app/locusChip.ts`) is the chip's entry point for tests and corpus checks. A chip-only whole is split like a `missing` one (`splitAsk`), so a conjoined question keeps its other parts. The guide's locus row is `lane: 'chip'` in category `locus`: its example is the chip's label, its description (`guideLocusChip`) its `needs` and its `point`, and it has no «try». The construction lane is `!e.lane` in every consumer: the LLM vocabulary, the parse and build guards, and the corpus. The one-line point is arm 4 of the lost-part refusal (`declinedPointProperty`): taught only when both parts record.
 
 *Identifiers:* `locusChips` · `objectLine` · `declinedPointProperty` · `pressChip` · `chipState` · `askLocus` · `lane: 'chip'`
 

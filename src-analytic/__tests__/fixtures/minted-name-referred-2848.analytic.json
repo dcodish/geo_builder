@@ -1,0 +1,11 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "x^2+4y^2=4",
+    "נתונה הנקודה (k-1, k-2)",
+    "P1 על האליפסה"
+  ],
+  "seed": 0,
+  "name": "#2848 — the student types the minted name back: one point P₁ on the ellipse"
+}

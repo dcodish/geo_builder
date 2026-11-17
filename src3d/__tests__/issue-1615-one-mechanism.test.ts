@@ -31,7 +31,7 @@ function build(lines: readonly string[]): St {
 
 const verdict = (st: St, line: string) => {
   const v = decideSubmit3(st, line);
-  return v.kind === 'refused' ? v.error.code : v.kind;
+  return v.kind === 'refused' ? v.error.code : v.kind === 'record' && v.held ? 'held' : v.kind;
 };
 
 /** The point at every verification seed, rounded to 9 places. */
@@ -99,7 +99,7 @@ describe('#1615 — the placement carries the figure with it', () => {
     const v = decideSubmit3(build(LINE), 'P(3,0,0)');
     if (v.kind !== 'record') throw new Error('setup');
     const st = { facts: v.facts, seed: v.seed };
-    expect(verdict(st, 'P(3,0,0)')).toBe('already-stated');
+    expect(verdict(st, 'P(3,0,0)')).toBe('held');
     expect(verdict(st, 'P(4,0,0)')).toBe('claim-refuted');
   });
 });

@@ -10,7 +10,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { runViewResolve, type ResolveViewDeps, type ViewResolveFound } from '../resolveView';
 import { deserializeFigure } from '@/store/figureFile';
-import { findValidConfig, groupKey, meetsRequirements, replay } from '@/replay/core';
+import { findValidConfigRound, groupKey, meetsRequirements, replay } from '@/replay/core';
+import { isNotDecided } from '../../../shell/notDecided';
 import { useGeoStore, type Fact } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
 import { buildParseCtx, parse } from '@/parser';
@@ -86,14 +87,23 @@ describe("#572 — the operator's saved collapse file, through the real load + s
       seed,
       meetsRequirements,
       // the worker's own semantics, run synchronously (ADR-290's search is pure)
-      autoResolve: async (f, s) => {
+      autoResolve: async (f, s, round) => {
         if (meetsRequirements(f, s)) return 'ok';
-        const found = findValidConfig(f, 0);
+        const found = findValidConfigRound(f, 0, round); // #2893 (ADR-831): the three outcomes, as the worker answers
+        if (isNotDecided(found)) return found;
         return found ? { ...found, fold: null, basis: { facts: f, seed: s } } : null;
       },
       applyView: (f) => applied.push(f),
+      // #2893: a round that reached the limit asks; the student presses «המשיכו לחפש», which runs the next round
+      onNotDecided: (round) => void (next = round),
     });
+    let next: number | null = null;
     await runViewResolve(deps);
+    while (next !== null && applied.length === 0) {
+      const round: number = next;
+      next = null;
+      await runViewResolve(deps, round);
+    }
     expect(applied, 'the load-path rescue applies a valid view').toHaveLength(1);
     const fig = replay(applied[0].facts as Fact[], applied[0].seed);
     const at = (id: string) => fig.positions.get(id)!;

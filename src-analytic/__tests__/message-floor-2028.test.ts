@@ -16,6 +16,12 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'not-handled': [{}],
   'name-taken': [{ detail: '∠ABC = 40°', nameOf: 'ABC', nameKind: 'angle' }, { detail: 'AB = 3', nameOf: 'AB', nameKind: 'length' }],
   'measure-contradicts': [{ detail: '∠ABC = 40°', what: '∠ABC = 40°' }],
+  'lengths-impossible': [
+    { detail: 'AC = 10', others: ['AB = 3', 'BC = 4'], why: { kind: 'triangle', tri: 'ABC', long: 'AC', longLen: 10, a: 'AB', b: 'BC', sum: 7 } },
+    { detail: 'AC = 10', others: [], why: { kind: 'triangle', tri: 'ABC', long: 'AC', longLen: 10, a: 'AB', b: 'BC', sum: 7 } },
+    { detail: 'BC = 4', others: ['ריבוע ABCD', 'AB = 3'], why: { kind: 'value', seg: 'BC', a: 3, b: 4 } },
+    { detail: 'BC = 4', others: [], why: { kind: 'value', seg: 'BC', a: 3, b: 4 } },
+  ], // #2894 (ADR-AG-483)
   'radius-contradicts': [{ detail: 'מעגל O ברדיוס 4', declared: 'מעגל O ברדיוס 3' }, { detail: 'מעגל O ברדיוס 4' }], // #2119 (ADR-684)
   'no-common-tangent': [{ detail: 'כל המשיקים המשותפים לשני המעגלים' }], // #2390 (ADR-AG-314)
   'radius-letter-taken': [
@@ -33,7 +39,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'arc-length-unread': [{ detail: 'AB' }], // #2032 (ADR-AG-408)
   'parabola-no-diameter': [{ detail: 'AB' }], // #2625 (ADR-AG-454)
   'not-canonical': [{ detail: 'פרבולה קנונית (y - 1)^2 = 4(x - 2)', line: '(y - 1)^2 = 4(x - 2)', curve: 'parabola' }, { detail: 'אליפסה קנונית (x - 3)^2/25 + y^2/9 = 1', line: '(x - 3)^2/25 + y^2/9 = 1', curve: 'ellipse' }], // #2664 (ADR-AG-455)
-  'parabola-no-centre': [{ detail: 'O מרכז הפרבולה' }], // #2625 (ADR-AG-454 Am. 1)
+  'parabola-no-centre': [{ detail: 'O מרכז הפרבולה', name: 'O' }, { detail: 'מרכז הפרבולה' }], // #2625 (ADR-AG-454 Am. 1), #2835 (ADR-AG-470)
   'unread-name': [{}],
   'unread-word': [{}],
   'mixed-number': [{ detail: '2', decimal: '45', sum: '30', product: '2' }, { detail: '2', sum: '30', product: '2' }],
@@ -70,6 +76,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'kind-mismatch': [{ existing: 'curve:circle', expected: 'parabola' }],
   'does-not-exist': [{ existing: 'curve:circle' }],
   'ring-contradicts-noun': [{}],
+  'ring-contradicts-angles': [{ polygon: 'ABCD', pair: 'ABDC', declared: '«∠DAB = 70°», «∠BCD = 110°»' }],
   'polygon-collapsed': [{ polygon: 'ABC', shape: 'משולש', declared: 'משולש ABC' }],
   'inscribed-contradicts-noun': [{ shape: 'טרפז ישר זווית', forced: 'מלבן' }],
   'inscribed-contradicts-declared': [{ shape: 'טרפז ישר זווית', forced: 'מלבן', declared: 'משולש ABC' }],

@@ -1,0 +1,67 @@
+{
+  "name": "feat-2894-a2-3d",
+  "title": "#2894 part 2 A, rebuilt on #2907 — 3-D: heavy figures settle sooner, and a value the givens fix is shown (PR, port 5204)",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5204",
+      "path": "/3d.html",
+      "title": "3-D: a point slid along a side to a stated length draws much sooner",
+      "lines": ["משולש ABC", "D על AB", "AD = 3"],
+      "lookFor": "Start from «נקה הכל». After «AD = 3» the figure is drawn, D on AB with AD = 3, noticeably sooner than on prod (timed in the PR). Nothing is refused; three rows.",
+      "before": "prod draws the same figure, but «AD = 3» takes about three times as long (timed in the PR).",
+      "expectRows": ["משולש ABC", "D על AB", "AD = 3"]
+    },
+    {
+      "id": "T2",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5204",
+      "path": "/3d.html",
+      "title": "3-D: a vector from a known point gives its head's coordinates",
+      "lines": ["A(0,0,0)", "AB = (1,2,3)"],
+      "lookFor": "The data panel lists «B(1, 2, 3)».",
+      "before": "prod lists no row for B: its coordinates are withheld although A and AB fix them.",
+      "expect": ["B(1, 2, 3)"]
+    },
+    {
+      "id": "T3",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5204",
+      "path": "/3d.html",
+      "title": "3-D: asking for that head answers it",
+      "lines": ["A(0,0,0)", "AB = (1,2,3)"],
+      "asks": ["B"],
+      "lookFor": "The question «B» answers «(1, 2, 3)».",
+      "before": "prod answers that B is not determined.",
+      "expect": ["(1, 2, 3)"]
+    },
+    {
+      "id": "T4",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5204",
+      "path": "/3d.html",
+      "title": "3-D: a cube that may stand on either side of its base plane does not claim a side",
+      "lines": ["קובייה ABCDA'B'C'D'", "A(0,0,0)", "AB=(2,0,0)", "מישור ABCD", "מישור ABCD מקביל למישור xy"],
+      "lookFor": "The data panel lists «A'(0, 0, ?)»: the cube may stand above or below z = 0.",
+      "before": "unchanged",
+      "expect": ["A'(0, 0, ?)"]
+    },
+    {
+      "id": "T5",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5204",
+      "path": "/3d.html",
+      "title": "3-D: the exam cube's answer is still accepted (a double root the speed-up must leave alone)",
+      "lines": ["קובייה ABCD", "נסמן: AB = u, AD = v, AA' = w", "D(0,0,0)", "C(4,3,0)", "A(3,n,p)", "שיעור ה-z של C' חיובי", "A = (3, -4, 0)"],
+      "lookFor": "Every line builds; «A = (3, -4, 0)» is accepted as its own row.",
+      "before": "unchanged",
+      "expectRows": ["A = (3, -4, 0)"]
+    }
+  ]
+}

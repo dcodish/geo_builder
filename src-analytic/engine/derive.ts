@@ -6,10 +6,11 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
+import { explainLengths, type LengthsWhy } from './metricBounds';
 import { centreIdOf, circleByName, commonTouchOf, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
-import { collapsedByGivens, completingStatement, pairsMetByGivens, partnerStatement, crossingHasNoPoint, curveAtOf, drawableAt, drawnConfiguration, hardRingFaults, holdsOn, lineCompareNoSide, seedNumber, viewBox, type Configuration, type Figure, type Seed } from './evaluate';
+import { adoptAsks, configurationKey, recordAsks, collapsedByGivens, completingStatement, pairsMetByGivens, partnerStatement, crossingHasNoPoint, curveAtOf, drawableAt, drawnConfiguration, hardRingFaults, holdsOn, lineCompareNoSide, seedNumber, viewBox, type Configuration, type Figure, type Seed } from './evaluate';
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure, type SideWord } from '../parser/parseAnalytic';
@@ -22,14 +23,20 @@ import { SOLVE_RESOLUTION, sameConstraint, type Constraint } from './solve';
 import { assignmentAt, flattenPicked } from './discreteAxes';
 import { followObjects } from './roles';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
-import { convexWhenSimple, shapeRow } from './shapes';
+import { shapeRow } from './shapes';
+import { ringConvexityProofAg } from './rings';
 import { POINT_NAME } from './pointName';
 import type { CevianHost } from '../../shell/cevianHost';
+import { BoundedStore, clearContentCaches, viewOf } from './content';
+import { workLane } from '../../shell/workMeter';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 export interface LineFault {
   index: number;
-  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'not-canonical' | 'third-crossing' | 'tangent-no-second-crossing' | 'forced-collinear';
+  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'not-canonical' | 'third-crossing' | 'tangent-no-second-crossing' | 'forced-collinear' | 'lengths-impossible';
+  /** #2894 (ADR-AG-483): a `lengths-impossible` refusal — the other lines whose lengths take part, and the reason. */
+  others?: string[];
+  why?: LengthsWhy;
   detail: string;
   /** For a name clash: what the name already holds, as a token the locale renders (#1046). */
   existing?: ApplyError['existing'];
@@ -112,6 +119,15 @@ function twiceMet(kind: string | null): SecondCrossingCurve | null {
  * the row is honest.
  */
 export type LineOutcome = 'created' | 'known' | 'narrowed' | 'faulted';
+
+/**
+ * THE CONSTRUCTION A DERIVATION'S FIGURE WAS DRAWN FROM (#2831, ADR-AG-473): `derive` draws `drawableAt(c, at, true)` of
+ * the folded construction, while `construction` carries the objects as the drawn configuration letters them. A caller
+ * that walks other configurations of the same lines («הציגו תצורה אחרת»'s solution cycle) draws them from this one, so
+ * each is exactly what `derive(lines, seed)` would draw, without folding the lines again per seed.
+ */
+const drawnFrom = new WeakMap<Derivation, Construction>();
+export const drawingConstructionOf = (d: Derivation): Construction | undefined => drawnFrom.get(d);
 
 export interface Derivation {
   construction: Construction;
@@ -214,8 +230,155 @@ export function derive(
   seedNames: Readonly<Record<string, string>> = {},
   pins: Readonly<Record<number, readonly string[]>> = {},
 ): Derivation {
-  /** #2039 (ADR-AG-358): `at` is a seed or a configuration a walk landed on; `seed` is its number. */
-  const seed = seedNumber(at);
+  const listKey = lineListKey(lines, seedNames, pins);
+  touched?.add(listKey);
+  const key = configurationKey(at);
+  const lineLists = storeOfLane();
+  let list = lineLists.get(listKey);
+  let hit = list?.derivations.get(key);
+  if (!hit) {
+    // A line list asked for more configurations than its bound starts again: its solves go with the old entry.
+    if (!list || list.derivations.size >= CONFIGURATIONS_MAX) {
+      list = { front: foldLines(lines, seedNames, pins), derivations: new Map(), shown: new Map() };
+      lineLists.set(listKey, list);
+    }
+    const mine = list;
+    const { value, askedOf } = recordAsks(() => deriveAt(mine, lines, at, pins));
+    // What the body asked of the construction it returns is what a reader of the derivation starts from.
+    hit = { derivation: shared(value), asked: askedOf(value.construction) };
+    mine.derivations.set(key, hit);
+  }
+  const construction = viewOf(hit.derivation.construction);
+  adoptAsks(construction, hit.asked);
+  return { ...hit.derivation, construction };
+}
+
+/**
+ * COMPUTE ONCE (#2888, [ADR-AG-476](../../docs/06c-decisions-analytic.md#adr-ag-476); ADR-W-210 invariant 4) — `derive` is a
+ * pure function of `(lines, seed names, pins)` and the configuration asked for, and it is remembered as one.
+ *
+ * - **One construction per line list.** The fold does not depend on the configuration, so a line list is parsed and folded
+ *   once ({@link foldLines}) and every configuration of it is solved on that one construction. Every solver memo hangs off
+ *   it (`content.ts`), so the decision of a submit, the re-render after it, each step of «הציגו תצורה אחרת», an edit and an
+ *   undo all read one set of solves.
+ * - **One derivation per (line list, configuration).** The fault attribution, the stated measures and the drawn
+ *   configuration are remembered too; a second `derive` of the same input is a lookup.
+ * - **What a caller gets is its own.** The derivation object and its `construction` are fresh per call (a VIEW of the
+ *   shared content, `viewOf`), so the page's pool mode and React's identity checks behave as they always did; the lists
+ *   inside are shared and frozen, as `conic.ts` freezes what it shares.
+ *
+ * THE BOUND. At most {@link LINE_LISTS_MAX} line lists, least recently used first; a line list asked for more than
+ * {@link CONFIGURATIONS_MAX} configurations is folded again and starts cold. Dropping a line list frees every solve that
+ * hangs off its construction. Nothing here reads a clock.
+ */
+export const LINE_LISTS_MAX = 64;
+export const CONFIGURATIONS_MAX = 96;
+
+/** What a line list folds to: everything `derive` computes before a configuration is asked for. */
+interface FoldedLines {
+  facts: Fact[];
+  owner: number[];
+  /** The parse refusals; the fold's and the figure's are added per configuration. */
+  faults: LineFault[];
+  minted: Array<{ index: number; id: string }>;
+  /** The facts that offered the canonical circle's centre letter (`nameCanonicalCentres`). */
+  offered: number[];
+  folded: ReturnType<typeof fold>;
+  /** The folded construction, with the session's seed names: the CONTENT every configuration is solved on. */
+  construction: Construction;
+}
+export interface LineList {
+  front: FoldedLines;
+  /** Per configuration (`configurationKey`): the derivation, and what its body asked of the construction it returns. */
+  derivations: Map<string, { derivation: Derivation; asked: string[] }>;
+  /** The construction as each configuration letters it (`followObjects`), one object per lettering. */
+  shown: Map<string, Construction>;
+}
+/**
+ * ONE STORE PER LANE (#2890, [ADR-AG-477](../../docs/06c-decisions-analytic.md#adr-ag-477); ADR-W-210 phase 3). The store
+ * is the one cache of this tree that is reached by a STRING, so it is the one place where two heaps could meet: every
+ * solver memo hangs off a construction object, and a construction is reachable only through here. A browser's page and
+ * its worker are two module instances and each has its own store. Under node they are one module instance, so the store
+ * is chosen by the work meter's lane (`shell/workMeter.ts`): work run through `inWorkerLane` reads and writes the
+ * worker's, everything else the page's. Nothing reaches the page's store from the worker's except what `settle.ts`
+ * adopts from a clone, which is exactly what a browser does. Outside `inWorkerLane` this is the single store it was.
+ */
+const stores: Record<'page' | 'worker', BoundedStore<LineList>> = {
+  page: new BoundedStore<LineList>(LINE_LISTS_MAX),
+  worker: new BoundedStore<LineList>(LINE_LISTS_MAX),
+};
+const storeOfLane = (): BoundedStore<LineList> => stores[workLane()];
+
+/** How many line lists this lane's store holds now (test-visible: the bound's lock reads it). */
+export function heldLineLists(): number {
+  return storeOfLane().size;
+}
+
+/** The keys of the line lists this lane's store holds, least recently used first (what a reseed hands back). */
+export function heldLineListKeys(): string[] {
+  return storeOfLane().keys();
+}
+
+/** The store's entry for a key, as it is (`settle.ts` reads it; a read here is not a use and refreshes nothing). */
+export function lineListOf(key: string): LineList | undefined {
+  return storeOfLane().peek(key);
+}
+
+/**
+ * Install a line list that another heap computed (`settle.ts` `adoptSettled`), under the key that heap kept it by. Its
+ * derivations are shared by every caller from here on, so they are frozen again: a clone is not.
+ */
+export function adoptLineList(key: string, list: LineList): void {
+  for (const hit of list.derivations.values()) shared(hit.derivation);
+  storeOfLane().set(key, list);
+}
+
+/** The line lists `derive` is being asked for, while {@link touchedLineLists} listens. */
+let touched: Set<string> | null = null;
+
+/**
+ * Run `fn` and report the keys of the line lists `derive` was asked for meanwhile, in this lane: what a settled result
+ * of that work has to carry. Re-entrant; an inner listener's keys are the outer one's too.
+ */
+export function touchedLineLists<T>(fn: () => T): { value: T; keys: string[] } {
+  const outer = touched;
+  const mine = new Set<string>();
+  touched = mine;
+  try {
+    return { value: fn(), keys: [...mine] };
+  } finally {
+    touched = outer;
+    if (outer) for (const key of mine) outer.add(key);
+  }
+}
+
+/**
+ * EMPTY EVERY CONTENT-KEYED CACHE OF THIS TREE — test-only (2-D's `clearReplayCaches`): the line-list store and every
+ * solver memo that hangs off a construction. The work meter's walk calls it where a student's session starts.
+ */
+export function clearAnalyticCaches(): void {
+  clearContentCaches();
+}
+
+export const lineListKey = (lines: readonly string[], seedNames: Readonly<Record<string, string>>, pins: Readonly<Record<number, readonly string[]>>): string =>
+  JSON.stringify([
+    lines,
+    Object.keys(seedNames).sort().map((k) => [k, seedNames[k]]),
+    Object.keys(pins).sort().map((k) => [k, pins[Number(k)]]),
+  ]);
+
+/** A derivation's lists are shared by every caller that asks for it: frozen, so a write throws instead of corrupting. */
+function shared(d: Derivation): Derivation {
+  for (const list of [d.lines, d.faults, d.outcomes, d.minted, d.created, d.createdCircles, d.hosts, d.notices, d.constraintLine, d.selectorLine]) if (list) Object.freeze(list);
+  return Object.freeze(d);
+}
+
+/** Lines → construction: parse, resolve the tool's letters and mints, fold. Pure over `(lines, seedNames, pins)`. */
+function foldLines(
+  lines: readonly string[],
+  seedNames: Readonly<Record<string, string>>,
+  pins: Readonly<Record<number, readonly string[]>>,
+): FoldedLines {
   const facts: Fact[] = [];
   const faults: LineFault[] = [];
   /** Which line produced each fact, so an apply refusal can be blamed on the right one. */
@@ -246,8 +409,37 @@ export function derive(
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
-  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices, created: factCreated, createdCircles: factCircles, hosts: factHosts } = fold(facts, owner);
-  const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded, seedNames: { ...seedNames } } : folded;
+  const folded = fold(facts, owner);
+  const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded.construction, seedNames: { ...seedNames } } : folded.construction;
+  return { facts, owner, faults, minted, offered: centred.offered, folded, construction };
+}
+
+/** The construction with its objects re-lettered — the same object for the same lettering of one line list. */
+function letteredAs(list: LineList, construction: Construction, objects: Construction['objects']): Construction {
+  const key = JSON.stringify(objects);
+  let hit = list.shown.get(key);
+  if (!hit) {
+    hit = { ...construction, objects };
+    list.shown.set(key, hit);
+  }
+  return hit;
+}
+
+/** One configuration of a folded line list: the figure, and every refusal, notice and measure read off it. */
+function deriveAt(
+  list: LineList,
+  lines: readonly string[],
+  at: Seed,
+  pins: Readonly<Record<number, readonly string[]>>,
+): Derivation {
+  /** #2039 (ADR-AG-358): `at` is a seed or a configuration a walk landed on; `seed` is its number. */
+  const seed = seedNumber(at);
+  const { facts, owner, construction } = list.front;
+  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices, created: factCreated, createdCircles: factCircles, hosts: factHosts } = list.front.folded;
+  // The line list's own records are shared by every configuration of it: this configuration's are copies.
+  const faults: LineFault[] = [...list.front.faults];
+  const minted = [...list.front.minted];
+  const centred = { offered: list.front.offered };
   // A tool letter whose point the fold did not create — the cevian ran to a point the figure already named the same
   // way (ADR-AG-211), or its line was refused — named nothing, and the row must not claim it did (#1263's rule).
   const present = new Set(construction.objects.map((o) => o.id));
@@ -377,29 +569,84 @@ export function derive(
    * Blamed on the LATEST of the two declarations — the line that completed the contradiction — and it SILENCES the
    * given-attribution arms below, on ADR-AG-240's rule: when one statement is named, the givens that fail in the
    * compromise configuration are that contradiction read twice, not a second culprit.
+   *
+   * #2812 ([ADR-AG-475](../../docs/06c-decisions-analytic.md#adr-ag-475)) — the proof is `ringConvexityProofAg`, with a
+   * second sufficient reason: ONE CIRCLE THROUGH EVERY LETTER (a circumscribed circle, or points stated on one circle).
+   * Rings of four letters or more. The lines that stated the circle join the blame, so the circle line that completes the
+   * contradiction («מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC») is the one refused.
    */
   const ringOrderFault: LineFault | null = (() => {
     const declaredAt = new Map<string, number>();
     facts.forEach((f, i) => {
       if (f.t === 'polygon' && !errors[i] && !declaredAt.has(f.id)) declaredAt.set(f.id, owner[i]);
     });
-    const byLetters = new Map<string, { id: string; convex: boolean }[]>();
+    const byLetters = new Map<string, { id: string; proof: ReturnType<typeof ringConvexityProofAg> }[]>();
     for (const o of construction.objects) {
-      if (o.kind !== 'polygon' || o.vertices.length !== 4 || !declaredAt.has(o.id)) continue;
+      if (o.kind !== 'polygon' || o.vertices.length < 4 || !declaredAt.has(o.id)) continue;
       const key = [...o.vertices].sort().join('');
-      byLetters.set(key, [...(byLetters.get(key) ?? []), { id: o.id, convex: convexWhenSimple(o.noun) }]);
+      byLetters.set(key, [...(byLetters.get(key) ?? []), { id: o.id, proof: ringConvexityProofAg(construction, o) }]);
     }
+    /** The lines a proof rests on: the line that made each circle, and the owner of each constraint it reads. */
+    const proofLines = (p: NonNullable<ReturnType<typeof ringConvexityProofAg>>): number[] => [
+      ...p.objects.flatMap((id) => {
+        const i = facts.findIndex((top) => factsWithin(top).some((g) => namesObject(g) && g.id === id));
+        return i >= 0 ? [owner[i]] : [];
+      }),
+      ...p.constraints.flatMap((k) => (constraintFact[k] === undefined ? [] : [owner[constraintFact[k]]])),
+    ];
     for (const group of byLetters.values()) {
-      if (group.length < 2 || !group.some((g) => g.convex)) continue;
-      const at = Math.max(...group.map((g) => declaredAt.get(g.id)!));
+      if (group.length < 2 || !group.some((g) => g.proof)) continue;
+      const at = Math.max(...group.map((g) => declaredAt.get(g.id)!), ...group.flatMap((g) => (g.proof ? proofLines(g.proof) : [])));
       if (faults.some((f) => f.index === at)) return null; // a truer message is already on that line
+      /**
+       * #2813 ([ADR-AG-471](../../docs/06c-decisions-analytic.md#adr-ag-471)): proved by its STATED INTERIOR ANGLES only —
+       * the refusal names the angle lines (operator ruling 2026-11-10) with his next step of 2026-11-12, 2-D's text.
+       */
+      if (!group.some((g) => g.proof && g.proof.reason !== 'angles')) {
+        const proved = group.find((g) => g.proof)!;
+        const other = group.find((g) => g !== proved)!;
+        const ring = (id: string) => { const o = objectById(construction, id); return o && o.kind === 'polygon' ? o.vertices.join('') : ''; };
+        const angleLines = [...new Set(proofLines(proved.proof!))].sort((a, b) => a - b);
+        return {
+          index: at,
+          code: 'ring-contradicts-angles' as const,
+          detail: lines[at],
+          polygon: ring(proved.id),
+          pair: ring(other.id),
+          declared: angleLines.map((i) => `«${lines[i].trim()}»`).join(', '),
+        };
+      }
       return { index: at, code: 'ring-contradicts-noun' as const, detail: lines[at] };
     }
     return null;
   })();
   if (ringOrderFault) faults.push(ringOrderFault);
   const groupOfConstraint = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
-  const completing = figure.unsatisfied.length > 0 ? completingStatement(construction, groupOfConstraint, seed, pinnedBy) : null;
+  /**
+   * STATED LENGTHS NO FIGURE CAN HAVE (#2894 part 2 C, [ADR-AG-483](../../docs/06c-decisions-analytic.md#adr-ag-483); 3-D's
+   * ADR-3D-495, its sentence). `evaluate` skipped the solve for them (`metricConflict`): the refusal says which lengths and
+   * why, on the newest line among the rows that fix them, naming the others. It stands in for the drop-one probe's blame,
+   * which it agrees with by construction (removing the newest of those rows removes the conflict).
+   */
+  // the reason chosen as 2-D chooses it (ADR-AG-483 Am. 1): the newest line's own lengths are tried first
+  const newestLine = Math.max(-1, ...groupOfConstraint);
+  const newestRows = new Set(groupOfConstraint.flatMap((g, r) => (g === newestLine ? [r] : [])));
+  const metric = figure.unsatisfied.length > 0 && !ringOrderFault ? explainLengths(construction.constraints, newestRows) : null;
+  const metricLines = metric ? [...new Set(metric.rows.map((r) => groupOfConstraint[r]).filter((g) => g >= 0))].sort((a, b) => a - b) : [];
+  const lengthsFault: LineFault | null =
+    metric && metricLines.length > 0 && !faults.some((f) => f.index === metricLines[metricLines.length - 1])
+      ? (() => {
+          const index = metricLines[metricLines.length - 1];
+          const others = metricLines.slice(0, -1).map((i) => lines[i]);
+          if (metric.kind === 'value') {
+            return { index, code: 'lengths-impossible' as const, detail: lines[index], others, why: { kind: 'value' as const, seg: metric.seg.join(''), a: metric.forced, b: metric.stated } };
+          }
+          const [a, b] = [[metric.p, metric.q], [metric.q, metric.r], [metric.p, metric.r]].filter(([x, y]) => !(metric.long.includes(x) && metric.long.includes(y))).map((q) => q.join(''));
+          return { index, code: 'lengths-impossible' as const, detail: lines[index], others, why: { kind: 'triangle' as const, tri: [metric.p, metric.q, metric.r].join(''), long: metric.long.join(''), longLen: metric.longLen, a, b, sum: metric.sum } };
+        })()
+      : null;
+  if (lengthsFault) faults.push(lengthsFault);
+  const completing = lengthsFault ? lengthsFault.index : figure.unsatisfied.length > 0 ? completingStatement(construction, groupOfConstraint, seed, pinnedBy) : null;
   /**
    * ONE BLAME MECHANISM FOR THE WHOLE ADMISSION VERDICT (#1699, ADR-AG-240). The probe's answer is a statement whose
    * removal ADMITS a figure — every given holds, every selector holds, the ring is the noun's (`admittedFigure`). So when
@@ -531,7 +778,7 @@ export function derive(
    * so. «לא נמצאה תצורה» would tell the student the search missed, when the givens themselves are what flatten it.
    * A given that cannot hold even flat («AC = 8.1» on 5 and 3) leaves no such evidence and keeps the search's words.
    */
-  const flattened = !ringOrderFault && completing !== null ? collapsedByGivens(construction, seed) : [];
+  const flattened = !ringOrderFault && !lengthsFault && completing !== null ? collapsedByGivens(construction, at) : [];
   const flatFault = flattened.length > 0 ? collapseFault(completing!, flattened[0]) : null;
   /**
    * THE GIVENS HOLD ONLY WHERE TWO NAMED POINTS MEET (#2506, ADR-AG-399 — 2-D's ADR-764, 3-D's ADR-3D-378; ADR-W-146).
@@ -541,7 +788,7 @@ export function derive(
    * completing line, the earlier statement it cannot hold with (`partnerStatement`, 2-D's `[vs #i]`), and the
    * completing statement as the reason — never «לא נמצאה תצורה», which says the search missed.
    */
-  const metPairs = !flatFault && !ringOrderFault && completing !== null ? pairsMetByGivens(construction, seed) : [];
+  const metPairs = !flatFault && !ringOrderFault && !lengthsFault && completing !== null ? pairsMetByGivens(construction, at) : [];
   const partner = metPairs.length > 0 ? partnerStatement(construction, groupOfConstraint, seed, completing!, pinnedBy) : null;
   if (flatFault) faults.push(flatFault);
   else if (metPairs.length > 0) {
@@ -552,7 +799,7 @@ export function derive(
       what: lines[completing!],
       ...(partner !== null ? { declared: lines[partner] } : {}),
     });
-  } else if (!ringOrderFault && completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
+  } else if (!ringOrderFault && !lengthsFault && completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
     faults.push({ index: completing, code: 'unsatisfiable', detail: lines[completing] });
   }
   for (const k of !ringOrderFault && completing === null ? figure.unsatisfied : []) {
@@ -1112,7 +1359,8 @@ export function derive(
    * which the cycling and the gates read. With no bound object this is the construction itself, unchanged.
    */
   const shownObjects = followObjects(construction.objects, construction.constraints.flatMap((k) => (k.t === 'choice' ? drawnOption(k) : [k])));
-  const shown: Construction = shownObjects === construction.objects ? construction : { ...construction, objects: shownObjects };
+  // #2888 (ADR-AG-476): one object per lettering of this line list, so the readers of every derivation that letters it so share its solves.
+  const shown: Construction = shownObjects === construction.objects ? construction : letteredAs(list, construction, shownObjects);
   // #1714: a constraint the parser built as a noun's or a correspondence's DEFINITION is not a stated measure; every
   // other one is a statement (the fold's own attribution, never a list of statement kinds).
   const stated = statedMeasures(
@@ -1124,7 +1372,9 @@ export function derive(
     drawnOption,
   );
   const selectorLine = construction.selectors.map((_, at) => (selectorFact[at] === undefined ? -1 : owner[selectorFact[at]]));
-  return { construction: shown, figure, box: viewBox(figure), seed, configuration: drawnConfiguration(construction, at, true), lines: [...lines], faults, outcomes, minted, created, createdCircles, hosts, pins: { ...pins }, notices, constraintLine, selectorLine, stated };
+  const derivation: Derivation = { construction: shown, figure, box: viewBox(figure), seed, configuration: drawnConfiguration(construction, at, true), lines: [...lines], faults, outcomes, minted, created, createdCircles, hosts, pins: { ...pins }, notices, constraintLine, selectorLine, stated };
+  drawnFrom.set(derivation, construction);
+  return derivation;
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
@@ -1138,7 +1388,8 @@ const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => Stri
  * the whole list and in order, because only the list knows what is taken: the SAME coordinates are one point;
  * a point the student already stated at exactly those coordinates keeps THEIR letter (the #1270 rule — a
  * student's letter wins); otherwise the next free reserved name, P₁, P₂, … — subscripted, so it is a letter a
- * student does not reach for first, and `NAME` reads it back. Earlier names never move when a line is added, so
+ * student does not reach for first, and `NAME` reads it back — a LATER line typing that name refers to this point, since
+ * the letters taken are read from the lines up to the mint's own (#2848, ADR-AG-464). Earlier names never move when a line is added, so
  * the figure stays stable — but for one: the tool's reserved letter yields to a student's FRESH letter stated later at
  * those coordinates (#2674, ADR-AG-404; operator ruling 2026-11-03, card d3 A: *"Rename the tool's letter to the
  * student's, no message (2-D's way, in every builder)"*), unless a line in between typed it, which makes it the
@@ -1148,7 +1399,18 @@ const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => Stri
 function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[]; minted: Array<{ index: number; id: string }> } {
   const text = JSON.stringify(facts);
   if (!text.includes(MINT_PREFIX)) return { facts, minted: [] };
-  const used = new Set<string>(text.match(new RegExp(`"${POINT_NAME}"`, 'g'))?.map((q) => q.slice(1, -1)) ?? []);
+  /*
+   * The letters TAKEN when a placeholder is named (#2848, ADR-AG-464): those of the lines up to and including its own —
+   * never a later one. A later line that only REFERS to the name («P1 על האליפסה», «P₁B = 5») binds to this point, so
+   * the name the row announced can be typed back; a later line that DEFINES a different point under it is the fold's
+   * name clash, as for any letter. So adding a line never renames an earlier one (ADR-AG-164 §3).
+   */
+  const namesOf = (f: Fact): string[] => JSON.stringify(f).match(new RegExp(`"${POINT_NAME}"`, 'g'))?.map((q) => q.slice(1, -1)) ?? [];
+  const used = new Set<string>();
+  let seen = 0;
+  const takeUpTo = (line: number) => {
+    for (; seen < facts.length && owner[seen] <= line; seen++) for (const q of namesOf(facts[seen])) used.add(q);
+  };
   const numeric = (f: Fact): [number, number] | null => {
     if (f.t !== 'point') return null;
     const x = evalExpr(f.x, {});
@@ -1160,6 +1422,7 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   let n = 0;
   facts.forEach((f, i) => {
     if (f.t !== 'point' || !f.id.startsWith(MINT_PREFIX) || names.has(f.id)) return;
+    takeUpTo(owner[i]);
     const at = numeric(f);
     const stated = (g: Fact): g is Extract<Fact, { t: 'point' }> => {
       if (!at || g.t !== 'point' || g.id.startsWith(MINT_PREFIX)) return false;

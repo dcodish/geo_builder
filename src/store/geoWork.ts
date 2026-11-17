@@ -1,37 +1,30 @@
 /**
  * #41 ([ADR-290](docs/06-decisions.md#adr-290)) — the geometry-worker CLIENT. The App calls these instead
- * of running the heavy searches on the main thread; each call is a worker transaction with a request id,
- * stale-result protection (responses for unknown ids are dropped), and CANCELLATION by termination
- * (`cancelGeoWork` kills + respawns the worker — the only true preemption JS offers; in-flight promises
- * reject with `{ cancelled: true }` so callers go quiet instead of erroring).
+ * of running the heavy searches on the main thread; each call is a worker request, and CANCELLATION is by
+ * termination (`cancelGeoWork` kills + respawns the worker — the only true preemption JS offers; in-flight
+ * promises reject with `{ cancelled: true }` so callers go quiet instead of erroring).
  *
- * Environments WITHOUT `Worker` (vitest / node / old browsers) fall back to running the SAME functions
- * synchronously — semantics identical, only the threading differs — so the whole test suite and the
- * scenario harness keep driving the store exactly as before.
+ * #2890 ([ADR-829](docs/06-decisions.md#adr-829), ADR-W-210 Am. 4): the transport is the shared client
+ * (`shell/workerClient`): request ids, stale replies dropped, cancel as terminate → hand the new worker the page's
+ * checkpoint → post again what was not cancelled, and the work-meter envelope. What stays HERE is what is 2-D's: the
+ * operations (`geoOps.ts`), which lane each runs on, the checkpoint (the fold of the figure on screen), the search
+ * basis (#2757), and the one shared detection sweep per fact list (#157). Both workers are started with the page
+ * (`startGeoWork`), so the first line of a session does not wait for the chunk to download.
+ *
+ * Environments WITHOUT `Worker` (vitest / node / old browsers) run the SAME operations in-process — semantics
+ * identical, only the threading differs — so the whole test suite and the scenario harness keep driving the store
+ * exactly as before. Which executor does that is injectable ({@link useGeoWorkExecutor}): the work-meter gate hands
+ * one that serves each lane from its own module instance, as a browser's two worker heaps are.
  */
-import type { QueryInput } from '@/engine/valuesPanel';
-import {
-  searchAnotherView,
-  findValidConfig,
-  meetsRequirements,
-  replay,
-  getFoldFor,
-  detectAll,
-  computeValues,
-  type DetectAllResult,
-  type Fact,
-  type FoldNode,
-} from '@/replay/core';
-import type { RowNouns } from '@/replay/narrowing';
+import type { QueryInput, ValuesPanelResult } from '@/engine/valuesPanel';
+import { adoptSettled, peekFoldFor, type DetectAllResult, type Fact, type FoldNode, type SearchResume, type SettledView } from '@/replay/core';
+import { isNotDecided, type NotDecided } from '../../shell/notDecided';
+import { createWorkerClient } from '../../shell/workerClient';
+import { sameInstanceExecutor, type Executor } from '../../shell/workerExecutor';
+import { geoOps, type GeoCheckpoint, type GeoOps } from './geoOps';
+export type { Acted, StoreData, ViewArg } from './geoOps';
+export { storeData } from './geoOps';
 import { rowNouns } from './rowNouns';
-import type { GeoWorkResponse, ResampleDone, AutoResolveDone, PrefoldDone, DetectDone, ValuesDone } from './geoWorker';
-
-type Done = ResampleDone | AutoResolveDone | PrefoldDone | DetectDone | ValuesDone;
-type Pending = {
-  resolve: (done: Done) => void;
-  reject: (err: Error & { cancelled?: boolean }) => void;
-  onProgress?: (k: number, n: number) => void;
-};
 
 /**
  * Two LANES, each its own worker instance ([ADR-401](docs/06-decisions.md#adr-401)). A worker runs one
@@ -42,108 +35,85 @@ type Pending = {
  * and superseding it is free (terminate the detect worker only — the interactive lane keeps its caches).
  */
 type Lane = 'interactive' | 'detect';
-const LANE_OF: Record<'resample' | 'autoResolve' | 'prefold' | 'detect' | 'values', Lane> = {
+const LANE_OF: Record<keyof GeoOps, Lane> = {
   resample: 'interactive',
   autoResolve: 'interactive',
   prefold: 'interactive',
+  // #2890 (ADR-830): the whole decision of an action runs where the searches run
+  settle: 'interactive',
+  act: 'interactive',
+  decide: 'interactive',
+  judge: 'interactive',
+  edit: 'interactive',
+  load: 'interactive',
+  audit: 'interactive',
+  dryRun: 'interactive',
   detect: 'detect',
   values: 'detect', // #217: same background lane — rides the same memoized pool
 };
 
-const hasWorker = typeof Worker !== 'undefined' && typeof document !== 'undefined';
-const workers: Record<Lane, Worker | null> = { interactive: null, detect: null };
-let nextId = 1;
-const pending = new Map<number, Pending & { lane: Lane }>();
+const spawn = (): Worker => new Worker(new URL('./geoWorker.ts', import.meta.url), { type: 'module' });
 
-function ensureWorker(lane: Lane): Worker {
-  const existing = workers[lane];
-  if (existing) return existing;
-  const worker = new Worker(new URL('./geoWorker.ts', import.meta.url), { type: 'module' });
-  worker.onmessage = (e: MessageEvent<GeoWorkResponse>) => {
-    const msg = e.data;
-    const p = pending.get(msg.id);
-    if (!p) return; // stale — superseded or cancelled
-    if ('progress' in msg) {
-      p.onProgress?.(msg.progress.k, msg.progress.n);
-      return;
-    }
-    pending.delete(msg.id);
-    if ('error' in msg) p.reject(new Error(msg.error));
-    else p.resolve(msg.done);
-  };
-  worker.onerror = () => {
-    // a worker crash rejects everything in flight on ITS lane; the next call respawns
-    const err = new Error('geometry worker crashed');
-    for (const [id, p] of [...pending]) {
-      if (p.lane !== lane) continue;
-      p.reject(err);
-      pending.delete(id);
-    }
-    workers[lane]?.terminate();
-    workers[lane] = null;
-  };
-  workers[lane] = worker;
-  return worker;
+/** The page's own heap serves the operations: the page's default budgets, and no fold to ship to itself. */
+// Built on first use: `geoOps.ts` imports the store, which imports this module, so the table is not there yet while
+// this module is evaluated (an import cycle a bundler and vitest resolve in a different order).
+let inProcess: Executor | null = null;
+const local = (): Executor => (inProcess ??= sameInstanceExecutor(geoOps({ crossing: false })));
+let executor: Executor | null = null;
+
+/**
+ * #2757 ([ADR-812](../../docs/06-decisions.md#adr-812)) — the figure on screen as the store last reported it
+ * ({@link supersedeStaleSearches} is called on every change of `(facts, seed)`). A worker spawned after a cancel or
+ * a crash is handed that figure's fold (the checkpoint), so the next action resumes from it instead of folding the
+ * whole figure cold in a heap that has just lost its caches.
+ */
+let onScreen: Fact[] | null = null;
+function checkpoint(): GeoCheckpoint | null {
+  if (!onScreen || onScreen.length === 0) return null;
+  const fold = peekFoldFor(onScreen); // by content, whatever a budget sees: the page runs no budget
+  return fold ? { facts: onScreen, fold } : null;
 }
 
-/** Kill a lane's in-flight work (terminate + respawn-on-demand). Its promises reject `{cancelled}`. */
-function cancelLane(lane: Lane): void {
-  if (workers[lane]) {
-    workers[lane]!.terminate();
-    workers[lane] = null;
-  }
-  const err = Object.assign(new Error('cancelled'), { cancelled: true });
-  for (const [id, p] of [...pending]) {
-    if (p.lane !== lane) continue;
-    p.reject(err);
-    pending.delete(id);
-  }
+const client = createWorkerClient<GeoOps>({
+  lanes: {
+    interactive: { spawn, prePaint: true },
+    detect: { spawn, prePaint: false },
+  },
+  executor: { run: (lane, op, args, hooks) => (executor ?? local()).run(lane, op, args, hooks), seed: (lane, args) => (executor ?? local()).seed?.(lane, args) },
+  seed: checkpoint,
+});
+
+/**
+ * #2890 (ADR-830): what the ✕ and a superseded search stop are the SEARCHES. The interactive worker also runs the whole
+ * decision of a line, an edit or a delete now, and a line typed while a search runs is posted behind it: stopping the
+ * search must not take that line with it. The worker is restarted only when the request it is running is a search.
+ */
+const SEARCHES: ReadonlySet<string> = new Set(['resample', 'autoResolve', 'prefold']);
+const isSearch = (request: { op: string }): boolean => SEARCHES.has(request.op);
+
+/** Start both workers now (the page's entry calls this), so their chunk downloads beside the page's own assets. */
+export function startGeoWork(): void {
+  client.start();
+}
+
+/**
+ * Test seam: the executor that serves the operations where there is no `Worker`. `null` restores the default (this
+ * module instance, the worker lane). The work-meter gate hands one executor per lane, each over its own module
+ * instance of `geoOps`, with every message cloned.
+ */
+export function useGeoWorkExecutor(next: Executor | null): void {
+  executor = next;
 }
 
 /** Kill the in-flight work the STUDENT is waiting on (the ✕ cancel button) — the interactive lane. The
  *  background detection lane is left alone: nothing is waiting on it, and killing it would only throw
  *  away a sweep the next step has to pay for again. */
 export function cancelGeoWork(): void {
-  cancelLane('interactive');
+  client.cancel('interactive', isSearch);
 }
 
 /** True when the error is a deliberate `cancelGeoWork` — callers go quiet, never surface it. */
-export const isCancelled = (err: unknown): boolean => Boolean((err as { cancelled?: boolean })?.cancelled);
-
-function call(
-  op: 'resample' | 'autoResolve' | 'prefold' | 'detect' | 'values',
-  facts: Fact[],
-  seed: number,
-  onProgress?: (k: number, n: number) => void,
-  /** #477: the student's value queries — carried on the `values` op only. */
-  queries: QueryInput[] = [],
-  /** #1996 (ADR-655): each row's stated nouns — carried on the `detect` op only (read here: the worker's replay may not parse). */
-  nouns: RowNouns = {},
-): Promise<Done> {
-  if (!hasWorker) {
-    // synchronous fallback — the same functions, same semantics, main thread (tests / no-Worker envs)
-    try {
-      if (op === 'resample') return Promise.resolve({ op, found: searchAnotherView(facts, seed, onProgress) });
-      if (op === 'autoResolve') {
-        if (meetsRequirements(facts, seed)) return Promise.resolve({ op, ok: true } as AutoResolveDone);
-        const found = findValidConfig(facts, seed); // #364 (ADR-510): from the current seed
-        return Promise.resolve({ op, found: found ? { ...found, fold: null } : null } as AutoResolveDone);
-      }
-      if (op === 'detect') return Promise.resolve({ op, result: detectAll(facts, nouns) });
-      if (op === 'values') return Promise.resolve({ op, result: computeValues(facts, queries) });
-      replay(facts, seed);
-      return Promise.resolve({ op: 'prefold', fold: getFoldFor(facts) } as PrefoldDone);
-    } catch (err) {
-      return Promise.reject(err);
-    }
-  }
-  const id = nextId++;
-  const lane = LANE_OF[op];
-  return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject, onProgress, lane });
-    ensureWorker(lane).postMessage({ id, op, facts, seed, ...(queries.length ? { queries } : {}), ...(op === 'detect' ? { nouns } : {}) });
-  });
-}
+export const isCancelled = (err: unknown): boolean => client.isCancelled(err);
 
 /**
  * #2757 ([ADR-812](../../docs/06-decisions.md#adr-812)) — the store state a configuration search was
@@ -190,43 +160,50 @@ async function searchOn<T>(basis: ViewBasis, run: () => Promise<T>): Promise<T> 
  * waits on it, so its lane is freed at once. Returns true when it superseded anything.
  */
 export function supersedeStaleSearches(now: { facts: Fact[]; seed: number }): boolean {
+  onScreen = now.facts; // first: a worker respawned below is handed THIS figure's fold
   let any = false;
   for (const token of searchesInFlight) {
     if (token.superseded || !isStaleBasis(token.basis, now)) continue;
     token.superseded = true;
     any = true;
   }
-  if (any) cancelLane('interactive');
+  if (any) client.cancel('interactive', isSearch);
   return any;
 }
 
 export const geoWork = {
   /** The "show another configuration" search, off-thread. Resolves the validated COMPOSITE view —
    *  facts (possibly carrying a branch/variant step) + seed — or null (ADR-340, #175). The view
-   *  carries the `basis` it was searched on (#2757). */
+   *  carries the `basis` it was searched on (#2757). #2893 (ADR-831): or "not decided" (the search reached its work
+   *  limit first), whose `resume.round` is what «המשיכו לחפש» passes as `round`. */
   async resample(
     facts: Fact[],
     seed: number,
     onProgress?: (k: number, n: number) => void,
-  ): Promise<{ facts: Fact[]; seed: number; basis: ViewBasis } | null> {
+    round = 0,
+  ): Promise<{ facts: Fact[]; seed: number; basis: ViewBasis } | null | NotDecided<SearchResume>> {
     const basis = { facts, seed };
-    const done = (await searchOn(basis, () => call('resample', facts, seed, onProgress))) as ResampleDone;
-    return done.found ? { ...done.found, basis } : null;
+    const found = await searchOn(basis, () => client.run(LANE_OF.resample, 'resample', { facts, seed, round }, { onProgress }));
+    if (found === null || isNotDecided(found)) return found;
+    if (found.settled) adoptSettled(found.settled); // #2890 (ADR-830): drawn without folding it again
+    return { facts: found.facts, seed: found.seed, basis };
   },
-  /** The post-commit config search. `'ok'` = already valid; `null` = nothing found in budget. */
+  /** The post-commit config search. `'ok'` = already valid; `null` = it finished and found nothing; #2893 (ADR-831):
+   *  "not decided" = it reached its work limit first (`resume.round` continues it). */
   async autoResolve(
     facts: Fact[],
     seed: number,
-  ): Promise<'ok' | { facts: Fact[]; seed: number; fold: FoldNode | null; basis: ViewBasis } | null> {
+    round = 0,
+  ): Promise<'ok' | { facts: Fact[]; seed: number; fold: FoldNode | null; basis: ViewBasis } | null | NotDecided<SearchResume>> {
     const basis = { facts, seed };
-    const done = (await searchOn(basis, () => call('autoResolve', facts, seed))) as AutoResolveDone;
-    if ('ok' in done) return 'ok';
-    return done.found ? { ...done.found, basis } : null;
+    const found = await searchOn(basis, () => client.run(LANE_OF.autoResolve, 'autoResolve', { facts, seed, round }));
+    if (found === 'ok' || found === null || isNotDecided(found)) return found;
+    if (found.settled) adoptSettled(found.settled); // #2890 (ADR-830)
+    return { facts: found.facts, seed: found.seed, fold: found.fold, basis };
   },
   /** Warm the fold for a fact-list's content off-thread; returns the node for `primeFoldFor`. */
   async prefold(facts: Fact[], seed: number): Promise<FoldNode | null> {
-    const done = (await call('prefold', facts, seed)) as PrefoldDone;
-    return done.fold;
+    return await client.run(LANE_OF.prefold, 'prefold', { facts, seed });
   },
   /**
    * All three detection layers' verdicts from ONE off-thread sample sweep (#157 / ADR-401).
@@ -239,9 +216,11 @@ export const geoWork = {
    */
   detect(facts: Fact[]): Promise<DetectAllResult> {
     if (detectInFlight?.facts === facts) return detectInFlight.promise;
-    if (detectInFlight) cancelLane('detect'); // superseded — its figure is no longer on screen
-    const promise = call('detect', facts, 0, undefined, [], rowNouns(facts))
-      .then((done) => (done as DetectDone).result)
+    if (detectInFlight) client.cancel('detect'); // superseded — its figure is no longer on screen
+    const promise = client
+      // #2890 (ADR-830): the page's fold of the figure goes with it, so the detect worker does not fold it again
+      .run(LANE_OF.detect, 'detect', { facts, nouns: rowNouns(facts), fold: peekFoldFor(facts) })
+      .then((result) => result)
       .finally(() => {
         if (detectInFlight?.promise === promise) detectInFlight = null;
       });
@@ -252,9 +231,27 @@ export const geoWork = {
 
 let detectInFlight: { facts: Fact[]; promise: Promise<DetectAllResult> } | null = null;
 
+/**
+ * #2890 ([ADR-830](../../docs/06-decisions.md#adr-830)) — THE WHOLE DECISION OF AN ACTION, in the worker. Each answers
+ * an `Acted` (`geoOps.ts`): what the worker changed and the settled view of the figure it ended on. The page puts it
+ * in its store at the one sink ({@link applyActed}). In the page's own heap (no `Worker`) the operation acted on the
+ * page's store directly and answers `applied`.
+ */
+export const geoJobs = {
+  settle: (facts: Fact[], seed: number): Promise<SettledView | null> => client.run('interactive', 'settle', { facts, seed }),
+  act: (state: import('./geoOps').StoreData, name: string, args: unknown[]) => client.run('interactive', 'act', { state, name, args }),
+  decide: (args: Parameters<GeoOps['decide']>[0]) => client.run('interactive', 'decide', args),
+  judge: (args: Parameters<GeoOps['judge']>[0]) => client.run('interactive', 'judge', args),
+  edit: (args: Parameters<GeoOps['edit']>[0]) => client.run('interactive', 'edit', args),
+  load: (text: string, prefold: boolean) => client.run('interactive', 'load', { text, prefold }),
+  /** #2893 (ADR-831): `from` continues an audit that reached its work limit (its `resumeAt`). */
+  audit: (facts: Fact[], from = 0) => client.run('interactive', 'audit', { facts, from }),
+  dryRun: (facts: Fact[], seed: number, cmds: import('@/engine').AnyCommand[]) => client.run('interactive', 'dryRun', { facts, seed, cmds }),
+};
+
 /** #217: the values-panel rows, off-thread on user request; shares the detect lane + pool memo.
  *  #477: the student's queries ride the SAME call, so their answers come from the same sample pool as
  *  the rows they sit beside — a second call could disagree with the list directly above it. */
-export function geoValues(facts: Fact[], queries: QueryInput[] = []): Promise<import('@/engine/valuesPanel').ValuesPanelResult> {
-  return call('values', facts, 0, undefined, queries).then((done) => (done as ValuesDone).result);
+export function geoValues(facts: Fact[], queries: QueryInput[] = []): Promise<ValuesPanelResult> {
+  return client.run(LANE_OF.values, 'values', { facts, queries }).then((result) => result);
 }

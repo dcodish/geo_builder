@@ -34,7 +34,7 @@ function play(lines: readonly string[]) {
   let error: unknown = null;
   for (const line of lines) {
     const v = decideSubmit3(st, line, () => `f${++n}`);
-    kinds.push(v.kind);
+    kinds.push((v.kind === 'record' && v.held ? 'held' : v.kind));
     if (v.kind === 'refused') error = v.error;
     if (v.kind === 'record') st = { facts: v.facts, seed: v.seed };
   }
@@ -111,7 +111,7 @@ describe('#1927 one ring is one cyclic order — the false reasons are gone', ()
   it.each([[['ריבוע ABCD', 'ריבוע ADCB']], [['ריבוע ABCD', 'ריבוע CDAB']]])(
     '%j — the same ring read from another vertex or reversed is still the same ring',
     (lines) => {
-      expect(play(lines).kinds).toEqual(['record', 'already-stated']);
+      expect(play(lines).kinds).toEqual(['record', 'held']);
     },
   );
   it('["פירמידה SABCD","ריבוע ABCD"] — a face the solid placed is the same ring, recorded', () => {
@@ -121,7 +121,7 @@ describe('#1927 one ring is one cyclic order — the false reasons are gone', ()
 
 describe('#1927 controls and the ruled boundary', () => {
   it('["ריבוע ABCD","מרובע ADCB"] — the simple order is never refused; since #1953 it is the square restated', () => {
-    expect(play(['ריבוע ABCD', 'מרובע ADCB']).kinds).toEqual(['record', 'already-stated']);
+    expect(play(['ריבוע ABCD', 'מרובע ADCB']).kinds).toEqual(['record', 'held']);
   });
   it.each([
     [['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABDE']],

@@ -18,12 +18,14 @@ import { readKnown, writeKnown, writeMode } from '../../shell/__tests__/fixtures
 
 function outcomeOf(v: Verdict3): Outcome {
   switch (v.kind) {
-    case 'record':
-      return { verdict: 'builds', shape: fingerprint(v.fact.cmds) };
-    case 'already-stated':
-      return { verdict: 'builds', code: 'already-stated' };
+    case 'record': // #2790 (ADR-3D-484): a held line is its own row too
+      return v.held ? { verdict: 'builds', code: 'held', shape: fingerprint(v.fact.cmds) } : { verdict: 'builds', shape: fingerprint(v.fact.cmds) };
+    case 'retick':
+      return { verdict: 'builds', code: 'retick' };
     case 'not-understood':
       return { verdict: 'not-handled' };
+    case 'not-decided': // #2893 (ADR-3D-494): the search reached its limit; the student is asked whether to go on
+      return { verdict: 'asks', code: 'not-decided' };
     case 'refused':
       return { verdict: /^ambiguous/.test(v.error.code) ? 'asks' : 'refused', code: v.error.code };
     case 'rename':
@@ -38,7 +40,7 @@ const run3D: DecideRunner = (context, lines) => {
   for (const line of context) {
     const v = decideSubmit3(s, line);
     if (v.kind === 'record') s = { facts: v.facts, seed: v.seed };
-    else if (v.kind !== 'already-stated') return null;
+    else if (v.kind !== 'retick') return null;
   }
   return lines.map((line) => outcomeOf(decideSubmit3(s, line)));
 };

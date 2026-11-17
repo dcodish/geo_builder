@@ -24,7 +24,7 @@ import { isHorizontal, isVerticalLine, lineByName, normalizedLine, type NamedLin
 import { commonTangentLine } from './commonTangents';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { closePairsOf, COLLAPSED_SIN_TOL, cornerKey, legibilityFaults, ringFaultsOf, thinRingsOf, THIN_SIN_TOL, type RingFault } from './rings';
-import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
+import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, toleranceFactor, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
 import { assignmentAt, joinChoiceSeeds, splitChoiceSeed } from './discreteAxes';
@@ -32,7 +32,10 @@ import { partIndexOf, partsOf } from './components';
 import { carryingLines } from './carryingLines';
 import { segmentIdOf } from './cevian';
 import { followObjects } from './roles';
+import { ContentCache, contentOf } from './content';
 import { offInkExtensions } from '../../shell/offInk';
+import { isLimitSignal } from './workLimitAn';
+import { lengthsImpossible } from './metricBounds';
 import { curveByName, inDomain, isFree, isPositional, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
 export interface FigurePoint {
@@ -1871,6 +1874,8 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      * WHICH AXIS IS THE ELLIPSE'S MAJOR ONE (#2616/#2619, ADR-AG-353/354) — the RESOLVED semi-axes, never the signed
      * letters: x holds when a > b, y when b > a, strictly at the figure's resolution (a circle, a = b, has no major axis).
      */
+    // A free parabola's axis (#2853, ADR-AG-467) is a definition the resolution already applied: it holds on its curve.
+    if (s.kind === 'opens-along') return true;
     if (s.kind === 'major-axis') {
       const atFn = (id: Id) => at.get(id) ?? null;
       const k = curveAtOf(c, env, atFn)(s.curve);
@@ -2138,7 +2143,9 @@ function constraintReads(raw: Construction): ReadonlyMap<Constraint, ReadonlySet
           },
           scale,
         );
-      } catch {
+      } catch (e) {
+        // #2893: a reached work limit is never "cannot be read": it ends the search (`workLimitAn`)
+        if (isLimitSignal(e)) throw e;
         /* a residual that cannot be read here links by its text alone */
       }
     }
@@ -2164,7 +2171,7 @@ function constraintReads(raw: Construction): ReadonlyMap<Constraint, ReadonlySet
 const splitOf = (c: Construction): Construction[] => partsOf(c, constraintReads);
 
 /** Per construction and configuration: its resolved parts (`locusPartAt`). */
-const locusPartsMemo = new WeakMap<Construction, Map<string, Construction[]>>();
+const locusPartsMemo = new ContentCache<Map<string, Construction[]>>('locusPartsMemo');
 
 /**
  * THE PART A POINT MOVES IN, AS ONE CONFIGURATION JUDGES IT (#2738, [ADR-AG-426](../../docs/06c-decisions-analytic.md#adr-ag-426)) —
@@ -2365,10 +2372,10 @@ function seedOrderParams(
  * `drawableAt` with the spread preference walks the seeds looking for an open ring, and on a DETERMINED
  * figure whose one triangle is narrow it walks all twenty-four; `distinctConfigSeeds` then evaluates the
  * same twenty-four for the panel. `evaluate` is pure over its two arguments, so the second walk is the
- * first one's work done again. Keyed weakly on the construction, which every consumer of one derivation
- * shares, so the memo lives exactly as long as the figure it describes.
+ * first one's work done again. Keyed weakly on the construction's CONTENT (#2888, ADR-AG-476; `content.ts`): every
+ * derivation of one line list shares it, whichever action asked, for as long as `derive`'s store holds that line list.
  */
-const evaluateMemo = new WeakMap<Construction, Map<number | string, Figure>>();
+const evaluateMemo = new ContentCache<Map<number | string, Figure>>('evaluateMemo');
 
 /**
  * How many evaluations were actually COMPUTED (a memo miss) — the operation count the #1473 perf lock
@@ -2387,7 +2394,9 @@ export const evaluateStats = { uncached: 0 };
  * `drawableAt` makes from configuration 0 to the seeds after it does not, so the first drawing is exactly the one it
  * always was (ADR-AG-022), however far that walk looks for a well-spread neighbour.
  */
-export function evaluate(raw: Construction, seed = 0, reach = 1, wide = seed !== 0): Figure {
+export function evaluate(given: Construction, seed = 0, reach = 1, wide = seed !== 0): Figure {
+  // #2888 (ADR-AG-476): solved on the content, so nothing a solve keeps (a part's frame, the prior figure) is one view's.
+  const raw = contentOf(given);
   let perSeed = evaluateMemo.get(raw);
   if (!perSeed) {
     perSeed = new Map();
@@ -2469,7 +2478,7 @@ function evaluateParts(raw: Construction, parts: Construction[], seed: number, r
   return mergeParts(raw, parts, figures, seed, figures.map((f) => f.choiceSeed ?? seed), partOf, false);
 }
 
-const partMemo = new WeakMap<Construction, Map<string, Figure>>();
+const partMemo = new ContentCache<Map<string, Figure>>('partMemo');
 function evaluatePart(part: Construction, seed: number, reach: number, wide: boolean, choiceStart: number): Figure {
   let perKey = partMemo.get(part);
   if (!perKey) {
@@ -2647,8 +2656,21 @@ export function resolvedAt(raw: Construction, seed: number, choiceSeed = seed): 
     selectors,
     // #2018 (ADR-AG-298): an object bound to a role («תיכון לבסיס»'s foot and segment) is lettered by the option this
     // configuration took — resolved here with the constraints, so nothing downstream reads another option's letters.
-    objects: followObjects(raw.objects, constraints),
+    objects: turnedObjects(followObjects(raw.objects, constraints), selectors),
   };
+}
+
+/**
+ * A FREE PARABOLA DRAWN ALONG THE AXIS ITS CONFIGURATION TOOK (#2853, [ADR-AG-467](../../docs/06c-decisions-analytic.md#adr-ag-467)):
+ * an `opens-along y` selector puts the curve's `turn` in its place, equation and text, so every reader of the resolved
+ * construction — the residuals, the focus, the frame, the panel — sees one curve. Along x the object is as stated.
+ */
+export function turnedObjects(objects: readonly GeoObject[], selectors: readonly Selector[]): GeoObject[] {
+  const turned = new Set(selectors.flatMap((s) => (s.kind === 'opens-along' && s.axis === 'y' ? [s.curve] : [])));
+  if (turned.size === 0) return objects as GeoObject[];
+  return objects.map((o) =>
+    o.kind === 'curve' && o.turn && turned.has(o.id) ? { ...o, curve: o.turn.curve, label: { ...o.label, eqSrc: o.turn.eqSrc } } : o,
+  );
 }
 
 /** Do the (resolved) selectors of `c` all hold at these positions? The one reading of a region given. */
@@ -2680,7 +2702,7 @@ export function admissibleAt(c: Construction, pos: Map<Id, Pt>, env: Env): boole
  * points («∢ABC = 10», «∢ABC = α», a ratio of two angles), and a right angle stated as two perpendicular segments sharing
  * an end. Read structurally off the rows (every option of a choice included), memoized per construction.
  */
-const statedCornersCache = new WeakMap<Construction, ReadonlySet<string>>();
+const statedCornersCache = new ContentCache<ReadonlySet<string>>('statedCornersCache');
 function statedCornersOf(c: Construction): ReadonlySet<string> {
   const hit = statedCornersCache.get(c);
   if (hit) return hit;
@@ -2748,7 +2770,7 @@ function legiblePositions(c: Construction, pos: Map<Id, Pt>): boolean {
  * fit moves the seed's sample as little as the descent must, so another seed draws another circle.
  */
 /** The figure a created shape JOINS — the construction without it — evaluated once per (raw construction, seed, choice). */
-const priorMemo = new WeakMap<Construction, { prior: Construction; figures: Map<string, Figure> } | null>();
+const priorMemo = new ContentCache<{ prior: Construction; figures: Map<string, Figure> } | null>('priorMemo');
 function priorOf(raw: Construction, removed: ReadonlySet<Id>): { prior: Construction; figures: Map<string, Figure> } {
   let hit = priorMemo.get(raw);
   if (!hit) {
@@ -2827,7 +2849,7 @@ function placesByValue(c: Construction, k: Constraint): boolean {
   const known = new Set(c.objects.map((o) => o.id));
   return !mentionsAny(k.left, known) || !mentionsAny(k.right, known);
 }
-const lineGroupsCache = new WeakMap<Construction, LineGroups>();
+const lineGroupsCache = new ContentCache<LineGroups>('lineGroupsCache');
 function lineGroupsOf(c: Construction): LineGroups {
   const lines = c.objectLine;
   if (!lines) return NO_GROUPS;
@@ -3382,7 +3404,7 @@ function fitLater(
 }
 
 /** The free vertices an object is placed from (itself when free), through its parents — `lineGroupsOf`'s `deps`. */
-const freeVerticesCache = new WeakMap<Construction, Map<Id, Set<Id>>>();
+const freeVerticesCache = new ContentCache<Map<Id, Set<Id>>>('freeVerticesCache');
 function freeVerticesOf(c: Construction, id: Id): ReadonlySet<Id> {
   let deps = freeVerticesCache.get(c);
   if (!deps) {
@@ -3652,7 +3674,7 @@ function seedFreePairs(c: Construction, seeded: Map<Id, Pt>, env: Env, seed: num
  * every seed reuses them, and no evaluation is added.
  */
 const ROOT_STREAM = 200017;
-const pinMemo = new WeakMap<Construction, Map<string, Map<string, number[] | 'identity'>>>();
+const pinMemo = new ContentCache<Map<string, Map<string, number[] | 'identity'>>>('pinMemo');
 function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number, choiceSeed: number): { env: Env; pins: Pin[] } {
   const register = paramRegister(c);
   const scope = new Map(register.filter((p) => !isDirectionSymbol(p.sym)).map((p) => [p.sym, narrowedDomain(p.domain, impliedRange(c, p.sym))] as const));
@@ -3772,7 +3794,7 @@ interface BlockList {
   /** The admitted roots, each with its index in the listing (0 is configuration 0's own root). */
   roots: Array<{ x: number[]; index: number }>;
 }
-const blockMemo = new WeakMap<Construction, Map<string, BlockList | null>>();
+const blockMemo = new ContentCache<Map<string, BlockList | null>>('blockMemo');
 function blockRootsOf(raw: Construction, choiceSeed: number): BlockList | null {
   const akey = assignmentAt(raw, choiceSeed).key;
   let perRaw = blockMemo.get(raw);
@@ -3967,6 +3989,93 @@ function labelsFromFigure(
   return { env: out, labelled };
 }
 
+/**
+ * THE WALK'S STEPS, SOLVED ONCE PER CONTENT (#2894 part 2, [ADR-AG-482](../../docs/06c-decisions-analytic.md#adr-ag-482)) —
+ * the memo behind `walk`'s continuation. Per raw content (cleared with every content cache), a step is keyed by the
+ * resolved construction (everything in it but its constraints), the constraint prefix (`i` constraints; `0` is the whole system the
+ * walk finishes on), the environment, the start vector to the last bit and the solver's tolerance factor: every input
+ * `solveLM` reads. The answer is the one a fresh solve would return. A served step is a FINISHED PIECE, like a served
+ * `evaluate` (ADR-AG-479: «המשיכו לחפש» goes on from what the last round finished), so it charges the work limit nothing.
+ */
+interface WalkStep {
+  r: SolveResult;
+}
+let walkStepsServed = true;
+/**
+ * AN INSTRUMENT (#2894 part 2, ADR-AG-482's lock): run `fn` with every walk step solved afresh — the walk before the
+ * continuation. Not a mode: nothing outside the locks calls it.
+ */
+export function withoutWalkContinuation<T>(fn: () => T): T {
+  const was = walkStepsServed;
+  walkStepsServed = false;
+  try {
+    return fn();
+  } finally {
+    walkStepsServed = was;
+  }
+}
+/** `systems` interns a (structure, prefix) to a short id, so a step's key does not carry the construction's text. */
+const walkMemo = new ContentCache<{ systems: Map<string, number>; steps: Map<string, WalkStep> }>();
+const numKey = (v: number): string => (Object.is(v, -0) ? '-0' : String(v));
+/**
+ * The exact text of a construction part: every number by its shortest round-trip spelling (−0, NaN and ±∞ kept apart,
+ * which JSON would fold into `0` and `null`), keys in their order, and a FUNCTION — which no text can stand for — as a
+ * fresh token, so a value carrying one is never served (its key matches nothing).
+ */
+let opaque = 0;
+function exactText(v: unknown): string {
+  if (typeof v === 'number') return numKey(v);
+  if (typeof v === 'string') return JSON.stringify(v);
+  if (v === null || v === undefined || typeof v === 'boolean') return String(v);
+  if (typeof v === 'function' || typeof v === 'symbol' || typeof v === 'bigint') return `<opaque ${(opaque += 1)}>`;
+  if (Array.isArray(v)) return `[${v.map(exactText).join(',')}]`;
+  if (v instanceof Map) return `M[${[...v].map(([k, w]) => `${exactText(k)}:${exactText(w)}`).join(',')}]`;
+  if (v instanceof Set) return `S[${[...v].map(exactText).join(',')}]`;
+  return `{${Object.keys(v)
+    .map((k) => `${JSON.stringify(k)}:${exactText((v as Record<string, unknown>)[k])}`)
+    .join(',')}}`;
+}
+const envKey = (e: Env): string =>
+  Object.keys(e)
+    .sort()
+    .map((k) => `${k}=${numKey(e[k])}`)
+    .join(',');
+function walkSteps(raw: Construction, c: Construction): { solve: (i: number, env: string, x: number[], run: () => SolveResult) => SolveResult } {
+  let memo = walkMemo.get(raw);
+  if (!memo) {
+    memo = { systems: new Map(), steps: new Map() };
+    walkMemo.set(raw, memo);
+  }
+  const { systems, steps: table } = memo;
+  const intern = (text: string): number => {
+    let id = systems.get(text);
+    if (id === undefined) {
+      id = systems.size;
+      systems.set(text, id);
+    }
+    return id;
+  };
+  const structure = exactText({ ...c, constraints: [] }); // everything but the constraints, which the prefix spells
+  // [0]: the whole system the walk finishes on; [i]: the first i constraints.
+  const prefixes: number[] = [intern(`${structure}|all|${exactText(c.constraints)}`)];
+  let acc = '';
+  for (const k of c.constraints) {
+    acc += exactText(k) + ';';
+    prefixes.push(intern(`${structure}|${acc}`));
+  }
+  return {
+    solve: (i, env, x, run) => {
+      if (!walkStepsServed || x.some((v) => Number.isNaN(v))) return run();
+      const key = `${prefixes[i]}|${env}|${toleranceFactor()}|${x.map(numKey).join(',')}`;
+      const hit = table.get(key);
+      if (hit) return { ...hit.r, values: [...hit.r.values] };
+      const r = run();
+      table.set(key, { r: { ...r, values: [...r.values] } });
+      return r;
+    },
+  };
+}
+
 function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramReach = 1, wide = seed !== 0): Figure {
   /**
    * DISCRETE freedom is resolved HERE, once, before anything measures a constraint (#1049).
@@ -3985,6 +4094,13 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * and the knowledge gate still see one truth.
    */
   const c: Construction = resolvedAt(raw, seed, choiceSeed);
+  /**
+   * STATED LENGTHS NO FIGURE CAN HAVE (#2894 part 2 C, [ADR-AG-483](../../docs/06c-decisions-analytic.md#adr-ag-483)): one segment
+   * given two lengths, or three points against the triangle inequality, read off the rows in closed form. No start can meet
+   * them, so none is paid: the fits and the solve are skipped, and the check below reports the rows unmet at the seed's own
+   * figure. 3-D's pivot does the same (ADR-3D-495); `derive` names the rows and the reason.
+   */
+  const metricallyImpossible = lengthsImpossible(c.constraints);
   // `paramReach`, never `reach`: this body has locals of that name (a span), and the parameter must not be shadowed
   let env = foldSignSelectors(c, sampleEnv(c, seed, paramReach, wide));
   // #2380 (ADR-AG-303): a parameter a given pins starts AT one of its roots — found by scan, chosen by the seed.
@@ -4458,10 +4574,10 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   }
 
   // The figure as it stood, then what each line added: every line's new points start fitted to it (#1687, ADR-AG-348).
-  fitLineByLine(c, env, seeded, hashed, seed);
+  if (!metricallyImpossible) fitLineByLine(c, env, seeded, hashed, seed);
 
   // A circle the tool created starts fitted to the figure it joins (#1647) — a start, never a verdict.
-  const fitted = fitCreatedShapes(raw, c, env, seeded, seed, choiceSeed, paramReach, wide);
+  const fitted = metricallyImpossible ? null : fitCreatedShapes(raw, c, env, seeded, seed, choiceSeed, paramReach, wide);
   if (fitted) {
     env = fitted.env;
     for (const [id, p] of fitted.seeded) seeded.set(id, p);
@@ -4627,7 +4743,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     return swapped ? [system.toVec(m, env0)] : [];
   };
 
-  if ((ids.length > 0 || sys.syms.length > 0) && c.constraints.length > 0 && !fitted?.dead) {
+  if ((ids.length > 0 || sys.syms.length > 0) && c.constraints.length > 0 && !fitted?.dead && !metricallyImpossible) {
     // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
     const solved = sys;
     /**
@@ -4823,13 +4939,30 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         }
         return null;
       };
+      /**
+       * ONE CONTINUATION, NOT A RE-SOLVE PER WALK (#2894 part 2, [ADR-AG-482](../../docs/06c-decisions-analytic.md#adr-ag-482)).
+       *
+       * Every walk of this content — each attempt, each sign re-seed, and above all each discrete OPTION
+       * `evaluateTryingChoices` tries at the same seed — used to solve its prefixes from scratch, although two walks that
+       * start from the same point with the same parameters solve the same prefixes to the same bits until the first
+       * constraint where their systems differ (a choice's option, a re-seeded angle). Measured on exam 2379's ninth line:
+       * 14 % of the pool's walk work was such a repeat. So the walks of one content are one tree: a prefix solve is keyed
+       * by everything its answer is a function of (`walkSteps`: the resolved construction, the
+       * prefix's constraints, the walk's environment, the start to the last bit, the tolerance) and solved once; a walk
+       * continues from the deepest step already solved. A served step is a finished piece and charges the work limit
+       * nothing, as a served `evaluate` does (ADR-AG-479), so a round of «המשיכו לחפש» goes on from it; a search that
+       * repeated walks therefore reaches further before the limit (ADR-AG-482 lists where that changed an outcome).
+       */
+      const steps = walkSteps(raw, c);
       const walk = (start: Map<Id, Pt>, attempt: Env): SolveResult => {
         let x = solved.toVec(start, attempt);
+        const ek = envKey(attempt);
         for (let i = 1; i <= c.constraints.length; i += 1) {
-          const prefix = carrierSystem({ ...c, constraints: c.constraints.slice(0, i) }, attempt);
-          x = solveLM(x, prefix.residualsAt, 60).values;
+          const from = x;
+          x = steps.solve(i, ek, from, () => solveLM(from, carrierSystem({ ...c, constraints: c.constraints.slice(0, i) }, attempt).residualsAt, 60)).values;
         }
-        return solveLM(x, solved.residualsAt);
+        const last = x;
+        return steps.solve(0, envKey(env), last, () => solveLM(last, solved.residualsAt));
       };
       const consider = (r: SolveResult): boolean => {
         if (r.ok && admissible(r.values)) {
@@ -5418,7 +5551,7 @@ const RING_REACH_TRIES = 8;
 // Keyed by seed AND by whether the spread preference was applied (#1174): the two modes answer
 // differently for the same seed, and sharing one cache would let whichever caller ran first
 // decide what the other one sees.
-const drawableCache = new WeakMap<Construction, Map<string, Figure>>();
+const drawableCache = new ContentCache<Map<string, Figure>>('drawableCache');
 
 /**
  * WHICH CONFIGURATION IS DRAWN (#2039 step 1, #1182, [ADR-AG-358](../../docs/06c-decisions-analytic.md#adr-ag-358)).
@@ -5484,7 +5617,61 @@ export function drawnSampleOf(f: Figure): string | undefined {
   return k ? `${k.seed}:${f.choiceSeed ?? k.seed}:${f.rootKey ?? ''}` : undefined;
 }
 /** Per construction and requested configuration: the configuration `drawableAt` drew (set beside `drawableCache`). */
-const drawnCache = new WeakMap<Construction, Map<string, Configuration>>();
+const drawnCache = new ContentCache<Map<string, Configuration>>('drawnCache');
+
+/**
+ * WHAT EACH READER HAS ASKED FOR (#2888, [ADR-AG-476](../../docs/06c-decisions-analytic.md#adr-ag-476)) — per construction
+ * OBJECT (a view, never its content): the configurations `drawableAt` was asked for through it.
+ *
+ * The configuration pool used to read "which seeds are evaluated" off `drawableCache`. That was the same question while
+ * every derivation had its own construction. With the solves shared by content it is not: a seed another action solved
+ * would count as read by a page that never asked for it, and a deferred pool decides what to SHOW from that set (a value
+ * the seeds read so far agree on is pending; one they already see differ makes the row walk the whole pool, before the
+ * paint). So what a pool has read is what was asked through ITS construction, exactly the set it was before: the
+ * sequence a page shows, and which side of the paint its work falls on, depend on the input alone, and only the COST of
+ * an ask depends on what is already solved.
+ */
+const askedOf = new WeakMap<Construction, Set<string>>();
+/** The derivation being computed: what its body asks of each content, for its views to start from ({@link recordAsks}). */
+let askRecorder: Map<Construction, Set<string>> | null = null;
+function noteAsked(c: Construction, key: string): void {
+  let mine = askedOf.get(c);
+  if (!mine) {
+    mine = new Set();
+    askedOf.set(c, mine);
+  }
+  mine.add(key);
+  if (askRecorder) {
+    const content = contentOf(c);
+    let recorded = askRecorder.get(content);
+    if (!recorded) {
+      recorded = new Set();
+      askRecorder.set(content, recorded);
+    }
+    recorded.add(key);
+  }
+}
+/**
+ * Run `fn` and report the configurations it asked `drawableAt` for, per construction content. `derive` runs its body under
+ * it and keeps what the body asked of the construction it RETURNS; every view of that derivation starts from those
+ * ({@link adoptAsks}), as the one construction a derivation used to build and return did.
+ */
+export function recordAsks<T>(fn: () => T): { value: T; askedOf: (c: Construction) => string[] } {
+  const outer = askRecorder;
+  const mine = new Map<Construction, Set<string>>();
+  askRecorder = mine;
+  try {
+    return { value: fn(), askedOf: (c) => [...(mine.get(contentOf(c)) ?? [])] };
+  } finally {
+    askRecorder = outer;
+  }
+}
+/** A new view of a derivation starts having asked what the derivation's own body asked. */
+export function adoptAsks(view: Construction, asked: readonly string[]): void {
+  for (const key of asked) noteAsked(view, key);
+}
+/** A configuration as one stable string — what `derive` keys a derivation of one line list by. */
+export const configurationKey = (at: Seed): string => drawableKey(at, false);
 
 /** The key a part's landing is recorded under: its first object, stable while lines are added to other parts. */
 export function partKey(part: Construction): string {
@@ -5494,6 +5681,32 @@ export function partKey(part: Construction): string {
 const partConfigOf = new WeakMap<Figure, PartConfiguration>();
 /** A figure assembled from parts: the parts' samples, as `drawnSampleOf` spells one (#2633's "same sample" test). */
 const mergedSample = new WeakMap<Figure, string>();
+
+/**
+ * WHICH CONFIGURATION A FIGURE IS, AS DATA (#2890, [ADR-AG-477](../../docs/06c-decisions-analytic.md#adr-ag-477)). The
+ * three tables above are keyed by the figure OBJECT, so a structured clone of a figure has none of them, and says
+ * nothing: `drawnSampleOf` would answer "not a figure `evaluate` computed" and «הציגו תצורה אחרת» would stop skipping the
+ * sample on screen. `settle.ts` carries these beside the figures it hands to another heap and re-attaches them there.
+ */
+export interface FigureTags {
+  evaluated?: Configuration;
+  part?: PartConfiguration;
+  merged?: string;
+}
+/** A figure's entries in the three tables; null for a figure that has none (a hand-built one). */
+export function figureTagsOf(f: Figure): FigureTags | null {
+  const evaluated = evaluatedAt.get(f);
+  const part = partConfigOf.get(f);
+  const merged = mergedSample.get(f);
+  if (!evaluated && !part && merged === undefined) return null;
+  return { ...(evaluated ? { evaluated } : {}), ...(part ? { part } : {}), ...(merged !== undefined ? { merged } : {}) };
+}
+/** Attach to a figure (a clone, in another heap) the entries its original had. First writer wins, as in `evaluate`. */
+export function tagFigure(f: Figure, tags: FigureTags): void {
+  if (tags.evaluated && !evaluatedAt.has(f)) evaluatedAt.set(f, tags.evaluated);
+  if (tags.part && !partConfigOf.has(f)) partConfigOf.set(f, tags.part);
+  if (tags.merged !== undefined && !mergedSample.has(f)) mergedSample.set(f, tags.merged);
+}
 
 /**
  * THE CONFIGURATION WALK OF A FIGURE OF INDEPENDENT PARTS (#2737, [ADR-AG-425](../../docs/06c-decisions-analytic.md#adr-ag-425)).
@@ -5567,11 +5780,9 @@ function drawableParts(c: Construction, at: Seed, preferSpread: boolean): Figure
  * is on the screen, and the next line is solved from there instead of from a configuration the student never saw.
  */
 export function drawnConfiguration(c: Construction, at: Seed, preferSpread = false): Configuration {
-  const key = drawableKey(at, preferSpread);
-  const hit = drawnCache.get(c)?.get(key);
-  if (hit) return hit;
+  // Always through `drawableAt` (a lookup when it is solved): the ask is then noted on the caller's construction (#2888).
   drawableAt(c, at, preferSpread);
-  return drawnCache.get(c)?.get(key) ?? configurationOf(at);
+  return drawnCache.get(c)?.get(drawableKey(at, preferSpread)) ?? configurationOf(at);
 }
 const drawableKey = (at: Seed, preferSpread: boolean): string => {
   const k = configurationOf(at);
@@ -5620,9 +5831,20 @@ export function drawableAt(
    */
   preferSpread = false,
 ): Figure {
+  const f = drawableOf(contentOf(c), at, preferSpread);
+  // #2888 (ADR-AG-476): the ask is the READER's (what its pool has read); the figure is the content's, shared.
+  noteAsked(c, drawableKey(at, preferSpread));
+  return f;
+}
+function drawableOf(c: Construction, at: Seed, preferSpread: boolean): Figure {
   // #2737 (ADR-AG-425): a figure of independent parts walks each part's configurations apart; one part walks as it always did.
   if (splitOf(c).length > 1) return drawableParts(c, at, preferSpread);
   return walkDrawable(c, at, preferSpread, (s, r, w) => evaluate(c, s, r, w), (f) => evaluatedAt.get(f), drawableCache, drawnCache);
+}
+/** A memo per construction: a `ContentCache`, or a plain `WeakMap` a walk keeps for itself. */
+interface PerConstruction<V> {
+  get(c: Construction): V | undefined;
+  set(c: Construction, value: V): unknown;
 }
 
 /**
@@ -5636,8 +5858,8 @@ function walkDrawable<K>(
   preferSpread: boolean,
   evalAt: (seed: number, reach: number, wide: boolean) => Figure,
   landedOf: (f: Figure) => K | undefined,
-  cache: WeakMap<Construction, Map<string, Figure>>,
-  drawnStore: WeakMap<Construction, Map<string, K | Configuration>>,
+  cache: PerConstruction<Map<string, Figure>>,
+  drawnStore: PerConstruction<Map<string, K | Configuration>>,
   /**
    * The parts already drawn beside this one (#2737): its points are kept visibly apart from theirs too, on the canvas they
    * share, so a point riding a carrier through another part's point («Y על הישר y=x» beside V(0,0)) is never opened on it.
@@ -6092,6 +6314,103 @@ export function looksTheSame(a: Figure, b: Figure): boolean {
   return true;
 }
 
+/**
+ * ARE THESE TWO CONFIGURATIONS ONE SOLUTION, PLACED DIFFERENTLY? (#2831, [ADR-AG-473](../../docs/06c-decisions-analytic.md#adr-ag-473),
+ * [ADR-W-206](../../docs/06w-decisions-workspace.md#adr-w-206); operator 2026-11-12, *"2831 - A"*: a mirror image of a drawing
+ * is the SAME solution placed differently).
+ *
+ * {@link looksTheSame} asks whether two drawings are one PICTURE; this asks whether they are one ANSWER. Two configurations
+ * are one solution when the drawing is the same up to a rigid motion of the plane (a turn, a shift or a mirror), every
+ * letter the figure uses has the same value, and every curve has the same shape — 3-D's ADR-3D-461 key, in the plane.
+ *
+ * The drawing is read in the figure's OWN frame: the origin at its first named point, the first axis toward the first
+ * named point apart from it, and the second axis signed so the first point off that line lies on its positive side (that
+ * sign is what folds a mirror). The coordinate axes are not part of the frame, so the x-axis mirror of the book's p2-15
+ * ellipse is the ellipse already shown. A curve contributes its characteristic points in that frame (a circle its centre
+ * and radius, a parabola its vertex and focus, an ellipse its four vertices as a set, a line its foot from the origin
+ * and its direction); a figure with fewer than two apart points has no frame and is one solution only with itself
+ * ({@link sameConfiguration}). Only «הציגו תצורה אחרת»'s ordering reads it (`app/another.ts`).
+ */
+export function sameSolution(a: Figure, b: Figure): boolean {
+  const ka = solutionParts(a);
+  const kb = solutionParts(b);
+  if (!ka || !kb) return sameConfiguration(a, b);
+  if (ka.length !== kb.length) return false;
+  const tol = 1e-3 * Math.max(1, ka.scale, kb.scale);
+  for (let i = 0; i < ka.length; i += 1) {
+    const x = ka.parts[i];
+    const y = kb.parts[i];
+    if (x.label !== y.label || x.pts.length !== y.pts.length || x.nums.length !== y.nums.length) return false;
+    for (let j = 0; j < x.nums.length; j += 1) if (!(Math.abs(x.nums[j] - y.nums[j]) <= SAME_VALUE_EPS * 10 * Math.max(1, Math.abs(x.nums[j]), Math.abs(y.nums[j])))) return false;
+    // A curve's points are a SET (an ellipse's ±a vertices swap under a mirror): every point of one meets one of the other.
+    const used = new Set<number>();
+    for (const p of x.pts) {
+      const k = y.pts.findIndex((q, n) => !used.has(n) && Math.hypot(p[0] - q[0], p[1] - q[1]) <= tol);
+      if (k < 0) return false;
+      used.add(k);
+    }
+  }
+  return true;
+}
+
+/** The figure in its own frame (see {@link sameSolution}): labelled point sets and plain numbers, plus the frame's scale. */
+function solutionParts(f: Figure): { parts: Array<{ label: string; pts: Array<[number, number]>; nums: number[] }>; length: number; scale: number } | null {
+  const pts = f.points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  if (pts.length < 2) return null;
+  const o = pts[0];
+  const far = Math.max(...pts.map((p) => Math.hypot(p.x - o.x, p.y - o.y)));
+  const apart = 1e-6 * Math.max(1, far);
+  const p1 = pts.find((p) => Math.hypot(p.x - o.x, p.y - o.y) > apart);
+  if (!p1) return null;
+  const len = Math.hypot(p1.x - o.x, p1.y - o.y);
+  const u: [number, number] = [(p1.x - o.x) / len, (p1.y - o.y) / len];
+  const v0 = (x: number, y: number) => -(x - o.x) * u[1] + (y - o.y) * u[0];
+  const off = pts.find((p) => Math.abs(v0(p.x, p.y)) > 1e-4 * Math.max(1, far));
+  const sign = off && v0(off.x, off.y) < 0 ? -1 : 1;
+  const frame = (x: number, y: number): [number, number] => [(x - o.x) * u[0] + (y - o.y) * u[1], sign * v0(x, y)];
+  const parts: Array<{ label: string; pts: Array<[number, number]>; nums: number[] }> = [];
+  for (const p of pts) parts.push({ label: `${p.id}:`, pts: [frame(p.x, p.y)], nums: [] });
+  for (const c of f.curves) {
+    const q = c.curve;
+    switch (q.kind) {
+      case 'circle':
+        parts.push({ label: `${c.id}:circle`, pts: [frame(q.cx, q.cy)], nums: [q.r] });
+        break;
+      case 'parabola': {
+        const h = q.h ?? 0;
+        const k = q.k ?? 0;
+        const focus: [number, number] = q.axis === 'y' ? [h, k + q.p / 2] : [h + q.p / 2, k];
+        parts.push({ label: `${c.id}:parabola`, pts: [frame(h, k)], nums: [] }, { label: `${c.id}:focus`, pts: [frame(...focus)], nums: [] });
+        break;
+      }
+      case 'ellipse': {
+        const h = q.h ?? 0;
+        const k = q.k ?? 0;
+        parts.push({ label: `${c.id}:ellipse`, pts: [frame(h - q.a, k), frame(h + q.a, k), frame(h, k - q.b), frame(h, k + q.b)], nums: [] });
+        break;
+      }
+      case 'line': {
+        const n = normalizedLine(q.a, q.b, q.c);
+        if (!n) break;
+        // The foot of the frame origin on the line, and the line's direction in the frame, folded to [0, π).
+        const d = n.a * o.x + n.b * o.y + n.c;
+        const foot = frame(o.x - d * n.a, o.y - d * n.b);
+        const dir = frame(o.x - n.b, o.y + n.a);
+        let ang = Math.atan2(dir[1], dir[0]);
+        if (ang < 0) ang += Math.PI;
+        if (ang >= Math.PI - 1e-9) ang -= Math.PI;
+        parts.push({ label: `${c.id}:line`, pts: [foot], nums: [Math.min(ang, Math.PI - ang) < 1e-6 ? 0 : ang] });
+        break;
+      }
+    }
+  }
+  for (const sym of f.usedSymbols) {
+    if (isDirectionSymbol(sym) || !Number.isFinite(f.env[sym])) continue;
+    parts.push({ label: `${sym}=`, pts: [], nums: [f.env[sym]] });
+  }
+  return { parts, length: parts.length, scale: far };
+}
+
 /** How many different pictures these configurations are. */
 function distinctCount(figs: readonly Figure[]): number {
   const reps: Figure[] = [];
@@ -6103,7 +6422,7 @@ function distinctCount(figs: readonly Figure[]): number {
  *  «תצורה אחרת» button use, for the same reason. */
 const DISTINCT_TRIES = 24;
 
-const distinctCache = new WeakMap<Construction, Map<number, number[]>>();
+const distinctCache = new ContentCache<Map<number, { seeds: number[]; walked: number }>>('distinctCache');
 
 /**
  * The seeds of up to `count` configurations that actually DIFFER (#1282).
@@ -6131,19 +6450,25 @@ export function distinctConfigSeeds(c: Construction, count = 3, tries = DISTINCT
     distinctCache.set(c, perCount);
   }
   const hit = perCount.get(count);
-  if (hit) return hit;
+  if (hit) {
+    // #2888 (ADR-AG-476): the walk's asks are this reader's too, whoever paid for the walk.
+    for (let seed = 0; seed < hit.walked; seed += 1) noteAsked(c, drawableKey(seed, false));
+    return hit.seeds;
+  }
 
   const seeds: number[] = [];
   const seen: Figure[] = [];
+  let walked = 0;
   for (let seed = 0; seed < tries && seeds.length < count; seed += 1) {
     const f = drawableAt(c, seed);
+    walked = seed + 1;
     // Tolerance-aware (#1539): two solves of one root are one configuration whatever their rounding.
     if (seen.some((g) => sameConfiguration(g, f))) continue;
     seen.push(f);
     seeds.push(seed);
   }
   const out = seeds.length > 0 ? seeds : [0];
-  perCount.set(count, out);
+  perCount.set(count, { seeds: out, walked });
   return out;
 }
 
@@ -6197,17 +6522,28 @@ export interface ConfigurationPool {
   /** The page's mode: gates answer PENDING from a partial pool instead of filling it. */
   defer(): void;
   readonly deferred: boolean;
+  /**
+   * FIGURE FIRST (#2890, [ADR-AG-478](../../docs/06c-decisions-analytic.md#adr-ag-478); operator ruling 2026-11-14):
+   * deferred, and the gates evaluate NOTHING for themselves, not even the floor of seeds 0..2 a deferred pool pays, and
+   * no reader fills the pool (`knownValues`' `fillPool` is ignored). A value the seeds already asked do not settle is
+   * pending until the knowledge arrives. What the figure's own derivation asked is still read, so a held page shows
+   * exactly what the heap that solved it showed at the same stage.
+   */
+  hold(): void;
+  readonly held: boolean;
   /** A gate answered pending on this pool — the page owes a re-render when it completes. */
   readonly pendingShown: boolean;
 }
 
 class Pool implements ConfigurationPool {
   deferred = false;
+  held = false;
   pendingShown = false;
   private done = false;
   constructor(private readonly c: Construction) {}
   private has(seed: number): boolean {
-    return drawableCache.get(this.c)?.has(drawableKey(seed, false)) ?? false;
+    // #2888 (ADR-AG-476): what THIS reader asked for, never what the shared content happens to hold (`askedOf`).
+    return askedOf.get(this.c)?.has(drawableKey(seed, false)) ?? false;
   }
   ready(): number[] {
     const out: number[] = [];
@@ -6230,12 +6566,21 @@ class Pool implements ConfigurationPool {
     return this.complete();
   }
   fill(): void {
-    if (this.done) return;
+    if (this.done) {
+      // #2888 (ADR-AG-476): a derivation being computed reads this pool as its own body always did — its asks are
+      // recorded even when an earlier derivation of the same content already filled it (`recordAsks`).
+      if (askRecorder) for (let s = 0; s < POOL_SIZE; s += 1) noteAsked(this.c, drawableKey(s, false));
+      return;
+    }
     for (let s = 0; s < POOL_SIZE; s += 1) drawableAt(this.c, s);
     this.done = true;
   }
   defer(): void {
     this.deferred = true;
+  }
+  hold(): void {
+    this.deferred = true;
+    this.held = true;
   }
   notePending(): void {
     this.pendingShown = true;
@@ -6243,6 +6588,7 @@ class Pool implements ConfigurationPool {
   }
 }
 
+// Per construction OBJECT, never per content (#2888, ADR-AG-476): the mode and the pending flag are one reader's.
 const poolCache = new WeakMap<Construction, Pool>();
 
 export function configurationPool(c: Construction): ConfigurationPool {
@@ -6310,8 +6656,16 @@ function poolSeeds(c: Construction): { pool: Pool; seeds: number[] } {
    * seeds at render — the very cost B′ moved off the render path. Three seeds is the floor the render path
    * has always paid; whatever they cannot settle is pending until the idle loop completes the pool.
    */
-  for (let s = 0; s < PENDING_FLOOR; s += 1) drawableAt(c, s);
+  if (!pool.held) for (let s = 0; s < PENDING_FLOOR; s += 1) drawableAt(c, s);
   return { pool, seeds: pool.ready() };
+}
+
+/** A HELD pool (#2890) has not asked for this seed: the reader answers pending instead of solving it. */
+function unaskedWhileHeld(c: Construction, seed: number): boolean {
+  const pool = poolOf(c);
+  if (!pool.held || pool.ready().includes(seed)) return false;
+  pool.notePending();
+  return true;
 }
 
 /** The seeds a deferred pool evaluates synchronously, before the render. */
@@ -6449,29 +6803,45 @@ function firstAdmittingDrop(
 
 /**
  * WHICH DECLARED POLYGONS THE GIVENS FORCE FLAT (#1849, ADR-AG-247) — the rings the thin-ring arm found the givens
- * holding on only collapsed (`Figure.collapsedRings`), over the window `drawableAt` walks from `seed`. In order of
- * first appearance, so the ring a refusal names is a function of the input and the seed alone.
+ * holding on only collapsed (`Figure.collapsedRings`), over the window `drawableAt` walks from `at`. In order of
+ * first appearance, so the ring a refusal names is a function of the input and the configuration alone.
  *
  * Called only on the refusal path, where `drawableAt` found nothing whole and so evaluated this whole window
- * already: every lookup is a memo hit (ADR-AG-144), never a new solve.
+ * already: every lookup is a memo hit (ADR-AG-144), never a new solve. **The window is the walk's own**
+ * ({@link walkWindow}, #2894 part 2, ADR-AG-481): the requested configuration, then each later seed at reach 1 with the
+ * request's `wide`. It used to be `evaluate(c, s)` with the defaults, which at a seed-0 request (`wide` false) are
+ * other configurations (`wide` true from seed 1 on): every such refusal solved a second 24-seed window it then read.
  */
-/**
- * WHICH OPERAND PAIRS THE GIVENS FORCE TOGETHER (#2506, ADR-AG-399) — `Figure.metPairs` over the same window, the
- * pair twin of {@link collapsedByGivens}. Refusal path only, every lookup a memo hit.
- */
-export function pairsMetByGivens(c: Construction, seed: number): [Id, Id][] {
-  const out: [Id, Id][] = [];
-  for (let s = seed; s <= seed + DRAWABLE_TRIES; s += 1) {
-    for (const p of evaluate(c, s).metPairs ?? []) if (!out.some((q) => q[0] === p[0] && q[1] === p[1])) out.push(p);
+export function collapsedByGivens(c: Construction, at: Seed): Id[] {
+  const out: Id[] = [];
+  for (const f of walkWindow(c, at)) {
+    for (const id of f.collapsedRings ?? []) if (!out.includes(id)) out.push(id);
   }
   return out;
 }
 
-export function collapsedByGivens(c: Construction, seed: number): Id[] {
-  const out: Id[] = [];
-  for (let s = seed; s <= seed + DRAWABLE_TRIES; s += 1) {
-    for (const id of evaluate(c, s).collapsedRings ?? []) if (!out.includes(id)) out.push(id);
+/**
+ * WHICH OPERAND PAIRS THE GIVENS FORCE TOGETHER (#2506, ADR-AG-399) — `Figure.metPairs` over the same window, the
+ * pair twin of {@link collapsedByGivens}. Refusal path only, every lookup a memo hit.
+ */
+export function pairsMetByGivens(c: Construction, at: Seed): [Id, Id][] {
+  const out: [Id, Id][] = [];
+  for (const f of walkWindow(c, at)) {
+    for (const p of f.metPairs ?? []) if (!out.some((q) => q[0] === p[0] && q[1] === p[1])) out.push(p);
   }
+  return out;
+}
+
+/**
+ * THE WINDOW `walkDrawable` EVALUATES FROM `at` (#2894 part 2, ADR-AG-481) — the first figure at the requested
+ * configuration, then seeds `seed + 1 … seed + DRAWABLE_TRIES` at reach 1 with the request's `wide`, exactly the
+ * `evalAt` calls of its forward walk. A reader of "the window the search walked" reads these, so on the refusal path
+ * (where the walk found nothing whole and evaluated all of them) every one is a memo hit.
+ */
+function walkWindow(c: Construction, at: Seed): Figure[] {
+  const { seed, reach, wide } = configurationOf(at);
+  const out: Figure[] = [evaluate(c, seed, reach, wide)];
+  for (let s = seed + 1; s <= seed + DRAWABLE_TRIES; s += 1) out.push(evaluate(c, s, 1, wide));
   return out;
 }
 
@@ -6810,7 +7180,7 @@ export function knownValues(
   if (!open && !pending) return { known: true, value };
   if (!open) return { known: false, pending: true };
   const pool = poolOf(c);
-  if (!opts.fillPool && pool.deferred && !pool.complete()) {
+  if ((!opts.fillPool || pool.held) && pool.deferred && !pool.complete()) {
     const seen: number[][] = [];
     for (const f of admittedOf(c, pool.ready())) {
       const v = read(f);
@@ -6873,6 +7243,7 @@ function sameFamily(cur: NumCurve, first: NumCurve): boolean {
 
 export function knownCurveOptions(c: Construction, id: Id): NumCurve[] | null {
   const read = (f: Figure) => f.curves.find((q) => q.id === id)?.curve ?? null;
+  if (unaskedWhileHeld(c, 0)) return null;
   const first = read(drawableAt(c, 0));
   if (!first) return null;
   const fields = coefficientFields(first);
@@ -6928,6 +7299,8 @@ export function knownCurve(
   // configuration at the first seed, never from a raw seed the tool would not show — measured on the
   // 572 figure, the raw seed 0 had not converged and its slope was 5e-5 off the one every drawable
   // configuration agreed on (#1317).
+  // #2890 (ADR-AG-478): a HELD pool evaluates nothing for a gate: seed 0 not yet asked is a curve not yet known.
+  if (!seeds && unaskedWhileHeld(c, 0)) return null;
   const first = read(drawableAt(c, seeds ? seeds[0] : 0));
   if (!first) return null;
   let pending = false;

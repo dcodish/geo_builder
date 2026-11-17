@@ -89,13 +89,14 @@ describe('#276 — NEW point on a coordinate axis (partial point)', () => {
     expect(d.positions.get('M')!.z).toBeGreaterThan(1e-6);
   });
 
-  it('a NEW point with SYMBOLIC components still takes the coord-sym / refusal lanes (byte-unchanged)', () => {
+  it('a NEW point with SYMBOLIC components takes the coord-sym lane (one letter) or the letter pool (#2563, two letters)', () => {
     expect(parse3('M(k,1,3)').ok).toBe(true); // the ADR-3D-032 coord-sym lane
     submit('M(k,1,3)');
     expect(state().lastError).toBeNull();
     reset();
-    submit('N(k,p,3)'); // two distinct letters — the honest refusal stands
-    expect(state().lastError).toMatchObject({ code: 'symbolic-new-point' });
+    submit('N(k,p,3)'); // #2563 (ADR-3D-489): two distinct letters build a sym-coord point (was the symbolic-new-point refusal)
+    expect(state().lastError).toBeNull();
+    expect(derive3(state().facts, 0).construction.points.get('N')?.kind).toBe('sym-coord');
   });
 });
 

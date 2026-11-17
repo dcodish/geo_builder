@@ -1,0 +1,152 @@
+{
+ "name": "round-2855-w2",
+ "title": "Fix round #2855, wave 2 (#2811 #2812 #2813, #2502, #2709, PR #2818)",
+ "cases": [
+  {
+   "id": "T12",
+   "title": "2-D (refusal): a crossed quadrilateral made by the stated angles is refused",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": ["מרובע ABCD", "∠DAB = 70°", "∠BCD = 110°", "מרובע ABDC"],
+   "expectRefusal": "שנו את אחת הזוויות או את סדר האותיות",
+   "lookFor": "The last line is refused, naming «∠DAB = 70°» and «∠BCD = 110°», and ends «שנו את אחת הזוויות או את סדר האותיות».",
+   "before": "ABDC was drawn crossed, every row green."
+  },
+  {
+   "id": "T13",
+   "title": "2-D (refusal): the same, with the angles typed after the second quadrilateral",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": ["מרובע ABCD", "מרובע ABDC", "∠DAB = 70°", "∠BCD = 110°"],
+   "expectRefusal": "שנו את אחת הזוויות או את סדר האותיות",
+   "lookFor": "«∠BCD = 110°» is refused the same way.",
+   "before": "Accepted; ABDC drawn crossed."
+  },
+  {
+   "id": "T14",
+   "title": "2-D: the quadrilateral with the two angles still builds, convex",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": ["מרובע ABCD", "∠DAB = 70°", "∠BCD = 110°"],
+   "cycles": 2,
+   "expectAbsent": ["שנו את אחת הזוויות"],
+   "lookFor": "A convex quadrilateral at each «הציגו תצורה אחרת»; never a dent at A or C.",
+   "before": "Some configurations drew a dent at C."
+  },
+  {
+   "id": "T15",
+   "title": "2-D (refusal): a circle through a crossed quadrilateral is refused",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": ["מרובע ABCD", "מרובע ABDC", "מעגל חוסם את ABDC"],
+   "expectRefusal": "ABDC",
+   "lookFor": "The circle line is refused with the crossed-shape message.",
+   "before": "Accepted; ABDC drawn crossed under a circle."
+  },
+  {
+   "id": "T16",
+   "title": "Analytic (refusal): the crossed quadrilateral is refused here too",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": ["מרובע ABCD", "∠DAB = 70°", "∠BCD = 110°", "מרובע ABDC"],
+   "expectRefusal": "שנו את אחת הזוויות או את סדר האותיות",
+   "lookFor": "Refused with the same sentence as 2-D.",
+   "before": "Accepted and drawn crossed."
+  },
+  {
+   "id": "T17",
+   "title": "3-D (refusal): the crossed quadrilateral is refused here too",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": ["מרובע ABCD", "∠DAB = 70°", "∠BCD = 110°", "מרובע ABDC"],
+   "expectRefusal": "שנו את אחת הזוויות או את סדר האותיות",
+   "lookFor": "Refused with the same sentence as 2-D.",
+   "before": "Accepted; drawn crossed at most configurations."
+  },
+  {
+   "id": "T18",
+   "title": "Analytic: «AB קוטר האליפסה» is understood",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": ["x^2/25+y^2/9=1", "AB קוטר האליפסה"],
+   "expectRows": ["AB קוטר האליפסה"],
+   "lookFor": "A and B on the ellipse, opposite each other through its centre.",
+   "before": "Not understood (only «AB קוטר באליפסה» was)."
+  },
+  {
+   "id": "T19",
+   "title": "Analytic: «קוטר האליפסה AB» and «AB מיתר האליפסה» are understood",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": ["x^2/25+y^2/9=1", "קוטר האליפסה AB", "CD מיתר האליפסה"],
+   "expectRows": ["קוטר האליפסה AB", "CD מיתר האליפסה"],
+   "lookFor": "Both rows built: AB a diameter, CD a chord, all four points on the ellipse.",
+   "before": "Both not understood."
+  },
+  {
+   "id": "T20",
+   "title": "Analytic: «AB הוא קוטר המעגל» is understood",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": ["נתון מעגל O שמשוואתו x^2+y^2=25", "AB הוא קוטר המעגל"],
+   "expectRows": ["AB הוא קוטר המעגל"],
+   "lookFor": "A and B on circle O, through its centre.",
+   "before": "Not understood (2-D read it)."
+  },
+  {
+   "id": "T21",
+   "title": "Analytic (refusal): a parabola has no diameter",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": ["y^2=8x", "AB קוטר הפרבולה"],
+   "expectRefusal": "לפרבולה אין מרכז",
+   "lookFor": "Refused with «לפרבולה אין מרכז, ולכן אין לה קוטר…».",
+   "before": "Not understood."
+  },
+  {
+   "id": "T22",
+   "title": "Analytic: an ellipse's chip shows the foci only",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": ["נתונה אליפסה שמשוואתה x^2/25+y^2/9=1"],
+   "expect": ["הצג מוקדים"],
+   "expectAbsent": ["הצג מדריכים"],
+   "lookFor": "The ellipse row's chip reads «הצג מוקדים»; no directrix option, no dashed directrix drawn.",
+   "before": "The chip offered «הצג מדריכים» and drew two directrices."
+  },
+  {
+   "id": "T23",
+   "title": "Analytic (unchanged): a parabola's chip still has its directrix",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": ["נתונה פרבולה שמשוואתה y^2=54x"],
+   "expect": ["הצג מדריך"],
+   "lookFor": "The parabola row's chip reads «הצג מדריך».",
+   "before": "unchanged"
+  }
+ ]
+}

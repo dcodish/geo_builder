@@ -14,10 +14,11 @@
  * The caller MOUNTS it per opening (a fresh `key` per point click), so the typed text, the note and the
  * offer never leak from one point to the next — 2-D's `openMenu` reset, made structural.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { color } from '../theme';
-import { afterRename, afterSwap, fillLetters, swapOffered, typedLetter, type LetterHolderView, type LetterRenameResult, type LetterSwapResult } from './letterOffer';
+import { afterRename, afterSwap, fillLetters, swapOffered, typedLetter, type LetterHolderView, type LetterRenameResult, type LetterRetry, type LetterSwapResult } from './letterOffer';
+import { NotDecidedNote } from './NotDecidedNote';
 
 export interface LetterPopoverStrings {
   /** the input's placeholder («אות») */
@@ -32,6 +33,10 @@ export interface LetterPopoverStrings {
   takenBy: string;
   /** the swap button, `{{a}}` = this point, `{{b}}` = the letter asked for («החליפו בין {{a}} ל-{{b}}») */
   swapLetters: string;
+  /** #2893: the caller's `suite.notDecided.message` — shown when its decision reached the work limit */
+  notDecided?: string;
+  /** #2893: the caller's `suite.notDecided.continue` («המשיכו לחפש») */
+  keepSearching?: string;
 }
 
 export interface LetterPopoverProps {
@@ -44,14 +49,22 @@ export interface LetterPopoverProps {
   title: ReactNode;
   /** the clicked point's label — what `onRename`/`onSwap` receive as their first letter */
   label: string;
-  /** absent = no letter input (2-D: a hidden point shows only «show label») */
-  onRename?: (from: string, to: string) => LetterRenameResult;
-  /** absent = no swap offer, even on a taken letter */
-  onSwap?: (a: string, b: string) => LetterSwapResult;
+  /** absent = no letter input (2-D: a hidden point shows only «show label»). The answer may be a promise
+   *  (#2874, ADR-W-210): a rename is a job on the product's work queue. The popover stays as it is while
+   *  the answer is pending, and a second press is not sent. */
+  onRename?: (from: string, to: string, round?: number) => LetterRenameResult | Promise<LetterRenameResult>;
+  /** absent = no swap offer, even on a taken letter. Awaitable, like `onRename`. #2893: `round` continues a decision
+   *  that reached its work limit («המשיכו לחפש»); absent on a first attempt. */
+  onSwap?: (a: string, b: string, round?: number) => LetterSwapResult | Promise<LetterSwapResult>;
   strings: LetterPopoverStrings;
   onClose: () => void;
   /** the longest label the product can type (2-D 3 — `C12`; 3-D 4 — `C12'`) */
   maxLength?: number;
+  /**
+   * the letter the input OPENS with, selected so typing replaces it (analytic #2851: a focus offer opens on the book's
+   * «F1»); absent = an empty input, as every popover opened before it
+   */
+  initialValue?: string;
   /** the product's own extra menu items, below the letter block (2-D: hide/show label) */
   children?: ReactNode;
   testId?: string;
@@ -76,17 +89,31 @@ export const letterPopoverBtn: CSSProperties = {
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
 
-export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, strings, onClose, maxLength = 3, children, testId }: LetterPopoverProps) {
-  const [value, setValue] = useState('');
-  const [note, setNote] = useState<'taken' | 'bad' | null>(null);
+export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, strings, onClose, maxLength = 3, initialValue, children, testId }: LetterPopoverProps) {
+  const [value, setValue] = useState(initialValue ?? '');
+  const [note, setNote] = useState<'taken' | 'bad' | 'not-decided' | null>(null);
+  const [retry, setRetry] = useState<LetterRetry | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
   const [takenBy, setTakenBy] = useState<{ holder: LetterHolderView; to: string } | null>(null);
 
-  function apply() {
-    const to = typedLetter(value);
-    if (!to || !onRename) return;
-    const out = afterRename(onRename(label, to), to);
+  const pending = useRef(false);
+
+  async function apply(round?: number, typed?: string) {
+    const to = typed ?? typedLetter(value);
+    if (!to || !onRename || pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    let res: LetterRenameResult;
+    try {
+      res = round === undefined ? await onRename(label, to) : await onRename(label, to, round);
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+    const out = afterRename(res, to);
     if (out.close) return onClose();
     setNote(out.note);
+    setRetry(out.retry);
     setTakenBy(out.takenBy);
     // #238: the holder is a step row the student has no reason to connect to «האות כבר בשימוש» —
     // the product lights it up, where it can.
@@ -98,12 +125,30 @@ export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, st
    * renamed onto the freed letter; operator ruling 2026-09-18: *"deleting a phase is a capability I do not
    * want to have automatically done as users will not expect the consequences."* A swap destroys nothing.
    */
-  function swap() {
-    if (!takenBy || !onSwap) return;
-    const out = afterSwap(onSwap(label, takenBy.to));
+  async function swap(round?: number, b?: string) {
+    const to = b ?? takenBy?.to;
+    if (!to || !onSwap || pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    let res: LetterSwapResult;
+    try {
+      res = round === undefined ? await onSwap(label, to) : await onSwap(label, to, round);
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+    const out = afterSwap(res, to);
     if (out.close) return onClose();
     setNote(out.note);
+    setRetry(out.retry);
   }
+
+  /** #2893: «המשיכו לחפש» — the same decision, one more round, from where it stopped. */
+  const keepSearching = () => {
+    if (!retry) return;
+    if (retry.kind === 'rename') void apply(retry.round, retry.to);
+    else void swap(retry.round, retry.to);
+  };
 
   return (
     <>
@@ -139,29 +184,34 @@ export function LetterPopover({ x, y, bounds, title, label, onRename, onSwap, st
               value={value}
               maxLength={maxLength}
               placeholder={strings.placeholder}
+              onFocus={initialValue ? (e) => e.currentTarget.select() : undefined}
               onChange={(e) => {
                 setValue(e.target.value);
                 if (note) setNote(null);
                 if (takenBy) setTakenBy(null);
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') apply();
+                if (e.key === 'Enter') void apply();
                 if (e.key === 'Escape') onClose();
               }}
               style={{ width: 64, padding: '3px 6px', fontSize: 13, borderRadius: 6, border: `1px solid ${color.borderStrong}`, textTransform: 'uppercase' }}
             />
-            <button type="button" style={letterPopoverBtn} title={strings.apply} aria-label={strings.apply} onClick={apply}>
+            <button type="button" style={letterPopoverBtn} title={strings.apply} aria-label={strings.apply} onClick={() => void apply()}>
               ✓
             </button>
           </div>
         )}
-        {note && <div style={{ fontSize: 11, color: color.danger }}>{note === 'taken' ? strings.taken : strings.bad}</div>}
+        {note === 'not-decided' ? (
+          <NotDecidedNote message={strings.notDecided ?? ''} continueLabel={strings.keepSearching ?? ''} onContinue={keepSearching} busy={busy} />
+        ) : (
+          note && <div style={{ fontSize: 11, color: color.danger }}>{note === 'taken' ? strings.taken : strings.bad}</div>
+        )}
         {takenBy && (
           <div style={{ fontSize: 11, color: color.muted, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {/* #238: the holder, in the student's OWN wording — a step row they can recognise. */}
             <span>{fillLetters(strings.takenBy, { what: takenBy.holder.text })}</span>
             {onSwap && swapOffered(takenBy.holder) && (
-              <button type="button" data-testid={testId ? `${testId}-swap` : undefined} style={{ ...letterPopoverBtn, textAlign: 'start' }} onClick={swap}>
+              <button type="button" data-testid={testId ? `${testId}-swap` : undefined} style={{ ...letterPopoverBtn, textAlign: 'start' }} onClick={() => void swap()}>
                 {fillLetters(strings.swapLetters, { a: label, b: takenBy.to })}
               </button>
             )}

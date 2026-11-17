@@ -27,6 +27,7 @@ import { honestyGateReport } from './honestyGates';
 import { rightAngleVertexNote } from './unreadParts';
 import { clauseCoverageVerdict } from './clauseCoverage';
 import { extensionSideVerdict } from './extensionSide';
+import { ringOrderVerdict } from './ringOrder';
 import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -245,6 +246,13 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   // #1927 (ADR-608): the crossed-ring refusal, on this seam too, through the same predicate and against the same
   // PREFIX facts — an edit that makes a row declare a ring the figure's placed points can only cross is refused
   // inline with the submit seam's text (ADR-W-006).
+  // #2811 (ADR-826): the ring-order refusal by proof, on this seam too, through the same verdict and the same PREFIX facts
+  const byProof = ringOrderVerdict(editText, r.commands, prefixFacts);
+  if (byProof) {
+    logDebug({ kind: 'input', utterance: editText, source: 'parser', result: `edit-${byProof.result}`, commands: r.commands });
+    setInputNote(t(byProof.messageKey, byProof.params));
+    return false;
+  }
   if (forcedCrossedRing(prefixFacts, r.commands, store().seed)) {
     logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-ring-contradicts-noun', commands: r.commands });
     setInputNote(t('input.ringContradictsNoun', { detail: editText.trim() }));

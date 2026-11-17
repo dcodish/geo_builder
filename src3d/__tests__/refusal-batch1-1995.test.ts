@@ -32,8 +32,6 @@ function submit(line: string, lng: Lng = 'he'): string | null {
 function setUp(lines: readonly string[]) {
   for (const l of lines) expect(submit(l), `setup «${l}»`).toBeNull();
 }
-/** The example the sentence quotes after «למשל» / "for example" — the spelling it teaches. */
-const taught = (sentence: string) => /(?:למשל|for example) «([^»]+)»/.exec(sentence)?.[1] ?? null;
 
 const CUBE = "קובייה ABCDA'B'C'D'";
 const PYRAMID = 'פירמידה SABCD';
@@ -95,11 +93,11 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
     expect(submit('הישר k מאונך למישור ABC')).toBeNull();
   });
 
-  it('symbolic new point: the taught «N(1,2,3)» is taken', () => {
+  // ⚠ REWRITTEN by #2563 (ADR-3D-489; the operator passed PR #2862's T35/T36, 2026-11-12): a new point with letter
+  // coordinates is read (k shared with B, p a new free letter), so the "numeric coordinates" refusal is no longer reached.
+  it('symbolic new point: «N(k,p,3)» is taken', () => {
     setUp([PYRAMID, 'B(2t, t, k)']);
-    const s = submit('N(k,p,3)')!;
-    expect(s).toBe('נקודה חדשה «N» צריכה שיעורים מספריים, למשל «N(1,2,3)». אותיות מותרות רק בשיעורים של נקודה שכבר קיימת בציור.');
-    expect(submit(taught(s)!)).toBeNull();
+    expect(submit('N(k,p,3)')).toBeNull();
   });
 
   it('sign unsatisfiable: says plainly the givens already fix it', () => {
@@ -142,6 +140,8 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
     const s = submit('179 < ∠SAB < 180');
     expect(s).toBe('אין תצורה של הציור שבה הזווית נמצאת בתחום הזה, ולכן הנתון לא נוסף. בדקו את גבולות התחום.');
     expect(s).not.toMatch(/ב- /);
+    // #2893 (ADR-3D-494): a range no angle can be in is refused with the same sentence, without a search
+    expect(submit('∠SAB > 200')).toBe(s);
     expect(submit('60 < ∠SAB < 90')).toBeNull();
   });
 
@@ -167,10 +167,9 @@ describe('#1995 batch 1 — 3-D: the English twins take the same shape, and teac
     expect(submit('הישר k מאונך למישור ABC', 'en')).toBeNull();
   });
 
+  // ⚠ REWRITTEN by #2563 (ADR-3D-489): the symbolic new point is read, in English too.
   it('symbolic new point', () => {
     setUp([PYRAMID, 'B(2t, t, k)']);
-    const s = submit('N(k,p,3)', 'en')!;
-    expect(s).toBe('A new point «N» needs numeric coordinates, for example «N(1,2,3)». Letters are only allowed in the coordinates of a point already in the figure.');
-    expect(submit(taught(s)!)).toBeNull();
+    expect(submit('N(k,p,3)', 'en')).toBeNull();
   });
 });

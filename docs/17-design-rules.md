@@ -264,17 +264,26 @@ statement is asserting a given the student never gave.
 
 - Any loop that calls `replay`/`evaluate` more than once takes a deadline parameter. No unbudgeted
   sweeps (the 2026-07-06 review found `resample` frozen for 28 s on a hard figure because it was the
-  one loop without a budget).
+  one loop without a budget). *Check:* the work-meter gate ([docs/08](08-testing-strategy.md), "The work
+  meter"; [ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1): a sweep added to an action raises that
+  action's count and fails the suite. It counts work with no clock, so it cannot see whether a loop takes a
+  deadline: that half is still read in review.
 - The failure path must be cheaper than the success path, never ~10× dearer: solvers early-out on
-  divergence; searches check their deadline *inside* the innermost replay loop.
-- New layers never add a second sampler (M3). If you need samples, take the shared set.
+  divergence; searches check their deadline *inside* the innermost replay loop. *Check:* the slow corpus's
+  refused lines, on demand (`npm run work:check -- <builder> --slow`). The suite's gate walks fixtures, whose
+  rows are accepted ones, so it does not check this rule.
+- New layers never add a second sampler (M3). If you need samples, take the shared set. *Check:* the
+  work-meter gate: a second sampler raises the `detect` or the submit count of every fixture it runs on.
 - Before adding a solver feature, measure one `replay` of the hardest locked scenario before/after and
   put both numbers in the ADR. A correctness feature that doubles replay cost needs the operator's
-  sign-off, not silence.
+  sign-off, not silence. *Check:* the work-meter gate makes this mechanical in all four builders: the rise
+  fails the suite, and `npm run work:record -- <builder> --accept-rise` prints the before and after that go
+  in the ADR.
 - A work-count budget charges every memo hit the work it saved, or proves no memo is reachable, because a
   hit counted as zero makes the verdict depend on cache warmth. Its determinism lock runs cold, then warm,
   on a figure whose cost sits in memoized calls, and asserts equal work, not only an equal verdict
-  ([ADR-558](06-decisions.md#adr-558) → #1605).
+  ([ADR-558](06-decisions.md#adr-558) → #1605). *Check:* every builder's work-meter gate ends with this lock
+  on its own counts: two figures walked again, after the whole corpus and twice in a row, with equal work.
 
 ## 8. Escalation template (when the right fix is too big for the session)
 

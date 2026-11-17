@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-10T18:09:28.110Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AB = AC",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "B",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "pair",
+                "from": "A",
+                "to": "C"
+              }
+            }
+          ]
+        }
+      ],
+      "enabled": false
+    },
+    {
+      "utterance": "זווית ABC = זווית ACB",
+      "cmds": [
+        {
+          "type": "angle-mark",
+          "vertex": "B",
+          "p": "A",
+          "q": "C"
+        },
+        {
+          "type": "angle-mark",
+          "vertex": "C",
+          "p": "A",
+          "q": "B"
+        },
+        {
+          "type": "angle-pair-eq",
+          "a": {
+            "kind": "pair",
+            "from": "B",
+            "to": "A"
+          },
+          "b": {
+            "kind": "pair",
+            "from": "B",
+            "to": "C"
+          },
+          "c": {
+            "kind": "pair",
+            "from": "C",
+            "to": "A"
+          },
+          "d": {
+            "kind": "pair",
+            "from": "C",
+            "to": "B"
+          }
+        }
+      ]
+    }
+  ]
+}

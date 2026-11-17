@@ -28,6 +28,14 @@
  * is the engine's own `hasLocus` — the point's own motion over its part's freedom, at the configuration being shown —
  * started from the free positions `drawableAt` gives, which is the same start `locusOf` walks from.
  *
+ * ## …except a point stated ON a carrier that holds still (#2849, ADR-AG-472)
+ *
+ * Operator, 2026-11-12: *"whenever a point is on a given curve, there is no point of giving it a chip. it just clutters the
+ * screen and is meaningless"*. The chord's ends on the ellipse, «M על המעגל I», «D על האליפסה»: each one's locus is the
+ * curve the student typed, so the engine's `onFixedCarrier` drops its chip. A point on a carrier that itself moves, a
+ * derived point (a midpoint, a foot, a crossing) and the bisector's «נקודה M» keep theirs. This loop is the one place a
+ * chip is chosen: the ask never re-decides it (it answers a chip's record, and a typed locus question points to the chip).
+ *
  * ## Where it sits: the row that INTRODUCED the point
  *
  * The construction's line provenance, `objectLine` (#1687, ADR-AG-348), is the fold's own attribution — the first
@@ -36,9 +44,10 @@
  * the solve's fit and this chip (ADR-AG-352 Am. 1).
  */
 import { ask, type Answer } from './ask';
-import type { Derivation } from '../engine/derive';
-import { drawableAt, drawnChoiceSeed } from '../engine/evaluate';
-import { hasLocus } from '../engine/locus';
+import { CONFIGURATIONS_MAX, type Derivation } from '../engine/derive';
+import { ContentCache } from '../engine/content';
+import { configurationKey, drawableAt, drawnChoiceSeed, type Figure } from '../engine/evaluate';
+import { hasLocus, onFixedCarrier } from '../engine/locus';
 import { isFree, type Id } from '../engine/types';
 import { locusSentence } from '../parser/locusPhrases';
 
@@ -71,10 +80,40 @@ export interface LocusChip {
  *
  * Empty for a figure with no free carrier (nothing moves) and for one whose drawable figure has a free carrier with
  * no position (nothing to start from) — both are figures whose ask has no curve to answer with.
+ *
+ * KEPT BY CONTENT (#2890, [ADR-AG-477](../../docs/06c-decisions-analytic.md#adr-ag-477); ADR-W-210 invariant 4). Each chip
+ * is a rank or two (`hasLocus`, `onFixedCarrier`), and the page asks on every render of a figure, behind no memo: the one
+ * reader of the page that solved again whatever was already solved (89 924 units in 1 212 recorded actions). The chips
+ * are a pure function of the construction and the configuration drawn, so they are kept under both, as every solver memo
+ * is (`content.ts`), for as long as the line list is, and travel with it in a settled result (`engine/settle.ts`). The two
+ * figures the answer was read from are kept beside it, so a derivation built by hand around another figure is never
+ * answered by this one's. What a caller gets is its own copy.
  */
 export function locusChips(d: Derivation): LocusChip[] {
   if (d.figure.points.length === 0) return [];
+  // Asked through the caller's construction whether or not the chips are kept: the ask is the reader's (ADR-AG-476).
   const f = drawableAt(d.construction, d.configuration);
+  let kept = chipsMemo.get(d.construction);
+  if (!kept) {
+    kept = new Map();
+    chipsMemo.set(d.construction, kept);
+  }
+  const key = configurationKey(d.configuration);
+  const hit = kept.get(key);
+  if (hit && hit.shown === d.figure && hit.at === f) return hit.chips.map((c) => ({ ...c }));
+  const chips = chipsOf(d, f);
+  if (!hit && kept.size >= LOCUS_CHIPS_KEPT) kept.delete(kept.keys().next().value as string);
+  kept.set(key, { shown: d.figure, at: f, chips });
+  return chips.map((c) => ({ ...c }));
+}
+
+/** How many configurations' chips are kept per figure: as many as `derive` keeps of one line list. */
+export const LOCUS_CHIPS_KEPT = CONFIGURATIONS_MAX;
+
+/** Per construction and configuration drawn: the chips, and the two figures they were read from. */
+const chipsMemo = new ContentCache<Map<string, { shown: Figure; at: Figure; chips: LocusChip[] }>>('chipsMemo');
+
+function chipsOf(d: Derivation, f: Figure): LocusChip[] {
   const start = new Map<Id, { x: number; y: number }>();
   for (const o of d.construction.objects) {
     if (!isFree(o)) continue;
@@ -86,7 +125,10 @@ export function locusChips(d: Derivation): LocusChip[] {
   for (const p of d.figure.points) {
     const line = d.construction.objectLine?.[p.id];
     if (line === undefined) continue;
-    if (!hasLocus(d.construction, f.env, p.id, start, d.configuration.seed, drawnChoiceSeed(f, d.configuration.seed))) continue;
+    const choice = drawnChoiceSeed(f, d.configuration.seed);
+    if (!hasLocus(d.construction, f.env, p.id, start, d.configuration.seed, choice)) continue;
+    // #2849 (ADR-AG-472): a point stated on a carrier that holds still has that carrier for its locus, already drawn.
+    if (onFixedCarrier(d.construction, f.env, p.id, start, d.configuration.seed, choice)) continue;
     chips.push({ line, id: p.id, sentence: locusSentence(p.id) });
   }
   return chips;

@@ -50,7 +50,7 @@ reading, with one implementation and two consumers.
 
 | Layer | Modules | What they are |
 |---|---|---|
-| **Primitives** | `theme.ts` · `bidi.ts` · `i18n.ts` · `format.ts` · `math.tsx` · `symbols.ts` · `save.ts` · `switcherConfig.ts` | Pure, no React, no product knowledge. Design tokens, bidi isolation, the i18n bootstrap, number/math display, the save envelope, the config overlay merge |
+| **Primitives** | `theme.ts` · `bidi.ts` · `i18n.ts` · `format.ts` · `math.tsx` · `symbols.ts` · `save.ts` · `switcherConfig.ts` · `work.ts` (the work queue, below) | Pure, no React, no product knowledge. Design tokens, bidi isolation, the i18n bootstrap, number/math display, the save envelope, the config overlay merge |
 | **Frame** | `AppFrame` · `Workbench` · `Switcher` · `InputArea` · `FactList` · `DataPanel` · `AskLane` · `SymbolRow` · `QuickChips` · `Banner` (`error`, `notice`, `info`) · `InfoNote` (the ⓘ on the `info` strip, [ADR-W-180](06w-decisions-workspace.md#adr-w-180); `NarrowingNote` is its name for the narrowing family) · `ManualScreen` · `Modal` · `ToolButton` · `FigureName` | React components implementing the D1–D10 rulings ([02w, *Suite rulings*](02w-requirements-workspace.md), moved from docs/28 §4a), each taking its product-shaped content as a slot |
 | **Export** | `export/svgToPng.ts` · `export/questionDoc.ts` | The shared output paths behind "save image" and "download question" — four consumers: every builder hands `questionDoc` its own givens list and bidi segmenter ([ADR-W-126](06w-decisions-workspace.md#adr-w-126)) |
 | **Also in the tree** | `ticks.ts` · `proofTarget.ts` · `studentText.ts` · `conjunction.ts` · `indexedName.ts` · `marks.ts` · `displayMode.ts` · `mathExpr.ts` · `usageLog.ts` · `session/` · `llm/` · `seo/` · frame: `LetterPopover` · `SegmentMenu` · `ResumeOffer` · `ShareSheet` | Not yet described in a section of their own: the primitives above plus the session, LLM-harness and site-metadata folders, and the frame pieces named |
@@ -257,7 +257,7 @@ Shell CODE holds no strings. The one exception, ruled by the operator on 2026-10
 - **Refusal voice ([ADR-W-151](06w-decisions-workspace.md#adr-w-151), #1868).** The "not understood" refusal is one suite key, `suite.refusal.notUnderstood`, with no interpolation (no echo of the line). Every builder's not-understood path reads it: 2-D's submit pipeline and `rightAngleVertexNote`, 3-D's `errorText3` for `not-understood`, analytic's and complex's `errorText` for `not-handled`. `<tree>/__tests__/not-understood-1868.test.ts` renders it through each builder's own refusal path (assertions in `shell/__tests__/fixtures/not-understood-1868.ts`); `suite-vocabulary.test.ts` holds the ruled text, the four retired keys, and the "tool's limit" frame (any message saying «מגבלה של הכלי» opens «הכלי עדיין לא יודע» and closes «— זו מגבלה של הכלי»).
 - **The already-there note ([ADR-W-152](06w-decisions-workspace.md#adr-w-152), #1990 → [ADR-W-204](06w-decisions-workspace.md#adr-w-204), #2790).** A line the figure already holds is recorded as its own row with one suite key, `suite.notice.alreadyHeld`, «זה כבר קיים באיור — נוסף כנתון נפרד.», with no interpolation: 2-D's `decideDeterministic` and `editPipeline`, analytic's held `record` (`notice.code: 'already-held'`, ADR-AG-462), complex's `record` `note` (ADR-CX-089). 3-D still answers its `already-stated` no-row notice with the older key `suite.notice.alreadyDrawn` until its port lands. `<tree>/__tests__/already-drawn-1990.test.ts` drives a restatement through each builder (assertions in `shell/__tests__/fixtures/already-drawn-1990.ts`); `suite-vocabulary.test.ts` holds the text and the five retired keys.
 - **The «same point» notice ([ADR-W-176](06w-decisions-workspace.md#adr-w-176), #1595; on `InfoNote` in every builder, [ADR-W-180](06w-decisions-workspace.md#adr-w-180)).** Two letters the drawn figure puts on one dot are named in one suite key, `suite.notice.converge`, 2-D's ADR-123 «{{a}} ו-{{b}} נפלו על אותה נקודה.». `shell/converge.ts` holds the shared half: `coincidentPairs(points, same)` and `convergeText(pairs, t, name?)`. Each builder passes the points its canvas labels and its own identity test (2-D `LEN_EPS` with the forcedness split and the ADR-447 filter, 3-D `samePlace3`, analytic `crossings.apart`, complex the solver's `TOL`), and reads them from the drawn derivation on every render. Locked per tree by `<tree>/__tests__/converge-1595.test.ts` (assertions in `shell/__tests__/fixtures/converge-1595.ts`).
-- **The proof-target refusal ([ADR-W-194](06w-decisions-workspace.md#adr-w-194), #2492).** One suite key, `suite.refusal.proofTarget` (ADR-W-107's sentence, the claim in `{{sentence}}`), read by every builder; the four product keys are retired. A second sentence says where the claim can be checked: 2-D's own `input.scope.proofTargetCheck` (the operator's sentence, the button's label nested as `$t(actions.viewRelations)`), and `suite.refusal.proofTargetCheckPanel` for a builder that sends the student to its data panel, whose `{{panel}}` and `{{ask}}` are that builder's own labels. `shell/proofTarget.ts` holds the two key names and `proofTargetPanelText(t, sentence, labels)`. Details under *Proof targets* below.
+- **The proof-target refusal ([ADR-W-194](06w-decisions-workspace.md#adr-w-194), #2492).** One suite key, `suite.refusal.proofTarget` (ADR-W-107's sentence, the claim in `{{sentence}}`), read by every builder; the four product keys are retired. A second sentence says where the claim can be checked: 2-D's own `input.scope.proofTargetCheck` (the operator's sentence, the button's label nested as `$t(actions.viewRelations)`), and `suite.refusal.proofTargetCheckPanel` for a builder that sends the student to its data panel, whose `{{panel}}` and `{{ask}}` are that builder's own labels; 3-D's own `err.proofTargetCheck` names what its panel can check ([ADR-W-205](06w-decisions-workspace.md#adr-w-205)). `shell/proofTarget.ts` holds the two key names and `proofTargetPanelText(t, sentence, labels)`. Details under *Proof targets* below.
 
 ### Student-facing text ([ADR-W-096](06w-decisions-workspace.md#adr-w-096))
 
@@ -406,7 +406,7 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 | --- | --- | --- |
 | 2-D | `input.scope.proofTargetCheck`: «ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור $t(actions.viewRelations).», the label nested from the key that labels the button | `proofTargetNote(sentence)` (`src/app/decideDeterministic.ts`): a `DecideNote` whose `also` is the line. The submit seam and the ✎ edit seam both render it with `renderNote` |
 | analytic, complex | `suite.refusal.proofTargetCheckPanel`, with `panel` = `t('dataTitle')` and `ask` = `t('askAdd')`: the panel's heading and its ask button, as that App draws them | `proofTargetPanelText` (`shell/proofTarget.ts`), called by each `errorText` |
-| 3-D | none yet (the 3-D arm is with the operator, #2492): its ask box shows no length on a figure with no stated size | `errorText3` reads `suite.refusal.proofTarget` alone |
+| 3-D | `err.proofTargetCheck` ([ADR-W-205](06w-decisions-workspace.md#adr-w-205)): «ניתן לבדוק טענה על זווית, ניצבות או מקביליות בחלונית «$t(dataPanel.title)»: שאלו שם על הזווית ולחצו «$t(query.add)» — למשל ∠(AB, CD).», a product key because it names what 3-D's panel answers (its ask box shows no length on a figure with no stated size); both names nested from the keys App3 draws | `errorText3`: the suite sentence, then the line |
 
 The panel line sends the student to the claim's QUANTITIES («עבור AB = AC שאלו על AB ועל AC»), because no ask box judges a typed claim. A builder that adopts it passes its own labels; it never retypes them.
 
@@ -481,6 +481,95 @@ The model is never called. **The meta-lock** runs the same checks against an ora
 
 ## The frame's surfaces
 
+### The work queue and the working indicator ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 2, #2874)
+
+**One job per student action; the working state is counted, never set.** `shell/work.ts` is pure (no React, no builder, no string):
+
+- `createWorkQueue({ paint?, basis?, sameBasis?, behind?, span? })` → `run(work, { lane?, paint?, behind? })`, `runIfIdle(…)`, `working(lane?)`, `inJob()`, `subscribe`, `idle()`.
+- **A job's life:** counted the moment it is asked for → waits for a paint (the indicator is on screen) → runs after every earlier job of its lane → its joined work settles → waits for the paint that shows what it produced → released, in a `finally`. In a builder that solves inside the React render, the heavy part runs after the store update the job made, which is why the closing paint is part of the job.
+- **`working(lane)` is the lane's count.** Nothing sets or clears it, so no exit can leave a tool working and none can forget to say so.
+- **Lanes** are named serial queues. `interactive` (the default) is the student's actions; a builder names others for work shown elsewhere (`another`: «הציגו תצורה אחרת», on its own button) or nested in a job that has already painted (`model`: the model call inside a submit, `paint: false`).
+- **The job handle:** `basis` and `stale()` (the stamp of the facts and seed the job STARTED on), `join(promise)` (work started and not awaited belongs to the job), `paint()` (a long job shows progress).
+- **The stamp is read when the job's turn starts**, after its opening paint and after every job it waited behind ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 4, #2890). Phase 1 read it when the job was asked for, so an action that waited its turn behind another looked stale by construction, though it acts on the figure as it then is (`useLatest`, below). `stale()` now means one thing: something else changed the figure while THIS job worked, so its result is for a figure no longer on screen.
+- **Ordering across lanes** (Am. 4). `behind` maps a lane to the lane its jobs take their turn behind (`run` may name one for a single job). Such a job is still counted and shown on its OWN lane, and it also waits for every job the other lane had been asked for before it; the other lane does not wait for it. Every builder declares `{ another: interactive }`: «הציגו תצורה אחרת» pressed while another action runs waits its turn and then searches the figure that action left (ruled), and a line entered while a search runs is still taken at once.
+- **A span of one job** (Am. 4). `span(job)` is called when a job's turn starts, where the stamp is read; what it returns is called when the job is released, after its closing paint. It measures one student action WHOLE, the render it causes included: the page-lane work ceiling of a builder that stays on the page's thread is one (`pageLaneCeiling`, below).
+- **`paint` is injected.** In a browser it is two animation frames, and resolves at once in a hidden tab. With no `requestAnimationFrame` (node, the suite) it resolves at once: a job is one promise, and tests that call an engine or a store directly are untouched.
+- `queuedActions(queue, state, names, { around? })` turns the listed store actions into jobs (same arguments, the result in a promise), reading the action from the store when the job runs. `around(name, args, job, runLocal)` is the builder's wrapper of every routed action, the place an action is sent to its solver (Am. 4): run it through the worker client's executor, prime and then `runLocal()`, or send it elsewhere and never call it. `watchBasis(queue, onChange, onFault)` is the basis guard: a figure whose basis changes with no job running is a fault.
+
+**The indicator** is `shell/frame/WorkingMark.tsx`. `InputArea`'s `busy` turns the submit button off, shows `busyLabel` and mounts `WorkingMark`: a ring turned by a CSS animation of `transform` alone, on its own layer (`will-change`), which the browser's compositor keeps running while the page's thread is busy (under «reduce motion», a fade of `opacity`). Its keyframes go into the document head, never into the button, where a `<style>` element would become part of the button's text. `useWorking(queue, lane)` reads the derived state (`useSyncExternalStore`). `useLatest(value)` keeps a component's job bodies as the latest render defines them: a job runs after the paint and after earlier jobs, so a body that closed over the render it was clicked in would act on a figure an earlier job has changed.
+
+**The working look is shown only after `WORKING_SHOWN_AFTER_MS` (300), and the page's thread is not what waits** (ADR-W-210 Am. 2, operator ruling 2026-11-13). In 3-D and analytic the thread that would count the 0.3 s is the one that is busy. So everything a working button changes is in the document from the queue's FIRST paint, invisible, and is revealed by CSS animations of `opacity` alone as long as the threshold, which the compositor runs like the ring's turn:
+
+- `WorkingFace({ working, idle, busy, slack? })` is a button's label. While working, the element's text is the busy label at once (what a test and a screen reader read); the idle label is drawn over it by a pseudo-element from `data-idle`, and the two swap at the threshold.
+- `workingDim(working, 0.6 | 0.5)` is the class that holds a working button at full strength until the threshold; the strength it greys to stays in the button's own style.
+- **A button has one size, at rest and while working**, because a change of size is layout, which only the page's thread can do. The working label is centred over the face (out of the flow), and the face reserves its width less the `slack` the button's own padding lends it (`InputArea` lends all but 2 px of the submit button's side padding, so «הוסף» keeps the width it always had).
+- `useShownWorking(working)` is the same threshold on the page's own clock, for a second sign whose arrival moves the layout (2-D's small line under the box, its search progress and ✕). It can only be late when the thread is busy; the button never is.
+- A product never renders `WorkingMark` itself: the routing lock fails a product source that does, because a mark drawn outside the face shows from the first frame.
+- Rule for a new reveal: one keyframe animation of `opacity`, as long as the threshold, holding its first value to the end. No `transition`, no `animation-delay`, no property that needs layout or paint (`shell/__tests__/working-reveal-2874.test.tsx`).
+
+**Two contracts are awaitable**, for all four builders: `FactList`'s `onEditCommit` and `LetterPopover`'s `onRename` / `onSwap` accept a promise. The editor and the popover stay open while it is pending; a second commit of the same edit is not sent.
+
+**Each builder's seam** is one module in its `app/`: the queue (with the builder's basis), the routing registry (`JOB_ACTIONS…`: the store actions that write the basis; `FREE_ACTIONS…`: the rest, each with why), the queued table (`act…`, derived from the job list), and `jobStore…()` for code already inside a job.
+
+| Builder | Module | Basis | How the App routes |
+| --- | --- | --- | --- |
+| 2-D | `src/app/work.ts` | `facts`, `seed` | `runSubmit` takes the queue (`SubmitDeps.work`) and is one job; the edit, the toggle and the load run as jobs that `join` the post-commit search; the rest through `act` |
+| 3-D | `src3d/app/work3.ts` | `facts`, `seed` | the submit (decision, dispatch, model call) is one job; the rest through `act3` |
+| Analytic | `src-analytic/app/workAn.ts` | `lines`, `disabled`, `seed`, `seedNames`, `hosts` | the submit is one job; the row actions and the letter popovers are job bodies kept by `useLatest` |
+| Complex | `src-complex/app/workCx.ts` | `lines`, `disabled`, `seed` | the same shape; its fold stays on the page's thread (ADR-W-210's exception) |
+
+A submit asks with `runIfIdle`: while the lane works it is not taken, and the line stays in the box (ADR-W-198).
+
+**The cross-product lock** is `shell/__tests__/fixtures/work-routing-rows.ts` ("How a cross-product wiring guard is written", above), and it guards the class, not a list of today's actions. A store's functions are read at run time, so a new action with no class fails; each free action's `set(…)` calls are read from the store's source, so one that writes a basis field fails; every source of the tree outside `store/` and `app/` is scanned for the hook spellings a component uses (a selector, `getState()`, a destructured hook) naming a job action; and the product's real table is driven under the basis guard. The meta-lock is `work-routing-meta-2874.test.ts`. What the scan cannot see (a store handle passed around under another name) the basis guard reports at run time: each page arms it in development.
+
+### The worker client ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 4, #2890)
+
+**One protocol between a builder's page and its worker, and the same operations where there is no worker.** Lifted out of 2-D's `geoWork` / `geoWorker` (ADR-290), which was the only one; analytic and 3-D get their first worker through it, and complex uses its page-lane half. Four modules, none of which knows a builder, an operation's name, a field of a result or what a checkpoint holds:
+
+| Module | Runs on | Holds |
+| --- | --- | --- |
+| `shell/workerProtocol.ts` | both | the messages, `OpContext`, `Op` / `OpTable`, `cancelled()` / `isCancelled()` |
+| `shell/workerHost.ts` | the worker | `serveWorker(ops, { seed? })`: a builder's worker entry is this one call |
+| `shell/workerClient.ts` | the page | `createWorkerClient({ lanes, executor, seed? })` → `start()`, `run(lane, op, args, { onProgress?, onPart? })`, `cancel(lane, which?)`, `isCancelled`, `remote(lane)` |
+| `shell/workerExecutor.ts` | the page, node | `sameInstanceExecutor`, `pageLaneExecutor`, `isolatedExecutor`, `executorByLane`, `pageLaneCeiling` |
+
+- **The protocol.** Page → worker: `run { id, op, args }`, `seed { args }`, `drop { id }`. Worker → page: `ready`, `progress { id, k, n }`, `part { id, name, value, units }`, `done { id, value, units }`, `error { id, message, units }`. `args` and `value` are the builder's and must survive `structuredClone`. Every `run` carries all its job needs: no message refers to an earlier one, so a worker can be replaced between any two jobs (measured in 2-D: starting every action from a fresh clone of the figure changes 7 of 1 327 recorded actions, Am. 4).
+- **An operation** is `(args, ctx) => value`. `ctx.part(name, value)` sends an intermediate result (a figure before the knowledge that follows it); `ctx.progress(k, n)`; `ctx.tick()` yields to the worker's message loop and resolves `true` when a newer request waits, which is the one way a worker hears anything while it works. An operation that never awaits a tick runs to its end and can only be stopped by terminating its worker.
+- **The host** serves one request at a time in the order received, and answers a SYNCHRONOUS operation inside its own message, as a worker that called its solver directly always did. A value that does not clone is the request's error, by name.
+- **A lane is one worker**, declared by the builder with its `spawn` (the literal `new Worker(new URL('./x.ts', import.meta.url), { type: 'module' })`, which a bundler must see where the file is named: the worker ENTRY stays in the product tree) and its phase (`prePaint`: the student waits for this lane's work, or it is background). A queue lane is what the student sees working; a client lane is a heap. The builder maps one onto the other.
+- **`start()` spawns every lane's worker with the page**, so the chunk downloads beside the page's own assets. 2-D's first line of a session used to wait about 0.4 s for it on the live site (Am. 2).
+- **Cancel is termination** (ADR-W-210). `cancel(lane, which)` rejects the selected requests with `{ cancelled }`. If the one the worker is RUNNING is among them: terminate, spawn, hand the new worker the builder's checkpoint (`seed`), and post again, in order, every request that was not cancelled. A request that was only waiting is dropped by message and the worker keeps its caches. A restart restores exactly two things: the waiting requests (the client's) and the checkpoint (the builder's: content the page holds that saves the worker solving it again; in 2-D the fold of the figure on screen).
+- **A crash** of a worker that was serving rejects the request it was running and restarts the same way. One that crashes before it was ever ready (a blocked or missing chunk) has run nothing, so every request is kept; after three such spawns in a row the lane stops spawning and its requests go to the executor.
+- **The executor is injected**, because the builders differ in what must happen where there is no `Worker`:
+
+  | Executor | The op table lives in | Units charged to | Arguments and values | Used by |
+  | --- | --- | --- | --- | --- |
+  | `sameInstanceExecutor(ops)` | this module instance | the worker lane | by reference | every suite; a browser with no `Worker` |
+  | `pageLaneExecutor(ops)` | this module instance | the page lane | by reference | a builder that stays on the page's thread (complex) |
+  | `isolatedExecutor(ops, { units, seed? })` | a SECOND module instance | that instance's own meter, returned in the envelope | `structuredClone`, both ways | the work-meter gates: a browser's separate heaps |
+
+  `executorByLane({ … })` gives each lane its own. The second instance is loaded by the test (`shell/__tests__/isolated-ops.ts`: `secondInstance(load)` forgets the module registry and runs `load`, whose dynamic imports build a fresh instance with its own caches and its own `shell/workMeter`).
+- **The meter envelope.** `part`, `done` and `error` carry the units the worker's own `shell/workMeter` counted since the job's previous message. The client joins them to the page's meter with `meterRemote(units, lane.prePaint)`: never page work, and before the paint when the lane is one the student waits for (the lane's phase, declared once, not the moment a message arrives). In the same instance the units are charged directly, in the worker lane.
+- **`pageLaneCeiling({ ceiling, onOver })`** is a queue `span`: it reads the page lane at a job's turn and at its release and reports an action over the ceiling. It cuts nothing: the work is done by then, and stopping a solve honestly needs phase 4's "not decided" outcome.
+
+| Builder | Op table | Worker entry | Lanes | Checkpoint | Without a `Worker` |
+| --- | --- | --- | --- | --- | --- |
+| 2-D | `src/store/geoOps.ts` (resample, autoResolve, prefold, detect, values) | `src/store/geoWorker.ts` | `interactive` (waited for), `detect` (background) | the fold of the figure on screen | `sameInstanceExecutor`; the gate injects two isolated ones (`useGeoWorkExecutor`) |
+| Complex | its store's job actions | none | none | none | `pageLaneExecutor`, with `pageLaneCeiling` on its queue |
+| Analytic, 3-D | theirs, in their own phase 3 steps | new | at least one | theirs | theirs |
+
+Locks: `shell/__tests__/worker-client.test.ts` (the host; the client against a fake `Worker` that clones every message and answers later; the three executors; the ceiling) and `shell/__tests__/work-queue-2874.test.ts` (the stamp, `behind`, `span`, `around`).
+
+### The work limit and "not decided" ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) phase 4, #2893)
+
+**A search is bounded in work, never in seconds**, so the suite and the browser run the same control flow and the same input gives the same outcome on every machine (invariant 3).
+
+- `shell/workLimit.ts`: `withWorkLimit(units, fn, read?)` opens a limit counted by default in the work meter's own unit (it reads `readWork().total` at the start; no second counter), or on a counter the builder passes when its solver already keeps a warmth-independent one (2-D's ADR-558 count charges a memo hit as the work it saved, so a warm cache and a cold one stop at the same place); it returns `{ value, reached, spent }`. A search's loop asks `limitReached()` where it read a clock. Limits nest: each is its own, and an outer one is reached by everything spent inside it. `unitsLeft()` reads the tightest. Each builder names its limits as constants, calibrated to about 10 s on the dev PC and documented with the measurement (operator, 2026-11-13: *"10s is an ok number"*).
+- `shell/notDecided.ts`: `NotDecided<R> = { kind: 'not-decided', resume: R, spent }`, the third outcome of a search beside a verdict and a refusal. `resume` is opaque to everything but the search that made it (what it already tried, so the next round does not repeat it). It is never a verdict, never a refusal naming a statement, never cached as a verdict, never stored as a fact or committed to the undo history, and it crosses the worker client as plain data.
+- `shell/frame/NotDecidedNote.tsx`: the page's face, placed where the builder shows a refusal. String-free: the caller passes `t('suite.notDecided.message')` («עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.») and `t('suite.notDecided.continue')` («המשיכו לחפש»); `onContinue` runs one more round of the same size from `resume` (operator, 2026-11-14, #2893 questions 1 and 2). A `status`, not an `alert`: nothing was refused.
+
+- **The letter popover** (`frame/letterOffer.ts`, `LetterPopover`): a rename answers `{ ok: false, reason: 'not-decided', round }` and a swap `{ ok: false, notDecided: { round } }` when the product's decision reached its work limit. That is not a refusal: the popover shows `NotDecidedNote` where it shows the invalid note (the caller passes `strings.notDecided` / `strings.keepSearching`, its `suite.notDecided` keys), and «המשיכו לחפש» calls the same callback again with `round`.
+
 ### The created-points notice ([ADR-W-162](06w-decisions-workspace.md#adr-w-162), #1467)
 
 `shell/frame/CreatedNotice.tsx` is a string-free `Banner kind="notice"` whose dismiss is the undo: ✕ (accessible
@@ -536,7 +625,7 @@ catalog's section display the rows a student was told to look for?"* lives in th
 
 ### One wording per role, and the first-visit About ([ADR-W-098](06w-decisions-workspace.md#adr-w-098))
 
-Shell holds no strings, so the suite vocabulary is held by a lock, not a module: `shell/__tests__/suite-vocabulary.test.ts` maps nine roles (determined, DOF count, busy, ask, undo, redo, clear-all, show-another, About) to each product's key(s), reads the four locales by file, and requires one wording per role in each language, anchored to the operator's ruled text. A product without a surface (complex has no busy state) is recorded as absent with its reason. The first-visit About is `AppFrameAbout.autoOpenKey`: opt-in, one localStorage key per product, written on close. 2-D's first-visit About uses it under the `geo_intro_seen` key.
+Shell holds no strings, so the suite vocabulary is held by a lock, not a module: `shell/__tests__/suite-vocabulary.test.ts` maps nine roles (determined, DOF count, busy, ask, undo, redo, clear-all, show-another, About) to each product's key(s), reads the four locales by file, and requires one wording per role in each language, anchored to the operator's ruled text. A product without a surface is recorded as absent with its reason (none lacks the busy state since #2874). The first-visit About is `AppFrameAbout.autoOpenKey`: opt-in, one localStorage key per product, written on close. 2-D's first-visit About uses it under the `geo_intro_seen` key.
 
 ### The current tool is in view on a phone ([ADR-W-097](06w-decisions-workspace.md#adr-w-097))
 
@@ -595,8 +684,8 @@ are good: that stays reviewed prose, per product and per locale.
 | --- | --- |
 | `x`, `y`, `bounds` | the anchor (the click) and the canvas size, in px of the positioned container. Placed by **physical** `left`/`top`, clamped into the canvas, never a logical inset (under RTL that mirrors the menu, 2-D F1/REN-1) |
 | `title`, `label` | the header, and the letter the callbacks receive first |
-| `onRename?(from, to)` | returns `{ok:true}` or `{ok:false, reason, holder?}`. `reason:'taken'` with a `holder: {text, onHighlight?}` shows the holder line and the swap offer. Any other reason (including a product's own, such as `busy`) shows the "invalid" note. Absent means no letter box |
-| `onSwap?(a, b)` | returns `{ok}`; absent means no offer |
+| `onRename?(from, to)` | returns `{ok:true}` or `{ok:false, reason, holder?}`, or a promise of one (a rename is a job on the product's work queue, #2874; the popover stays as it is while the answer is pending and a second press is not sent). `reason:'taken'` with a `holder: {text, onHighlight?}` shows the holder line and the swap offer. Any other reason (including a product's own, such as `busy`) shows the "invalid" note. Absent means no letter box |
+| `onSwap?(a, b)` | returns `{ok}`, or a promise of it; absent means no offer |
 | `strings` | `placeholder`, `apply`, `taken`, `bad`, `takenBy` (`{{what}}`), `swapLetters` (`{{a}}`, `{{b}}`) — all from the caller |
 | `maxLength` | the longest typed label (2-D 3, 3-D 4 for `C1'`) |
 | `children` | the product's own items below the letter block (2-D: hide/show label) |
@@ -627,6 +716,8 @@ The caller mounts it once per opening (`key`), so typed text, the note and the o
 | `onClose` | the backdrop and every toggle (the result is seen on the canvas at once) |
 
 **The decisions are in `segmentDisplay.ts`, not in the JSX.** `toggleSegFlag(map, key, flag)` keeps the map canonical: only `true` flags are stored, an all-off entry is removed, and hiding does not forget the dash. `segInk(display)` returns `solid` / `dashed` / `ghost`, and both renderers paint from it and write it as `data-ink`. `segmentMenuItems(state, wired)` returns hide or show, then dashed or solid while the segment is drawn. `cleanSegDisplay(raw)` cleans a loaded map. The key is the product's own (2-D: the seg id; analytic: the endpoint pair `A|B`).
+
+**What a hidden segment takes with it** ([ADR-W-207](06w-decisions-workspace.md#adr-w-207), #2852). `hiddenWith(scene)` is the one decision both flat canvases paint from: given the hidden and drawn segments, the values, knees and ticks, the points other marks touch, and the product's `lone` set, it returns which values, knees and ticks go and which points. The row keeps the value: `FactRow.hidden` draws «מוסתר» (`suite.hiddenRow.mark`, `.title`), and its click is the product's show toggle.
 
 **A hidden segment has no ink, never no existence.** Where segments are clickable, a faint dashed ghost (`data-noexport`) stays on the line so the menu can bring it back. A product's store keeps the segment in the construction.
 
@@ -846,3 +937,29 @@ The images are regenerated, never edited: `scripts/render-icons.mjs` (from each 
 `seo/icon.svg`) and `scripts/render-og.mjs`, which types a figure into the running app and takes the
 app's **own «download image» output** (FR-EX-3's chrome-free export), then lays it beside the icon and
 the name read from the served `<h1>`.
+
+## The work meter ([ADR-W-210](06w-decisions-workspace.md#adr-w-210) Am. 1, #2873)
+
+`shell/workMeter.ts` is the one counter of solver work for all four builders. It lives in `shell/` because
+four engines need the same counter, lane and phase, and an engine may already import a `shell/` primitive.
+It holds no product knowledge: the caller decides what one unit is (the table is in
+[docs/08](08-testing-strategy.md), "The work meter").
+
+- `meterWork(units = 1)` — called from each builder's innermost solving function. It adds to three counters
+  that only ever grow: `total`, `page` (the unit was charged on the page's UI thread) and `prePaint` (the
+  unit was charged before the action's figure could paint).
+- **The lane.** In a real Worker the global scope says so (`globalThis instanceof WorkerGlobalScope`) and no
+  unit is page work. Everywhere else the lane is `page`, unless the work runs inside `inWorkerLane(fn)`:
+  a worker client's synchronous fallback does that, so under node the work a browser sends to its worker
+  is charged to the worker. `inWorkerLane` is synchronous and restores the lane when `fn` returns or throws;
+  `holdWorkerLane()` is the same for an operation that yields and resumes (Am. 4).
+- **Work counted in another heap** (Am. 4) joins these counts through `meterRemote(units, prePaint)`: the
+  units a worker reports with each message (the worker client's envelope, above). They are never page work.
+- **The phase.** `meterAction()` begins one student action and returns `painted()`, `unpainted()` and
+  `end()`. The action's driver calls `painted()` where the App's figure is on screen; `end()` returns the
+  three counts of the action. No builder marks its paints at run time: the phase is the driver's statement.
+- Nothing in a product reads the counters to decide anything, so the meter cannot change a verdict.
+
+The gate's shared half is `shell/__tests__/work-gate.ts`: the baseline file's format, the comparison, the
+message a fix session reads, and the re-record. Each tree's `__tests__/work-meter-gate.test.ts` hands it the
+counts of its own walk. A fifth builder adds one `meterWork()` call, a driver and a gate file.

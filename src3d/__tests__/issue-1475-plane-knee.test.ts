@@ -182,13 +182,14 @@ describe('#1475 — dihedralGeometry (the shared helper)', () => {
   });
 });
 
-describe('#2341 — typed today, a right angle the planes already make is already known (ADR-3D-449)', () => {
-  it('«π1 ניצב ל-π2» over two perpendicular equation planes: «כבר קיים», no row, so no knee', () => {
+// #2790 (ADR-3D-484, ADR-W-200): a held line is its own row and is drawn like any row — the knee is back (was ADR-3D-449's no row)
+describe('#2790 — typed today, a right angle the planes already make is held: its own row, with its knee', () => {
+  it('«π1 ניצב ל-π2» over two perpendicular equation planes: the notice, a row, and the knee', () => {
     build(NAMED_1, NAMED_2);
     st().submit('π1 ניצב ל-π2');
     expect(st().lastError).toBeNull();
-    expect(st().facts).toHaveLength(2);
-    expect(st().lastNotice).toEqual({ code: 'already-stated' });
-    expect(scene(derive3(st().facts, st().seed)).marks).toHaveLength(0);
+    expect(st().facts).toHaveLength(3);
+    expect(st().lastNotice).toEqual({ code: 'already-held' });
+    expect(scene(derive3(st().facts, st().seed)).marks).toHaveLength(1);
   });
 });

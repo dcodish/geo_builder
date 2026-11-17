@@ -24,6 +24,8 @@ function outcomeOf(v: SubmitVerdictCx): Outcome {
       return { verdict: 'asks', code: 'ask-lane' };
     case 'refuse':
       return { verdict: v.error.key === 'not-handled' ? 'not-handled' : 'refused', code: v.error.key };
+    case 'not-decided': // #2893 (ADR-CX-092): the gate reached its work limit; no recorded phrasing reaches it
+      return { verdict: 'not-decided', code: 'not-decided' };
   }
 }
 

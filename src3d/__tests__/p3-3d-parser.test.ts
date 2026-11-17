@@ -32,10 +32,12 @@ describe('#275 — a BARE parametric line «x=(0,2,0)+t(2,-2,0)» (no ℓ: prefi
 
 describe('#322 — re-typing a constraint-macro utterance does NOT duplicate its ScalarPin', () => {
   it('a rhombus-prism macro re-typed keeps ONE length pin (not two)', () => {
-    const once = build(['מנסרה שבסיסה מעוין']);
+    // #2838 (ADR-3D-486): named by its letters — an unlettered noun typed again is a NEW prism, with its own pin
+    const RHOMBUS_PRISM = "מנסרה שבסיסה מעוין ABCDA'B'C'D'";
+    const once = build([RHOMBUS_PRISM]);
     const pins1 = once.scalarPins.length;
     expect(pins1).toBeGreaterThan(0); // the macro pushed at least one length pin
-    const twice = build(['מנסרה שבסיסה מעוין', 'מנסרה שבסיסה מעוין']);
+    const twice = build([RHOMBUS_PRISM, RHOMBUS_PRISM]);
     expect(twice.scalarPins.length).toBe(pins1); // re-type is idempotent (deduped)
   });
 });

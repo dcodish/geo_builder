@@ -141,9 +141,10 @@ export type ParseFailure =
   | { code: 'parabola-no-diameter'; detail: string }
   /**
    * #2625 (ADR-AG-454 Am. 1; operator ruling 2026-11-10, Q-2625b (a)) — «מרכז הפרבולה», «O מרכז הפרבולה», "the centre of the
-   * parabola": the same reason as the diameter's, read by the centre role's reader. `detail` is the line.
+   * parabola": the same reason as the diameter's, read by the centre role's reader. `detail` is the line. `name` (#2835,
+   * ADR-AG-470): the student's letter for the point, which the sentence's next step («O קודקוד הפרבולה») reuses.
    */
-  | { code: 'parabola-no-centre'; detail: string }
+  | { code: 'parabola-no-centre'; detail: string; name?: string }
   /**
    * #1919 (ADR-626, the operator's ruling of 2026-10-08: *"we only support english or hebrew … rejected.
    * in all tools"*) — a letter this tool cannot read. Analytic had no member of the class: it handed
@@ -847,7 +848,7 @@ const NAMING_TAIL_EN = '(?:\\s*,)?(?:\\s+[-–](?=\\s))?\\s*:?\\s*(?:is\\s+|whos
  * copula or a colon after «המעגל». Without one («משוואת המעגל x²+y²=25», the catalog's naming form) the phrase
  * names a circle by its equation and keeps creating it.
  */
-const CONTEXTUAL_CIRCLE_EQ_HE = new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+המעגל(?:\\s+הנתון)?\\s*(?::|\\s(?:היא|הוא)(?=[\\s:]))`);
+const CONTEXTUAL_CIRCLE_EQ_HE = new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+(?:המעגל(?:\\s+הנתון)?|האליפסה(?:\\s+הנתונה)?|הפרבולה(?:\\s+הנתונה)?)\\s*(?::|\\s(?:היא|הוא)(?=[\\s:]))`);
 
 function matchCurve(line: string): CurveHit | null {
   // --- line: «נתון הישר ℓ1: 4y-3x-20=0» · «משוואת הישר AC היא y=-2x+8» · «הישר x=-4» ---
@@ -1038,7 +1039,8 @@ function matchCurve(line: string): CurveHit | null {
       kind,
       eqSrc: heNamed[4],
       ...(heNamed[2] ? { canonical: true as const } : {}),
-      ...(kind === 'circle' && !numeral && CONTEXTUAL_CIRCLE_EQ_HE.test(line) ? { contextual: true } : {}),
+      // The conics too (#2853, ADR-AG-467): «משוואת האליפסה היא …» is about THE ellipse, as «משוואת המעגל היא …» is.
+      ...(!heNamed[2] && !numeral && CONTEXTUAL_CIRCLE_EQ_HE.test(line) ? { contextual: true } : {}),
     };
   }
 
@@ -2730,8 +2732,11 @@ export type RoleRef =
   | { role: 'foci' }
   | { role: 'directrix' }
   | { role: 'perimeter'; noun?: string; ids?: Id[] }
-  /** «הקודקוד הימני של האליפסה» · «הקצה הימני של הציר הגדול» · «קודקוד האליפסה» (#2616, ADR-AG-353). */
-  | { role: 'vertex'; side?: EllipseSide; axis?: 'major' | 'minor' }
+  /**
+   * «הקודקוד הימני של האליפסה» · «הקצה הימני של הציר הגדול» · «קודקוד האליפסה» (#2616, ADR-AG-353). `host` (#2835,
+   * ADR-AG-470): the conic the phrase names — «קודקוד הפרבולה» is the parabola's one vertex; «הקודקוד שלה» names none.
+   */
+  | { role: 'vertex'; host?: 'parabola' | 'ellipse'; side?: EllipseSide; axis?: 'major' | 'minor' }
   /** «קודקודי האליפסה» — the ask (#2616). */
   | { role: 'vertices' }
   /**
@@ -2776,9 +2781,16 @@ const ROLE_ONE_FOCUS_EN = new RegExp(`^one\\s+of\\s+(?:the\\s+|its\\s+)?foci${OF
 const ROLE_FOCI_HE = /^(?:ה?שיעורי\s+)?ה?מוקדי(?:ם)?(?:\s+(?:של\s+)?ה?אליפסה|\s+שלה)?$/;
 const ROLE_FOCI_EN = /^(?:the\s+|its\s+)?(?:coordinates\s+of\s+(?:the\s+)?)?foci(?:\s+of\s+(?:the\s+)?ellipse)?$/i;
 const ROLE_VERTEX_SIDE_HE = new RegExp(`^(?:ה?שיעורי\\s+)?ה?קו?דקוד\\s+ה?${SIDE_HE}${OF_ELLIPSE_HE}$`);
+const ROLE_VERTEX_SIDE_PARABOLA_HE = new RegExp(`^(?:ה?שיעורי\\s+)?ה?קו?דקוד\\s+ה?${SIDE_HE}\\s+(?:של\\s+)?ה?פרבולה$`);
+const ROLE_VERTEX_SIDE_PARABOLA_EN = new RegExp(`^(?:the\\s+)?(?:coordinates\\s+of\\s+(?:the\\s+)?)?${SIDE_EN}\\s+vertex\\s+of\\s+(?:the\\s+)?parabola$`, 'i');
 const ROLE_VERTEX_SIDE_EN = new RegExp(`^(?:the\\s+)?(?:coordinates\\s+of\\s+(?:the\\s+)?)?${SIDE_EN}\\s+vertex${OF_ELLIPSE_EN}$`, 'i');
-const ROLE_VERTEX_ANY_HE = /^(?:ה?שיעורי\s+)?ה?קו?דקוד\s+(?:של\s+)?ה?אליפסה$/;
-const ROLE_VERTEX_ANY_EN = /^(?:a\s+|the\s+)?vertex\s+of\s+(?:the\s+)?ellipse$/i;
+/**
+ * «קודקוד האליפסה» · «קודקוד הפרבולה» · «הקודקוד שלה» (#2835, ADR-AG-470: the parabola is a host of the same reader, its
+ * one vertex a role point like its focus). A bare «הקודקוד» names no conic — it is a polygon's vertex — so it is not read.
+ */
+const ROLE_VERTEX_ANY_HE = /^(?:ה?שיעורי\s+)?ה?קו?דקוד(?:\s+(?:של\s+)?ה?(אליפסה|פרבולה)|\s+שלה)$/;
+const ROLE_VERTEX_ANY_EN =
+  /^(?:a\s+|the\s+)?(?:coordinates\s+of\s+(?:the\s+)?)?(?:vertex\s+of\s+(?:the\s+)?(ellipse|parabola)|(ellipse|parabola)['’]s\s+vertex|its\s+vertex)$/i;
 // #1863 (ADR-AG-377): «מרכז האליפסה» — the book's own noun («מיתר העובר דרך מרכז האליפסה נקרא קוטר»)
 // #2625 (ADR-AG-454 Am. 1; operator ruling 2026-11-10, Q-2625b (a)): the parabola is a host of the same reader, refused.
 const ROLE_ELLIPSE_CENTRE_HE = /^(?:ה?שיעורי\s+)?(?:ה?נקודת\s+)?מרכז\s+(?:של\s+)?ה?(אליפסה|פרבולה)$/;
@@ -2818,7 +2830,14 @@ export function readRoleRef(raw: string): RoleRef | null {
   if (ROLE_FOCI_HE.test(text) || ROLE_FOCI_EN.test(text)) return { role: 'foci' };
   const vertexSide = ROLE_VERTEX_SIDE_HE.exec(text) ?? ROLE_VERTEX_SIDE_EN.exec(text);
   if (vertexSide) return { role: 'vertex', side: ellipseSideOf(vertexSide[1]) };
-  if (ROLE_VERTEX_ANY_HE.test(text) || ROLE_VERTEX_ANY_EN.test(text)) return { role: 'vertex' };
+  // «הקודקוד הימני של הפרבולה» (#2835, ADR-AG-470): read, so M1 can say a parabola's one vertex has no side (out-of-scope).
+  const parabolaSide = ROLE_VERTEX_SIDE_PARABOLA_HE.exec(text) ?? ROLE_VERTEX_SIDE_PARABOLA_EN.exec(text);
+  if (parabolaSide) return { role: 'vertex', host: 'parabola', side: ellipseSideOf(parabolaSide[1]) };
+  const vertexAny = ROLE_VERTEX_ANY_HE.exec(text) ?? ROLE_VERTEX_ANY_EN.exec(text);
+  if (vertexAny) {
+    const hostWord = vertexAny[1] ?? vertexAny[2];
+    return { role: 'vertex', ...(hostWord ? { host: /פרבולה|parabola/i.test(hostWord) ? ('parabola' as const) : ('ellipse' as const) } : {}) };
+  }
   const centre = ROLE_ELLIPSE_CENTRE_HE.exec(text) ?? ROLE_ELLIPSE_CENTRE_EN.exec(text);
   if (centre) return /פרבולה|parabola/i.test(centre[1]) ? { role: 'centre', host: 'parabola' } : { role: 'centre' };
   const axisEnd = ROLE_AXIS_END_HE.exec(text) ?? ROLE_AXIS_END_EN.exec(text);
@@ -2948,14 +2967,16 @@ function parseMeasureRoles(line: string): RuleOutcome {
         const slot = pointSlot(value.replace(/^ב(?=ה?נקודה\s)/, ''));
         if (!slot) continue;
         // «O מרכז הפרבולה» (#2625, ADR-AG-454 Am. 1): a parabola has no centre — understood, refused, never escalated.
-        if (ref.host === 'parabola') return refuse('parabola-no-centre', line);
+        if (ref.host === 'parabola') return { ok: false, code: 'parabola-no-centre', detail: line, ...('name' in slot ? { name: slot.name } : {}) } as ParseResult;
         const facts = (id: Id): Fact[] => [{ t: 'ellipse-centre-of', id, src: line }];
         return 'name' in slot ? made(facts(slot.name)) : withMint(line, slot, facts);
       }
       case 'vertex': {
         const slot = pointSlot(value.replace(/^ב(?=ה?נקודה\s)/, ''));
         if (!slot) continue;
-        const facts = (id: Id): Fact[] => [{ t: 'vertex-of', id, ...(ref.side ? { side: ref.side } : {}), ...(ref.axis ? { axis: ref.axis } : {}), src: line }];
+        const facts = (id: Id): Fact[] => [
+          { t: 'vertex-of', id, ...(ref.host ? { host: ref.host } : {}), ...(ref.side ? { side: ref.side } : {}), ...(ref.axis ? { axis: ref.axis } : {}), src: line },
+        ];
         return 'name' in slot ? made(facts(slot.name)) : withMint(line, slot, facts);
       }
       case 'axis': {
@@ -3033,6 +3054,17 @@ const CANON_CIRCLE_HE = new RegExp(`^${HE_GIVEN}ה?מעגל(?:\\s+ה?קנוני|
 const CANON_CIRCLE_EN = /^(?:given\s+)?(?:a|the)\s+(?:canonical\s+circle|circle\s+(?:centred|centered)\s+at\s+the\s+origin)$/i;
 /** The book's letters for an equation-less canonical ellipse (ruling 2026-10-30, Q1 → A). */
 const CANONICAL_ELLIPSE_EQ = 'x^2/a^2+y^2/b^2=1';
+/**
+ * A BARE CONIC NOUN IS A FREE CONIC (#2853, ADR-AG-467; operator ruling 2026-11-12: *"It should be a free ellipse"*, and for
+ * the parabola *"2853 - A"*, any of the four directions). The letters are the tool's, as the canonical one's are: h, k for
+ * the centre or the vertex (ADR-AG-455's frame), a, b the semi-axes, p the parabola's parameter.
+ */
+const FREE_ELLIPSE_EQ = '(x-h)^2/a^2+(y-k)^2/b^2=1';
+/** The free parabola opening along x, and the same parabola TURNED to open along y (the axis swap of `conicFrame`). */
+const FREE_PARABOLA_EQ = '(y-k)^2=2p(x-h)';
+const FREE_PARABOLA_TURNED_EQ = '(x-h)^2=2p(y-k)';
+const BARE_PARABOLA_HE = new RegExp(`^${HE_GIVEN}ה?פרבולה$`);
+const BARE_PARABOLA_EN = /^(?:given\s+)?(?:a|the)\s+parabola$/i;
 
 function parseCanonicalConic(line: string): RuleOutcome {
   const alone = AXIS_ALONE_HE.exec(line) ?? AXIS_ALONE_EN.exec(line);
@@ -3052,11 +3084,35 @@ function parseCanonicalConic(line: string): RuleOutcome {
     const facts = r.facts.map((f): Fact => (f.t === 'curve' ? { ...f, fresh: true, src: line } : { ...f, src: line }));
     return made([...facts, ...axisFacts]);
   }
-  if (!clause) return null;
+  if (!clause) return freeConic(line);
   // An ellipse declared WITH its equation and the clause: the declaration as the curve reader reads it, then the clause.
   const r = parseClause(head);
   if (!r.ok || !r.facts.some((f) => f.t === 'curve' && f.curve.kind === 'ellipse')) return null;
   return made([...r.facts.map((f) => ({ ...f, src: line })), ...axisFacts]);
+}
+
+/**
+ * «אליפסה» · «נתונה אליפסה» · "an ellipse" — (x−h)²/a² + (y−k)²/b² = 1, all four letters free (#2853, ADR-AG-467). «פרבולה» ·
+ * «נתונה פרבולה» · "a parabola" — (y−k)² = 2p(x−h) with its `turn`, (x−h)² = 2p(y−k): which of the two is drawn is a discrete
+ * axis M1 opens (`opens-along`), and the sign of p the direction along it, so «הציגו תצורה אחרת» reaches all four. `null` when
+ * the line is no bare conic noun.
+ */
+function freeConic(line: string): RuleOutcome {
+  const ellipse = BARE_ELLIPSE_HE.test(line) || BARE_ELLIPSE_EN.test(line);
+  const parabola = !ellipse && (BARE_PARABOLA_HE.test(line) || BARE_PARABOLA_EN.test(line));
+  if (!ellipse && !parabola) return null;
+  const r = parseClause(ellipse ? `נתונה אליפסה שמשוואתה ${FREE_ELLIPSE_EQ}` : `נתונה פרבולה שמשוואתה ${FREE_PARABOLA_EQ}`);
+  if (!r.ok) return null;
+  const turned = parabola ? parseClause(`נתונה פרבולה שמשוואתה ${FREE_PARABOLA_TURNED_EQ}`) : null;
+  const turn = turned?.ok ? turned.facts.find((f) => f.t === 'curve') : undefined;
+  if (parabola && (!turn || turn.t !== 'curve')) return null;
+  return made(
+    r.facts.map((f): Fact =>
+      f.t === 'curve'
+        ? { ...f, fresh: true, ...(turn && turn.t === 'curve' ? { turn: { curve: turn.curve, eqSrc: turn.label.eqSrc ?? FREE_PARABOLA_TURNED_EQ } } : {}), src: line }
+        : { ...f, src: line },
+    ),
+  );
 }
 
 /** «הציר הגדול … על ציר ה-y» → y; «הציר הקטן … על ציר ה-y» → x (the major axis is the other one). */
@@ -3588,8 +3644,15 @@ const TANGENT_FROM_EN = new RegExp(
  */
 // The host: the circle with its centre or name — or the ellipse or parabola (#2618, ADR-AG-355), the third capture.
 const CHORD_CIRCLE_HE = `ב(?:ה)?(?:מעגל(?:\\s+(?:ש?מרכזו\\s+(${NAME})|(${CIRCLE_NAME})))?|(${CONIC_NOUN_HE}))`;
+/*
+ * The ONE chord's host, after the chord (#2502, ADR-AG-468; 2-D's reading): «במעגל», «של המעגל» and the construct state
+ * «המעגל» («AB מיתר המעגל», «CD הוא מיתר של המעגל», «מיתר AB של האליפסה»): the same three groups as `CHORD_CIRCLE_HE`,
+ * so every spelling lowers through the one `chordFacts`. «של» takes the article: «של מעגל» (a circle, indefinite) is not
+ * read here.
+ */
+const CHORD_HOST_HE = `(?:ב(?:ה)?|של\\s+ה|ה)(?:מעגל(?:\\s+(?:ש?מרכזו\\s+(${NAME})|(${CIRCLE_NAME})))?|(${CONIC_NOUN_HE}))`;
 const CHORD_ONE_HE = new RegExp(
-  `^${HE_GIVEN}(?:(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?מיתר|(?:ה)?מיתר\\s+(${NAME})(${NAME}))(?:\\s+${CHORD_CIRCLE_HE})?$`,
+  `^${HE_GIVEN}(?:(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?מיתר|(?:ה)?מיתר\\s+(${NAME})(${NAME}))(?:\\s+${CHORD_HOST_HE})?$`,
 );
 const CHORD_ONE_EN = new RegExp(
   `^(?:(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+chord|(?:the\\s+)?chord\\s+(${NAME})(${NAME}))(?:\\s+(?:of|in)\\s+(?:the\\s+)?(?:circle(?:\\s+(?:centred\\s+at\\s+|centered\\s+at\\s+)?(${CIRCLE_NAME}))?|(${CONIC_NOUN_EN})))?$`,
@@ -3656,7 +3719,9 @@ function clauseFacts(clause: string, line: string): Fact[] | null {
   return r.ok ? r.facts.map((x) => ({ ...x, src: line })) : null;
 }
 
-function parseChord(line: string): RuleOutcome {
+function parseChord(raw: string): RuleOutcome {
+  // «מיתר המעגל AB» — the host before the ends is the same sentence as «מיתר AB של המעגל» (#2502).
+  const line = hostBeforeEnds(raw);
   const one = CHORD_ONE_HE.exec(line);
   const oneEn = one ? null : CHORD_ONE_EN.exec(line);
   if (one || oneEn) {
@@ -5011,6 +5076,18 @@ const THRU_BARE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+(${NAME}${NAME}${NAME})
  */
 
 /**
+ * THE HOST BEFORE THE ENDS — «קוטר המעגל AB», «קוטר האליפסה AB», «מיתר האליפסה AB» (#2502, ADR-AG-468; 2-D reads the circle's
+ * spelling): the construct state with the curve between the noun and the ends. It is the same sentence as «קוטר AB של
+ * המעגל», so it is rewritten to that text, which the diameter and chord readers own, and the two cannot lower apart. Only the
+ * definite noun with no name of its own: «קוטר המעגל AC נמצא על …» and «קוטר מעגל O היוצא מ…» are other sentences.
+ */
+const HOST_BEFORE_ENDS_HE = new RegExp(`^(${HE_GIVEN}(?:ה)?(?:קוטר|מיתר))\\s+(ה(?:מעגל|${CONIC_NOUN_HE}))\\s+((?:${NAME}){2})$`);
+function hostBeforeEnds(line: string): string {
+  const m = HOST_BEFORE_ENDS_HE.exec(line);
+  return m ? `${m[1]} ${m[3]} של ${m[2]}` : line;
+}
+
+/**
  * «BD קוטר במעגל» — a DIAMETER (#1324). The sentence names the two ends and, optionally, the circle; WHICH
  * circle it means is decided at M1 (`diameter-of`), because the parser is pure over one line.
  *
@@ -5028,11 +5105,11 @@ const THRU_BARE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+(${NAME}${NAME}${NAME})
  */
 const DIAM_HE = new RegExp(
   `^${HE_GIVEN}(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?קוטר` +
-    `(?:\\s+(ב|של\\s+)(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)|(פרבולה)))?$`,
+    `(?:\\s+(?:(ב|של\\s+)|(?=ה))(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)|(פרבולה)))?$`,
 );
 /** «קוטר BD במעגל» — the noun first, the same statement. */
 const DIAM_NOUN_FIRST_HE = new RegExp(
-  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(ב|של\\s+)(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)|(פרבולה))$`,
+  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(?:(ב|של\\s+)|(?=ה))(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)|(פרבולה))$`,
 );
 /** «נתון מעגל שקוטרו BD» — the circle DEFINED by its diameter, always a new circle. */
 const DIAM_DEFINE_HE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+ש(?:ה)?קוטר(?:ו|\\s+שלו)(?:\\s+(?:הוא|היא))?\\s+(${NAME})(${NAME})$`);
@@ -5042,7 +5119,9 @@ const DIAM_EN = new RegExp(
 );
 const DIAM_DEFINE_EN = new RegExp(`^(?:the\\s+|a\\s+)?circle\\s+(?:with|on)\\s+(?:the\\s+|a\\s+)?diameter\\s+(${NAME})(${NAME})$`, 'i');
 
-function parseCircleThru(line: string): RuleOutcome {
+function parseCircleThru(raw: string): RuleOutcome {
+  // «קוטר האליפסה AB» — the host before the ends is «קוטר AB של האליפסה» (#2502).
+  const line = hostBeforeEnds(raw);
   const thru = THRU_HE.exec(line) ?? THRU_EN.exec(line);
   const bare = thru ? null : THRU_BARE.exec(line);
   if (thru || bare) {
@@ -10521,6 +10600,10 @@ function parseClauseRules(raw: string): ParseResult {
      * described by its centre letter («נתון מעגל M שמשוואתו …», «משוואת המעגל M היא …») is the circle the figure
      * already has on that centre when it has one — the same statement, matched by the centre.
      */
+    // THE conic (#2853, ADR-AG-467): about the figure's one ellipse / parabola when it has one, created only with none.
+    if (curve.contextual && (curve.kind === 'ellipse' || curve.kind === 'parabola')) {
+      return made([{ t: 'the-conic', kind: curve.kind, create: curveFacts, eq, eqSrc: trim(curve.eqSrc), src: line }]);
+    }
     if (curve.contextual || curve.centre) {
       const about: Fact[] = [{ t: 'circle-eq', circleId: CIRCLE_SENTINEL, eq, src: line }];
       return made([{ t: 'the-circle', create: curveFacts, about, ...(curve.centre ? { match: { centre: curve.centre } } : {}), src: line }]);

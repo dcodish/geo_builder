@@ -56,7 +56,7 @@ import { readAngleAsk, readRoleRef, readTangentNoun, touchTangentNoun, type Role
 import { angleAt } from '../engine/solve';
 import { angleText, lineAngleOf } from './lineAngle';
 import { curveEquationOf, curveParts, directrixText, lettersText, locusEquation, symbolicLocusEquation } from './curveText';
-import { parabolaFocus } from '../engine/curves';
+import { parabolaRolePoint } from '../engine/conicFrame';
 import { ellipseRolePoint, type EllipseRole, type EllipseSide } from '../engine/derived';
 import { ringsNamed } from '../engine/shapes';
 import { isPointName, withPointName } from '../engine/pointName';
@@ -1070,20 +1070,30 @@ function roleAnswer(
   // conic with a focus, parabola or ellipse — the given's reading (M1's `focus-of`).
   // «מרכז הפרבולה» (#2625, ADR-AG-454 Am. 1): understood, and there is none — the refusal's own sentence, worded by the page.
   if (role.role === 'centre' && role.host === 'parabola') return { question, value: null, fact: 'parabola-no-centre' };
-  const ellipseOnly = role.role !== 'focus' && role.role !== 'directrix';
-  const wantKind = ellipseOnly || (role.role === 'focus' && role.host === 'ellipse') ? 'ellipse' : 'parabola';
-  const hosts = role.role === 'focus' && !role.host ? [...hostsOf(d, 'parabola'), ...hostsOf(d, 'ellipse')] : hostsOf(d, wantKind);
+  // The parabola's vertex (#2835, ADR-AG-470) is its one vertex, the focus's twin; a side or an axis word is an ellipse's.
+  const oneVertex = role.role === 'vertex' && !role.side && !role.axis;
+  // «הקודקוד הימני של הפרבולה»: a parabola's one vertex has no side — there is none to answer.
+  if (role.role === 'vertex' && role.host === 'parabola' && !oneVertex) return { question, value: null };
+  const ellipseOnly = role.role !== 'focus' && role.role !== 'directrix' && !oneVertex;
+  const wantKind = ellipseOnly || ((role.role === 'focus' || role.role === 'vertex') && role.host === 'ellipse') ? 'ellipse' : 'parabola';
+  const either = (role.role === 'focus' || oneVertex) && !role.host;
+  const hosts = either ? [...hostsOf(d, 'parabola'), ...hostsOf(d, 'ellipse')] : hostsOf(d, wantKind);
   if (hosts.length !== 1) return { question, value: null, host: { kind: wantKind, found: hosts.length } };
   const cv = knownCurve(d.construction, hosts[0].id);
   // #2735 (ADR-AG-459): a conic the givens fix only in the student's letters answers its role in them, «(2k, 0)», «x = -2k».
-  if (!cv) return { question, value: roleInLetters(d, hosts[0].id, (cur, f) => conicRoleText(cur, role, question, f), fmt) };
+  // #2835 (ADR-AG-470): a parabola's role point the givens fix while the curve stays open — the vertex of «y² = 2px» is
+  // (0, 0) for every p — is knowledge, and answers in numbers before the letters are asked.
+  if (!cv) {
+    const print = (cur: NumCurve, f: (v: number) => string) => conicRoleText(cur, role, question, f);
+    return { question, value: parabolaRoleKnown(d, hosts[0].id, print, fmt) ?? roleInLetters(d, hosts[0].id, print, fmt) };
+  }
   if (cv.kind === 'ellipse') return ellipseRoleAnswer(cv, role, question, fmt);
   if (cv.kind === 'parabola') {
     // The directrix in the one role-line wording the panel prints (am. 1) — derived from the line
     // itself, so no orientation is assumed here.
     if (role.role === 'directrix') return { question, value: directrixText(cv) };
-    const fp = parabolaFocus(cv);
-    return { question, value: `(${fmt(fp.x)}, ${fmt(fp.y)})` };
+    const fp = parabolaRolePoint(cv, role.role === 'vertex' ? 'vertex' : 'focus');
+    return { question, value: `(${fmt(fp.x + 0)}, ${fmt(fp.y + 0)})` };
   }
   return { question, value: null };
 }
@@ -1094,8 +1104,45 @@ function conicRoleText(cur: NumCurve, role: RoleRef, question: string, fmt: (v: 
   if (cur.kind !== 'parabola') return null;
   // y² = 2px: the directrix is x = −p/2 (`parabolaDirectrix`), written as the role line `directrixText` writes a vertical one.
   if (role.role === 'directrix') return `x = ${fmt(-cur.p / 2)}`;
-  const fp = parabolaFocus(cur);
-  return `(${fmt(fp.x)}, ${fmt(fp.y)})`;
+  const fp = parabolaRolePoint(cur, role.role === 'vertex' ? 'vertex' : 'focus');
+  return `(${fmt(fp.x + 0)}, ${fmt(fp.y + 0)})`;
+}
+
+/**
+ * A PARABOLA'S ROLE THE GIVENS FIX WHILE ITS CURVE IS OPEN (#2835, ADR-AG-470) — the numeric arm's printer run at every
+ * configuration with a recording formatter, each recorded number judged by the one knowledge gate (`isKnowledge`), so
+ * the answer is a value only when it is the same in every configuration. A different printed shape anywhere, or a number
+ * that moves, and it answers nothing here (the letters are asked next). A parabola only: it is the vertex's lock.
+ */
+function parabolaRoleKnown(
+  d: Derivation,
+  hostId: Id,
+  print: (cur: NumCurve, fmt: (v: number) => string) => string | null,
+  fmt: (v: number) => string,
+): string | null {
+  const here = d.figure.curves.find((q) => q.id === hostId)?.curve;
+  if (!here || here.kind !== 'parabola') return null;
+  const record = (cur: NumCurve | undefined): { text: string; nums: number[] } | null => {
+    if (!cur || cur.kind !== 'parabola') return null;
+    const nums: number[] = [];
+    const text = print(cur, (v) => {
+      nums.push(v);
+      return `\u0000${nums.length - 1}\u0000`;
+    });
+    return text === null ? null : { text, nums };
+  };
+  const shape = record(here);
+  if (!shape) return null;
+  const values: number[] = [];
+  for (let i = 0; i < shape.nums.length; i += 1) {
+    const k = isKnowledge(d.construction, (f) => {
+      const r = record(f.curves.find((q) => q.id === hostId)?.curve);
+      return r && r.text === shape.text ? r.nums[i] : null;
+    });
+    if (!k.known) return null;
+    values.push(k.value);
+  }
+  return shape.text.replace(/\u0000(\d+)\u0000/g, (_, i: string) => fmt(values[Number(i)] + 0));
 }
 
 /**

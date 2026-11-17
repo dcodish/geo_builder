@@ -147,8 +147,8 @@ describe('surfacing — the DATA PANEL says it, the canvas stays clean (operator
   it('typed on a general tetrahedron the relation is already known (#2341): no row', () => {
     state().clear();
     for (const u of ['פירמידה ABCD', 'AB ו-CD מצטלבים']) submit(u);
-    expect(state().facts).toHaveLength(1);
-    expect(state().lastNotice).toEqual({ code: 'already-stated' });
+    expect(state().facts).toHaveLength(2);
+    expect(state().lastNotice).toEqual({ code: 'already-held' });
   });
 
   it('…and reports a relation the figure merely HOLDS, never stated', () => {

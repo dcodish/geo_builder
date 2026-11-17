@@ -15,8 +15,9 @@ import { buildScene, segKey } from '../render/scene';
 import { Figure } from '../render/Figure';
 import { measurablesOf } from '../app/measurable';
 import { loadAnalyticSession } from '../app/loadSession';
-import { dispatchRename, dispatchSwap } from '../app/rename';
+import { decideRename, dispatchRename, dispatchSwap } from '../app/rename';
 import { segmentDisplayFaults, type InkSeen } from '../../shell/__tests__/fixtures/segment-display-rows';
+import { hiddenRowLines, lonePoints } from '../app/hideOwnership';
 
 const store = () => useAnalyticStore.getState();
 const current = () => derive(store().lines, store().seed, store().seedNames);
@@ -116,5 +117,81 @@ describe('#1653 — the analytic segment display follows its letters and its ses
   it('a hand-edited save cannot inject anything but hidden/dashed flags', () => {
     loadAnalyticSession({ app: 'analytic-builder', version: 1, lines: ['A(0,0)'], seed: 0, segStyle: { 'A|B': { hidden: true, colour: 'red' }, 'B|C': 'x' } }, 'f');
     expect(store().segStyle).toEqual({ 'A|B': { hidden: true } });
+  });
+});
+
+/**
+ * #2852 (ADR-AG-474) — hiding a segment hides what exists only for it, by 2-D's rule (ADR-825) through the one shared
+ * decision. The operator's figure, through the REAL store, `derive`, `buildScene` with the knowledge App hands it
+ * (`stated`, `segStyle`, `lonePoints`) and the REAL `Figure` markup — the markup the image export rasterises.
+ */
+describe('#2852 — the analytic canvas: a hidden segment takes its value, its marks and a point the tool named for it', () => {
+  const RHOMBUS = ['מעוין שצלעו 5', 'גובה המעוין 4.8', 'אלכסוני המעוין על הצירים'];
+  const scene = () => {
+    const d = current();
+    return buildScene(d.figure, d.box, 600, 600, { segStyle: store().segStyle, stated: d.stated, lonePoints: lonePoints(d.construction, d.minted) });
+  };
+  const html = () => renderToStaticMarkup(<Figure scene={scene()} onPick={() => {}} />);
+  const hiddenLines = () =>
+    hiddenRowLines(current().construction, new Set(Object.entries(store().segStyle).filter(([, v]) => v.hidden).map(([k]) => k)));
+
+  it('the operator’s rhombus: hide DH → no H, no knee, no «4.8»; the rhombus unchanged; the row marked; show restores', () => {
+    build(RHOMBUS);
+    expect(current().minted.map((m) => m.id)).toContain('H');
+    const before = scene();
+    expect(before.points.map((p) => p.id)).toContain('H');
+    expect(before.stated.marks.filter((m) => m.kind === 'right')).toHaveLength(1);
+    expect(html()).toMatch(/>4\.8</);
+    const sides = before.segments.filter((g) => g.key !== segKey(['D', 'H'])).map((g) => [g.key, g.x1, g.y1, g.x2, g.y2]);
+
+    store().toggleSegHidden(segKey(['D', 'H']));
+    const after = scene();
+    expect(after.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D']);
+    expect(after.stated.marks.filter((m) => m.kind === 'right')).toHaveLength(0);
+    expect(html()).not.toMatch(/>4\.8</);
+    expect(html()).toMatch(/>5</); // the side's own «5» stays
+    expect(after.segments.find((g) => g.key === segKey(['D', 'H']))?.ink).toBe('ghost');
+    expect(after.segments.filter((g) => g.key !== segKey(['D', 'H'])).map((g) => [g.key, g.x1, g.y1, g.x2, g.y2])).toEqual(sides);
+    expect([...hiddenLines().keys()]).toEqual([1]);
+    // still in the figure: the givens hold, and the height is still there for every question
+    expect(current().construction.objects.some((o) => o.id === 'H')).toBe(true);
+
+    store().toggleSegHidden(segKey(['D', 'H']));
+    expect(scene().points.map((p) => p.id)).toContain('H');
+    expect(scene().stated.marks.filter((m) => m.kind === 'right')).toHaveLength(1);
+    expect(html()).toMatch(/>4\.8</);
+    expect(hiddenLines().size).toBe(0);
+  });
+
+  it('hiding AB in triangle ABC takes AB’s stated value only: A, B and C stay', () => {
+    build(['נתונה הנקודה A(2,6)', 'נתונה הנקודה B(8,2)', 'נתונה הנקודה C(4,10)', 'משולש ABC']);
+    store().toggleSegHidden(segKey(['A', 'B']));
+    expect(scene().points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C']);
+  });
+
+  /**
+   * The operator's ruling of 2026-11-12 on PR #2863 (question 1, option a): a rename makes the point the student's. The
+   * record is the one the rename already writes: the tool's letter is written into its sentence («… פוגש את הצלע בנקודה K»),
+   * so it is no longer `minted` and `lonePoints` never offers it. (The rhombus's «גובה המעוין 4.8» has no naming form, so its
+   * H cannot be renamed today — `rename-not-typed` — and the height of a triangle carries the lock.)
+   */
+  it('a tool-named foot the student RENAMED stays when its height is hidden (H → K, hide AK: K stays)', () => {
+    build(['נתונה הנקודה A(2,6)', 'נתונה הנקודה B(8,2)', 'נתונה הנקודה C(4,10)', 'משולש ABC', 'גובה מנקודה A במשולש ABC']);
+    expect(lonePoints(current().construction, current().minted).has('H')).toBe(true);
+    const s = store();
+    const v = decideRename('H', 'K', { lines: s.lines, disabled: s.disabled, queries: s.queries, spokenFor: s.spokenFor, seed: s.seed, seedNames: s.seedNames, segStyle: s.segStyle, hosts: s.hosts }, current());
+    expect(v.kind).toBe('apply');
+    if (v.kind === 'apply') store().applyRename(v);
+    expect(lonePoints(current().construction, current().minted).has('K')).toBe(false);
+    store().toggleSegHidden(segKey(['A', 'K']));
+    expect(scene().segments.find((g) => g.key === segKey(['A', 'K']))?.ink).toBe('ghost');
+    expect(scene().points.map((p) => p.id)).toContain('K');
+  });
+
+  it('a tool-named point another line uses stays', () => {
+    build([...RHOMBUS, 'M אמצע DH']);
+    store().toggleSegHidden(segKey(['D', 'H']));
+    expect(lonePoints(current().construction, current().minted).has('H')).toBe(false);
+    expect(scene().points.map((p) => p.id)).toContain('H');
   });
 });

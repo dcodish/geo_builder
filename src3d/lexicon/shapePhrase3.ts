@@ -252,3 +252,44 @@ export function definiteShapeExample3(sentence: string, letters: string): string
   const span = shapeNounSpan3(s);
   return span ? `${s.slice(0, span.end)} ${letters}${s.slice(span.end)}`.trim() : s;
 }
+
+/**
+ * #2838 ([ADR-3D-486](../../docs/06b-decisions-3d.md#adr-3d-486)) — the SOLID nouns' words (Hebrew, English), for how
+ * a solid noun is introduced: the same article rule as {@link shapeNounSpan3}, so «הקובייה» is the drawn cube and
+ * «קובייה» a new one (FR-SP-24, widened to solids by the operator's 2026-11-12 ruling).
+ */
+const SOLID_NOUN_WORDS3: ReadonlyArray<readonly [string, string]> = [
+  ['פירמיד[הות]+', 'pyramids?'],
+  ['קוביי?[הות]+', 'cubes?'],
+  ['תיב[הות]+', 'box(?:es)?|cuboids?'],
+  ['מנסר[הות]+', 'prisms?'],
+  ['מקבילונ?(?:ים)?', 'parallelepipeds?'],
+  ['טטר[אה]?ה?דר(?:ו[ןנ])?|ארבעו[ןנ]', 'tetrahedr(?:on|a)'],
+];
+
+/** The FIRST solid-noun occurrence of `s`: where its word ends, and its article (the {@link shapeNounSpan3} rule). */
+export function solidNounSpan3(s: string): { end: number; article: ShapeArticle3 } | null {
+  let best: { at: number; end: number; article: ShapeArticle3 } | null = null;
+  for (const [he, en] of SOLID_NOUN_WORDS3) {
+    const h = new RegExp(String.raw`(?:^|[^א-ת])([א-ת]*?)(?:${he})[א-ת]*`).exec(s);
+    if (h && (!best || h.index < best.at)) {
+      const glued = h[1].replace(/^[וש]+/, '');
+      best = { at: h.index, end: h.index + h[0].length, article: glued === 'ה' ? 'definite' : glued ? 'prefixed' : 'indefinite' };
+    }
+    const e = new RegExp(String.raw`\b(?:${en})\b`, 'i').exec(s);
+    if (e && (!best || e.index < best.at)) {
+      best = { at: e.index, end: e.index + e[0].length, article: EN_DEFINITE3.test(s.slice(0, e.index)) ? 'definite' : 'indefinite' };
+    }
+  }
+  return best && { end: best.end, article: best.article };
+}
+
+/** The article of the first solid noun in `s` (`indefinite` when there is none). */
+export const solidNounArticle3 = (s: string): ShapeArticle3 => solidNounSpan3(s)?.article ?? 'indefinite';
+
+/** #2838 — {@link definiteShapeExample3} for a definite SOLID noun: «הקובייה» → «הקובייה ABCDA'B'C'D'». */
+export function definiteSolidExample3(sentence: string, letters: string): string {
+  const s = sentence.trim();
+  const span = solidNounSpan3(s);
+  return span ? `${s.slice(0, span.end)} ${letters}${s.slice(span.end)}`.trim() : s;
+}

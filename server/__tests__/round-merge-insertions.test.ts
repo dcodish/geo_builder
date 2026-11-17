@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
-import { mergeInsertions } from '../../scripts/round-merge-insertions.mjs';
+import { insertTheirs, mergeInsertions } from '../../scripts/round-merge-insertions.mjs';
 
 describe('round staging merge — both branches inserted at the same point', () => {
   it('keeps both insertions and the shared closing lines ONCE (the round #2822 brace loss)', () => {
@@ -27,5 +27,19 @@ describe('round staging merge — both branches inserted at the same point', () 
 
   it('a side that changed base lines is not a pure insertion — left for a hand merge', () => {
     expect(mergeInsertions('A\nB\nC\n', 'A\nB2\nC\n', 'A\nB\nY\nC\n')).toBeNull();
+  });
+});
+
+describe('round staging merge — theirs inserted one block, ours changed the file elsewhere (an earlier wave)', () => {
+  it('places their block before the shared closers ours still carries, keeping closers once', () => {
+    const base = "export const S = [\n  { name: 'a' },\n];\n";
+    const ours = "// header changed by wave 1\nexport const S = [\n  { name: 'a' },\n  { name: 'w1' },\n];\n";
+    const theirs = "export const S = [\n  { name: 'a' },\n  { name: 'b' },\n];\n";
+    const merged = insertTheirs(base, ours, theirs) as string;
+    expect(merged).toBe("// header changed by wave 1\nexport const S = [\n  { name: 'a' },\n  { name: 'w1' },\n  { name: 'b' },\n];\n");
+  });
+
+  it('their side changed a base line: not a single insertion — hand merge', () => {
+    expect(insertTheirs('A\nB\nC\n', 'A\nB\nX\nC\n', 'A\nB2\nC\n')).toBeNull();
   });
 });

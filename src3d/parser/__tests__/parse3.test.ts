@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { labelTokens, namesQuadBase3, normalize3, parse3 } from '../parse3';
+import { labelTokens, membershipQuestion3, namesQuadBase3, normalize3, parse3, readSubjectFrame3, subjectFrame3 } from '../parse3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
 
@@ -167,5 +167,37 @@ describe('#2490 — the right pyramid lowers the engine\'s one cyclic fix', () =
     ]);
     expect(cmds('פירמידה ישרה ABCDS שבסיסה טרפז').slice(1)).toEqual([{ type: 'length-rel', a1: 'A', b1: 'C', rhs: { pair: ['B', 'D'] }, c: 1, origin: 'shape' }]);
     expect(cmds('פירמידה ישרה ABCDS')).toEqual([{ type: 'solid', kind: 'pyramid4r', ids: ['A', 'B', 'C', 'D', 'S'] }]); // a rectangle: no fix
+  });
+});
+
+// #2062 (ADR-3D-479): the exam's subject frame «הנקודה M מקיימת …» is read as the bare statement it frames
+describe('#2062 — the subject frame «הנקודה M מקיימת …» reads as its statement', () => {
+  const BARE = ['BM = 1/6u - 2/3v + 1/12w', 'AM = 3', 'AM = MB', '∠AMB = 90', 'M אמצע BC', 'AM = t·AB', 'M(1,2,3)'];
+  const FRAMES = ['הנקודה M מקיימת ', 'נקודה M מקיימת ', 'M מקיימת ', 'M מקיים ', 'הנקודה M מקיימת: ', 'M מקיימת: ', 'the point M satisfies ', 'M satisfies ', 'point M satisfies: ', 'נתון כי הנקודה M מקיימת '];
+  it('every frame spelling, in front of every statement M is an operand of, lowers to the bare commands', () => {
+    for (const bare of BARE) {
+      const want = parse3(bare);
+      expect(want.ok, bare).toBe(true);
+      for (const frame of FRAMES) expect(parse3(frame + bare), frame + bare).toEqual(want);
+    }
+  });
+  it('a frame whose statement does not mention its point is not this sentence: left as typed', () => {
+    expect(subjectFrame3('הנקודה D מקיימת AB = 3')).toBe('הנקודה D מקיימת AB = 3');
+    expect(parse3('הנקודה D מקיימת AB = 3').ok).toBe(false);
+    expect(readSubjectFrame3('הנקודה M מקיימת AM = 3')).toEqual({ subject: 'M', rest: 'AM = 3' });
+    expect(readSubjectFrame3("הנקודה M' מקיימת AM = 3")).toBeNull(); // M is not M'
+  });
+});
+
+// #2062 (ADR-3D-480): the membership question, one reader for the main input and the ask lane
+describe('#2062 — «האם הנקודה M נמצאת במישור AEC?» is read as a question', () => {
+  it('reads every spelling, in both languages', () => {
+    for (const q of ['האם הנקודה M נמצאת במישור AEC?', 'האם M נמצאת במישור AEC', 'האם נקודה M נמצא במישור AEC ?', 'האם M שייכת למישור AEC'.replace('למישור', 'במישור'), 'האם M מונחת על המישור AEC?', 'is M in plane AEC?', 'Is the point M on the plane AEC'])
+      expect(membershipQuestion3(q), q).toEqual({ point: 'M', plane: 'AEC' });
+    expect(membershipQuestion3("האם E נמצאת במישור BCC'B'?")).toEqual({ point: 'E', plane: "BCC'B'" });
+    expect(membershipQuestion3('האם M נמצאת במישור π1?')).toEqual({ point: 'M', plane: 'π1' });
+  });
+  it('a statement is not a question', () => {
+    for (const s of ['M נמצאת במישור AEC', 'M על מישור AEC', 'האם AB מקביל למישור AEC?']) expect(membershipQuestion3(s), s).toBeNull();
   });
 });

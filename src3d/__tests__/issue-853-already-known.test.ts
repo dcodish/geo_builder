@@ -29,8 +29,11 @@ const build = (us: string[]) => {
   // #2341 (ADR-3D-449): typed, a held statement is «כבר קיים» with no row; it is kept here as the row a save holds
   for (const u of us) submitOrSave3(u);
 };
+/** #2790 (Q-2790c [judged], ADR-3D-484): a TYPED held row says the held notice only; this lock reads the note's detection on
+ *  the rows as a file holds them (no held mark), where it still speaks. The typed path: already-drawn-1990.test.ts. */
+const asSaved = () => st().facts.map(({ held: _held, ...f }) => f);
 const known = (): Extract<BuildNotice3, { kind: 'already-known' }>[] =>
-  derive3(st().facts, st().seed).notices.filter(
+  derive3(asSaved(), st().seed).notices.filter(
     (n): n is Extract<BuildNotice3, { kind: 'already-known' }> => n.kind === 'already-known',
   );
 
@@ -41,7 +44,8 @@ describe('#853 — the four cases are ONE channel', () => {
 
   /** One figure per case, each the figure its own issue reported. */
   const CASES: { name: string; steps: string[]; rel: string }[] = [
-    { name: '#612 a shape the figure already held', steps: ['פירמידה ABCDS שבסיסה ריבוע', 'ריבוע ABCD'], rel: 'shape' },
+    // #612's shape case left this channel in #2790 (ADR-3D-484): a held shape row says the held notice only (2-D's answer);
+    // its lock is issue-612-615-shape-naming.test.ts and already-drawn-1990.test.ts
     { name: '#396 two self-determined objects', steps: ['המישור π1: z = 0', 'המישור π2: x = 0', 'π1 ניצב ל-π2'], rel: 'objects' },
     { name: '#842 a containment both endpoints already met', steps: [CUBE, 'מישור ABCD', 'E אמצע AC', 'BE מוכל במישור ABCD'], rel: 'contained' },
     { name: '#850 a ∥ the figure implies', steps: [CUBE, "AB מקביל למישור A'B'C'D'"], rel: 'parallel' },

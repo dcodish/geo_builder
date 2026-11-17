@@ -19,6 +19,8 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { freeDofCount3, placementSampled3 } from '../engine/evaluate';
+import { verifyClaim } from '../engine/claims';
+import { scalarPinOrigin3 } from '../engine/types';
 import { numericRank } from '../engine/solve3';
 import { derive3, useGeo3 } from '../store/store3';
 
@@ -135,5 +137,71 @@ describe('#990 — numericRank', () => {
     expect(numericRank([[1e-12, 2e-12], [3e-12, 1e-12]])).toBe(0); // all noise
     expect(numericRank([[1, 1e-12], [0, 1e-12]])).toBe(1); // a real column beside a noise column
     expect(numericRank([[1, 0, 0], [0, 1, 0], [1, 1, 0]])).toBe(2); // third = first + second
+  });
+});
+
+/**
+ * #2795 ([ADR-3D-483](../../docs/06b-decisions-3d.md#adr-3d-483)) — a restatement never moves the drawing. «זווית ABC =
+ * זווית ACB» after «AB = AC» added a cos-eq pin whose rows lie in the length pin's span; the redundant row changed the
+ * Levenberg–Marquardt path and the free triangle moved 1.3e-3 / 3.9e-3 / 1.3e-3 at seeds 1–3 (measured at 13f710fe).
+ * The pivot now measures which pins it holds without driving them (newest stating fact first) and solves the figure
+ * without them, keeping that solution only where their claims hold.
+ */
+describe('#2795 — a held pin is left out of the solve, and still checked', () => {
+  const at = (seed: number) => derive3(useGeo3.getState().facts, seed);
+  const moveOf = (a: ReturnType<typeof at>, b: ReturnType<typeof at>): number => {
+    let m = 0;
+    for (const [id, p] of a.resolved.positions) {
+      const q = b.resolved.positions.get(id);
+      if (q) m = Math.max(m, Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z));
+    }
+    return m;
+  };
+  it.each([
+    [['משולש ABC', 'AB = AC', 'זווית ABC = זווית ACB']],
+    [['משולש שווה שוקיים ABC', 'זווית ABC = זווית ACB']],
+    [['טרפז שווה שוקיים ABCD', 'זווית DAB = זווית ABC']],
+  ])('%j: nothing moves at seeds 0–3 and the cue is unchanged', (seq) => {
+    build(seq.slice(0, -1));
+    const before = [0, 1, 2, 3].map(at);
+    const cue = [0, 1, 2, 3].map(cueAt);
+    submit(seq.at(-1)!);
+    expect(useGeo3.getState().facts).toHaveLength(seq.length);
+    [0, 1, 2, 3].forEach((seed) => {
+      expect(moveOf(before[seed], at(seed)), `@${seed}`).toBeLessThanOrEqual(1e-9);
+      expect(cueAt(seed), `cue @${seed}`).toBe(cue[seed]);
+    });
+  });
+
+  it('the left-out pin is the newest fact’s, it is listed, and its claim is checked (it holds)', () => {
+    build(['משולש ABC', 'AB = AC', 'זווית ABC = זווית ACB']);
+    const d = at(1);
+    const c = d.construction;
+    const angle = c.scalarPins.find((p) => scalarPinOrigin3.get(p)?.fact === 2)!;
+    expect(angle.kind).toBe('cos-eq');
+    expect(scalarPinOrigin3.get(angle)?.claim?.type).toBe('cos-eq');
+    expect(verifyClaim(scalarPinOrigin3.get(angle)!.claim!, c, 0)).toBe(true);
+    expect(Object.values(d.status).every((s) => s === 'ok')).toBe(true);
+  });
+
+  it('untick, then delete, «AB = AC»: the angle equality drives on its own and the triangle stays isosceles', () => {
+    for (const drop of ['toggle', 'remove'] as const) {
+      build(['משולש ABC', 'AB = AC', 'זווית ABC = זווית ACB']);
+      useGeo3.getState()[drop](useGeo3.getState().facts[1].id);
+      for (const seed of [0, 1, 2, 3]) {
+        const p = at(seed).resolved.positions;
+        const len = (a: string, b: string) => Math.hypot(p.get(a)!.x - p.get(b)!.x, p.get(a)!.y - p.get(b)!.y, p.get(a)!.z - p.get(b)!.z);
+        expect(Math.abs(len('A', 'B') - len('A', 'C')), `${drop} @${seed}`).toBeLessThan(1e-6);
+      }
+    }
+  });
+
+  it('a pin that drives is never left out: «AB = AC» alone still makes the triangle isosceles', () => {
+    build(['משולש ABC', 'AB = AC']);
+    for (const seed of [0, 1, 2, 3]) {
+      const p = at(seed).resolved.positions;
+      const len = (a: string, b: string) => Math.hypot(p.get(a)!.x - p.get(b)!.x, p.get(a)!.y - p.get(b)!.y, p.get(a)!.z - p.get(b)!.z);
+      expect(Math.abs(len('A', 'B') - len('A', 'C')), `@${seed}`).toBeLessThan(1e-6);
+    }
   });
 });

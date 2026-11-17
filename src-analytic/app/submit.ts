@@ -216,6 +216,9 @@ const subjectIdsOf = (parsed: { facts: readonly Fact[] }): string[] => {
 const collapseFields = (f: Derivation['faults'][number]) =>
   f.code === 'polygon-collapsed'
     ? { polygon: f.polygon, shape: f.shape, declared: f.declared }
+    : // #2813 (ADR-AG-471) — a ring proved convex by its stated angles: the ring, the other order, the angle lines.
+      f.code === 'ring-contradicts-angles'
+      ? { polygon: f.polygon, pair: f.pair, declared: f.declared }
     : // #1918 (ADR-AG-252) — a circle through a ring its noun forbids, in two sentences: both nouns and the other sentence.
       f.code === 'inscribed-contradicts-declared'
       ? { shape: f.shape, forced: f.forced, declared: f.declared }
@@ -258,7 +261,10 @@ const collapseFields = (f: Derivation['faults'][number]) =>
                             : // #2386 (ADR-AG-310) — a side the line does not have: the word the refusal quotes
                               f.code === 'side-of-vertical' || f.code === 'side-of-horizontal'
                               ? { side: f.side }
-                              : {};
+                              : // #2894 (ADR-AG-483) — stated lengths no figure can have: the other lines, and why
+                                f.code === 'lengths-impossible'
+                                ? { others: f.others, why: f.why }
+                                : {};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {

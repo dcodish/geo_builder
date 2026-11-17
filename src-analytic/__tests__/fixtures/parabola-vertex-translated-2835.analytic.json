@@ -1,0 +1,10 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "(y-3)^2=8(x-2)",
+    "V קודקוד הפרבולה"
+  ],
+  "seed": 0,
+  "name": "#2835 — a translated parabola's vertex named: V at (2, 3)"
+}

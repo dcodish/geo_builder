@@ -161,6 +161,7 @@
       "int-tangent": "«{{detail}}»: two circles with equal radii cannot be internally tangent, because two such circles are the same circle. State only one of the two: «internally tangent» or «with equal radii».",
       "concentric": "«{{detail}}»: two circles with equal radii and a common centre are the same circle. State only one of the two: «concentric» or «with equal radii»."
     },
+    "ringContradictsAngles": "«{{detail}}» can't be added: by {{forcing}}, the shape {{ring}} is convex, and points in convex position have only one order in which the sides don't cross — so {{other}} would fold over itself. Change one of the angles or the order of the letters.",
     "ringContradictsNoun": "The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.",
     "shapeNoun": {
       "right-trapezoid": "right trapezoid",
@@ -356,7 +357,6 @@
     "pair": "{{a}} and {{b}}"
   },
   "errors": {
-    "metricImpossibleTriangle": "Impossible: |{{seg}}| = {{value}} — the sum of two sides of a triangle is always greater than the third side, and {{sides}} = {{sum}}. Check the givens.",
     "metricImpossiblePath": "Impossible: |{{seg}}| = {{value}} — the path from {{a}} to {{b}} via {{via}} is {{sum}}, and a straight segment is shorter than any other path between its endpoints. Check the givens.",
     "angleSumImpossibleTriangle": "Impossible: the angles of a triangle always sum to 180°, and here {{angles}} sum to {{sum}}. Check the givens.",
     "angleSumImpossiblePolygon": "Impossible: the angles of polygon {{poly}} sum to {{bound}}, and here {{angles}} sum to {{sum}}. Check the givens.",
@@ -426,6 +426,12 @@
     "shapeExcluded": "The figure is already known to be a {{actual}}, so it is not called a {{stated}}. Remove the earlier given if you meant {{stated}}.",
     "overConstrained_said": "Can't do that: «{{said}}» contradicts an earlier given — they can't both hold. The reason: {{what}}.",
     "overConstrained_said_vs": "Can't do that: «{{said}}» contradicts «{{other}}» — they can't both hold. The reason: {{what}}.",
+    "lengthsImpossibleValue": "The givens contradict each other: they give the segment {{seg}} two different lengths, {{a}} and {{b}}. Check which of these lengths is wrong.",
+    "lengthsImpossibleValue_said": "The givens in «{{said}}» contradict each other: they give the segment {{seg}} two different lengths, {{a}} and {{b}}. Check which of these lengths is wrong.",
+    "lengthsImpossibleValue_said_vs": "The givens contradict each other — «{{said}}» cannot hold together with «{{other}}»: together they give the segment {{seg}} two different lengths, {{a}} and {{b}}. Check which of these lengths is wrong.",
+    "lengthsImpossibleTriangle": "The givens contradict each other: they make |{{long}}| = {{longLen}} and |{{a}}| + |{{b}}| = {{sum}}, but by the triangle inequality in {{tri}}, always |{{long}}| ≤ |{{a}}| + |{{b}}|. Check which of these lengths is wrong.",
+    "lengthsImpossibleTriangle_said": "The givens in «{{said}}» contradict each other: they make |{{long}}| = {{longLen}} and |{{a}}| + |{{b}}| = {{sum}}, but by the triangle inequality in {{tri}}, always |{{long}}| ≤ |{{a}}| + |{{b}}|. Check which of these lengths is wrong.",
+    "lengthsImpossibleTriangle_said_vs": "The givens contradict each other — «{{said}}» cannot hold together with «{{other}}»: together they make |{{long}}| = {{longLen}} and |{{a}}| + |{{b}}| = {{sum}}, but by the triangle inequality in {{tri}}, always |{{long}}| ≤ |{{a}}| + |{{b}}|. Check which of these lengths is wrong.",
     "restatedSize": "Can't do that: radius of {{circle}} = {{value}} contradicts an earlier given — they can't both hold.",
     "restatedSize_said": "Can't do that: «{{said}}» contradicts an earlier given — they can't both hold.",
     "restatedSize_said_vs": "Can't do that: «{{said}}» contradicts «{{other}}» — they can't both hold.",

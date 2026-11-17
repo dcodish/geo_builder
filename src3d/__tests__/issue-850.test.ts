@@ -33,8 +33,11 @@ const build = (us: string[]) => {
   for (const u of us) submitOrSave3(u);
 };
 /** The #850 CASES of the converged `already-known` channel (#853) — the ∥/⟂ ones. */
+/** #2790 (Q-2790c [judged], ADR-3D-484): a TYPED held row says the held notice only; this lock reads the note's detection on
+ *  the rows as a file holds them (no held mark), where it still speaks. The typed path: already-drawn-1990.test.ts. */
+const asSaved = () => st().facts.map(({ held: _held, ...f }) => f);
 const entailed = (seed = 0) =>
-  derive3(st().facts, seed).notices.filter(
+  derive3(asSaved(), seed).notices.filter(
     (n): n is Extract<BuildNotice3, { kind: 'already-known' }> =>
       n.kind === 'already-known' && (n.rel === 'perp' || n.rel === 'parallel'),
   );
@@ -48,8 +51,8 @@ describe('#2341 — typed today, an entailed relation is already known (ADR-3D-4
     st().submit("קובייה ABCDA'B'C'D'");
     st().submit(line);
     expect(st().lastError).toBeNull();
-    expect(st().facts).toHaveLength(1);
-    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+    expect(st().facts).toHaveLength(2);
+    expect(st().lastNotice).toEqual({ code: 'already-held' });
   });
 });
 

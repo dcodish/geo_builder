@@ -49,6 +49,7 @@ import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
 import { ctxOf } from './scenario-pipeline';
 import { gateVerdict, heldKind } from './submit-gate';
+import { ringOrderVerdict } from '@/app/ringOrder';
 import i18n from '@/i18n';
 import { circleResolver, humanizeError } from '@/i18n/humanizeError';
 import { circleMenuTitle } from '@/i18n/circleText';
@@ -58,7 +59,7 @@ import { latinAngleLetters, latinProseLabels, parse } from '@/parser';
 import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
 import { stripFormatControls } from '../../shell/bidi';
 import { parseValueQuery } from '@/parser/valueQuery';
-import { COLLAPSED_VS, computeValues, detectAll, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
+import { clearReplayCaches, COLLAPSED_VS, computeValues, detectAll, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { roleReadings } from '@/app/roleReadings';
 import { drivenSolveStats } from '@/engine/evaluate';
@@ -1827,7 +1828,8 @@ export const SCENARIOS_4: Scenario[] = [
     check: (fig) => {
       const entries = Object.entries(fig.status);
       const last = entries[entries.length - 1]!;
-      expect(String(last[1]), 'refused as impossible, naming the bound').toMatch(/^impossible: \|AC\| = 9 exceeds 8/);
+      // #2894 (ADR-835 Am. 1, ruling 2026-11-15): the one length-conflict sentence, the triangle's three lengths
+      expect(String(last[1]), 'refused as impossible, naming the bound').toMatch(/^over-constrained: \|AC\| = 9 but \|AB\| \+ \|BC\| = 8 in triangle ABC /);
       expect(fig.pending, 'a proven contradiction is never a pending info state').toBe(false);
       // keep-prior: the 4-4 triangle the student did build is still there
       const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));
@@ -6180,7 +6182,7 @@ export const SCENARIOS_4: Scenario[] = [
           expect(c.center.y).toBeCloseTo(before.center.y, 9);
           expect(c.r).toBeCloseTo(before.r, 9);
         }
-        const next = searchAnotherView(cur.facts, cur.seed, undefined, 60_000);
+        const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY); // #2893: was a generous 60 s clock
         if (!next) break;
         cur = next;
       }
@@ -6729,7 +6731,186 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(A, D) + dist(D, B), 'D stays on AB').toBeCloseTo(dist(A, B), 6);
     },
   },
+  {
+    id: 'crossed-ring-circle-last-2811',
+    title:
+      '#2811 (ADR-826): «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» — the circle line is refused (four points on one circle have one simple order), in every order; one ring with its circle, and two orders with no circle, still build',
+    guards:
+      "Plan of #2811 (armed 2026-11-11 on ADR-W-199 §2 and #2810's review): 2-D refused the circle-FIRST order (the prior pool was all-concyclic) but accepted the circle LAST and drew ABDC crossed at 6/6 seeds (re-measured at pickup on caf619a5: accepted, `findValidConfig` null). Root cause: `forcedCrossedRing` reads only the rings the current line DECLARES, so a line that proves the letters convex — a circle through them, or a rider that completes the circle — was never asked whether it leaves the standing rings a simple drawing. Fix: `ringConvexityProofs` (a circle through every letter, «קמור») and `ringOrderContradiction`, structural and pool-free, blamed on the latest line; a proved ring no longer yields its convexity (`convexityYields`).",
+    steps: ['מרובע ABCD', 'מרובע ABDC'],
+    check(fig) {
+      allStepsOk(fig);
+      // R5, the issue's exact lines, and R4: the circle line is refused
+      for (const circle of ['מעגל חוסם את ABDC', 'מעגל חוסם את ABCD'])
+        expect(gateVerdict(factsOf(['מרובע ABCD', 'מרובע ABDC']), circle), circle).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      // R12: a rider that completes the circle, then the second order
+      expect(gateVerdict(factsOf(['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD']), 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      // R1 and R5b still refuse
+      expect(gateVerdict(factsOf(['מרובע ABCD', 'מעגל חוסם את ABCD']), 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      expect(gateVerdict(factsOf(['מרובע ABCD', 'מרובע ABDC']), 'המרובע ABCD חסום במעגל')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+      // C1 and one ring with its circle commit, every ring simple
+      for (const [before, line] of [[['מרובע ABCD'], 'מרובע ABDC'], [['מרובע ABCD'], 'מעגל חוסם את ABCD']] as const) {
+        expect(gateVerdict(factsOf([...before]), line).kind, line).toBe('commit');
+        const found = findValidConfig(factsOf([...before, line]), 0);
+        expect(found, `${line}: a view exists`).not.toBeNull();
+        const pos = replay(found!.facts, found!.seed).positions;
+        for (const r of line === 'מרובע ABDC' ? [['A', 'B', 'C', 'D'], ['A', 'B', 'D', 'C']] : [['A', 'B', 'C', 'D']])
+          expect(ringSimple(r.map((id) => pos.get(id as Id) as Vec)), `${line}: ${r.join('')} simple`).toBe(true);
+      }
+    },
+  },  {
+    id: 'stated-angle-interior-2813',
+    title:
+      '#2813 (ADR-823): a stated polygon angle is the INTERIOR angle — «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°» is convex at every view, and a second order of its letters is refused on the line that completes it, naming the angle lines',
+    guards:
+      "Operator rulings on #2813: 2026-11-10 (b) *\"a stated polygon angle is always the interior angle … the last line is refused and the refusal names the lines that force it\"*; 2026-11-12 *\"B. a crossed quad is not a quad\"*, with the hint «שנו את אחת הזוויות או את סדר האותיות». Re-measured at pickup on caf619a5 through the gate: A1 «מרובע ABDC» committed and the config search drew ABDC crossed (6/6); A2 (angles last) committed with C seated reflex, a '110°' corner 250° inside; «דלתון ABCD» with the same angles committed a dart. Root cause: every reading of a stated corner was the UNSIGNED ray angle, so a view floor held only to simplicity (ADR-613's yielding ring, ADR-622's reflex seat) could seat a stated corner reflex. Fix: the floor reads the corner's turn against the ring's orientation, and Σ stated interior angles ≥ (n − 3)·180° proves convex position (`ringConvexityProofs`), refused structurally by `ringOrderContradiction` before any pool.",
+    steps: ['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      // A1 — the issue's exact lines: «מרובע ABDC» is refused, naming both angle lines
+      const a1 = factsOf(['מרובע ABCD', '∠DAB = 70°', '∠BCD = 110°']);
+      expect(gateVerdict(a1, 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring', detail: 'input.ringContradictsAngles' });
+      const pr = parse('מרובע ABDC', ctxOf(a1));
+      const v = ringOrderVerdict('מרובע ABDC', pr.ok ? pr.commands : [], a1)!;
+      expect(stripFormatControls(he(v.messageKey, v.params) as string)).toBe(
+        'לא ניתן להוסיף את «מרובע ABDC»: לפי «∠DAB = 70°», «∠BCD = 110°» הצורה ABCD קמורה, ולנקודות במצב קמור יש רק סדר אחד שבו הצלעות לא נחתכות — לכן ABDC מתקפלת על עצמה. שנו את אחת הזוויות או את סדר האותיות.',
+      );
+      // A2 — the angles last: the angle that completes it is the line refused
+      expect(gateVerdict(factsOf(['מרובע ABCD', 'מרובע ABDC', '∠DAB = 70°']), '∠BCD = 110°')).toMatchObject({ kind: 'refused', detail: 'input.ringContradictsAngles' });
+      // the kite with the same angles is refused the same way (a dart would seat a stated corner reflex)
+      expect(gateVerdict(factsOf(['דלתון ABCD', '∠DAB = 70°', '∠BCD = 110°']), 'מרובע ABDC').kind).toBe('refused');
+      // unchanged: two orders with no angle build a concave quadrilateral (ADR-622); one ring with its angles builds
+      expect(gateVerdict(factsOf(['מרובע ABCD']), 'מרובע ABDC').kind).toBe('commit');
+      // the angle-only quadrilateral is convex at every view the search offers
+      for (let seed = 0; seed < 6; seed++) {
+        const found = findValidConfig(a1, seed);
+        expect(found, `seed ${seed}: a view exists`).not.toBeNull();
+        const pos = replay(found!.facts, found!.seed).positions;
+        const q = ['A', 'B', 'C', 'D'].map((id) => pos.get(id as Id)!);
+        const turns = q.map((o, i) => Math.sign((q[(i + 1) % 4].x - o.x) * (q[(i + 2) % 4].y - o.y) - (q[(i + 1) % 4].y - o.y) * (q[(i + 2) % 4].x - o.x)));
+        expect(turns.every((t) => t !== 0 && t === turns[0]), `seed ${seed}: ABCD convex`).toBe(true);
+      }
+    },
+  },
+  {
+    id: 'right-angle-seat-cycles-on-drawn-triangle-2370',
+    title: '#2370: «משולש ABC» · «המשולש ישר זווית» — «הציגו תצורה אחרת» moves the right angle from C to A, to B and back (ADR-828)',
+    guards:
+      "#2370 (P3; found while triaging #2363, measured again at 9cd61315 through the submit pipeline and the worker's resample): after «משולש ABC» · «המשולש ישר זווית» every press of «הציגו תצורה אחרת» answered «only-config» and the right angle stayed at C, though ADR-481 makes the seat a cyclable axis and the one-line «משולש ישר זווית ABC» cycled C → A → B. Root cause: `applyCommand`'s right-triangle seat on a placed vertex wrote `solve` INTO the vertex object of the construction it started from, which is the fold memo's held entry for «משולש ABC» (ADR-280); every candidate the search folded then resumed (ADR-406) from a triangle whose C was already driven, so the seat at A or B had no free vertex left and other seeds sampled nothing. Fix (ADR-828): the vertex is replaced, never written into; the class is locked by a deep-frozen walk of every fixture and catalog example (`engine/__tests__/apply-purity.test.ts`) and the memo by `replay/__tests__/fold-resume.test.ts`.",
+    steps: ['משולש ABC', 'המשולש ישר זווית'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(rightAngleSeat(fig), 'typed: the right angle is at C').toBe('C');
+      // the student's button, three presses, on the session that typed the two lines (the first line's fold is held)
+      for (const lines of [['משולש ABC', 'המשולש ישר זווית'], ['משולש ABC', 'ABC ישר זווית'], ['משולש ישר זווית ABC']]) {
+        const views = pressAll(factsOf(lines), 3);
+        expect(views.length, `${lines.join(' · ')}: every press finds another view`).toBe(4);
+        for (const view of views) expect(Object.values(view.status).every((st) => st === 'ok'), `${lines.join(' · ')}: every view is green`).toBe(true);
+        expect(views.map(rightAngleSeat), `${lines.join(' · ')}: the right angle visits C, A and B, and returns`).toEqual(['C', 'A', 'B', 'C']);
+      }
+      // «משולש ABC» typed again in the same session is a plain triangle: no right angle nobody stated, at any seed
+      const plain = factsOf(['משולש ABC']);
+      for (let seed = 0; seed < 4; seed++) expect(rightAngleSeat(replay(plain, seed)), `«משולש ABC» alone, seed ${seed}`).toBe('');
+    },
+  },
+  {
+    id: 'same-facts-same-figure-whatever-was-built-before-2444',
+    title: '#2444: three right-triangle figures built in one session — each shows what it shows from nothing (ADR-828)',
+    guards:
+      "#2444 (found while planning #2355; merged into #2370): in ONE process «משולש ישר זווית ABC», then «משולש ABC» · «ABC משולש ישר זווית», then «משולש ABC» · «משולש ישר זווית ABC חסום במעגל»; the last figure's rows replayed with ∠C = 90.00 where a cold replay of the same rows gave 60.95. The same in-place write as #2370: the right triangle composed on the drawn triangle left `solve` on C inside the held fold of «משולש ABC», and every later figure that begins with «משולש ABC» resumed from it. Asserts the exact sequence: after the three figures, each of them and «משולש ABC» alone replays, at seeds 0–3, to the positions and row statuses a session that built nothing gives (the caches cleared, a JSON clone of the rows), and the held «משולש ABC» carries no driven vertex.",
+    steps: ['משולש ABC', 'משולש ישר זווית ABC חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const figures = [['משולש ישר זווית ABC'], ['משולש ABC', 'ABC משולש ישר זווית'], ['משולש ABC', 'משולש ישר זווית ABC חסום במעגל'], ['משולש ABC']].map((lines) => factsOf(lines));
+      const shown = (facts: Fact[]) =>
+        [0, 1, 2, 3].map((seed) => {
+          const d = replay(facts, seed);
+          return JSON.stringify({ positions: [...d.positions].sort(([a], [b]) => (a < b ? -1 : 1)), status: facts.map((f) => d.status[f.id]), lastError: d.lastError });
+        });
+      const warm = figures.map(shown);
+      const held = replay(figures[3], 0).construction.objects.find((o) => o.id === 'C');
+      expect(JSON.stringify(held), 'the held «משולש ABC»: C is a free vertex, nothing drives it').not.toContain('solve');
+      for (let seed = 0; seed < 4; seed++) expect(rightAngleSeat(replay(figures[3], seed)), `«משולש ABC» alone, seed ${seed}: no right angle nobody stated`).toBe('');
+      // the same rows in a session that built nothing
+      clearReplayCaches();
+      const cold = figures.map((facts) => shown(JSON.parse(JSON.stringify(facts)) as Fact[]));
+      expect(warm).toEqual(cold);
+    },
+  },
+  {
+    id: 'lengths-clearer-reason-2894',
+    title: '#2894 (ADR-835): a length the rest of the figure already forces, stated otherwise, is refused with 3-D\'s reason — which segment, and its two lengths — naming the statement it contradicts',
+    guards:
+      'Operator ruling 2026-11-15 on #2894 («The clearer reason everywhere (Recommended)»): a length conflict the metric closure decides is refused in the sentence 3-D gives (ADR-3D-495, its lengths-impossible keys), word for word, replacing 2-D\'s «לא ניתן: … סותר את … הסיבה: |AC| = 10». The fold\'s drop-one search still names the earlier statement. Measured on the combined C+E branch through the submit gate. The closure, its explanation and the round trip are src/engine/__tests__/metric-closure.test.ts and engine-error-total.test.ts.',
+    // The refused line never becomes a fact, so each line is driven through the submit gate in `check`.
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const cases: [string[], string, string][] = [
+        [['משולש ABC', 'AB = 3', 'BC = 4'], 'AC = 10', 'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «AB = 3», «BC = 4»: יחד הם קובעים |AC| = 10 ו-|AB| + |BC| = 7, אבל לפי אי־שוויון המשולש ABC תמיד |AC| ≤ |AB| + |BC|. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['ריבוע ABCD', 'AB = 3'], 'AC = 10', 'הנתונים סותרים זה את זה — «AC = 10» לא מתקיים יחד עם «ריבוע ABCD», «AB = 3»: יחד הם נותנים לקטע AC שני אורכים שונים, 3√2 ו-10. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מלבן ABCD', 'AB = 3', 'BC = 4'], 'AC = 7', 'הנתונים סותרים זה את זה — «AC = 7» לא מתקיים יחד עם «מלבן ABCD», «AB = 3», «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['משולש שווה צלעות ABC', 'AB = 3'], 'BC = 5', 'הנתונים סותרים זה את זה — «BC = 5» לא מתקיים יחד עם «משולש שווה צלעות ABC», «AB = 3»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-5. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מעגל O ברדיוס 2', 'AB קוטר במעגל'], 'AB = 6', 'הנתונים סותרים זה את זה — «AB = 6» לא מתקיים יחד עם «מעגל O ברדיוס 2», «AB קוטר במעגל»: יחד הם נותנים לקטע AB שני אורכים שונים, 4 ו-6. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מרובע ABCD', 'AB = 3', 'BC = 4'], 'ABCD ריבוע', 'הנתונים סותרים זה את זה — «ABCD ריבוע» לא מתקיים יחד עם «AB = 3», «BC = 4»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.'],
+      ];
+      for (const [prior, line, words] of cases) {
+        const facts = factsOf(prior);
+        const v = gateVerdict(facts, line);
+        expect(v.kind === 'refused' && v.reason, `«${line}» after «${prior.join(' · ')}» is refused before it becomes a fact`).toBe('error');
+        const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+        expect(humanizeError(detail, he, line, otherUtteranceForError(facts, detail)).replace(/[\u2066-\u2069]/g, ''), `«${line}»: 3-D's words, naming both statements`).toBe(words);
+      }
+      // the control: the diagonal the square forces still commits
+      expect(gateVerdict(factsOf(['ריבוע ABCD']), 'AC = 10').kind, 'a square with only its diagonal stated commits').toBe('commit');
+    },
+  },
+  {
+    id: 'new-solutions-first-tangent-right-triangle-2831',
+    title:
+      '#2831 (ADR-824, ADR-W-206): «מעגל O · משיק מ-A בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6» — the three triangles (the right angle at A, B or D) are the first drawing and presses 1 and 2; the mirror images come after',
+    guards:
+      "Operator ruling 2026-11-12 on #2831 («2831 - A»): a mirror image of a drawing is the SAME solution placed differently, and «הציגו תצורה אחרת» shows new solutions first (Q-2731c (b)). Measured on c82d767c through searchAnotherView: the axes are branch2 (which tangent point B, a mirror) × side2 (which side of AB D sits, a mirror) × seat3 (which vertex holds the right angle, the solution), and the odometer turns the mirror axes first, so the three triangles came on presses 0, 2 and 4, each after a mirror of the one before. The determined-shape arm now walks the solution cycle: the assignments grouped by shape fingerprint, interleaved round-robin from the all-default one.",
+    steps: ['נתון מעגל O שרדיוסו 5', 'מנקודה A הוציאו משיק למעגל בנקודה B', 'OA = 13', 'משולש ישר זווית ABD', 'BD = 6'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['נתון מעגל O שרדיוסו 5', 'מנקודה A הוציאו משיק למעגל בנקודה B', 'OA = 13', 'משולש ישר זווית ABD', 'BD = 6']);
+      const sig = (f: ReturnType<typeof replay>) => {
+        const ids = [...f.positions.keys()].filter((id) => /^[A-Z]$/.test(id)).sort();
+        const ds: number[] = [];
+        for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) ds.push(dist(f.positions.get(ids[i])!, f.positions.get(ids[j])!));
+        const m = Math.max(...ds);
+        return ds.map((x) => (x / m).toFixed(3)).join(',');
+      };
+      // From the drawing the commit shows (the store settles each line through the config search), six presses.
+      let cur = findValidConfig(facts) ?? { facts, seed: 0 };
+      const shapes = [sig(replay(cur.facts, cur.seed))];
+      for (let k = 0; k < 6; k++) {
+        const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);
+        expect(next, `press ${k + 1} finds another configuration`).not.toBeNull();
+        expect(meetsRequirements(next!.facts, next!.seed), `press ${k + 1} meets every given`).toBe(true);
+        cur = next!;
+        shapes.push(sig(replay(cur.facts, cur.seed)));
+      }
+      expect(shapes, 'seven drawings: the first and six presses').toHaveLength(7);
+      expect(new Set(shapes.slice(0, 3)).size, 'the three triangles are presses 0, 1 and 2').toBe(3);
+      expect(new Set(shapes).size, 'there are three solutions, no fourth').toBe(3);
+      expect(shapes.slice(3, 6), 'presses 3–5 are the same three solutions placed differently').toEqual(shapes.slice(0, 3));
+    },
+  },
 ];
+/** #2370 / #2444 (ADR-828): the vertex of ABC that carries a right angle ('' = none, two letters never happen in a triangle). */
+function rightAngleSeat(f: ReturnType<typeof replay>): string {
+  const ids = ['A', 'B', 'C'] as const;
+  return ids
+    .filter((v) => {
+      const [p, q] = ids.filter((x) => x !== v);
+      return Math.abs(angle(at(f, p), at(f, v), at(f, q)) - 90) < 1e-4;
+    })
+    .join('');
+}
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
 function ringEnclosesCircle(f: ReturnType<typeof replay>, ids: string[]): boolean {
   const c = f.circles.get('circle-O');

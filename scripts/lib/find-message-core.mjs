@@ -18,7 +18,7 @@
  * No I/O beyond reading the repo; the CLI (`scripts/find-message.mjs`) prints. Tested by
  * `scripts/__tests__/find-message.test.ts`.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -93,8 +93,26 @@ export async function loadTsTable(rel, root = REPO_ROOT) {
   return instance.resources;
 }
 
+/**
+ * ONE SCAN PER PROCESS (#2894). Bundling the TS tables with esbuild and parsing the code switch are the costly parts of
+ * a search (≈ 0.6 s alone, ≈ 28 s under a full suite's load, where a 30 s test limit then fails at random). Their
+ * inputs do not change between two searches of one process, so each is read once, keyed by the root and the source
+ * files' modification times: an edit between two searches (a long-lived process) is still read fresh.
+ */
+const scanCache = new Map();
+const stamp = (root, rels) => `${root}|${rels.map((r) => { const a = join(root, r); return existsSync(a) ? statSync(a).mtimeMs : 0; }).join(',')}`;
+function once(kind, root, rels, compute) {
+  const key = `${kind}|${stamp(root, rels)}`;
+  if (!scanCache.has(key)) scanCache.set(key, compute());
+  return scanCache.get(key);
+}
+
 /** Every TS table entry: `{ file: 'src-analytic/i18n/index.ts [he]', key, value }`. */
-export async function tsEntries(root = REPO_ROOT) {
+export function tsEntries(root = REPO_ROOT) {
+  return once('ts', root, TS_LOCALE_MODULES, () => scanTsEntries(root));
+}
+
+async function scanTsEntries(root) {
   const rows = [];
   for (const rel of TS_LOCALE_MODULES) {
     const resources = await loadTsTable(rel, root);
@@ -130,6 +148,10 @@ const KEY_SHAPE = /^(errors|input)\.[\w.]+$/;
  * returns `null` renders the floor (`[]`). Fall-through labels share their clause.
  */
 export function codeTable(root = REPO_ROOT) {
+  return once('codes', root, [CODE_SWITCH], () => scanCodeTable(root));
+}
+
+function scanCodeTable(root) {
   const src = ts.createSourceFile(CODE_SWITCH, readFileSync(join(root, CODE_SWITCH), 'utf8'), ts.ScriptTarget.Latest, true);
   const wordings = {};
   let switchNode;

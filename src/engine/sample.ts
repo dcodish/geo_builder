@@ -24,7 +24,7 @@ import { evaluate } from './evaluate';
 import { lineOffset, polygonMargin, sideRecordsOf, sideShortfall, type SideRecord } from './requirements';
 import { pointInPolygon, pointOutsidePolygon } from './geometry';
 import { constraintRank } from './dofRank';
-import { chargeHit, computeWithCell, solveBudget, type WorkCell } from './solveBudget';
+import { chargeHit, computeWithCell, registerLedger, solveBudget, type WorkCell } from './solveBudget';
 
 /**
  * An ORDER/REGION constraint ('angle-order' / 'length-order' / 'collinear-order' / 'angle-acuteness')
@@ -375,16 +375,28 @@ export function statedCyclicOrderSeat(c: Construction, members: readonly OnCircl
   return out;
 }
 
+/**
+ * #2894 ([ADR-834](../../docs/06-decisions.md#adr-834)): {@link applySeed} returns `c` itself at every seed — no
+ * non-pinned free point, no free on-circle or on-line point, no unconsumed shape scalar. Its own early return, shared,
+ * so the configuration searches' proof that a view is the same at every seed reads exactly what the sampler reads.
+ */
+export function samplesNothing(c: Construction): boolean {
+  return (
+    !c.objects.some((o) => o.kind === 'free-point' && !o.pinned) &&
+    !c.objects.some((o) => isFreeOnCircle(o)) &&
+    !c.objects.some((o) => isFreeOnLine(o)) &&
+    !c.objects.some((o) => isShapeCarrier(o) && notConsumed(o as { solve?: unknown }))
+  );
+}
+
 export function applySeed(c: Construction, seed: number): Construction {
   if (!seed) return c;
+  if (samplesNothing(c)) return c; // fully determined → nothing to sample
   // A non-pinned free point is perturbed even when a constraint drives it: one scalar constraint
   // under-determines a 2-DOF point, so it keeps residual freedom, and re-solving from the perturbed
   // start yields a DIFFERENT valid configuration (the constraint is re-enforced by `evaluate`).
   const free = c.objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned);
   const freeCircle = c.objects.filter((o): o is OnCirclePoint => isFreeOnCircle(o));
-  const freeLine = c.objects.filter((o): o is OnLinePoint => isFreeOnLine(o));
-  const freeShape = c.objects.some((o) => isShapeCarrier(o) && notConsumed(o as { solve?: unknown }));
-  if (free.length === 0 && freeCircle.length === 0 && freeLine.length === 0 && !freeShape) return c; // fully determined → nothing to sample
 
   // Free-point cluster: seeded spin about its centroid + per-point jitter.
   const cx = free.length ? free.reduce((s, p) => s + p.x, 0) / free.length : 0;
@@ -1060,6 +1072,11 @@ export function allConstraints(c: Construction): Set<Constraint> {
  * rank costs 2·(movable parameters) `evaluateCore` calls and every consumer asks about the same figure.
  */
 const dofMemo = new WeakMap<Construction, { n: number; cell: WorkCell }>();
+registerLedger((c) => dofMemo.get(c as Construction)?.cell);
+/** #2890 ([ADR-830](docs/06-decisions.md#adr-830)): adopt a settled DOF count of `c`, computed in another heap. */
+export function adoptDofCount(c: Construction, n: number, units = 0): void {
+  if (!dofMemo.has(c)) dofMemo.set(c, { n, cell: { own: units, deps: [], charged: 0 } });
+}
 export function freeDofCount(c: Construction): number {
   const hit = dofMemo.get(c);
   if (hit && chargeHit(hit.cell)) return hit.n; // #1605 (ADR-582): the rank's evaluateCore calls are charged on a hit

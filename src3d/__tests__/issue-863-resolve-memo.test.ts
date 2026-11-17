@@ -7,13 +7,17 @@
  * seed and a second panel render re-solved all three panel seeds (the #863 figure: 836 more
  * `leastSquares` solves per panel, 1.44 M residual evaluations). Locked by COUNT, cold and warm — never
  * by clock.
+ *
+ * #2888 ([ADR-3D-491](../../docs/06b-decisions-3d.md#adr-3d-491), amending ADR-3D-304): the key is the construction's
+ * CONTENT, no longer the object. What this file locks is unchanged in purpose (one solve per figure and configuration,
+ * and never another figure's resolution); the last test's second half is the one expectation that changed, and says so.
  */
 import { seedNumber3 } from '../engine/components3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { deserializeFigure3 } from '../store/figureFile3';
-import { derive3 } from '../store/store3';
+import { clearSolveCaches3, derive3 } from '../store/store3';
 import { dataView } from '../engine/dataView';
 import { knowledgeSamples3, resolve3, resolveStats3 } from '../engine/evaluate';
 import { leastSquaresStats } from '../engine/solve3';
@@ -57,7 +61,8 @@ describe('#863 Part A — resolve3 is solved once per (construction, configurati
 
   it('the memo is keyed on the configuration: another seed or an explicit parameter value is its own solve', () => {
     const r = load('plane-distance-param-1472.geo3.json');
-    const c = { ...derive3([...r.facts], r.seed).construction }; // a fresh key: nothing resolved yet
+    const c = { ...derive3([...r.facts], r.seed).construction };
+    clearSolveCaches3(); // #2888: a copy has the derive's content, so it is a fresh key (nothing resolved yet) once the content keys are cleared
     const base = resolve3(c, r.seed);
     expect(resolve3(c, seedNumber3(r.seed) + 1)).not.toBe(base);
     const branches = base.param?.branches ?? [];
@@ -71,14 +76,22 @@ describe('#863 Part A — resolve3 is solved once per (construction, configurati
     expect(resolveStats3.uncached).toBe(1);
   });
 
-  it('a DIFFERENT construction object is never served another figure’s resolution (identity key)', () => {
+  it('a DIFFERENT figure is never served another figure’s resolution; a copy of a construction is the same figure (content key)', () => {
     const r = load('symbolic-line-equation-863.geo3.json');
     const c2 = derive3(r.facts.slice(0, 2), r.seed).construction;
     const c3 = derive3(r.facts.slice(0, 3), r.seed).construction;
     expect(resolve3(c2, r.seed)).not.toBe(resolve3(c3, r.seed));
-    // a shallow copy is a new key, so a derived construction («k = 2» substituted) re-solves
+    // #2888 (ADR-3D-491) — AMENDED. This asserted that a shallow copy is a new key and re-solves (1 uncached). A copy has
+    // the same content, so it is the same figure and is answered with the first object's resolution…
+    const solved = resolve3(c3, r.seed);
     reset();
-    resolve3({ ...c3 }, r.seed);
+    expect(resolve3({ ...c3 }, r.seed)).toBe(solved);
+    expect(resolveStats3.uncached).toBe(0);
+    // …and what the old line protected still holds: a DERIVED construction, one whose content differs in anything at
+    // all (here one more angle mark), is its own key and re-solves
+    reset();
+    const derived = { ...c3, angleMarks: [...c3.angleMarks, { vertex: 'A', p: 'B', q: 'C' }] };
+    expect(resolve3(derived, r.seed)).not.toBe(solved);
     expect(resolveStats3.uncached).toBe(1);
   });
 });

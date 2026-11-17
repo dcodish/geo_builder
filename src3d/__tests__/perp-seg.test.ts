@@ -115,12 +115,12 @@ describe('issue #14 — the exact prod sequence (session 4wmcbqbl): SM ⊥ DB DR
     const n = state().facts.length;
     submit('AB ⊥ AS'); // (2,0,0)·(0,0,5) = 0 ✓
     expect(state().lastError).toBeNull();
-    // #2341 (ADR-3D-449): a true ⊥ on a determined figure is already known — «כבר קיים», no row
-    expect(state().lastNotice).toEqual({ code: 'already-stated' });
-    expect(state().facts.length).toBe(n);
+    // #2790 (ADR-3D-484): a true ⊥ on a determined figure is held — its own row, with the notice
+    expect(state().lastNotice).toEqual({ code: 'already-held' });
+    expect(state().facts.length).toBe(n + 1);
     submit('AB ⊥ BD'); // (2,0,0)·(−2,3,0) = −4 ≠ 0 → refuted, keep-prior
     expect(state().lastError).not.toBeNull();
-    expect(state().facts.length).toBe(n);
+    expect(state().facts.length).toBe(n + 1);
   });
 });
 

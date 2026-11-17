@@ -50,8 +50,8 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   dofConfigs: { '2d': ['actions.dofConfigs'], '3d': null, complex: null, analytic: null },
   dofConfigsMany: { '2d': ['actions.dofConfigsMany'], '3d': null, complex: null, analytic: null },
   dofCount: { '2d': ['actions.dof'], '3d': ['cue.free'], complex: ['freedomCount'], analytic: ['freeDof'] },
-  // complex has no asynchronous path (no LLM, no deferred values), so it never shows a busy state
-  busy: { '2d': ['input.loading', 'values.computing'], '3d': ['input.thinking'], complex: null, analytic: ['thinking'] },
+  // #2874 (ADR-W-210): every builder shows the working indicator, complex included — one wording
+  busy: { '2d': ['input.loading', 'values.computing'], '3d': ['input.thinking'], complex: ['thinking'], analytic: ['thinking'] },
   askSubmit: { '2d': ['values.queryAdd'], '3d': ['query.add'], complex: ['askAdd'], analytic: ['askAdd'] },
   undo: { '2d': ['actions.undo'], '3d': ['actions.undo'], complex: ['undo'], analytic: ['undo'] },
   redo: { '2d': ['actions.redo'], '3d': ['actions.redo'], complex: ['redo'], analytic: ['redo'] },

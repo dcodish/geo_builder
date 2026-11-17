@@ -31,6 +31,7 @@ import { parse, buildParseCtx } from '@/parser';
 import i18n from '@/i18n';
 import { factsOf } from '@/__tests__/scenario-pipeline';
 import { SCENARIOS_4 } from '@/__tests__/scenarios-corpus-4';
+import { createWorkQueue } from '../../../shell/work';
 
 /** The shard file's `vi.mock` stub, driven untyped as before the split (its resolved value is not an LlmOutcome). */
 const llmParseMock = llmParse as unknown as Mock;
@@ -41,14 +42,13 @@ async function submit(line: string): Promise<{ accepted: boolean; notes: string[
   const deps: SubmitDeps = {
     t: (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'he' }) as string,
     locale: 'he',
-    ui: { setInputNote: (m) => { if (m) notes.push(m); }, setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => { cleared++; }, setBusy: () => {} },
+    ui: { setInputNote: (m) => { if (m) notes.push(m); }, setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => { cleared++; } },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => String(raw),
@@ -123,7 +123,9 @@ export function reattemptCostShard(k: number, n: number): void {
       // re-homed to the free radius it builds, and the line is refused where it really fails: B on the same circle
       // against «BC=10» (the same partner, #3), reason the quarter's own membership |CB| = |CA| — described as the
       // equality of two named lengths, never as an unstated `1·R` that ADR-W-130's provenance check sends to the floor.
-      expect(cold.note).toMatch(/\|CB\| = \|CA\| cannot hold \[vs #3\]/);
+      // #2894 (ADR-835, ruling 2026-11-15): the metric closure proves it and says which segment: the quarter puts B at
+      // |CA| = 15 from C, and «BC=10» says 10 — still refused against «BC=10» (#3).
+      expect(cold.note).toMatch(/segment BC would be both 15 and 10 with #1, #3 cannot hold \[vs #3\]/);
       expect(warm.note).toBe(cold.note);
       // The plan aimed at ~2.5M; the re-attempt cap cannot sit below the most expensive SUCCESSFUL re-attempt the
       // calibration sweep measured (511k), so two cut re-attempts at 750k each remain (ADR-583, measured 3.03M).

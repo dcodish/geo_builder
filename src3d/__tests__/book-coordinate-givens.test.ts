@@ -315,8 +315,10 @@ describe('guards', () => {
     submit('B(2k, k, 1)'); // the same letter as a PIN symbol — two mechanisms, refused
     expect(err()).toEqual({ code: 'two-params' });
   });
-  it('a NEW point with two distinct symbols stays the honest refusal (needs a figure to ride)', () => {
+  it('#2563 (ADR-3D-489): a NEW point with two distinct symbols builds, its letters open (was the symbolic-new-point refusal)', () => {
     submit('B(2t, t, k)');
-    expect(err()).toEqual({ code: 'symbolic-new-point', id: 'B' });
+    expect(err()).toBeNull();
+    const B = derive3(state().facts, 0).positions.get('B')!;
+    expect(B.x).toBeCloseTo(2 * B.y, 9);
   });
 });

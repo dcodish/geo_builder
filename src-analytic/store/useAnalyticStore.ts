@@ -17,6 +17,7 @@ import { cleanSegDisplay, toggleSegFlag, type SegDisplayMap } from '../../shell/
 import type { RefKind } from '../engine/names';
 import type { TangentsExhausted } from '../engine/apply';
 import { canonicalSeed, sameSeed, type PartConfiguration, type Seed } from '../engine/evaluate';
+import type { LengthsWhy } from '../engine/metricBounds';
 import { cleanAnnotations, type AnnotationMap } from '../app/annotations';
 import { ALL_SHOWN, cleanCanvasDisplay, displayForSave, type CanvasDisplay } from '../render/canvasDisplay';
 import { isPointName } from '../engine/pointName';
@@ -123,7 +124,7 @@ export type InputError =
   /** #2625 (ADR-AG-454) — «AB קוטר בפרבולה»: a parabola has no centre, so it has no diameter; `detail` is the line. */
   | { key: 'parabola-no-diameter'; detail: string }
   /** #2625 (ADR-AG-454 Am. 1) — «O מרכז הפרבולה»: a parabola has no centre. */
-  | { key: 'parabola-no-centre'; detail: string }
+  | { key: 'parabola-no-centre'; detail: string; name?: string }
   /** #1919 — a letter the tool cannot read; `detail` is the run(s) as typed (`shell/inputScript`). */
   | { key: 'unread-name' | 'unread-word'; detail: string }
   /** #2222 (ADR-AG-284) — an ASCII mixed number «5 1/2», refused with its unambiguous spellings (`engine/expr.findMixedNumber`). */
@@ -214,6 +215,8 @@ export type InputError =
   /** A construct that cannot exist in this figure, which has no freedom left to try (#1058). */
   | { key: 'does-not-exist'; detail: string; existing?: string }
   | { key: 'ring-contradicts-noun'; detail: string }
+  /** #2813 (ADR-AG-471) — the ring proved convex by its stated angles (`polygon`), the other order (`pair`), the angle lines (`declared`). */
+  | { key: 'ring-contradicts-angles'; detail: string; polygon?: string; pair?: string; declared?: string }
   /** #1849 (ADR-AG-247) — the givens flatten a declared polygon: its name, its noun (registry key) and its declaring sentence. */
   | { key: 'polygon-collapsed'; detail: string; polygon?: string; shape?: string; declared?: string }
   /** #1554 ruling 1 (ADR-AG-198) — a noun no circle can pass around, said to be inscribed: both nouns, registry keys. */
@@ -263,6 +266,8 @@ export type InputError =
   | { key: 'name-taken'; detail: string; holder?: string; nameOf?: string; nameKind?: 'angle' | 'length'; declared?: string }
   /** #2061 (ADR-AG-277) — the same letter with another coefficient: 2-D's reason clause and the earlier line. */
   | { key: 'measure-contradicts'; detail: string; what?: string; declared?: string }
+  /** #2894 (ADR-AG-483) — stated lengths no figure can have (3-D's ADR-3D-495 sentence): the other lines, and why. */
+  | { key: 'lengths-impossible'; detail: string; others?: string[]; why?: LengthsWhy }
   /** #2119 (ADR-684) — a second, different radius for a circle: the line that sized it. */
   | { key: 'radius-contradicts'; detail: string; declared?: string }
   /** #2388 (ADR-AG-307): R is a point and the radius parameter — `holder` the letter, `reading` the first, `declared` its line. */

@@ -142,6 +142,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   },
   { category: 'points', he: 't פרמטר חיובי', en: 't is a positive parameter', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
   { category: 'points', he: 't > 0', en: 't > 0', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
+  // #1524 (ADR-3D-477): a RANGE on a letter — the sign that allows zero, and two-sided
+  { category: 'points', he: 't ≥ 0', en: 't ≥ 0', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
+  { category: 'points', he: '2 ≤ t ≤ 5', en: '2 ≤ t ≤ 5', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
+  { category: 'points', he: 't גדול מ-2', en: 't is greater than 2', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
   // #324 (ADR-3D-079): a ring's relation to a COORDINATE plane (lowercase x/y/z) or axis
   { category: 'planesLines', he: 'הבסיס ABCD מונח על מישור שמקביל למישור [xy]', en: 'base ABCD lies on a plane parallel to the xy-plane' },
   { category: 'planesLines', he: 'המישור ABC מונח על המישור [xy]', en: 'plane ABC lies on the xy-plane' },
@@ -278,6 +282,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'points', he: "DF = (k/2)DB + kDC'", en: "DF = (k/2)DB + kDC'" },
   { category: 'points', he: 'AS = (1-t)u + 0.5v + tw', en: 'AS = (1-t)u + 0.5v + tw', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
   { category: 'points', he: 'AM = (0.5+k/6)u + (k+3.5)w', en: 'AM = (0.5+k/6)u + (k+3.5)w', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
+  // #1551 (ADR-3D-472): several letters in one relation — over placed points they are solved, over a new point free
+  { category: 'points', he: 'EM = a·EA + b·EC', en: 'EM = a·EA + b·EC', needs: { he: ["תיבה ABCDA'B'C'D'", "E אמצע BB'", "M אמצע AC"], en: ["box ABCDA'B'C'D'", "E is the midpoint of BB'", "M is the midpoint of AC"] } },
   { category: 'points', he: 'EF מקביל למישור ABC', en: 'EF is parallel to plane ABC' },
   { category: 'points', he: 'ABEC מלבן', en: 'ABEC is a rectangle' },
   { featured: true, category: 'points', he: 'D בראשית הצירים', en: 'D is at the origin' },

@@ -39,6 +39,8 @@
  */
 
 import { readEnvelope, type LoadAudit } from '../../shell/save';
+import { limitReached, withWorkLimit } from '../../shell/workLimit';
+import { notDecided, type NotDecided } from '../../shell/notDecided';
 import { readDisplayMode } from '../../shell/displayMode';
 import { unreadScript } from '../../shell/inputScript';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -197,7 +199,26 @@ function unreadRefusal(parsed: Extract<ReturnType<typeof parseLineV2>, { ok: fal
 export type Verdict =
   /** accepted, in this configuration — the caller records the seed so the figure shown is the one that fit */
   | { readonly ok: true; readonly seed: number }
-  | { readonly ok: false; readonly error: InputError };
+  | { readonly ok: false; readonly error: InputError }
+  /** #2893 (ADR-CX-092): the gate reached its work limit before it decided; `resume.from` is the blame's next line */
+  | { readonly ok: false; readonly notDecided: NotDecided<BlameResume> };
+
+/** Where a gate that reached its limit goes on from: the index of the next earlier line its blame asks about. */
+export interface BlameResume {
+  from: number;
+}
+
+/**
+ * #2893 ([ADR-CX-092](../../docs/06d-decisions-complex.md#adr-cx-092), ADR-W-210 phase 4) — THE GATE'S WORK LIMIT, in
+ * complex's unit (one executed line read or one exact solve, ADR-CX-090; the work meter's total). The one loop of the
+ * gate that grows with the figure is its differential blame, two folds per earlier line; it was bounded by nothing. It is
+ * exact, so it always finished: the dearest recorded action charges 26 units, and the page's ceiling is 256
+ * (`CEILING_CX`, ADR-CX-091). The limit is the operator's ~10 s (#2893), calibrated on the dev PC (2026-11-14): a blame
+ * over 10, 40 and 120 earlier lines charged 22, 41 and 91 units in 38, 23 and 82 ms (570 to 1 760 units/s; a line read
+ * once per content is cheap to ask again), so ten seconds is 6 000 to 17 000 units. 10 000 is far above anything a figure
+ * reaches today, so no student sees it. Reached, the gate answers "not decided", never a refusal naming a line.
+ */
+export const GATE_WORK_LIMIT_CX = 10_000;
 
 /**
  * Would adding `raw` break an earlier line? — the whole gate, pure over `(lines, raw, seed)`.
@@ -211,7 +232,10 @@ export type Verdict =
  * When no single earlier line explains it, the new statement cannot hold at all (`|z1| = -5`, or a
  * claim on the origin) and the refusal quotes the student's own line rather than inventing a culprit.
  */
-export function acceptLine(lines: readonly string[], raw: string, seed: number): Verdict {
+export function acceptLine(lines: readonly string[], raw: string, seed: number, from = 0): Verdict {
+  return withWorkLimit(GATE_WORK_LIMIT_CX, () => acceptLineUnder(lines, raw, seed, from)).value;
+}
+function acceptLineUnder(lines: readonly string[], raw: string, seed: number, from: number): Verdict {
   const next = [...lines, raw];
   const beforeD = fold(lines, seed);
   const before = violationsOf(beforeD);
@@ -222,7 +246,8 @@ export function acceptLine(lines: readonly string[], raw: string, seed: number):
   const known = refusalWhy(beforeD, fold(next, seed));
   if (known) return { ok: false, error: known };
 
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = from; i < lines.length; i++) {
+    if (limitReached()) return { ok: false, notDecided: notDecided({ from: i }, GATE_WORK_LIMIT_CX) }; // #2893 (ADR-CX-092)
     const without = lines.filter((_, k) => k !== i);
     const b2 = violationsOf(fold(without, seed));
     const a2 = violationsOf(fold([...without, raw], seed));
@@ -253,7 +278,11 @@ function gateChange(
   after: readonly string[],
   seed: number,
   changed: string,
+  from = 0,
 ): Verdict {
+  return withWorkLimit(GATE_WORK_LIMIT_CX, () => gateChangeUnder(before, after, seed, changed, from)).value;
+}
+function gateChangeUnder(before: readonly string[], after: readonly string[], seed: number, changed: string, from: number): Verdict {
   const wasD = fold(before, seed);
   const was = violationsOf(wasD);
   for (let ds = 0; ds < CONFIG_TRIES; ds++) {
@@ -261,7 +290,9 @@ function gateChange(
   }
   const known = refusalWhy(wasD, fold(after, seed));
   if (known) return { ok: false, error: known };
-  for (const candidate of before) {
+  for (let i = from; i < before.length; i++) {
+    const candidate = before[i];
+    if (limitReached()) return { ok: false, notDecided: notDecided({ from: i }, GATE_WORK_LIMIT_CX) }; // #2893 (ADR-CX-092)
     if (candidate === changed) continue;
     const b2 = violationsOf(fold(before.filter((l) => l !== candidate), seed));
     const a2 = violationsOf(fold(after.filter((l) => l !== candidate), seed));
@@ -276,7 +307,7 @@ function gateChange(
  * POSITION (order is meaningful), and if the figure it re-enters cannot hold it, the toggle is
  * refused naming the conflicting statement — the row stays muted rather than lying.
  */
-export function toggleLine(index: number): boolean {
+export function toggleLine(index: number, from = 0): boolean {
   const st = () => useComplexStore.getState();
   const { lines, disabled, seed } = st();
   if (index < 0 || index >= lines.length) return false;
@@ -291,9 +322,13 @@ export function toggleLine(index: number): boolean {
     activeOf(lines, nextDisabled),
     seed,
     lines[index],
+    from,
   );
+  st().setNotDecided(null);
   if (!verdict.ok) {
-    st().setError(verdict.error);
+    // #2893 (ADR-CX-092): a gate that reached its work limit is not a refusal: the row stays muted, and the page asks
+    if ('notDecided' in verdict) st().setNotDecided({ kind: 'toggle', index, from: verdict.notDecided.resume.from });
+    else st().setError(verdict.error);
     return false;
   }
   // no append — the line already exists; adopt the configuration the gate found for it
@@ -308,7 +343,7 @@ export function toggleLine(index: number): boolean {
  * nothing and names the refusal. Editing a MUTED line only rewrites its text: it gates when it
  * is re-enabled, which is the moment it would touch the figure.
  */
-export function editLine(index: number, raw: string): boolean {
+export function editLine(index: number, raw: string, from = 0): boolean {
   const st = () => useComplexStore.getState();
   const { lines, disabled, seed } = st();
   const line = raw.trim();
@@ -326,9 +361,12 @@ export function editLine(index: number, raw: string): boolean {
     return true;
   }
   const trial = lines.map((l, i) => (i === index ? line : l));
-  const verdict = gateChange(activeOf(lines, disabled), activeOf(trial, disabled), seed, line);
+  const verdict = gateChange(activeOf(lines, disabled), activeOf(trial, disabled), seed, line, from);
+  st().setNotDecided(null);
   if (!verdict.ok) {
-    st().setError(verdict.error);
+    // #2893 (ADR-CX-092): a gate that reached its work limit is not a refusal: the row keeps its text, and the page asks
+    if ('notDecided' in verdict) st().setNotDecided({ kind: 'edit', index, line, from: verdict.notDecided.resume.from });
+    else st().setError(verdict.error);
     return false;
   }
   st().replaceLine(index, line, verdict.seed);
@@ -409,9 +447,11 @@ export type SubmitVerdictCx =
   | { readonly kind: 'record'; readonly line: string; readonly seed: number; readonly note?: InputNote }
   /** a question typed in the givens box — routed to the ask lane (#789) */
   | { readonly kind: 'ask'; readonly line: string }
-  | { readonly kind: 'refuse'; readonly error: InputError };
+  | { readonly kind: 'refuse'; readonly error: InputError }
+  /** #2893 (ADR-CX-092): the gate reached its work limit before it decided — the line stays in the box, not added */
+  | { readonly kind: 'not-decided'; readonly line: string; readonly resume: BlameResume };
 
-export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = false): SubmitVerdictCx {
+export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = false, from = 0): SubmitVerdictCx {
   const line = raw.trim();
   const active = activeOf(state.lines, state.disabled);
 
@@ -447,8 +487,8 @@ export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = fa
   if (!parsed.ok) return { kind: 'refuse', error: unreadRefusal(parsed, line, active) };
 
   // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)
-  const verdict = acceptLine(active, line, state.seed);
-  if (!verdict.ok) return { kind: 'refuse', error: verdict.error };
+  const verdict = acceptLine(active, line, state.seed, from);
+  if (!verdict.ok) return 'notDecided' in verdict ? { kind: 'not-decided', line, resume: verdict.notDecided.resume } : { kind: 'refuse', error: verdict.error };
   // #2268 (ADR-CX-084, LADDER-CX stage 0e′) → #2790 (ADR-CX-089, ADR-W-200; operator 2026-11-09): a statement the exact
   // solve already entails is ACCEPTED as its own row, with the already-held notice — it holds its relation alone once the
   // row that implied it is muted or deleted. Seed-free, so a value that merely holds in this drawing records silently.
@@ -472,13 +512,24 @@ export function submitLine(
    * student's record), and only a typed line is told it was already held (#2790, ADR-CX-089).
    */
   replaying = false,
+  /** #2893 (ADR-CX-092): «המשיכו לחפש» — the blame goes on from this earlier line */
+  from = 0,
 ): boolean {
   const st = () => useComplexStore.getState();
   const { lines, disabled, seed } = st();
-  const v = decideSubmitCx({ lines, disabled, seed }, raw, replaying);
+  let v = decideSubmitCx({ lines, disabled, seed }, raw, replaying, from);
+  // A LOAD restores lines the student saved, not a search the student is waiting on: its gate goes on, round after round,
+  // until it decides (the blame is exact and finite: two folds per earlier line), so a saved line is never left undecided
+  while (replaying && v.kind === 'not-decided') v = decideSubmitCx({ lines, disabled, seed }, raw, replaying, v.resume.from);
+  st().setNotDecided(null);
   switch (v.kind) {
     case 'refuse':
       st().setError(v.error);
+      return false;
+    case 'not-decided':
+      // the line is not added, and stays in the box (operator, 2026-11-14, #2893 q3)
+      st().clearError();
+      st().setNotDecided({ kind: 'line', line: v.line, from: v.resume.from });
       return false;
     case 'ask':
       st().addQuery(v.line);

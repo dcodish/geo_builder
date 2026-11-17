@@ -85,9 +85,27 @@ function shapePredicate(line: string): string | null {
   return `${phraseText.trim()} ${letters}${paren}`;
 }
 
+/**
+ * THE SUBJECT FRAME (#2062, [ADR-819](../../docs/06-decisions.md#adr-819)) — «הנקודה M מקיימת AM = 3», «נקודה M
+ * מקיימת: AM = MB», «M מקיים …», "the point M satisfies AM = MB": the exam names the point a statement is about,
+ * then states it. The statement alone is what is asserted (operator ruling 2026-10-14, card `d14b-2062-frame` A: in
+ * front of any statement, in every builder), so the frame comes off. Only when the statement MENTIONS the named
+ * point: «הנקודה D מקיימת AB = 3» is not this sentence (D would vanish without a word), and stays as typed.
+ * Analytic's `satisfiesClause` and 3-D's `readSubjectFrame3` are copies, never imports.
+ */
+const SUBJECT_FRAME_HE = new RegExp(String.raw`^(?:ה?נקודה\s+)?(${ULABEL})\s+מקיי(?:ם|מת|מים|מות)(?:\s*:\s*|\s+)(.+)$`);
+const SUBJECT_FRAME_EN = new RegExp(String.raw`^(?:[Tt]he\s+)?(?:[Pp]oint\s+)?(${ULABEL})\s+satisf(?:ies|y)(?:\s*:\s*|\s+)(.+)$`);
+export function readSubjectFrame(s: string): { subject: string; rest: string } | null {
+  const m = SUBJECT_FRAME_HE.exec(s) ?? SUBJECT_FRAME_EN.exec(s);
+  if (!m) return null;
+  const [, subject, rest] = m;
+  return (rest.match(LABEL_G) ?? ([] as string[])).includes(subject) ? { subject, rest: rest.trim() } : null;
+}
+
 /** The exam's frame, read off one (already orthographic) line: the canonical sentence, or the line unchanged. */
 export function readFrame(s: string): string {
   let out = s;
   for (const [from, to] of UNWRAP) out = out.replace(from, to);
+  out = readSubjectFrame(out)?.rest ?? out;
   return shapePredicate(out) ?? out;
 }

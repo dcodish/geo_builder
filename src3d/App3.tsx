@@ -5,7 +5,7 @@
  * src/ — docs/20 §12 rule 1).
  */
 
-import type { Seed3 } from './engine/components3';
+import { sameSeed3, type Seed3 } from './engine/components3';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
@@ -22,13 +22,14 @@ import { Workbench } from '../shell/frame/Workbench';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { ToolButton } from '../shell/frame/ToolButton';
+import { NotDecidedNote } from '../shell/frame/NotDecidedNote';
 // #1376: the row's ORDER is a shared contract — a product supplies actions by id, never by position.
 import { orderToolActions } from '../shell/frame/toolRow';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's own buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import registry from '../products.json';
-import { dataView, panelIsEmpty, radiusRowLabel3 } from './engine/dataView';
-import { answerQuery } from './engine/queries';
+import { dataView, mutualRowKey3, panelIsEmpty, pointPlaneRowKey3, radiusRowLabel3 } from './engine/dataView';
+import { answerQuery, type QueryResult } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { defaultPlaneDisplay3 } from './engine/types';
 import { bareNamingSlots } from './engine/notices';
@@ -68,7 +69,14 @@ import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
-import { derive3, factLead3, claimGivens3, redo3, undo3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
+import { derive3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
+import { ANOTHER, MODEL, VALUES, act3, armBasisGuard3, jobStore3, work3 } from './app/work3';
+import { offPage3, offPageAction3, setPanelOpen3, useValues3 } from './app/offPage3';
+import { WorkingFace, useShownWorking, useWorking, workingDim } from '../shell/frame/WorkingMark';
+
+// #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
+// without the work queue shows up the first time anyone presses it.
+if (import.meta.env.DEV) armBasisGuard3((message) => console.error(message));
 import { letterRename3 } from './store/rename3';
 import type { LetterRenameResult } from '../shell/frame/letterOffer';
 import { planeChipsByFact } from './store/planeChips';
@@ -101,6 +109,16 @@ function MathRun({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** #2890 (ADR-3D-493): a question whose answer is still being solved: «= בודק…», after the shell's threshold. */
+function AskPending3({ text }: { text: string }) {
+  const shown = useShownWorking(true);
+  return shown ? (
+    <span className="text-slate-400" data-testid="ask-pending">
+      {' '}= {text}
+    </span>
+  ) : null;
+}
+
 export default function App3() {
   const { t, i18n } = useTranslation();
   const facts = useGeo3((s) => s.facts);
@@ -129,6 +147,13 @@ export default function App3() {
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
   );
   const [showWitness, setShowWitness] = useState(true); // #397: distance witnesses, default on
+  // #2062 (ADR-3D-480): the panel row a membership question points at — highlighted and scrolled into view
+  const [highlightRow, setHighlightRow] = useState<string | null>(null);
+  useEffect(() => {
+    if (!highlightRow) return;
+    const el = document.querySelector(`[data-row-key="${CSS.escape(highlightRow)}"]`);
+    el?.scrollIntoView?.({ block: 'nearest' });
+  }, [highlightRow, showData]);
   // #742: the row disables (never hides) — the 2-D canUndo/canRedo mechanism, mirrored.
   const canUndo3 = useStore(useGeo3.temporal, (s) => s.pastStates.length > 0);
   const canRedo3 = useStore(useGeo3.temporal, (s) => s.futureStates.length > 0);
@@ -136,16 +161,8 @@ export default function App3() {
   const lastError = useGeo3((s) => s.lastError);
   const lastNotice = useGeo3((s) => s.lastNotice); // #613 — the statement succeeded and added nothing
   const lastCreated = useGeo3((s) => s.lastCreated); // #1467 (ADR-3D-382): the points the last line created by reference
-  const submit = useGeo3((s) => s.submit);
-  const dispatchVerdict = useGeo3((s) => s.dispatchVerdict);
-  const toggle = useGeo3((s) => s.toggle);
-  const remove = useGeo3((s) => s.remove);
-  const replaceFact = useGeo3((s) => s.replaceFact);
-  const rename = useGeo3((s) => s.rename);
-  const swap = useGeo3((s) => s.swap);
-  const clear = useGeo3((s) => s.clear);
-  const resample = useGeo3((s) => s.resample);
-  const loadFigure = useGeo3((s) => s.loadFigure);
+  /** #2893 (ADR-3D-494): the last action's search reached its work limit — shown while the store holds the figure it was made on */
+  const lastNotDecided = useGeo3((s) => (s.lastNotDecided && s.lastNotDecided.facts === s.facts && sameSeed3(s.lastNotDecided.seed, s.seed) ? s.lastNotDecided : null));
   const queries = useGeo3((s) => s.queries);
   const addQuery = useGeo3((s) => s.addQuery);
   const removeQuery = useGeo3((s) => s.removeQuery);
@@ -157,13 +174,19 @@ export default function App3() {
   const toggleDihedralShown = useGeo3((s) => s.toggleDihedralShown);
   const reportLoadError = useGeo3((s) => s.reportLoadError);
 
-  const submitSteps = useGeo3((s) => s.submitSteps);
-
   const [text, setText] = useState('');
   // steps display: vector notation moved to src3d/render/notation.ts (#312 — the boundary-class
   // fix lives there, unit-tested; the stored utterance stays untouched).
   // the palette's insert lives in shell/InputArea now (wrap-selection, applySymbol — B4)
-  const [busy, setBusy] = useState(false);
+  // #2874 (ADR-W-210): the tool is WORKING on something the student did — the work queue's derived state,
+  // never a flag set here. Every action that re-solves the figure is a job on `work3`: counted from the
+  // click, run only after this state has been painted (3-D solves on the page's own thread, in the handler
+  // and in the render), and released in a `finally` after the paint that shows the result.
+  const working = useWorking(work3);
+  /** «הציגו תצורה אחרת» is counted on its own lane and shown on its own button, as 2-D shows it. */
+  const resampling = useWorking(work3, ANOTHER);
+  /** The model is being asked (a lane nested in the submit's job): the last line's notices wait for its answer. */
+  const asking = useWorking(work3, MODEL);
   // #73 (ADR-3D-040): the guidance register's what-to-do-instead note (shown in place of an error)
   const [guidanceNote, setGuidanceNote] = useState<string | null>(null);
   const [loadNote, setLoadNote] = useState<string | null>(null); // #309: a loaded file that does not rebuild
@@ -182,8 +205,6 @@ export default function App3() {
   // #842 (ADR-3D-192) → #1550 (ADR-3D-281): which row owns each plane's display chip — the FIRST ok row
   // whose sentence names the plane, declaration or relation; one chip per plane. Derived from the fact list.
   // #847: a row that is not `ok` owns nothing. #1550: a plane the figure does not draw has no chip.
-  // #1542 (ADR-3D-429): a plane equation that drove the figure leads with the given's dot, never the verified ✓
-  const claimGivens = useMemo(() => claimGivens3(facts), [facts]);
   const planeChips = useMemo(
     () => planeChipsByFact(facts, (id) => derived.status[id] === 'ok', (name) => derived.resolved.planes.has(name)),
     [facts, derived.status, derived.resolved.planes],
@@ -323,12 +344,19 @@ export default function App3() {
     const f = e.target.files?.[0];
     e.target.value = ''; // allow re-loading the same file
     if (!f) return;
-    const r = deserializeFigure3(await f.text());
-    if (r.ok) {
-      loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode, r.dihedralShown);
-      setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
-      noteLoadOutcome(r.facts, r.seed);
-    } else reportLoadError(r.reason);
+    const text = await f.text();
+    // #2874: a load re-solves the whole figure — one job, the parse and the load audit included
+    await work3.run(async () => {
+      // #2890 (ADR-3D-493): solved off the page first; the page then reads the same file with the same row ids
+      const h = await offPage3([{ kind: 'open', text }]);
+      const r = deserializeFigure3(text);
+      if (r.ok) {
+        jobStore3().loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode, r.dihedralShown);
+        setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
+        noteLoadOutcome(r.facts, r.seed);
+      } else reportLoadError(r.reason);
+      h.after();
+    });
   };
 
   /**
@@ -365,15 +393,19 @@ export default function App3() {
   /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
 
-  const openLink3 = (payload: string) => {
-    const r = openShared3(payload);
-    if (r.ok) {
-      setFigureName(r.name ?? ''); // a link has no filename to take the name from
-      noteLoadOutcome(r.facts, r.seed);
-    } else {
-      setShareError(r.reason === 'too-large' ? 'too-large' : 'broken');
-    }
-  };
+  // #2874: opening a link is a load — one job
+  const openLink3 = (payload: string) =>
+    void work3.run(async () => {
+      const h = await offPage3([{ kind: 'open', text: payload }]); // #2890: solved off the page first
+      const r = openShared3(payload);
+      h.after();
+      if (r.ok) {
+        setFigureName(r.name ?? ''); // a link has no filename to take the name from
+        noteLoadOutcome(r.facts, r.seed);
+      } else {
+        setShareError(r.reason === 'too-large' ? 'too-large' : 'broken');
+      }
+    });
 
   useEffect(() => {
     // #1372: a link OUTRANKS the session offer and is never shown beside it — the student who tapped
@@ -460,16 +492,22 @@ export default function App3() {
 
   const acceptOffer = () => {
     if (!offer) return;
-    const r = restoreSession3(offer.payload);
-    setOffer(null);
-    if (r.ok) {
-      setFigureName(r.name ?? ''); // a restored session has no filename to take its name from
-      noteLoadOutcome(r.facts, r.seed);
-    } else {
-      // Refused and NAMED, exactly as a stale file is — then stop offering what cannot open.
-      reportLoadError(r.reason);
-      forgetSession3();
-    }
+    const payload = offer.payload;
+    // #2874: restoring is loading — one job
+    void work3.run(async () => {
+      const h = await offPage3([{ kind: 'open', text: payload }]); // #2890: solved off the page first
+      const r = restoreSession3(payload);
+      h.after();
+      setOffer(null);
+      if (r.ok) {
+        setFigureName(r.name ?? ''); // a restored session has no filename to take its name from
+        noteLoadOutcome(r.facts, r.seed);
+      } else {
+        // Refused and NAMED, exactly as a stale file is — then stop offering what cannot open.
+        reportLoadError(r.reason);
+        forgetSession3();
+      }
+    });
   };
 
   const declineOffer = () => {
@@ -497,13 +535,44 @@ export default function App3() {
     });
   }, []);
 
-  const dataPanel = useMemo(() => (showData ? dataView(derived.construction, seed) : null), [showData, derived, seed]);
+  /**
+   * #2890 (ADR-3D-493) — THE VALUES FOLLOW THE FIGURE. Operator, 2026-11-14 (#2890): *"Figure first, both tools"*;
+   * *"One «בודק…» line"*; *"Yes, all redraws"*. The panel's rows and the saved questions' answers are solved by the
+   * worker after the figure; until they are in hand for the figure on screen the panel reads ONE grey line «בודק…»
+   * (shown after the shell's threshold), never a number from the previous figure. Where nothing is solved off the page
+   * (no `Worker`) the values are always in hand.
+   */
+  const values = useValues3(facts, seed);
+  useEffect(() => setPanelOpen3(showData), [showData]);
+  const valuesPending = showData && !values.panel;
+  // the shell's threshold: the line is shown only once the values have been awaited for WORKING_SHOWN_AFTER_MS, so values
+  // that follow the figure quickly never blink it (the page's thread is free to count: the solving is in the worker)
+  const showPending = useShownWorking(valuesPending);
+  const dataPanel = useMemo(() => (showData && values.panel ? dataView(derived.construction, seed) : null), [showData, values.panel, derived, seed]);
   // #274 (ADR-3D-057): answer each saved query against the current figure. Coordinate-free honesty gate
   // lives in `answerQuery` — a query it can't answer as knowledge reports WHY, never a sampled number.
+  // #2890: a question whose answer is still being solved reads «בודק…» in place of its answer, as analytic's ask row does.
   const queryResults = useMemo(
-    () => (showData ? queries.map((q) => answerQuery(derived.construction, q, seed)) : []),
-    [showData, queries, derived, seed],
+    () =>
+      showData && values.panel
+        ? queries.map((q): QueryResult & { pending?: true } => (values.answered(q) ? answerQuery(derived.construction, q, seed) : { text: q, answer: null, echo: 'plain', pending: true }))
+        : [],
+    [showData, values, queries, derived, seed],
   );
+  // the panel opened on a figure whose values were not read (it was closed): one job reads them
+  const panelJob = useRef<{ facts: unknown; seed: unknown } | null>(null);
+  useEffect(() => {
+    if (!showData || values.panel || values.pendingFor !== null) return;
+    if (panelJob.current?.facts === facts && panelJob.current.seed === seed) return; // asked for already
+    panelJob.current = { facts, seed };
+    void work3.run(
+      async () => {
+        const h = await offPage3([], { panel: true });
+        h.after();
+      },
+      { lane: VALUES },
+    );
+  }, [showData, values, facts, seed]);
   const [queryText, setQueryText] = useState('');
   const queryRef = useRef<HTMLInputElement | null>(null);
 
@@ -519,14 +588,15 @@ export default function App3() {
    * session-INDEPENDENT — 2-D's rule, kept identical here — and clearing a figure is not a request to
    * put the panels back the way they started.
    */
-  const clearAll = () => {
-    logDebug3({ kind: 'action', action: 'clear' });
-    clear();
-    setText('');
-    setGuidanceNote(null);
-    setQueryText('');
-    setLoadNote(null);
-  };
+  const clearAll = () =>
+    void work3.run(async () => {
+      logDebug3({ kind: 'action', action: 'clear' });
+      await offPageAction3('clear', [], () => jobStore3().clear());
+      setText('');
+      setGuidanceNote(null);
+      setQueryText('');
+      setLoadNote(null);
+    });
 
   /**
    * #483 — clicking an offered ℓ∩π crossing NAMES it. Deliberately routed through the ordinary
@@ -536,34 +606,36 @@ export default function App3() {
    */
   /** #578: the canvas half of the rename. One store action for both entry points — the text command is
    *  intercepted in `submit`, this is the click — so a refusal reads the same either way. */
-  const onRenamePoint = (from: string, to: string): LetterRenameResult => {
-    if (busy) return { ok: false, reason: 'busy' };
-    const res = rename(from, to);
+  const onRenamePoint = async (from: string, to: string): Promise<LetterRenameResult> => {
+    if (asking) return { ok: false, reason: 'busy' };
+    const res = await act3.rename(from, to); // #2874: a rename re-solves the figure — a job
     logDebug3({ kind: 'action', action: 'rename', detail: `${from}->${to}:${res.ok ? 'ok' : res.reason}` });
     return letterRename3(res); // #1631: a taken letter carries its holder, which the popover quotes and offers to swap
   };
   /** #1302 / #1631: the popover's swap offer — the same store action the typed «החלף בין A ל-B» reaches. */
-  const onSwapPoints = (a: string, b: string) => {
-    if (busy) return { ok: false };
-    const res = swap(a, b);
+  const onSwapPoints = async (a: string, b: string) => {
+    if (asking) return { ok: false };
+    const res = await act3.swap(a, b);
     logDebug3({ kind: 'action', action: 'swap', detail: `${a}<->${b}:${res.ok ? 'ok' : res.reason}` });
     return { ok: res.ok };
   };
 
   const onNameCrossing = (k: { line: string; plane: string }) => {
-    if (busy) return;
+    if (asking) return;
     const id = nextFreeLabel3(derived.construction);
     if (!id) return; // A–Z exhausted — no name to give, so no silent renaming of something else
     setGuidanceNote(null);
     setLoadNote(null);
     const utterance = crossingUtterance3({ ...k, point: { x: 0, y: 0, z: 0 } }, id, i18n.language !== 'en');
-    submit(utterance);
-    logDebug3({
-      kind: 'input',
-      utterance,
-      locale: i18n.language,
-      source: 'parser',
-      result: useGeo3.getState().lastError?.code ?? 'ok',
+    void work3.run(async () => {
+      await offPageAction3('submit', [utterance], () => jobStore3().submit(utterance));
+      logDebug3({
+        kind: 'input',
+        utterance,
+        locale: i18n.language,
+        source: 'parser',
+        result: useGeo3.getState().lastError?.code ?? 'ok',
+      });
     });
   };
 
@@ -571,10 +643,12 @@ export default function App3() {
   // click and see it BUILD, no data entry) and rides the identical path — parser, guidance
   // short-circuits, LLM escalation, logging.
   const submitText = async (raw = text) => {
-    if (!raw.trim() || busy) return;
+    if (!raw.trim()) return;
+    // #2874: a submit is ONE job, its model call included. While the tool works a submit is not taken: Enter
+    // is off and the line stays in the box (ADR-W-198), now for every action the tool is working on.
     // #1778 (ADR-W-125): a pasted PARAGRAPH is submitted one sentence at a time, one row each; the box keeps
     // what is left when a sentence is not taken.
-    await submitTyped(raw, submitSentence3, setText);
+    await work3.runIfIdle(() => submitTyped(raw, submitSentence3, setText));
   };
 
   /** One sentence through the 3-D submit. Reads the LIVE store, so a paragraph's next sentence sees this one's row. */
@@ -585,8 +659,11 @@ export default function App3() {
     // lowercase-label nudge, then the #73 (ADR-3D-040) guidance register, in that order — is ONE pure
     // function, `decideDeterministic3`. This handler only dispatches it, so the log-triage replay, which
     // CALLS the same function, cannot disagree with what a student is shown.
+    // #2890 (ADR-3D-493): the decision is solved off the page first; the page then decides over what was solved
+    const line = await offPage3([{ kind: 'line', raw }]);
     const v = decideDeterministic3(useGeo3.getState(), raw);
     if (v.kind === 'guided') {
+      line.after();
       // A guided line never reaches the model: a non-constructive family can never build, so an LLM call
       // on it is pure cost (the 2-D ADR-289 twin), and a lowercase-label line is taught its spelling.
       logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: 'not-understood', intermediate: true });
@@ -595,29 +672,55 @@ export default function App3() {
       useGeo3.setState({ lastError: null });
       return 'kept';
     }
-    dispatchVerdict(v);
+    jobStore3().dispatchVerdict(v);
+    line.after();
+    // #2893 (ADR-3D-494, ruling 3): a line whose search reached its limit stays in the box and is not added
+    if (useGeo3.getState().lastNotDecided) {
+      logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: 'not-decided' });
+      return 'kept';
+    }
     let err = useGeo3.getState().lastError;
+    // #2062 (ADR-3D-480): the exam's membership question points at a panel row — open the panel and highlight it
+    if (err?.code === 'answer-in-panel') {
+      setHighlightRow(err.known ? pointPlaneRowKey3(err.point, err.plane) : null);
+      if (err.known) setShowData(true);
+    } else setHighlightRow(null);
     logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
     // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
     if (err?.code === 'not-understood') {
-      setBusy(true);
-      try {
-        // #2231 (ADR-W-189): the ask, the one retry and the sequence gate, reachable from a test
-        const { steps, restored, retry } = await escalate3Flow(useGeo3.getState(), raw, escalate3);
-        if (retry) logDebug3(nameRetryEvent(retry));
-        if (steps) submitSteps(raw, steps);
-        err = useGeo3.getState().lastError;
-        // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
-        // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
-        // for the dev trace; the lean sink reads `commands`, mirroring the 2-D #84 field).
-        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, ...(restored.length > 0 ? { restored } : {}), result: err ? err.code : 'ok' });
-      } finally {
-        setBusy(false);
-      }
+      // #2231 (ADR-W-189): the ask, the one retry and the sequence gate, reachable from a test.
+      // #2874: the wait for the model is counted on the queue's MODEL lane (nested in this submit's job,
+      // which has already painted) and released in the queue's `finally`.
+      const { steps, restored, retry } = await work3.run(() => escalate3Flow(useGeo3.getState(), raw, escalate3), { lane: MODEL, paint: false });
+      if (retry) logDebug3(nameRetryEvent(retry));
+      if (steps) await offPageAction3('submitSteps', [raw, steps], () => jobStore3().submitSteps(raw, steps));
+      err = useGeo3.getState().lastError;
+      // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
+      // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
+      // for the dev trace; the lean sink reads `commands`, mirroring the 2-D #84 field).
+      logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, ...(restored.length > 0 ? { restored } : {}), result: err ? err.code : 'ok' });
     }
     if (err) return 'kept';
     setGuidanceNote(null);
     return 'consumed';
+  };
+
+  /** #2893 (ADR-3D-494, ruling 2): «המשיכו לחפש» — one more round of the same size, from where the search stopped. */
+  const continueSearch = () => {
+    const nd = lastNotDecided;
+    if (!nd) return;
+    const { facts: _f, seed: _s, ...ask } = nd;
+    logDebug3({ kind: 'action', action: 'continue-search', detail: ask.action });
+    void work3.runIfIdle(
+      async () => {
+        const rows = useGeo3.getState().facts;
+        await offPageAction3('continueSearch', [ask], () => jobStore3().continueSearch(ask));
+        const st = useGeo3.getState();
+        // the line was added: it leaves the box, as a line that is taken does
+        if (ask.action === 'submit' && st.facts !== rows && !st.lastNotDecided && !st.lastError && text.trim() === ask.utterance) setText('');
+      },
+      ask.action === 'press' ? { lane: ANOTHER } : undefined,
+    );
   };
 
   const statusDot = (st: FactStatus3 | undefined) => {
@@ -776,11 +879,16 @@ export default function App3() {
               cannot disagree. */}
           <InputArea
             value={text}
-            onChange={setText}
+            onChange={(next) => {
+              setText(next);
+              // #2893 (ruling 3, 2026-11-14): typing something else dismisses the question about the stopped line
+              const nd = useGeo3.getState().lastNotDecided;
+              if (nd?.action === 'submit' && next.trim() !== nd.utterance) useGeo3.setState({ lastNotDecided: null });
+            }}
             onSubmit={() => void submitText()}
             placeholder={t('input.placeholder')}
             submitLabel={t('input.add')}
-            busy={busy}
+            busy={working}
             busyLabel={t('input.thinking')}
             symbols={SYMBOL_SPECS_3}
             /**
@@ -826,7 +934,7 @@ export default function App3() {
 
           {/* #309 (ADR-3D-087): a file that deserializes cleanly but does not REBUILD must say so —
               it used to load "successfully" onto a blank canvas. Persists until the next submit. */}
-          {loadNote && !busy && (
+          {loadNote && !asking && (
             <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {loadNote}
             </div>
@@ -834,7 +942,7 @@ export default function App3() {
           {/* #305 (ADR-3D-090): a NON-error build notice — the step committed, and the figure was
               adjusted so the statement could hold («ישרה» over a non-cyclic base). Distinct from the
               amber error strip: nothing failed, so it reads as information, not a warning. */}
-          {!busy && notices.map((n, i) => n.kind === 'narrowed' ? (
+          {!asking && notices.map((n, i) => n.kind === 'narrowed' ? (
             // #1996 (ADR-3D-343): the givens forced a narrower kind — the cross-builder family, on its one face (#2266)
             <div key={`notice-${i}`} data-testid="narrowed-note">
               <NarrowingNote>{narrowingText3(n.note, t as NarrowTranslate)}</NarrowingNote>
@@ -865,7 +973,7 @@ export default function App3() {
           ))}
           {/* #1595 (ADR-3D-404, ADR-W-176): two letters on one dot are accepted, and the page says so — 2-D's ADR-123
               sentence through the suite key, read from the DRAWN figure, so it holds while the drawing has the pair. */}
-          {!busy && derived.coincidences.length > 0 && (
+          {!asking && derived.coincidences.length > 0 && (
             <div data-testid="converge-note">
               <InfoNote>{convergeText(derived.coincidences, t as ConvergeTranslate)}</InfoNote>
             </div>
@@ -873,7 +981,7 @@ export default function App3() {
           {/* #1918 (ADR-3D-313): the amber MISMATCH banner — 2-D's `figure.mismatch` (ADR-165), copied: a declared
               trapezoid the drawing shows with both pairs parallel. Derived per render, so it holds while the
               drawing is a parallelogram and clears on the edit, mute or delete that makes it a trapezoid again. */}
-          {!busy && derived.shapeWarnings.length > 0 && (
+          {!asking && derived.shapeWarnings.length > 0 && (
             <Banner kind="notice">
               <div style={{ fontWeight: 600, marginBottom: 4 }}>⚠ {t('warn.mismatch')}</div>
               <ul style={{ margin: 0, paddingInlineStart: 18 }}>
@@ -884,32 +992,41 @@ export default function App3() {
             </Banner>
           )}
           {/* #1467 (ADR-W-162): shown while its line is still the last row — any later row, ✕, undo or edit retires it */}
-          {lastCreated && !lastError && !busy && facts[facts.length - 1]?.id === lastCreated.factId && (
+          {lastCreated && !lastError && !asking && facts[facts.length - 1]?.id === lastCreated.factId && (
             <CreatedNotice
               text={t(createdNoticeTextOf({ names: lastCreated.ids, circle: lastCreated.circle }).key, createdNoticeTextOf({ names: lastCreated.ids, circle: lastCreated.circle }).params)}
               undoLabel={t(CREATED_NOTICE_KEYS.undo)}
               onUndo={() => {
                 logDebug3({ kind: 'action', action: 'delete', detail: lastCreated.factId });
-                remove(lastCreated.factId);
+                void act3.remove(lastCreated.factId);
               }}
             />
           )}
-          {lastNotice && !lastError && !busy && (
+          {lastNotice && !lastError && !asking && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              {lastNotice.code === 'already-stated'
-                ? t('suite.notice.alreadyDrawn') /* #1990 (ADR-3D-377): 2-D's sentence, one suite key */
+              {lastNotice.code === 'already-held'
+                ? t('suite.notice.alreadyHeld') /* #2790 (ADR-3D-484, ADR-W-204): the suite's held-row notice, 2-D's sentence */
                 : t('notice.vertexAngleReadAs', { angles: lastNotice.angles }) /* #1942: 2-D's «הובן כ-∠CAB» */}
             </div>
           )}
-          {guidanceNote && !lastError && !busy && (
+          {guidanceNote && !lastError && !asking && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {guidanceNote}
             </div>
           )}
-          {lastError && !busy && (
+          {lastError && !asking && (
             <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {errorText3(t, lastError)}
             </div>
+          )}
+          {/* #2893 (ADR-3D-494; operator 2026-11-14, #2893 q1–q3): a search that reached its work limit, where a refusal shows */}
+          {lastNotDecided && !lastError && !asking && (
+            <NotDecidedNote
+              message={t('suite.notDecided.message')}
+              continueLabel={t('suite.notDecided.continue')}
+              onContinue={continueSearch}
+              busy={working || resampling}
+            />
           )}
 
           {/* The examples dropdown retired (B4 completed, operator's parity catch 2026-08-18):
@@ -946,14 +1063,8 @@ export default function App3() {
               // #934 (ADR-3D-228) → #1401 (ADR-W-088): the row's DIRECTION is the shared chrome's now,
               // derived with `textDir3` from this text — this callback used to set `dir` itself.
               text: factRowText3(f, new Set(vectorNames3(derived.construction)), derived.readings[f.id]),
-              lead:
-                factLead3(f, derived.status[f.id], claimGivens) === 'verified' ? (
-                  <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
-                    ✓
-                  </span>
-                ) : (
-                  statusDot(derived.status[f.id])
-                ),
+              // #2790 (ADR-3D-484): every row leads with its status dot — a claim row is a given, never a ✓
+              lead: statusDot(derived.status[f.id]),
               content: (
                 <span className="block min-w-0 truncate text-sm">
                   {/* #900 (ADR-3D-216): the routing lives in FactRow3, not in this callback — a decision
@@ -994,17 +1105,17 @@ export default function App3() {
             }))}
             textDir={textDir3}
             emptyHint={t('facts.empty')}
-            onToggle={toggle}
+            onToggle={(id) => void act3.toggle(id)}
             toggleLabel={t('facts.toggleTitle')}
             editValueOf={(id) => facts.find((f) => f.id === id)?.utterance ?? ''}
             onEditCommit={(id, next) => {
               logDebug3({ kind: 'action', action: 'edit', detail: id }); // #182: a reported session replays edits
-              return replaceFact(id, next);
+              return act3.replaceFact(id, next); // #2874: an edit re-solves the figure — a job; the editor waits for its answer
             }}
             editLabel={t('facts.edit')}
             symbols={SYMBOL_SPECS_3}
             symbolsToggleTitle={t('palette.show')}
-            onDelete={(id) => { logDebug3({ kind: 'action', action: 'delete', detail: id }); remove(id); }} // #182: so a reported session replays deletions
+            onDelete={(id) => { logDebug3({ kind: 'action', action: 'delete', detail: id }); void act3.remove(id); }} // #182: so a reported session replays deletions
             deleteLabel={t('facts.delete')}
           />
 
@@ -1065,14 +1176,24 @@ export default function App3() {
           <div style={figureRowStyle}>
             {/* #182: each store interaction logs one lean `action` line so a reported prod session
                 replays end-to-end (the 2-D #84/#189 mirror — delete logs at its own button above). */}
-            <button type="button" style={facts.length === 0 ? rowAccentOffStyle : rowAccentStyle} disabled={facts.length === 0} onClick={() => { logDebug3({ kind: 'action', action: 'show-another' }); resample(); }}>
-              {t('actions.another')}
+            {/* #2874: one job on its own lane — the button reads «חושב…» and is off while it runs, as 2-D's does */}
+            <button
+              type="button"
+              className={workingDim(resampling, 0.5)}
+              style={facts.length === 0 || resampling ? rowAccentOffStyle : rowAccentStyle}
+              disabled={facts.length === 0 || resampling}
+              onClick={() => {
+                logDebug3({ kind: 'action', action: 'show-another' });
+                void work3.runIfIdle(() => offPageAction3('resample', [], () => jobStore3().resample()), { lane: ANOTHER });
+              }}
+            >
+              <WorkingFace working={resampling} idle={t('actions.another')} busy={t('input.thinking')} />
             </button>
             <span style={rowSpacerStyle} />
-            <button type="button" style={canUndo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo3} onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); undo3(); }}>
+            <button type="button" style={canUndo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo3} onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); void act3.undo(); }}>
               {t('actions.undo')}
             </button>
-            <button type="button" style={canRedo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo3} onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); redo3(); }}>
+            <button type="button" style={canRedo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo3} onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); void act3.redo(); }}>
               {t('actions.redo')}
             </button>
             <button type="button" style={facts.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle} disabled={facts.length === 0} onClick={clearAll}>
@@ -1228,8 +1349,14 @@ export default function App3() {
                             : `dataPanel.mutual.${m.rel}`,
                           { a: m.a, b: m.b },
                         );
+                        const rowKey = mutualRowKey3(m);
                         return (
-                          <span key={`${m.rel}-${m.a}-${m.b}`} dir={textDir3(line)} className="block font-medium">
+                          <span
+                            key={rowKey}
+                            data-row-key={rowKey}
+                            dir={textDir3(line)}
+                            className={`block font-medium${highlightRow === rowKey ? ' rounded bg-amber-100 ring-2 ring-amber-400' : ''}`}
+                          >
                             {line}
                           </span>
                         );
@@ -1264,7 +1391,9 @@ export default function App3() {
                         <span>
                           {/* #1543 (ADR-3D-301): the echo is arrowed only when the QUESTION was read as a vector */}
                           {askEchoNode3(r.text, r.echo, new Set(vectorNames3(derived.construction)))}
-                          {r.answer !== null ? (
+                          {r.pending ? (
+                            <AskPending3 text={t('dataPanel.checking')} />
+                          ) : r.answer !== null ? (
                             <span className="font-medium">
                               {/* #823: an answer may have several ROWS — a plane gives its standard and
                                   its parametric form, one per line, never joined by a `|` (operator,
@@ -1277,10 +1406,10 @@ export default function App3() {
                                 </span>
                               ))}
                               {/* #813: a note may ACCOMPANY an answer (a frameless plane reports its shape and says why no equation follows) */}
-                              {r.note && <span className="font-normal text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>}
+                              {r.note && <span className="font-normal text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param, ...r.inPanel })}</span>}
                             </span>
                           ) : (
-                            <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>
+                            <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param, ...r.inPanel })}</span>
                           )}
                         </span>
                         <button type="button" onClick={() => removeQuery(i)} className="shrink-0 text-slate-400 hover:text-rose-600" aria-label={t('query.remove')}>
@@ -1291,8 +1420,15 @@ export default function App3() {
                   },
                 ]}
               >
-                {(!dataPanel || panelIsEmpty(dataPanel)) && queryResults.length === 0 && (
-                  <p className="text-slate-400">{t('dataPanel.empty')}</p>
+                {valuesPending ? (
+                  /* #2890 (ruled 2026-11-14): ONE grey line while the values are computed, after the shell's threshold */
+                  showPending && (
+                    <p className="text-slate-400" data-testid="values-pending">
+                      {t('dataPanel.checking')}
+                    </p>
+                  )
+                ) : (
+                  (!dataPanel || panelIsEmpty(dataPanel)) && queryResults.length === 0 && <p className="text-slate-400">{t('dataPanel.empty')}</p>
                 )}
                 {/* #739: the distance-witness display toggle — a checkbox HERE like 2-D's display
                     toggles (#738), not a button on the figure row (reverses the B6 placement). */}
@@ -1315,7 +1451,20 @@ export default function App3() {
                   addLabel={t('query.add')}
                   unreadableHint={t('query.note.notUnderstood')}
                   onSubmit={(text) => {
-                    addQuery(text);
+                    // #2890 (ADR-3D-493): the answer is solved off the page; the row reads «בודק…» until it is in hand
+                    void work3.run(
+                      async () => {
+                        const h = await offPage3([{ kind: 'ask', text }], { panel: true });
+                        addQuery(text);
+                        h.after();
+                        await h.settled;
+                        // #2062 (ADR-3D-480): a membership question asked here highlights the row its answer points at
+                        const s = useGeo3.getState();
+                        const a = answerQuery(derive3(s.facts, s.seed).construction, text, s.seed);
+                        setHighlightRow(a.inPanel ? pointPlaneRowKey3(a.inPanel.point, a.inPanel.plane) : null);
+                      },
+                      { lane: VALUES },
+                    );
                   }}
                   palette={{ symbols: SYMBOL_SPECS_3, startCollapsed: true, compact: true, toggleTitle: t('palette.show') }}
                 />
@@ -1353,12 +1502,13 @@ export default function App3() {
                 // each its own row, then the example; a line that is not taken stops the chain (the lock makes that
                 // unreachable). On a figure the click submits the example alone.
                 const lines = guideTryLines3(c, lang, useGeo3.getState().facts.length);
-                void (async () => {
+                // #2874: the lines an example needs and the example itself are ONE student action — one job
+                void work3.runIfIdle(async () => {
                   for (const line of lines.slice(0, -1)) {
-                    if (busy || (await submitSentence3(line)) !== 'consumed') return;
+                    if ((await submitSentence3(line)) !== 'consumed') return;
                   }
-                  await submitText(raw);
-                })();
+                  if (raw.trim()) await submitTyped(raw, submitSentence3, setText);
+                });
               },
             };
           }),

@@ -15,13 +15,13 @@ function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
   useGeo3.temporal.getState().clear();
 }
-/** #2341 (ADR-3D-449): the lines answered «כבר קיים» — an answer the figure already holds adds no row and is not refused. */
+/** #2341 → #2790 (ADR-3D-484): the lines the figure already held — each its own row with the held notice, never refused. */
 let KNOWN: string[] = [];
 const submit = (u: string) => {
   const rows = useGeo3.getState().facts.length;
   useGeo3.getState().submit(u);
   const st = useGeo3.getState();
-  if (st.lastError === null && st.facts.length === rows && st.lastNotice?.code === 'already-stated') KNOWN.push(u);
+  if (st.lastError === null && st.facts.length === rows + 1 && st.lastNotice?.code === 'already-held') KNOWN.push(u);
 };
 const state = () => useGeo3.getState();
 const derived = () => derive3(state().facts, state().seed);
@@ -48,21 +48,21 @@ describe('GATE — 2021 חורף א Q2 (vec-defined C, right angle, plane equati
 
   it('Hebrew: the full chain builds and every answer verifies', () => {
     HE.forEach(submit);
-    expect(state().facts).toHaveLength(5);
-    expect(KNOWN).toEqual(["C = (0, 5, -1)","∠BAC = 90","המישור ABC: x + z + 1 = 0","E = (-3, 5, 2)"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
+    expect(state().facts).toHaveLength(5 + KNOWN.length);
+    expect(KNOWN).toEqual(["C = (0, 5, -1)","∠BAC = 90","המישור ABC: x + z + 1 = 0","E = (-3, 5, 2)"]); // #2790 (ADR-3D-484): each answer the figure already holds is its own row, with the held notice
     expectAllOk();
   });
 
   it('English mirror of the core steps', () => {
     ['A(0,2,-1)', 'B(-3,2,2)', 'D(-2,3,1)', 'AD = 2/3AB + 1/3AC', 'the angle ABC is 45', 'ABEC is a rectangle'].forEach(submit);
     // ∠ABC is NOT 45 in this triangle — the wrong vertex-angle claim refused
-    expect(state().facts).toHaveLength(5);
+    expect(state().facts).toHaveLength(5 + KNOWN.length);
   });
 
   it('a rectangle completion on a non-right base refuses honestly', () => {
     ['A(0,0,0)', 'B(2,0,0)', 'C(1,3,0)'].forEach(submit); // ∠BAC ≠ 90
     submit('ABEC מלבן');
-    expect(state().facts).toHaveLength(3);
+    expect(state().facts).toHaveLength(3 + KNOWN.length);
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 });
@@ -82,8 +82,8 @@ describe('GATE — 2021 קיץ ב Q2 (the cevian intersection → coordinate ans
       'E = (0, 4, 0)',
       'F = (1.5, 3, 0)',
     ].forEach(submit);
-    expect(state().facts).toHaveLength(7);
-    expect(KNOWN).toEqual(["E = (0, 4, 0)","F = (1.5, 3, 0)"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
+    expect(state().facts).toHaveLength(7 + KNOWN.length);
+    expect(KNOWN).toEqual(["E = (0, 4, 0)","F = (1.5, 3, 0)"]); // #2790 (ADR-3D-484): each answer the figure already holds is its own row, with the held notice
     expectAllOk();
   });
 });
@@ -106,15 +106,15 @@ describe('GATE — 2018 קיץ Q2 (box on axes, a vector-relation point, SKEW li
 
   it('Hebrew: the chain builds and the skew claim verifies', () => {
     HE.forEach(submit);
-    expect(state().facts).toHaveLength(9);
-    expect(KNOWN).toEqual(["NK ו-PL מצטלבים"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
+    expect(state().facts).toHaveLength(9 + KNOWN.length);
+    expect(KNOWN).toEqual(["NK ו-PL מצטלבים"]); // #2790 (ADR-3D-484): each answer the figure already holds is its own row, with the held notice
     expectAllOk();
   });
 
   it('a false mutual-position claim refuses (the same lines are NOT intersecting)', () => {
     HE.slice(0, 9).forEach(submit);
     submit('NK ו-PL נחתכים');
-    expect(state().facts).toHaveLength(9);
+    expect(state().facts).toHaveLength(9 + KNOWN.length);
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 });

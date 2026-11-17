@@ -29,7 +29,7 @@ import {
 import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostRowCount, jointCostRows, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
 import { sideRecordsOf, sideShortfall, statedTangency, type SideRecord } from './requirements';
 import { solveLM } from './solveLM';
-import { budgetExceeded, chargeHit, computeWithCell, countWork, solveBudget, type WorkCell } from './solveBudget';
+import { budgetExceeded, chargeHit, computeWithCell, countWork, exactKey, measuredRun, registerLedger, servedRuns, serveRun, servingRepeats, solveBudget, type WorkCell } from './solveBudget';
 import { GLUED_NAME_WHOLE } from '../../shell/indexedName';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
@@ -555,9 +555,13 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   const rescue = { convex: { rows: rowsFor(true), scale: seed.map(() => span), admit }, relaxed: { rows: rowsFor(false), scale: seed.map(() => span), admit } };
   const barrier = collapseBarrier(c, cons, ids);
   const lambda = 1e-3 / (span * span); // scale-free; only breaks ties on the solution manifold
+  // #2894 (ADR-833): whether the plain search met a point where the barrier-augmented cost differs from its own (a
+  // non-zero barrier, or a figure the barrier cannot read) — while it never does, the retry is the same search.
+  let barrierMet = false;
   const regCost = (x: number[]): number => {
-    const base = residFull(x, true).s;
+    const { s: base, pos } = residFull(x, true);
     if (!isFinite(base)) return Infinity;
+    if (!barrierMet && (!pos || barrier(pos) !== 0)) barrierMet = true;
     let s = base;
     for (let i = 0; i < x.length; i++) s += lambda * (x[i] - seed[i]) * (x[i] - seed[i]);
     return s;
@@ -587,9 +591,12 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   // relaxed accept only if no convex solution is reachable. A no-op when the figure declares no ≥4-gon.
   const accepted = (x: number[], requireConvex: boolean): boolean =>
     solutionAccepted(c, place, x, cons, span, requireConvex) && (!steer || allSidesHold(c, place(x)));
+  // #2894 (ADR-833): the descents of one `solveAll` (its aim and steer fixed) — the relaxed pass repeats the convex
+  // pass's descents call for call, and they are served (charged as run). Opened per `solveAll`.
+  let nm: NelderMeadRun = nelderMead;
   const finish = (requireConvex: boolean, useBarrier = false): { x: number[]; ok: boolean } => {
     const best = multiStartSolve(seed, offsets, span * 0.2, useBarrier ? regCostB : regCost, resid, [span * 0.05, span * 0.005], 400, (x) =>
-      accepted(x, requireConvex), requireConvex ? rescue.convex : rescue.relaxed,
+      accepted(x, requireConvex), requireConvex ? rescue.convex : rescue.relaxed, nm,
     );
     return { x: best, ok: accepted(best, requireConvex) };
   };
@@ -598,10 +605,19 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   // barrier-augmented cost and prefer a strictly-healthier accepted result. A healthy plain result
   // (barrier 0 — the overwhelming case) returns untouched, so previously-green basin choices are
   // preserved bit-for-bit; a forced coincidence (ADR-123) finds no accepted improvement and falls back.
+  //
+  // #2894 (ADR-833): a FAILED plain search whose every cost evaluation met a zero barrier is what the retry would run
+  // again, point for point (`regCostB` = `regCost` there, and NM, the polish and the LM rung read nothing else), to the
+  // same failure — so it is served, charged as run, instead of run. Not with the side steer (its accept reads more).
   const pick = (requireConvex: boolean): { x: number[]; ok: boolean } => {
-    const base = finish(requireConvex);
+    const plain = measuredRun(() => finish(requireConvex));
+    const base = plain.value;
     const b0 = base.ok ? barrierAt(base.x) : Infinity;
     if (base.ok && b0 === 0) return base;
+    if (!base.ok && !barrierMet && !steer && serveRun(plain)) {
+      drivenSolveStats.servedRetries++;
+      return base;
+    }
     const retry = finish(requireConvex, true);
     if (retry.ok && barrierAt(retry.x) < b0) return retry;
     return base;
@@ -610,6 +626,9 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   // does, so the fallback would re-run the identical solve to the identical failure (half of every refusal).
   const convexMatters = declaresConvexity(c);
   const solveAll = (): { x: number[]; ok: boolean } => {
+    nm = servedNelderMead();
+    // sticky over the solveAll: the relaxed pass's served descents are the convex pass's, whose points it records
+    barrierMet = false;
     const conv = pick(true);
     return conv.ok || !convexMatters ? conv : pick(false);
   };
@@ -656,6 +675,8 @@ export function multiStartSolve(
   polishIters: number,
   accept: (x: number[]) => boolean,
   rescue?: LmRescue,
+  /** #2894 (ADR-833): the descent to run — a caller that repeats descents passes {@link servedNelderMead}'s */
+  nm: NelderMeadRun = nelderMead,
 ): number[] {
   let best = seed;
   let bestReg = regCost(seed);
@@ -681,7 +702,7 @@ export function multiStartSolve(
     // a candidate to judge.
     if (start !== seed && budgetExceeded()) break;
     consider(start); // a seeded restart (e.g. the grid-scan / binding-aware seed) may already be a valid solution
-    const x = nelderMead(regCost, start, 400, searchStep);
+    const x = nm(regCost, start, 400, searchStep);
     const fx = regCost(x);
     if (fx < bestReg) {
       bestReg = fx;
@@ -691,7 +712,7 @@ export function multiStartSolve(
   }
   for (const st of polishSteps) {
     if (budgetExceeded()) break; // #259 — same reasoning, for the polish passes
-    best = nelderMead(polishCost, best, polishIters, st);
+    best = nm(polishCost, best, polishIters, st);
     consider(best);
   }
   if (accept(best)) return best;
@@ -1071,7 +1092,7 @@ export function warmStartCarriers(to: Construction, from: Construction): Constru
  * vertex) and height (a perp-offset dist) solve together. Works in normalised coordinates.
  */
 /** #1602 (ADR-557): how often the joint optimizer ran — the operation-count lock's probe (never time). */
-export const drivenSolveStats = { joint: 0, shapeRescue: 0, lmRescue: 0, lmRescued: 0, lmEvals: 0 }; // lm*: #2797 (ADR-816) — LM starts run / accepted
+export const drivenSolveStats = { joint: 0, shapeRescue: 0, lmRescue: 0, lmRescued: 0, lmEvals: 0, servedRetries: 0 }; // lm*: #2797 (ADR-816) — LM starts run / accepted; servedRetries: #2894 (ADR-833)
 
 function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construction {
   drivenSolveStats.joint++;
@@ -1163,9 +1184,11 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     const rescue = { rows, scale: seedU.map(() => 1), admit };
     const barrier = collapseBarrier(c, cons, specs.map((s) => s.id));
     const lambda = 1e-3; // tiny tie-breaker toward the seed (normalised space)
+    let barrierMet = false; // #2894 (ADR-833): see resolveFreeDriven's `pick`
     const regCost = (u: number[]): number => {
-      const base = costFull(u, true).s;
+      const { s: base, pos } = costFull(u, true);
       if (!isFinite(base)) return Infinity;
+      if (!barrierMet && (!pos || barrier(pos) !== 0)) barrierMet = true;
       let s = base;
       for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
       return s;
@@ -1291,9 +1314,15 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     }
     // Plain search first (previously-green basin choices preserved); the barrier-augmented RETRY runs
     // only when the plain result failed or parked near-degenerate (ADR-238 — see resolveFreeDriven).
-    let best = run(regCost);
+    // #2894 (ADR-833): a FAILED plain search that met a zero barrier at every cost evaluation is the retry's search
+    // point for point, to the same failure: served (charged as run), not run again. Not with the side steer.
+    barrierMet = false;
+    const plain = measuredRun(() => run(regCost));
+    let best = plain.value;
     const b0 = best.ok ? barrierAt(best.u) : Infinity;
-    if (!best.ok || b0 > 0) {
+    if (!best.ok && !barrierMet && !steer && serveRun(plain)) {
+      drivenSolveStats.servedRetries++; // the retry, served
+    } else if (!best.ok || b0 > 0) {
       const retry = run(regCostB);
       if (retry.ok && barrierAt(retry.u) < b0) best = retry;
     }
@@ -1400,7 +1429,8 @@ function freePolygonVerticesToRecruit(c: Construction, carriers: GeoObject[]): G
  * `accept` gate still judges it, and `solveBudget.aborts` marks the fold so {@link computeReplay}
  * refuses to memoize a truncated one.
  */
-export function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300, step = 0.15): number[] {
+export function nelderMead(cost: (x: number[]) => number, x0: number[], iters = 300, step = 0.15): number[] {
+  const f = servingRepeats(cost); // #2894: a point this call has already evaluated is served, and charged as computed
   const n = x0.length;
   let simplex = [x0.slice(), ...x0.map((_, i) => x0.map((v, j) => (j === i ? v + step : v)))];
   let fv = simplex.map(f);
@@ -1437,6 +1467,26 @@ export function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300
   }
   order();
   return simplex[0];
+}
+
+/** A Nelder–Mead descent, as {@link multiStartSolve} runs it. */
+export type NelderMeadRun = (cost: (x: number[]) => number, x0: number[], iters?: number, step?: number) => number[];
+
+/**
+ * #2894 ([ADR-833](../../docs/06-decisions.md#adr-833)) — descents served by identity: the same cost FUNCTION (the
+ * caller's closure; it must be pure for the memo's life), start, iterations and step return the descent already run,
+ * charged as run (`servedRuns`). Scoped to the caller that opens it.
+ */
+export function servedNelderMead(): NelderMeadRun {
+  const serve = servedRuns<number[]>();
+  const ids = new Map<(x: number[]) => number, number>();
+  return (cost, x0, iters = 300, step = 0.15) => {
+    const k = exactKey(x0);
+    if (k === null) return nelderMead(cost, x0, iters, step);
+    let id = ids.get(cost);
+    if (id === undefined) ids.set(cost, (id = ids.size));
+    return serve(`${id}|${iters}|${step}|${k}`, () => nelderMead(cost, x0, iters, step)).slice();
+  };
 }
 
 /** Argument minimising `f` over [lo,hi]: grid scan for the basin, ternary-refine it. */
@@ -1563,7 +1613,20 @@ export function drivenConstraintsOf(c: Construction): Constraint[] {
  * the ADR-123 heavy figure this halves a cold replay; it changes NO result, only reuse.
  */
 const evalMemo = new WeakMap<Construction, { r: EvalResult; cell: WorkCell }>();
+registerLedger((c) => evalMemo.get(c as Construction)?.cell);
 
+/**
+ * #2890 ([ADR-830](docs/06-decisions.md#adr-830)) — ADOPT a settled evaluation of `c`: one computed in another heap (a
+ * worker) and received WITH `c`, in one structured clone. The page's readers then hit it as if it had been computed
+ * here. Its ledger is flat (the work it saved), as a transplanted fold's is (ADR-584). Never overwrites an entry.
+ */
+export function adoptEvaluate(c: Construction, r: EvalResult, units = 0): void {
+  if (!evalMemo.has(c)) evalMemo.set(c, { r, cell: { own: units, deps: [], charged: 0 } });
+}
+/** #2890 (ADR-830): adopt the settled baked construction of `c` (see {@link adoptEvaluate}). */
+export function adoptResolved(c: Construction, r: Construction, units = 0): void {
+  if (!resolvedMemo.has(c)) resolvedMemo.set(c, { r, cell: { own: units, deps: [], charged: 0 } });
+}
 export function evaluate(c: Construction): EvalResult {
   const hit = evalMemo.get(c);
   // #1605 (ADR-582): a hit is charged the work it saved; one a work budget cannot afford is recomputed
@@ -1581,6 +1644,7 @@ export function evaluate(c: Construction): EvalResult {
  * was already evaluated — the DOF accountant's Jacobian (#1264) — pays no second solve.
  */
 const resolvedMemo = new WeakMap<Construction, { r: Construction; cell: WorkCell }>();
+registerLedger((c) => resolvedMemo.get(c as Construction)?.cell);
 export function resolveDrivenMemo(c: Construction): Construction {
   const hit = resolvedMemo.get(c);
   if (hit && chargeHit(hit.cell)) return hit.r; // #1605 (ADR-582): charged like every memo on the counted path

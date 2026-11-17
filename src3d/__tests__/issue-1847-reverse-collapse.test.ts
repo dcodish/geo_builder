@@ -25,12 +25,14 @@ const plain = (s: string | null): string => (s ?? '').replace(/[⁦-⁩]/g, '');
 function run(lines: readonly string[], seed: Seed3) {
   let st: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed };
   let n = 0;
+  let held = false;
   for (let i = 0; i < lines.length; i++) {
     const v = decideDeterministic3(st, lines[i], () => `f${++n}`);
-    if (v.kind !== 'record') return { st, refusedAt: i, error: v.kind === 'refused' ? v.error : null, kind: v.kind };
+    if (v.kind !== 'record') return { st, refusedAt: i, error: v.kind === 'refused' ? v.error : null, kind: v.kind, held: false };
     st = { facts: v.facts, seed: v.seed };
+    held = v.held === true; // #2790 (ADR-3D-484): the last line the figure already held
   }
-  return { st, refusedAt: -1, error: null, kind: 'record' as const };
+  return { st, refusedAt: -1, error: null, kind: 'record' as const, held };
 }
 
 /** |Newell normal| / span² of the ring — 0 for a collinear ring. */
@@ -99,12 +101,12 @@ describe('#1847 — what does not change', () => {
     }
   }, 120_000);
 
-  // #2341 (ADR-3D-449): a membership the figure holds is already known: «כבר קיים», no row, never a refusal
+  // #2341 → #2790 (ADR-3D-484): a membership the figure holds is already known: its own row with the notice, never a refusal
   it('a membership claim that holds is never refused (the centroid on the median): it is already known', () => {
     for (const seed of SEEDS_24.slice(0, 8)) {
       const r = run(['משולש ABC', 'E מפגש התיכונים במשולש ABC', 'M אמצע BC', 'E על AM'], seed);
-      expect(r.refusedAt, `seed ${seed}: ${JSON.stringify(r.error)}`).toBe(3);
-      expect(r.kind, `seed ${seed}`).toBe('already-stated');
+      expect(r.refusedAt, `seed ${seed}: ${JSON.stringify(r.error)}`).toBe(-1); // #2790 (ADR-3D-484): its own row, held
+      expect(r.held, `seed ${seed}`).toBe(true);
       const d = derive3(r.st.facts, r.st.seed);
       for (const f of r.st.facts) expect(d.status[f.id], `seed ${seed}: «${f.utterance}»`).toBe('ok');
     }

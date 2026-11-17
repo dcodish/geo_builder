@@ -54,7 +54,8 @@
 import type { Construction, Id } from './types';
 import type { AngleRef, Constraint, Direction } from './solve';
 import type { LengthExpr } from './lengths';
-import { promisesOneParallelPair } from './shapes';
+import { convexWhenSimple, promisesOneParallelPair } from './shapes';
+import { circleDefPoints } from './types';
 
 /** A position, as `evaluate` has already resolved it. */
 export interface RingPt {
@@ -72,7 +73,7 @@ export interface RingPt {
  * 2-D ADR-165): when the givens leave no true trapezoid the figure is drawn, and
  * `app/shapeWarnings.ts` warns about it while it holds.
  */
-export type RingViolation = 'degenerate' | 'crossed' | 'trapezoid-is-parallelogram';
+export type RingViolation = 'degenerate' | 'crossed' | 'trapezoid-is-parallelogram' | 'reflex-corner';
 
 /** A declared polygon whose drawn ring contradicts its noun — carried with the id so the line that
  *  stated it can be blamed, and the noun so a report can use the student's own word. */
@@ -244,14 +245,99 @@ export function ringViolation(vertices: readonly RingPt[], noun?: string): RingV
  */
 export function ringFaultsOf(c: Construction, at: (id: Id) => RingPt | undefined): RingFault[] {
   const faults: RingFault[] = [];
+  let corners: StatedCornerAg[] | undefined;
   for (const o of c.objects) {
     if (o.kind !== 'polygon') continue;
     const pts = o.vertices.map(at);
     if (pts.some((p) => !p)) continue;
-    const violation = ringViolation(pts as RingPt[], o.noun);
+    // #2813 (ADR-AG-471): a stated corner angle is the interior angle — a simple ring that seats one reflex is not it
+    const violation = ringViolation(pts as RingPt[], o.noun) ??
+      (o.vertices.length >= 4 && statedCornerReflex(o.vertices, pts as RingPt[], (corners ??= statedCornersAg(c.constraints))) ? 'reflex-corner' : null);
     if (violation) faults.push({ id: o.id, noun: o.noun, violation });
   }
   return faults;
+}
+
+/**
+ * #2813 ([ADR-AG-471](../../docs/06c-decisions-analytic.md#adr-ag-471), 2-D's ADR-823; operator ruling 2026-11-10 (b):
+ * *"a stated polygon angle is always the interior angle"*) — the angle wedges the construction STATES, with the index
+ * of the constraint that states each: a stated angle (`angle`, any measure — each fixes one unsigned angle) and a
+ * `perpendicular` whose two segments meet at one corner (90° there). `deg` is the value in degrees when it is a plain
+ * number in degrees, the one the convexity proof can add up; absent otherwise (still a corner the floor reads).
+ */
+export interface StatedCornerAg {
+  v: Id;
+  p: Id;
+  q: Id;
+  deg?: number;
+  /** the index into `construction.constraints` */
+  at: number;
+}
+export function statedCornersAg(constraints: readonly Constraint[]): StatedCornerAg[] {
+  const out: StatedCornerAg[] = [];
+  constraints.forEach((k, at) => {
+    if (k.t === 'angle') {
+      const deg = !k.measure && k.value.kind === 'num' ? k.value.value : undefined;
+      if (deg !== undefined && !(deg > 0 && deg < 180 - 1e-6)) return; // not an interior wedge's value
+      out.push({ v: k.at.v, p: k.at.a, q: k.at.b, ...(deg !== undefined ? { deg } : {}), at });
+    } else if (k.t === 'perpendicular') {
+      const shared = [k.a, k.b].filter((x) => x === k.c || x === k.d);
+      if (shared.length !== 1) return;
+      const v = shared[0]!;
+      const p = k.a === v ? k.b : k.a;
+      const q = k.c === v ? k.d : k.c;
+      if (p !== v && q !== v && p !== q) out.push({ v, p, q, deg: 90, at });
+    }
+  });
+  return out;
+}
+
+/** The stated corners of the ring `ids`: a wedge at a vertex between its two ring neighbours, in either ray order. */
+function ringCornersAg(ids: readonly Id[], corners: readonly StatedCornerAg[]): { index: number; corner: StatedCornerAg }[] {
+  const n = ids.length;
+  const out: { index: number; corner: StatedCornerAg }[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = ids[(i + n - 1) % n], v = ids[i], next = ids[(i + 1) % n];
+    for (const w of corners) if (w.v === v && ((w.p === prev && w.q === next) || (w.p === next && w.q === prev))) out.push({ index: i, corner: w });
+  }
+  return out;
+}
+
+/**
+ * #2813 (ADR-AG-471): is a STATED corner of this simple ring its reflex corner? A corner whose turn opposes the ring's
+ * orientation is the inside of a dent (360° minus the wedge), which a stated angle never names. A hard ring fault, so
+ * `drawableAt` never draws it and «הציגו תצורה אחרת» never offers it.
+ */
+function statedCornerReflex(ids: readonly Id[], p: readonly RingPt[], corners: readonly StatedCornerAg[]): boolean {
+  const stated = ringCornersAg(ids, corners);
+  if (stated.length === 0) return false;
+  const n = p.length;
+  let area = 0;
+  for (let i = 0; i < n; i++) area += p[i].x * p[(i + 1) % n].y - p[(i + 1) % n].x * p[i].y;
+  const orient = Math.sign(area);
+  if (orient === 0) return false;
+  return stated.some(({ index }) => {
+    const o = p[(index + n - 1) % n], a = p[index], b = p[(index + 1) % n];
+    return Math.sign((a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)) === -orient;
+  });
+}
+
+/**
+ * #2813 (ADR-AG-471): do the STATED interior angles of the ring `ids` leave no room for a reflex corner? A reflex corner
+ * leaves the others less than (n − 3)·180°, so stated corners (each below 180°) summing to at least that prove convex
+ * position. Returns the indices of the constraints that prove it, or null. The smallest stated value at a corner is read.
+ */
+function anglesLeaveNoRoomAg(ids: readonly Id[], constraints: readonly Constraint[]): number[] | null {
+  const n = ids.length;
+  const best = new Map<number, StatedCornerAg>();
+  for (const { index, corner } of ringCornersAg(ids, statedCornersAg(constraints))) {
+    if (corner.deg === undefined) continue;
+    const had = best.get(index);
+    if (!had || corner.deg < had.deg!) best.set(index, corner);
+  }
+  if (best.size === 0) return null;
+  const sum = [...best.values()].reduce((s, w) => s + w.deg!, 0);
+  return sum >= (n - 3) * 180 - 1e-6 ? [...best.values()].map((w) => w.at) : null;
 }
 
 /**
@@ -490,4 +576,52 @@ export function closePairsOf(
     }
   }
   return out;
+}
+
+/** Why a ring's letters are in convex position, and the statements that say so (#2812, ADR-AG-475). */
+export interface RingConvexityProofAg {
+  /** a noun convex whenever simple (ADR-AG-261), one circle through every letter (#2812), stated interior angles (#2813) */
+  reason: 'noun' | 'circle' | 'angles';
+  /** circle objects whose DEFINITION puts letters on them — their owning line is a proof line */
+  objects: Id[];
+  /** indices into `construction.constraints` (an `on-curve` rider, a stated angle) — their owning line is a proof line */
+  constraints: number[];
+}
+
+/**
+ * #2812 ([ADR-AG-475](../../docs/06c-decisions-analytic.md#adr-ag-475)) — the analytic copy of 2-D's `ringConvexityProofs`
+ * (ADR-826; copied, never imported): does a statement prove the declared polygon `o`'s letters in convex position? Four
+ * or more points in convex position have ONE simple cyclic order, so another declared order of them crosses. Reasons:
+ * - its noun is convex whenever simple (`convexWhenSimple`, ADR-AG-261's reason, unchanged);
+ * - **one circle through every letter**: a circle through three points (`circle-thru`, its `through` points or a
+ *   diameter's ends) or a stated circle (`circle-at`, a circle `curve`), with an `on-curve` constraint for every other
+ *   letter. `cyclicFacts` lowers «מעגל חוסם את ABCD» / «המרובע ABCD חסום במעגל» to exactly that, and a rider
+ *   «D על המעגל» is the same constraint, so riders are read with no extra case. Structural, never positions;
+ * - #2813 ([ADR-AG-471](../../docs/06c-decisions-analytic.md#adr-ag-471)): **stated interior angles** that sum to at least
+ *   (n − 3)·180° — no corner has room to be reflex.
+ */
+export function ringConvexityProofAg(c: Construction, o: { vertices: readonly Id[]; noun?: string }): RingConvexityProofAg | null {
+  const ids = o.vertices;
+  if (ids.length < 4 || new Set(ids).size !== ids.length) return null;
+  if (convexWhenSimple(o.noun)) return { reason: 'noun', objects: [], constraints: [] };
+  // #2813 (ADR-AG-471): stated interior angles that leave no room for a reflex corner
+  const angles = anglesLeaveNoRoomAg(ids, c.constraints);
+  if (angles) return { reason: 'angles', objects: [], constraints: angles };
+  for (const circle of c.objects) {
+    const isCircle = circle.kind === 'circle-thru' || circle.kind === 'circle-at' || (circle.kind === 'curve' && circle.curve.kind === 'circle');
+    if (!isCircle) continue;
+    const through = circle.kind === 'circle-thru' ? circleDefPoints(circle.def).filter(() => circle.def.t !== 'incircle') : [];
+    const riders = new Map<Id, number>();
+    c.constraints.forEach((k, at) => {
+      if (k.t === 'on-curve' && k.curve === circle.id && !riders.has(k.id)) riders.set(k.id, at);
+    });
+    if (!ids.every((id) => through.includes(id) || riders.has(id))) continue;
+    const usesThrough = ids.some((id) => through.includes(id));
+    return {
+      reason: 'circle',
+      objects: usesThrough ? [circle.id] : [],
+      constraints: ids.flatMap((id) => (!through.includes(id) && riders.has(id) ? [riders.get(id)!] : [])),
+    };
+  }
+  return null;
 }

@@ -9,7 +9,7 @@
  * shared chassis existed ([docs/28 §5](../docs/archive/28-product-unification.md) Phase 4), and mounting
  * rather than re-deriving the chrome is the whole return on that work.
  */
-import { useCallback, useMemo, useState, useRef, useEffect, useLayoutEffect, type ChangeEvent, type CSSProperties } from 'react';
+import { useCallback, useMemo, useState, useRef, useEffect, type ChangeEvent, type CSSProperties } from 'react';
 import { useStore } from 'zustand';
 import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
@@ -31,19 +31,19 @@ import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/
 import { INITIAL_VIEW, centreOf, panned, toWorld, viewAfterChange, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtAnalytic } from './format';
+import { hiddenRowLines, lonePoints } from './app/hideOwnership';
 import { curveDetailsKey, curveParts, namedRow } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
-import { commitRecord, decideEditHost, decideSubmit, decideToggle, noticeText, reachesFallback, sentenceOutcome } from './app/submit';
+import { commitRecord, noticeText, reachesFallback, sentenceOutcome } from './app/submit';
 import { submitTyped, type SentenceOutcome } from '../shell/sentences';
 import { activeOf, activePins, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
-import { fallbackRefusal, runFallback } from './app/fallback';
+import { fallbackRefusal, runFallback, type FallbackSolver } from './app/fallback';
 import { nameRetryEvent } from '../shell/llm/retryLostNames';
 import { curveRowName, detailRowText, openCurveText, panelKnowledge, panelRowText, paramRows, segmentKnowledge, segmentLengthText, sideEquationText, slopeRowText, valueText } from './app/panelRows';
 import { isolateRtlName } from '../shell/bidi';
-import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
@@ -66,7 +66,7 @@ import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { MAX_FIGURE_STATEMENTS, figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { ANALYTIC_ENVELOPE } from './store/useAnalyticStore';
 import { COMMAND_CATALOG_ANALYTIC } from './parser/catalogAnalytic';
-import { analyticBidi } from './i18n';
+import { analyticBidi, analyticI18n } from './i18n';
 import { questionLines } from './app/questionLines';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
@@ -75,15 +75,19 @@ import { AskLane } from '../shell/frame/AskLane';
 import { askSettled, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, chipState, drawnLoci, drawnMarks, isDrawn, pressChip, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
-import { dispatchRename, dispatchSwap, letterRenameOf, letterTargetOf } from './app/rename';
+import { applyRenameVerdict, applySwapVerdict, letterRenameOf, letterTargetOf, type RenameState } from './app/rename';
 import { LetterPopover } from '../shell/frame/LetterPopover';
 import { SegmentMenu } from '../shell/frame/SegmentMenu';
-import { centreLabelOf, centrePopoverOps } from './app/centreName';
+import { applyCentreName, applyCentreSwap, centreLabelOf } from './app/centreName';
 import { segKey } from './render/scene';
 import { segmentName } from './app/lines';
 import { curveMenuOf, type CurveMenuTarget } from './app/curveDisplay';
-import type { LetterRenameResult } from '../shell/frame/letterOffer';
-import { anotherConfiguration } from './app/another';
+import type { LetterRenameResult, LetterSwapResult } from '../shell/frame/letterOffer';
+import { decideAn, isAnswered, showFigure } from './app/workerAn';
+import { basisOfState, useShownFigure } from './app/useShownFigure';
+import { PendingText } from './app/PendingText';
+import type { ReaderInputs } from './app/figureReaders';
+import { AUDIT_LATER, finishLoadAudit } from './app/loadSession';
 import { offersOf, pointAt } from './engine/crossings';
 import { VERTICAL_TOL } from './engine/lines';
 import { rowShownText, useAnalyticStore, type InputError } from './store/useAnalyticStore';
@@ -96,14 +100,29 @@ import { onSharedLink } from '../shell/session/link';
 import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
 import { ShareSheet } from '../shell/frame/ShareSheet';
 import { loadAnalyticSession } from './app/loadSession';
+import { ANOTHER, MODEL, armBasisGuardAn, jobStoreAn, workAn } from './app/workAn';
+import { WorkingFace, useLatest, useWorking, workingDim } from '../shell/frame/WorkingMark';
+
+// #2874 (ADR-W-210): in development a figure that changes outside a job is reported, so an action added
+// without the work queue shows up the first time anyone presses it.
+if (import.meta.env.DEV) armBasisGuardAn((message) => console.error(message));
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
+import { NotDecidedNote } from '../shell/frame/NotDecidedNote';
+import { isNotDecided, type NotDecided } from '../shell/notDecided';
+import type { ResumeAn } from './engine/workLimitAn';
+
 import { unstatedChoices } from './engine/unstatedChoices';
 import { unstatedChoiceText } from './app/unstatedChoice';
 import { locusChips } from './app/locusChip';
 import { circleNotesOf, conicChipKey, conicChips, conicMarksOf, isCircleShaped, markAnchors, type CircleNote } from './app/conicMarks';
 import { withConic } from './app/annotations';
 import { displayPointName } from './engine/pointName';
+
+/** #2893 (ADR-AG-479): a fallback solve reached its work limit — thrown out of `runFallback`, caught in `tryFallback`. */
+class FallbackStopped {
+  constructor(readonly stopped: NotDecided<ResumeAn>) {}
+}
 
 
 declare const __BUILD__: string;
@@ -162,21 +181,11 @@ const CANVAS_MIN = 320;
 
 export function App() {
   const { t, i18n } = useTranslation();
+  const storeState = useAnalyticStore();
   const {
-    lines,
-    seed,
     error,
     queries,
     setQueries,
-    recordLine,
-    recordLlmLines,
-    spokenFor,
-    hosts,
-    disabled,
-    setDisabled,
-    applyRename,
-    applySwap,
-    seedNames,
     segStyle,
     toggleSegHidden,
     toggleSegDashed,
@@ -187,10 +196,6 @@ export function App() {
     toggleCurveDashed,
     annotations,
     setAnnotations,
-    removeLine,
-    replaceLine,
-    clearAll,
-    goToSeed,
     setError,
     notice,
     setNotice,
@@ -199,9 +204,22 @@ export function App() {
     loadAudit,
     setLoadAudit,
     serialize,
-    undo,
-    redo,
-  } = useAnalyticStore();
+  } = storeState;
+  /**
+   * #2890 (ADR-AG-478, ADR-W-210 phase 3) — THE PAGE NEVER SOLVES. Every figure is solved in the analytic worker
+   * (`app/workerAn.ts`) and adopted; the page renders the last store state whose figure it holds (`useShownFigure`),
+   * so the rows, the canvas and the panel change together. The figure comes FIRST and its values after (operator
+   * ruling 2026-11-14, #2890 question 1): at stage `figure` the pool is held and every value is pending.
+   */
+  const figureInputs = useMemo<ReaderInputs>(() => ({ asks: queries.map(({ sentence, via }) => (via ? { sentence, via } : { sentence })), annotations }), [queries, annotations]);
+  const shownFigure = useShownFigure(storeState, figureInputs);
+  const { lines, seed, spokenFor, hosts, disabled, seedNames } = shownFigure.state;
+  const valuesShown = shownFigure.stage === 'values';
+  /** The figure of the store as it is now, and its values: what a job waits for before it is released. */
+  const figureOfStore = async (): Promise<void> => {
+    const live = useAnalyticStore.getState();
+    await showFigure({ basis: basisOfState(live), inputs: { asks: [], annotations: live.annotations } }).figure;
+  };
   /**
    * Can we step back or forward? Read from the TEMPORAL store, as both siblings do, so a disabled
    * button means "there is nothing there" rather than a guess from the line count — clearing the
@@ -215,8 +233,35 @@ export function App() {
    * #2552 D9 (ADR-AG-344): or the new circle it stated, by its centre (`circle`).
    */
   const [createdNotice, setCreatedNotice] = useState<{ index: number; line: string; names: string[]; circle?: string } | null>(null);
-  /** #1251 — the LLM fallback is in flight. Owns only the spinner; the decision lives in app/fallback.ts. */
-  const [thinking, setThinking] = useState(false);
+  /**
+   * #2874 (ADR-W-210): the tool is WORKING on something the student did — the work queue's derived state,
+   * never a flag set here. Every action that re-solves the figure is a job on `workAn`: counted from the
+   * click, run only after this state has been painted (this builder solves on the page's own thread, in the
+   * handler and in the render), and released in a `finally` after the paint that shows the result. The
+   * model fallback (#1251) is part of its submit's job.
+   */
+  const working = useWorking(workAn);
+  /**
+   * #2893 (ADR-AG-479, ADR-W-210 phase 4) — A SEARCH THAT REACHED ITS WORK LIMIT: «עדיין לא נמצא פתרון — החיפוש נעצר
+   * אחרי כ-10 שניות.» with «המשיכו לחפש», where a refusal shows (operator, 2026-11-14, #2893 questions 1–3). Page state
+   * only: never a fact, never an undo step. `again` runs the next round, which starts from what this one finished (the
+   * worker's memos); typing in the box, or any other action, dismisses it.
+   */
+  const [stopped, setStopped] = useState<{ again: () => void } | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const stopHere = (nd: NotDecided<ResumeAn>, again: (round: number) => unknown): void => {
+    setError(null);
+    const round = nd.resume.round + 1;
+    setStopped({
+      again: () => {
+        setStopped(null);
+        void again(round);
+      },
+    });
+  };
+  /** «הציגו תצורה אחרת» is counted on its own lane and shown on its own button, as 2-D shows it. */
+  const resampling = useWorking(workAn, ANOTHER);
 
   /**
    * SAVE and LOAD (#1087) — the shared envelope, the shared naming, the sibling’s own order.
@@ -244,7 +289,8 @@ export function App() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    void file.text().then((text) => {
+    // #2874: a load re-solves the whole figure — one job, the parse and the audit included
+    void file.text().then((text) => workAn.run(async () => {
       let parsed: unknown;
       try {
         parsed = JSON.parse(text);
@@ -274,10 +320,11 @@ export function App() {
       }
       // The restore + audit + trace is app/loadSession.ts, shared with the session offer (#1238):
       // a restore is a load, so it is audited like one.
-      loadAnalyticSession(env.data, figureNameFromFileName(file.name, 'analytic'));
+      const { lines: loaded } = loadAnalyticSession(env.data, figureNameFromFileName(file.name, 'analytic'), AUDIT_LATER);
+      await auditInWorker(loaded);
       // A load is a new figure, so the view it is seen through is a new view too (#1209).
       showWholeFigure();
-    });
+    }));
   };
 
   /**
@@ -293,11 +340,15 @@ export function App() {
   /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
 
-  const openLinkAn = (payload: string) => {
-    const r = openSharedAnalytic(payload);
-    if (r === true) showWholeFigure();
-    else setShareError(r);
-  };
+  // #2874: opening a link is a load — one job
+  const openLinkAn = (payload: string) =>
+    void workAn.run(async () => {
+      const r = openSharedAnalytic(payload, AUDIT_LATER);
+      if (r === true) {
+        await auditInWorker(useAnalyticStore.getState().lines);
+        showWholeFigure();
+      } else setShareError(r);
+    });
 
   useEffect(() => {
     // A link outranks the session offer and is never shown beside it: the student asked for THIS
@@ -382,14 +433,32 @@ export function App() {
 
   const acceptOffer = () => {
     if (!offer) return;
-    const ok = restoreSessionAn(offer.payload);
-    setOffer(null);
-    if (ok) showWholeFigure();
-    else {
-      // Refused: named in this product's own error voice, then stop offering what cannot open.
-      setError({ key: 'load-unreadable', detail: t('sessionOffer') });
-      forgetSessionAn();
-    }
+    const payload = offer.payload;
+    // #2874: restoring is loading — one job
+    void workAn.run(async () => {
+      const ok = restoreSessionAn(payload, AUDIT_LATER);
+      setOffer(null);
+      if (ok) {
+        await auditInWorker(useAnalyticStore.getState().lines);
+        showWholeFigure();
+      }
+      else {
+        // Refused: named in this product's own error voice, then stop offering what cannot open.
+        setError({ key: 'load-unreadable', detail: t('sessionOffer') });
+        forgetSessionAn();
+      }
+    });
+  };
+
+  /** #2890: a load's audit replays the saved lines in the worker; then the loaded figure is drawn. */
+  const auditInWorker = async (loaded: readonly string[], round = 1): Promise<void> => {
+    setStopped(null);
+    const { disabled: muted, hosts: recorded } = useAnalyticStore.getState();
+    const audit = await decideAn('audit', { lines: loaded, disabled: muted, hosts: recorded, round });
+    // #2893 (ADR-AG-479): an audit that stopped has no answer yet — the figure is drawn, and the audit asks to go on
+    if (isNotDecided(audit)) stopHere(audit, (next) => workAn.run(() => auditInWorker(loaded, next)));
+    else finishLoadAudit(loaded, audit);
+    await figureOfStore();
   };
 
   const declineOffer = () => {
@@ -541,6 +610,8 @@ export function App() {
   const [pick, setPick] = useState<{ items: Measurable[]; letter: string | null; segment?: { key: string; name: string }; curve?: CurveMenuTarget; x: number; y: number; seq: number } | null>(null);
   /** #1598: a clicked unnamed circle CENTRE — the offer it is, and where (viewport px) to open the letter popover. */
   const [centrePick, setCentrePick] = useState<{ offerId: string; x: number; y: number; seq: number } | null>(null);
+  /** #2851 (ADR-AG-465): the shown focus whose letter popover is open — the offer id and the book letter it opens on. */
+  const [focusPick, setFocusPick] = useState<{ offerId: string; letter: string; x: number; y: number; seq: number } | null>(null);
   /** The input zone — «שנה אות» focuses its box after filling it (the shared InputArea takes no ref). */
   const inputZoneRef = useRef<HTMLDivElement | null>(null);
 
@@ -588,13 +659,15 @@ export function App() {
    */
   const showWholeFigure = () => setView(INITIAL_VIEW);
 
-  const clearSession = () => {
-    logAnalytic({ kind: 'action', action: 'clear' });
-    clearAll();
-    setDraft('');
-    setAskText('');
-    showWholeFigure();
-  };
+  const clearSession = () =>
+    void workAn.run(async () => {
+      logAnalytic({ kind: 'action', action: 'clear' });
+      jobStoreAn().clearAll();
+      await figureOfStore();
+      setDraft('');
+      setAskText('');
+      showWholeFigure();
+    });
   const [dataOpen, setDataOpen] = useState(true);
   /**
    * «הצג בנייה» — the medians, altitudes or bisectors that DEFINE a derived point (#1030).
@@ -616,12 +689,14 @@ export function App() {
   /** #1973 (ADR-AG-430): the hosts each cevian line was accepted in, on the active projection — `derive`'s pins. */
   const pins = useMemo(() => activePins(hosts, lines.length, disabled), [hosts, lines.length, disabled]);
   const d = useMemo(() => {
+    // #2890 (ADR-AG-478): a lookup of what the worker settled. At stage `figure` the pool is HELD: every gate is
+    // pending and nothing is evaluated here; at stage `values` the pool is complete and every gate reads it.
     const out = derive(active, seed, seedNames, pins);
-    // #1473 (ADR-AG-180, operator ruling B′): the page's knowledge gates judge only what is already
-    // evaluated and answer «בודק…» for the rest; the pool completes AFTER the render (effect below).
-    configurationPool(out.construction).defer();
+    if (!valuesShown) configurationPool(out.construction).hold();
     return out;
-  }, [active, seed, seedNames, pins]);
+    // `version`: what was adopted since; a new view reads it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, seed, seedNames, pins, valuesShown, shownFigure.version]);
   /**
    * #1177 (ADR-AG-352) — THE LOCUS CHIPS: one per point that has a locus, on the row that introduced it. The predicate
    * is the engine's `hasLocus` (app/locusChip.ts), never re-derived here; a click is the measure menu's `toggleAsk`.
@@ -652,14 +727,13 @@ export function App() {
   const shapeWarnings = useMemo(() => shapeWarningsOf(active, d), [active, d]);
   // #1595 (ADR-AG-366): the letters the drawn figure puts on one dot — the suite notice reads them, per render
   const coincidences = useMemo(() => coincidencesOf(d), [d]);
-  const [poolTick, setPoolTick] = useState(0);
-  useLayoutEffect(() => completePoolAfterRender(configurationPool(d.construction), () => setPoolTick((n) => n + 1)), [d]);
+  // #2890 (ADR-AG-478): the pool is completed in the worker, which hands the values over; `d` changes with them.
   /**
    * #1863 (ADR-AG-376) — THE CONIC CHIPS: one per stated parabola or ellipse (not one the givens make a circle), on the
    * row that introduced it. A press records the next state on the annotation channel (ADR-AG-375); nothing is submitted.
    */
   // poolTick: the circle test reads the configuration pool
-  const conics = useMemo(() => conicChips(d, annotations), [d, annotations, poolTick]);
+  const conics = useMemo(() => conicChips(d, annotations), [d, annotations]);
   /**
    * #1864 (ADR-AG-267, docs/10 P4): every choice the tool made for an unstated given, worded — SAID under the row
    * that opened it and gathered beside «הציגו תצורה אחרת», for as long as it is unstated. 2-D's two surfaces.
@@ -668,23 +742,22 @@ export function App() {
    */
   const unstatedNotes = useMemo(
     () => unstatedChoices(d).map((c) => ({ line: c.line, text: unstatedChoiceText(c, (k, o) => t(k, o)) })),
-    // poolTick: the pool completed, re-read the gate
-    [d, t, poolTick],
+    [d, t],
   );
   /**
    * THE GIVENS FORCED A NARROWER KIND (#1996, ADR-AG-276 — operator rulings 2026-10-13): one ⓘ line per declared ring the
    * givens force into a narrower named kind, naming the cause. Read off the COMPLETE configuration pool only, and computed
    * AFTER paint (a passive effect, never in the render): the pool completes after the render (ADR-AG-180, operator
    * 2026-09-29: *"we cannot afford 0.5 s addition"*), so the note arrives with the pool's re-render and never delays the
-   * figure. An incomplete pool reports pending, which makes `poolScheduler` re-render on completion. Kept with the
+   * figure. Since #2890 (ADR-AG-478) it is read once the worker's values are adopted, never at the figure stage. Kept with the
    * derivation it was read from, so a changed figure never shows the old figure's note.
    */
   const [narrowed, setNarrowed] = useState<{ d: typeof d; notes: AnalyticNarrowing[] } | null>(null);
   useEffect(() => {
-    const notes = narrowingNotesOf(active, d);
+    // #2890: read once the values are held (the worker solved the sub-lists the note derives)
+    const notes = valuesShown ? narrowingNotesOf(active, d) : [];
     setNarrowed((prev) => (prev?.d === d && prev.notes === notes ? prev : { d, notes }));
-    // poolTick: the pool completed, read it again
-  }, [active, d, poolTick]);
+  }, [active, d, valuesShown]);
   const narrowings = narrowed?.d === d ? narrowed.notes : [];
   /**
    * #1863 (ADR-AG-377, operator 2026-11-03 card d2) — AN ELLIPSE THE GIVENS MAKE A CIRCLE, said in the narrowing note's
@@ -693,10 +766,10 @@ export function App() {
    */
   const [rounded, setRounded] = useState<{ d: typeof d; notes: CircleNote[] } | null>(null);
   useEffect(() => {
-    const notes = circleNotesOf(active, d, (ls) => derive(ls, seed, seedNames));
+    // #2890: read once the values are held: the note derives sub-lists, which the worker has solved by then
+    const notes = valuesShown ? circleNotesOf(active, d, (ls) => derive(ls, seed, seedNames)) : [];
     setRounded({ d, notes });
-    // poolTick: the pool completed, read it again
-  }, [active, d, poolTick, seed, seedNames]);
+  }, [active, d, valuesShown, seed, seedNames]);
   const circleNotes = rounded?.d === d ? rounded.notes : [];
 
   /**
@@ -748,9 +821,16 @@ export function App() {
     // #1212 removed `describeCurve` (imported now); #1137's `locusKind` stays — it is locale.
     // #1473: `askSettled` — an answer whose gates still wait for the pool is «בודק…», never a value.
     // #2673 (ADR-AG-381): `q.via` is the way in — only the chip's record is answered with the locus.
-    () => queries.map((q) => ({ ...askSettled(d, q.sentence, fmt, locusKind, q.via), shown: q.shown })),
-    // poolTick: the pool completed, re-read the gates
-    [queries, d, fmt, locusKind, poolTick],
+    // #2890 (ADR-AG-478): a question is a value. Until the worker has answered it on this figure its row is pending,
+    // and the page asks the figure nothing for it (a traced locus is solved, never read off the pool).
+    () =>
+      queries.map((q) =>
+        valuesShown && isAnswered(basisOfState(shownFigure.state), q)
+          ? { ...askSettled(d, q.sentence, fmt, locusKind, q.via), shown: q.shown }
+          : { question: q.sentence, value: null, pending: true as const, shown: q.shown },
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [queries, d, fmt, locusKind, valuesShown],
   );
 
   /**
@@ -897,20 +977,47 @@ export function App() {
    * {@link submitSentence} in order, one row each, and sets the box to what is left when it stops.
    */
   const submit = (raw: string) => {
-    void submitTyped(raw, submitSentence, setDraft);
+    // #2874: a submit is ONE job, its model call included. While the tool works a submit is not taken: Enter
+    // is off and the line stays in the box (ADR-W-198), now for every action the tool is working on. The
+    // sentence body is the LATEST render's, so a job that waited its turn reads the figure as it is then.
+    void workAn.runIfIdle(() => submitTyped(raw, (sentence) => live.current.submitSentence(sentence), setDraft));
   };
+  /** #2893 (ADR-AG-479): «המשיכו לחפש» on a typed line — the box again, its first sentence as the next round. */
+  const submitRound = (round: number) =>
+    workAn.runIfIdle(() => {
+      let first = true;
+      return submitTyped(
+        draftRef.current,
+        (sentence) => {
+          const r = first ? round : 1;
+          first = false;
+          return live.current.submitSentence(sentence, r);
+        },
+        setDraft,
+      );
+    });
 
   /**
    * One sentence. It reads the LIVE store rather than this render's `active`/`d`: a paragraph's second
    * sentence must see the row its first just recorded («האנך חותך…» after the perpendicular). On a single
    * sentence the two are the same state, and the render's memoized derivation is reused.
    */
-  const submitSentence = async (raw: string): Promise<SentenceOutcome> => {
+  const submitSentence = async (raw: string, round = 1): Promise<SentenceOutcome> => {
+    setStopped(null);
     const live = useAnalyticStore.getState();
-    const same = live.lines === lines && live.disabled === disabled && live.seed === seed && live.seedNames === seedNames && live.hosts === hosts;
-    const act = same ? active : activeOf(live.lines, live.disabled);
-    const cur = same ? d : derive(act, live.seed, live.seedNames, activePins(live.hosts, live.lines.length, live.disabled));
-    const verdict = decideSubmit(raw, act, live.seed, cur);
+    const act = activeOf(live.lines, live.disabled);
+    // #2890 (ADR-AG-478): decided in the worker, on the figure the store holds now
+    const verdict = await decideAn('submit', { raw, basis: basisOfState(live), round });
+    /**
+     * #2893 (ADR-AG-479): NOT DECIDED — the search reached its work limit. Not a verdict: nothing is recorded and nothing
+     * is logged as a refusal; the line stays in the box (ruling 3) and «המשיכו לחפש» submits the box again, this
+     * sentence as the next round.
+     */
+    if (isNotDecided(verdict)) {
+      logAnalytic({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: 'not-decided' });
+      stopHere(verdict, submitRound);
+      return 'kept';
+    }
     /**
      * THE TRACE (#1300) — one line per submitted utterance, including the ones that fail.
      *
@@ -945,7 +1052,7 @@ export function App() {
          * tool understood the student and disagreed, and handing that to a model would replace a
          * correct explanation with a guess.
          */
-        if (reachesFallback(verdict)) return (await tryFallback(raw, verdict.error, act, live.seed)) ? 'consumed' : 'kept';
+        if (reachesFallback(verdict)) return (await tryFallback(raw, verdict.error, act, live.seed, round)) ? 'consumed' : 'kept';
         setError(verdict.error);
         return sentenceOutcome(verdict);
       /**
@@ -955,7 +1062,9 @@ export function App() {
       case 'record':
         // #1350 — the notice rides IN the commit that records the line: `recordLine` clears the
         // transient surfaces, so a notice set before it would be erased by the very line that earned it.
-        commitRecord(verdict, recordLine, t);
+        commitRecord(verdict, jobStoreAn().recordLine, t);
+        // the figure first: the job is released once it is drawn, and its values follow
+        await figureOfStore();
         if (verdict.created?.length || verdict.createdCircle) {
           const now = useAnalyticStore.getState().lines;
           setCreatedNotice({
@@ -985,13 +1094,27 @@ export function App() {
        * is dispatched here rather than decided by `decideSubmit`, which sees only the active lines.
        */
       case 'rename': {
-        const r = dispatchRename(verdict.from, verdict.to, sessionOf(live), { applyRename, setError }, cur);
-        return r.kind === 'apply' ? 'consumed' : 'kept';
+        const r = await letterInWorker({ kind: 'rename', from: verdict.from, to: verdict.to }, sessionOf(live), round);
+        if (isNotDecided(r)) {
+          stopHere(r, submitRound); // #2893 (ADR-AG-479)
+          return 'kept';
+        }
+        if (r.kind !== 'rename') return 'kept';
+        applyRenameVerdict(r.verdict, { applyRename: jobStoreAn().applyRename, setError });
+        await figureOfStore();
+        return r.verdict.kind === 'apply' ? 'consumed' : 'kept';
       }
       // #1303 / #1631 — a SWAP («החלף בין A ל-B»): the rename's contract, two letters at once.
       case 'swap': {
-        const r = dispatchSwap(verdict.a, verdict.b, sessionOf(live), { applySwap, setError }, cur);
-        return r.kind === 'apply' ? 'consumed' : 'kept';
+        const r = await letterInWorker({ kind: 'swap', a: verdict.a, b: verdict.b }, sessionOf(live), round);
+        if (isNotDecided(r)) {
+          stopHere(r, submitRound); // #2893 (ADR-AG-479)
+          return 'kept';
+        }
+        if (r.kind !== 'swap') return 'kept';
+        applySwapVerdict(r.verdict, { applySwap: jobStoreAn().applySwap, setError });
+        await figureOfStore();
+        return r.verdict.kind === 'apply' ? 'consumed' : 'kept';
       }
     }
   };
@@ -1005,7 +1128,31 @@ export function App() {
    * refusal is about words they actually wrote.
    */
   /** The whole session a rename or swap rewrites, read from the live store (#1778: mid-paragraph, the render's copy is stale). */
-  const sessionOf = (live: ReturnType<typeof useAnalyticStore.getState>) => ({
+  /** #2890: a letter change decided in the worker, over the whole session. */
+  const letterInWorker = (request: Parameters<typeof decideAn<'letter'>>[1]['request'], state: RenameState, round = 1) => decideAn('letter', { request, state, round });
+  /** #2893 (ADR-AG-479): the popover's answer when a letter decision reached its limit — the round «המשיכו לחפש» runs. */
+  const renameStopped = (nd: NotDecided<ResumeAn>) => ({ ok: false as const, reason: 'not-decided', round: nd.resume.round + 1 });
+  const swapStopped = (nd: NotDecided<ResumeAn>) => ({ ok: false, notDecided: { round: nd.resume.round + 1 } });
+  /** #2890: the fallback's two solves, in the worker. */
+  /**
+   * #2893 (ADR-AG-479): a fallback solve that reached its work limit ends the fallback as "not decided": nothing is
+   * recorded, the line stays in the box, and «המשיכו לחפש» submits it again (the model is asked again: its answer is
+   * not kept between rounds).
+   */
+  const fallbackSolver = (round: number): FallbackSolver => ({
+    existing: async (ls, at) => {
+      const v = await decideAn('fallbackExisting', { lines: ls, seed: at, round });
+      if (isNotDecided(v)) throw new FallbackStopped(v);
+      return v;
+    },
+    judge: async (utterance, ls, at, answer, existing) => {
+      const v = await decideAn('fallbackJudge', { utterance, lines: ls, seed: at, answer, existing, round });
+      if (isNotDecided(v)) throw new FallbackStopped(v);
+      return v;
+    },
+  });
+
+  const sessionOf = (live: ReturnType<typeof useAnalyticStore.getState>): RenameState => ({
     lines: live.lines,
     disabled: live.disabled,
     queries: live.queries,
@@ -1015,22 +1162,37 @@ export function App() {
     segStyle: live.segStyle,
     curveStyle: live.curveStyle,
     annotations: live.annotations,
+    hosts: live.hosts,
   });
 
   /** Answers whether the model's lines were recorded — the sentence was taken (#1778: the paragraph chain goes on). */
-  const tryFallback = async (raw: string, original: InputError, act: readonly string[], atSeed: Seed): Promise<boolean> => {
-    setThinking(true);
+  const tryFallback = async (raw: string, original: InputError, act: readonly string[], atSeed: Seed, round = 1): Promise<boolean> => {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
     try {
-      const out = await runFallback(raw, act, atSeed, (utterance, context, keep, contradicted) =>
-        llmParseAnalytic(utterance, context, {
-          signal: ctl.signal,
-          locale: i18n.language === 'en' ? 'en' : 'he',
-          ...(keep?.length ? { keep } : {}),
-          ...(contradicted?.length ? { contradicted } : {}),
-        }),
-      );
+      // #2874: the wait for the model is counted on the queue's MODEL lane (nested in this submit's job, which
+      // has already painted the working state) and released in the queue's `finally`.
+      const out = await workAn
+        .run(
+        () =>
+          runFallback(raw, act, atSeed, (utterance, context, keep, contradicted) =>
+            llmParseAnalytic(utterance, context, {
+              signal: ctl.signal,
+              locale: i18n.language === 'en' ? 'en' : 'he',
+              ...(keep?.length ? { keep } : {}),
+              ...(contradicted?.length ? { contradicted } : {}),
+            }),
+            fallbackSolver(round),
+          ),
+        { lane: MODEL, paint: false },
+        )
+        .catch((e: unknown) => {
+          if (!(e instanceof FallbackStopped)) throw e;
+          logAnalytic({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', result: 'not-decided' });
+          stopHere(e.stopped, submitRound);
+          return null;
+        });
+      if (!out) return false;
       if (out.retry) logAnalytic(nameRetryEvent(out.retry)); // #2231 (ADR-W-189)
       /**
        * THE ESCALATION'S OUTCOME (#1300) — the event that could not be answered when #1297 was triaged.
@@ -1059,7 +1221,8 @@ export function App() {
       if (out.kind === 'lines') {
         // #1297 (operator ruling 2026-09-27, 'student's words now'): the rows DISPLAY the sentence
         // the student typed; the machine lines stay the stored truth so replay is unchanged.
-        recordLlmLines(raw, out.lines, noticeText(out.notice, t), out.configuration);
+        jobStoreAn().recordLlmLines(raw, out.lines, noticeText(out.notice, t), out.configuration);
+        await figureOfStore();
         return true;
       }
       /**
@@ -1072,7 +1235,6 @@ export function App() {
       return false;
     } finally {
       clearTimeout(timer);
-      setThinking(false);
     }
   };
 
@@ -1119,6 +1281,8 @@ export function App() {
       segStyle,
       // #2238 — the student's per-curve display choices (hidden / dashed)
       curveStyle,
+      // #2852 (ADR-AG-474) — the tool's letters that may go with a hidden segment (no other line uses them)
+      lonePoints: lonePoints(d.construction, d.minted),
       // #1714 — what the student STATED about a length, angle, area or arc, written on the figure
       stated: d.stated,
       // #1863 — the conic role marks the chips asked for (ADR-AG-376), and the ellipses that are circles (ADR-AG-377)
@@ -1129,9 +1293,13 @@ export function App() {
       // #2696 (ADR-AG-393) — two letters on one dot are written «C=E», from the pairs R214's notice reads
       coincidences,
     });
-    // poolTick: the pool completed, re-read the gates (#1473)
-  }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle, roleMarks, display, coincidences]);
+  }, [d, view, canvasSize, answers, segStyle, curveStyle, roleMarks, display, coincidences]);
 
+  // #2852 (ADR-AG-474): the rows a hidden segment touches (by active line), each with the keys its «מוסתר» shows again
+  const hiddenRows = useMemo(
+    () => hiddenRowLines(d.construction, new Set(Object.entries(segStyle).filter(([, v]) => v.hidden).map(([k]) => k))),
+    [d, segStyle],
+  );
   const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 
   // The DOF cue (02c P4 — an under-determined figure is drawn, and its openness is VISIBLE).
@@ -1140,11 +1308,9 @@ export function App() {
   const freeCount = reportedDof(d.construction, d.figure.carrierDof);
   // #1289 — the panel's knowledge gates, decided ONCE (app/panelRows.ts) and rendered below; the
   // corpus invariant "freedom in the panel ⇒ something in it is unknown" asks the same function.
-  // poolTick: the pool completed, re-read the gates (#1473)
-  const knows = useMemo(() => panelKnowledge(d), [d, poolTick]);
+  const knows = useMemo(() => panelKnowledge(d), [d]);
   // #1473 — the slope and length rows' gates, one callable decision like `panelKnowledge`.
-  // poolTick, as above
-  const segs = useMemo(() => segmentKnowledge(d), [d, poolTick]);
+  const segs = useMemo(() => segmentKnowledge(d), [d]);
   const checking = t('checking');
   /**
    * ONE ASK ROW'S BODY (#2393, ADR-AG-316) — what the lane answered, worded. Extracted from the row so a conjoined question
@@ -1176,8 +1342,9 @@ export function App() {
     ) : a.unreadable ? (
       `${a.question} — ${t('askUnreadable')}`
     ) : a.pending ? (
-      /* #1473 — a gate this answer reads still waits for the configuration pool: «בודק…», never a provisional value */
-      `${a.question} = ${checking}`
+      /* #1473 — a gate this answer reads still waits for the configuration pool: «בודק…», never a provisional value;
+         #2890 (ADR-AG-478) — and it is shown only after 0.3 s */
+      <PendingText text={`${a.question} = ${checking}`} checking={checking} render={(x) => <MathText text={analyticBidi.isolateLtrRuns(x)} />} />
     ) : (
       /**
        * A VERTICAL SLOPE IS AN ANSWER, NOT A FAILURE (#1223).
@@ -1199,7 +1366,7 @@ export function App() {
           : a.fact === 'lines-cross'
             ? t('askLinesCross')
             : a.fact === 'parabola-no-centre'
-              ? /* #2625 (ADR-AG-454 Am. 1): the refusal's own sentence, one wording for both lanes */ t('errParabolaNoCentre')
+              ? /* #2625 (ADR-AG-454 Am. 1): the refusal's reason; its next step is the ask box's own question (#2835, ADR-AG-470) */ t('errParabolaNoCentreAsk')
             : a.fact === 'points' && a.points
               ? /* #1227 (ADR-AG-136): a determined point's locus IS the point(s) — the
                    locus lane's own grammar, «נקודה · (4, 3)» beside «ישר · x = 4» */
@@ -1218,6 +1385,125 @@ export function App() {
 
   // NO `suiteActions`: AppFrame renders the language toggle AND the About button itself, using this
   // product's own `language` key. Passing a toggle here put two «English» buttons on the suite bar.
+  /**
+   * #2874 (ADR-W-210) — THE JOB BODIES of the actions this component decides itself, kept as the LATEST
+   * render defines them (`useLatest`). A job runs after the paint, and after any job asked for before it;
+   * these read `lines`, `d` and the rest from the render current THEN, never from the render that was
+   * clicked. Each is one student action that re-solves the figure.
+   */
+  const live = useLatest({
+    submitSentence,
+    /** #1548 — the mute checkbox: muting always applies; un-muting faces the typed-line gate (`decideToggle`). */
+    toggleRow: async (id: string, round = 1): Promise<void> => {
+      setStopped(null);
+      const i = Number(id);
+      const verdict = await decideAn('toggle', { index: i, basis: basisOfState(useAnalyticStore.getState()), round });
+      // #2893 (ADR-AG-479): not decided — the row keeps its state, and the next round is offered
+      if (isNotDecided(verdict)) return stopHere(verdict, (next) => workAn.run(() => live.current.toggleRow(id, next)));
+      logAnalytic({
+        kind: 'action',
+        action: 'toggle',
+        detail: `${i}:${disabled.includes(i) ? 'on' : 'off'}`,
+        ...(verdict.kind === 'refused' ? { result: verdict.error.key } : {}),
+      });
+      if (verdict.kind === 'refused') setError(verdict.error);
+      else {
+        jobStoreAn().setDisabled(verdict.disabled);
+        await figureOfStore();
+      }
+    },
+    editRow: async (id: string, next: string, round = 1): Promise<boolean> => {
+      setStopped(null);
+      const i = Number(id);
+      // #1973 (ADR-AG-430): an edit is an accept — the row records the host its new sentence resolved to
+      const edit = await decideAn('edit', { index: i, text: next, basis: basisOfState(useAnalyticStore.getState()), round });
+      // #2893 (ADR-AG-479): not decided — the row keeps its sentence and its editor stays open; the next round is offered
+      if (isNotDecided(edit)) {
+        stopHere(edit, (r) => workAn.run(() => live.current.editRow(id, next, r)));
+        return false;
+      }
+      if (!edit.ok) return false;
+      // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
+      logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
+      jobStoreAn().replaceLine(i, next, edit.host?.ring);
+      await figureOfStore();
+      return true;
+    },
+    deleteRow: async (id: string) => {
+      setStopped(null);
+      logAnalytic({ kind: 'action', action: 'delete', detail: lines[Number(id)] ?? id });
+      jobStoreAn().removeLine(Number(id));
+      await figureOfStore();
+    },
+    /** Undo, redo, and the created notice's «בטל»: a store step, then its figure. */
+    storeStep: async (step: () => void) => {
+      setStopped(null);
+      step();
+      await figureOfStore();
+    },
+    /**
+     * «הציגו תצורה אחרת». The button asks for what it PROMISES — a figure that differs (#1084).
+     *
+     * Incrementing the seed redrew the same picture for the first few presses on the operator's own
+     * figure, while the DOF cue beside it said the figure still had freedom. When nothing differs,
+     * saying so beats redrawing in silence.
+     */
+    another: async (round = 1): Promise<void> => {
+      setStopped(null);
+      const next = await decideAn('another', { basis: basisOfState(useAnalyticStore.getState()), round });
+      // #2893 (ADR-AG-479): a walk that reached its limit is not «אין תצורה אחרת»: it says so and offers the next round
+      if (isNotDecided(next)) return stopHere(next, (r) => workAn.runIfIdle(() => live.current.another(r), { lane: ANOTHER }));
+      // #1300: the seed IS the configuration, so a replay that loses this press redraws a
+      // different figure from the one the report is about.
+      logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });
+      // #1262: the frame is carried across the configuration change (see the box effect).
+      if (next.found) carryFrameRef.current = true;
+      if (next.found) {
+        jobStoreAn().goToSeed(next.seed);
+        await figureOfStore();
+      } else setNotice(t('noticeOnlyConfiguration'));
+    },
+    /** A POINT's letter popover (#1631): a taken letter is answered IN the popover (its holder, the swap offer);
+     *  every other refusal keeps the analytic tree's own sentence in the error line, which says WHY. */
+    renameLetter: async (from: string, to: string, round = 1): Promise<LetterRenameResult> => {
+      const r = await letterInWorker({ kind: 'rename', from, to }, sessionOf(useAnalyticStore.getState()), round);
+      if (isNotDecided(r)) return renameStopped(r);
+      if (r.kind !== 'rename') return { ok: false, reason: 'rename-bad-name' };
+      const v = applyRenameVerdict(r.verdict, { applyRename: jobStoreAn().applyRename, setError: (e) => (e && e.key === 'rename-taken' ? undefined : setError(e)) });
+      await figureOfStore();
+      return letterRenameOf(v);
+    },
+    swapLetters: async (a: string, b: string, round = 1): Promise<LetterSwapResult> => {
+      const r = await letterInWorker({ kind: 'swap', a, b }, sessionOf(useAnalyticStore.getState()), round);
+      if (isNotDecided(r)) return swapStopped(r);
+      if (r.kind !== 'swap') return { ok: false };
+      const v = applySwapVerdict(r.verdict, { applySwap: jobStoreAn().applySwap, setError });
+      await figureOfStore();
+      return { ok: v.kind === 'apply' };
+    },
+    /** #1598 — the centre offer's popover: the letter typed records the sentence the typed path would; #2890: decided in the worker.
+     *  #2851 (ADR-AG-465): a shown focus's popover is the same two operations on the focus's sentence. */
+    centreOps: (offerId: string, offer: 'centre' | 'focus' = 'centre') => {
+      const actions = { record: (v: Parameters<typeof commitRecord>[0]) => commitRecord(v, jobStoreAn().recordLine, t), applySwap: jobStoreAn().applySwap, setError };
+      return {
+        onRename: async (_from: string, to: string, round = 1): Promise<LetterRenameResult> => {
+          const r = await letterInWorker({ kind: offer === 'centre' ? 'centreName' : 'focusName', offerId, to }, sessionOf(useAnalyticStore.getState()), round);
+          if (isNotDecided(r)) return renameStopped(r);
+          const out = r.kind === 'centreName' ? applyCentreName(r.verdict, actions) : { ok: false as const, reason: 'rename-bad-name' };
+          await figureOfStore();
+          return out;
+        },
+        onSwap: async (_a: string, b: string, round = 1): Promise<LetterSwapResult> => {
+          const r = await letterInWorker({ kind: offer === 'centre' ? 'centreSwap' : 'focusSwap', offerId, taken: b }, sessionOf(useAnalyticStore.getState()), round);
+          if (isNotDecided(r)) return swapStopped(r);
+          const out = r.kind === 'centreSwap' ? applyCentreSwap(r.verdict, actions) : { ok: false as const };
+          await figureOfStore();
+          return out;
+        },
+      };
+    },
+  });
+
   return (
     <AppFrame
       title={t('suite.product.analytic')}
@@ -1377,12 +1663,16 @@ export function App() {
           <div ref={inputZoneRef} style={{ display: 'contents' }}>
             <InputArea
               value={draft}
-              onChange={setDraft}
+              onChange={(v) => {
+                // #2893 (ruling 3): typing something else dismisses the question
+                if (v !== draftRef.current) setStopped(null);
+                setDraft(v);
+              }}
               onSubmit={() => submit(draft)}
               placeholder={t('inputPlaceholder')}
               submitLabel={t('add')}
               /* #1251 — the fallback is a network round-trip; the student sees it working. */
-              busy={thinking}
+              busy={working}
               busyLabel={t('thinking')}
               symbols={SYMBOLS}
               /*
@@ -1440,6 +1730,12 @@ export function App() {
                   {errorText}
                 </p>
               )}
+              {/* #2893 (ADR-AG-479): a search that reached its work limit, where a refusal shows; never a refusal */}
+              {stopped && (
+                <div style={{ marginTop: 8 }}>
+                  <NotDecidedNote message={t('suite.notDecided.message')} continueLabel={t('suite.notDecided.continue')} onContinue={stopped.again} busy={working} />
+                </div>
+              )}
               {/*
                 An informational answer, never the danger colour and never `role="alert"` (#1045):
                 the student restated something true, and styling that as an error would teach them
@@ -1458,7 +1754,8 @@ export function App() {
                     text={t(createdNoticeTextOf(createdNotice).key, createdNoticeTextOf(createdNotice).params)}
                     undoLabel={t(CREATED_NOTICE_KEYS.undo)}
                     onUndo={() => {
-                      removeLine(createdNotice.index);
+                      const index = createdNotice.index;
+                      void workAn.run(() => live.current.storeStep(() => jobStoreAn().removeLine(index)));
                       setCreatedNotice(null);
                     }}
                   />
@@ -1545,6 +1842,13 @@ export function App() {
                 text: line,
                 // #1973 (ADR-AG-430): the shape the row's cevian was drawn in, BESIDE the student's words — 2-D's tag (ADR-797)
                 tag: hostTag(d.hosts.find((h) => rows[h.index] === i)?.host, t),
+                // #2852 (ADR-AG-474, ADR-W-207): a row whose segment is hidden on the canvas says so; its click shows it again
+                ...([...hiddenRows.keys()].some((l) => rows[l] === i)
+                  ? (() => {
+                      const keys = [...hiddenRows].filter(([l]) => rows[l] === i).flatMap(([, ks]) => ks);
+                      return { hidden: { text: t('suite.hiddenRow.mark'), title: t('suite.hiddenRow.title'), onShow: () => keys.forEach((k) => toggleSegHidden(k)) } };
+                    })()
+                  : {}),
                 // #1864 (ADR-AG-267): the tool's choice for this row's unstated given, said under it (2-D's `role="note"`).
                 ...(unstatedNotes.some((n) => rows[n.line] === i)
                   ? {
@@ -1620,34 +1924,12 @@ export function App() {
                * because this handler exists. Muting always applies; un-muting faces the typed-line gate
                * (`decideToggle`) and, refused, the row stays muted and the error surface names why.
                */
-              onToggle={(id) => {
-                const i = Number(id);
-                const verdict = decideToggle(i, lines, disabled, seed, d, hosts);
-                logAnalytic({
-                  kind: 'action',
-                  action: 'toggle',
-                  detail: `${i}:${disabled.includes(i) ? 'on' : 'off'}`,
-                  ...(verdict.kind === 'refused' ? { result: verdict.error.key } : {}),
-                });
-                if (verdict.kind === 'refused') setError(verdict.error);
-                else setDisabled(verdict.disabled);
-              }}
+              onToggle={(id) => void workAn.run(() => live.current.toggleRow(id))}
               toggleLabel={t('factToggle')}
               editValueOf={(id) => lines[Number(id)] ?? ''}
-              onEditCommit={(id, next) => {
-                const i = Number(id);
-                // #1973 (ADR-AG-430): an edit is an accept — the row records the host its new sentence resolved to
-                const edit = decideEditHost(i, next, lines, disabled, seed, seedNames, hosts);
-                if (!edit.ok) return false;
-                // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
-                logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
-                replaceLine(i, next, edit.host?.ring);
-                return true;
-              }}
-              onDelete={(id) => {
-                logAnalytic({ kind: 'action', action: 'delete', detail: lines[Number(id)] ?? id });
-                removeLine(Number(id));
-              }}
+              // #2874: an edit and a delete re-solve the figure — jobs; the editor waits for the edit's answer
+              onEditCommit={(id, next) => workAn.run(() => live.current.editRow(id, next))}
+              onDelete={(id) => void workAn.run(() => live.current.deleteRow(id))}
               footer={
                 /* CLEAR-ALL MOVED to the under-canvas row (#1098) — it acts on the figure, like
                    undo/redo, and #739 made that call for complex for the same reason. What stays
@@ -1750,6 +2032,8 @@ export function App() {
               }}
               /* #1598 — an unnamed circle's centre opens the letter popover: the student picks the letter. */
               onCentre={(offerId, screen) => setCentrePick({ offerId, x: screen.x, y: screen.y, seq: Date.now() })}
+              /* #2851 — a shown focus opens the same popover, on the book's letter: the student nails it as a point. */
+              onFocus={(offer, screen) => setFocusPick({ offerId: offer.id, letter: offer.letter, x: screen.x, y: screen.y, seq: Date.now() })}
               onCrossing={(sentence) => {
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
                 // and what the student is told. This only asks whether jumping the configuration
@@ -1816,27 +2100,13 @@ export function App() {
           <div style={figureRowStyle}>
             <button
               type="button"
-              style={lines.length === 0 ? rowAccentOffStyle : rowAccentStyle}
-              disabled={lines.length === 0}
-              onClick={() => {
-                /**
-                 * The button asks for what it PROMISES — a figure that differs (#1084).
-                 *
-                 * Incrementing the seed redrew the same picture for the first few presses on the
-                 * operator's own figure, while the DOF cue beside it said the figure still had
-                 * freedom. When nothing differs, saying so beats redrawing in silence.
-                 */
-                const next = anotherConfiguration(active, seed, undefined, seedNames, pins);
-                // #1300: the seed IS the configuration, so a replay that loses this press redraws a
-                // different figure from the one the report is about.
-                logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });
-                // #1262: the frame is carried across the configuration change (see the box effect).
-                if (next.found) carryFrameRef.current = true;
-                if (next.found) goToSeed(next.seed);
-                else setNotice(t('noticeOnlyConfiguration'));
-              }}
+              className={workingDim(resampling, 0.5)}
+              style={lines.length === 0 || resampling ? rowAccentOffStyle : rowAccentStyle}
+              disabled={lines.length === 0 || resampling}
+              // #2874: one job on its own lane — the button reads «חושב…» and is off while it runs, as 2-D's does
+              onClick={() => void workAn.runIfIdle(() => live.current.another(), { lane: ANOTHER })}
             >
-              {t('another')}
+              <WorkingFace working={resampling} idle={t('another')} busy={t('thinking')} />
             </button>
 
             {/* #1864 (ADR-AG-267): while the tool holds a choice the student has not stated, say so beside the button
@@ -1888,7 +2158,7 @@ export function App() {
               disabled={!canUndo}
               onClick={() => {
                 logAnalytic({ kind: 'action', action: 'undo' }); // #1300
-                undo();
+                void workAn.run(() => live.current.storeStep(() => jobStoreAn().undo()));
               }}
             >
               {t('undo')}
@@ -1899,7 +2169,7 @@ export function App() {
               disabled={!canRedo}
               onClick={() => {
                 logAnalytic({ kind: 'action', action: 'redo' }); // #1300
-                redo();
+                void workAn.run(() => live.current.storeStep(() => jobStoreAn().redo()));
               }}
             >
               {t('redo')}
@@ -2328,13 +2598,9 @@ export function App() {
             level (it must not scale with the zoom or clip at the canvas edge) and the popover places
             itself inside its positioned container.
           */
-          const state = { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations };
           const letter = pick.letter;
-          const onRename = (from: string, to: string): LetterRenameResult => {
-            // A taken letter is answered IN the popover (its holder, the swap offer); every other refusal
-            // keeps the analytic tree's own sentence in the error line, which says WHY.
-            return letterRenameOf(dispatchRename(from, to, state, { applyRename, setError: (e) => (e && e.key === 'rename-taken' ? undefined : setError(e)) }, d));
-          };
+          // #2874: a rename re-solves the figure — a job; the popover waits for its answer
+          const onRename = (from: string, to: string, round?: number) => workAn.run(() => live.current.renameLetter(from, to, round));
           return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
               <LetterPopover
@@ -2345,7 +2611,7 @@ export function App() {
                 title={letter}
                 label={letter}
                 onRename={onRename}
-                onSwap={(a, b) => ({ ok: dispatchSwap(a, b, state, { applySwap, setError }, d).kind === 'apply' })}
+                onSwap={(a, b, round) => workAn.run(() => live.current.swapLetters(a, b, round))}
                 strings={{
                   placeholder: t('letterPlaceholder'),
                   apply: t('letterApply'),
@@ -2353,6 +2619,8 @@ export function App() {
                   bad: t('letterBad'),
                   takenBy: t('letterTakenBy'),
                   swapLetters: t('letterSwap'),
+                  notDecided: t('suite.notDecided.message'),
+                  keepSearching: t('suite.notDecided.continue'),
                 }}
                 onClose={() => setPick(null)}
                 testId="letter-popover"
@@ -2432,13 +2700,12 @@ export function App() {
         taken letter quotes its holder and offers the swap, like every LetterPopover.
       */}
       {centrePick && (() => {
-        const state = { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations };
-        const ops = centrePopoverOps(
-          centrePick.offerId,
-          state,
-          { record: (v) => commitRecord(v, recordLine, t), applySwap, setError },
-          d,
-        );
+        // #2874: naming a centre records a line, and its swap rewrites the session — jobs, decided on the latest render
+        const offerId = centrePick.offerId;
+        const ops = {
+          onRename: (from: string, to: string, round?: number) => workAn.run(() => live.current.centreOps(offerId).onRename(from, to, round)),
+          onSwap: (a: string, b: string, round?: number) => workAn.run(() => live.current.centreOps(offerId).onSwap(a, b, round)),
+        };
         return (
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
             <LetterPopover
@@ -2457,9 +2724,52 @@ export function App() {
                 bad: t('letterBad'),
                 takenBy: t('letterTakenBy'),
                 swapLetters: t('letterSwap'),
+                notDecided: t('suite.notDecided.message'),
+                keepSearching: t('suite.notDecided.continue'),
               }}
               onClose={() => setCentrePick(null)}
               testId="centre-popover"
+            />
+          </div>
+        );
+      })()}
+
+      {/*
+        NAME A SHOWN FOCUS (#2851, ADR-AG-465) — the centre's popover on a focus mark, opened on the book's letter. The
+        letter confirmed records the sentence a student could type («F1 מוקד ימני של האליפסה», `focusSentenceOf`); a taken
+        letter quotes its holder and offers the swap, as the centre's does (`label` is the letter the holder would take).
+      */}
+      {focusPick && (() => {
+        // decided in the worker on the latest render, as the centre's (#2890, #2874)
+        const offerId = focusPick.offerId;
+        const ops = {
+          onRename: (from: string, to: string, round?: number) => workAn.run(() => live.current.centreOps(offerId, 'focus').onRename(from, to, round)),
+          onSwap: (a: string, b: string, round?: number) => workAn.run(() => live.current.centreOps(offerId, 'focus').onSwap(a, b, round)),
+        };
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
+            <LetterPopover
+              key={focusPick.seq}
+              x={focusPick.x}
+              y={focusPick.y}
+              bounds={{ width: window.innerWidth, height: window.innerHeight }}
+              title={t('focusTitle')}
+              label={centreLabelOf(d)}
+              initialValue={focusPick.letter}
+              onRename={ops.onRename}
+              onSwap={ops.onSwap}
+              strings={{
+                placeholder: t('letterPlaceholder'),
+                apply: t('letterApply'),
+                taken: t('letterTaken'),
+                bad: t('letterBad'),
+                takenBy: t('letterTakenBy'),
+                swapLetters: t('letterSwap'),
+                notDecided: t('suite.notDecided.message'),
+                keepSearching: t('suite.notDecided.continue'),
+              }}
+              onClose={() => setFocusPick(null)}
+              testId="focus-popover"
             />
           </div>
         );
@@ -2548,7 +2858,8 @@ function fmt(v: number): string {
  * built from. The braces are added here, where the string stops being data and becomes type.
  */
 // #1644 (ADR-AG-199): the braces AND the bidi isolation of a composed row live in `panelRowText`, so a lock calls it.
-const ValueRow = ({ text }: { text: string }) => <MathText text={panelRowText(text)} />;
+/** #2890 (ADR-AG-478): a pending value's «בודק…» is shown only after 0.3 s (`PendingText`). */
+const ValueRow = ({ text }: { text: string }) => <PendingText text={panelRowText(text)} checking={analyticI18n.t('checking')} />;
 
 /**
  * The manual's sections, in teaching order (#1087).

@@ -30,9 +30,9 @@ function play(lines: readonly string[]) {
   let twin: string | null = null;
   for (const line of lines) {
     const v = decideSubmit3(st, line, () => `f${++n}`);
-    kinds.push(v.kind);
+    kinds.push((v.kind === 'record' && v.held ? 'held' : v.kind));
     if (v.kind === 'refused') error = v.error as never;
-    if (v.kind === 'already-stated') {
+    if (v.kind === 'retick') {
       twin = v.twin.utterance;
       st = { facts: v.facts, seed: st.seed };
     }
@@ -53,9 +53,8 @@ describe('#1988 — the issue’s own lines: an implied noun is «already there�
     ['ריבוע ABCD', 'מרובע ABCD'], // ADR-3D-324's own case, unchanged
   ])('«%s» · «%s»', (a, b) => {
     const r = play([a, b]);
-    expect(r.kinds, 'never refused').toEqual(['record', 'already-stated']);
-    expect(r.st.facts.length, 'no new row').toBe(1);
-    expect(r.twin, 'the note names the line that declared the ring').toBe(a);
+    expect(r.kinds, 'never refused').toEqual(['record', 'held']);
+    expect(r.st.facts.length, 'its own row (#2790, ADR-3D-484)').toBe(2);
   });
 
   it.each([
@@ -63,10 +62,10 @@ describe('#1988 — the issue’s own lines: an implied noun is «already there�
     ['ריבוע ABCD', 'מקבילית ADCB'],
     ['מלבן ABCD', 'מקבילית DCBA'],
   ])('«%s» · «%s» — every reading of the same ring (ADR-3D-324)', (a, b) => {
-    expect(play([a, b]).kinds).toEqual(['record', 'already-stated']);
+    expect(play([a, b]).kinds).toEqual(['record', 'held']);
   });
 
-  it('the figure is untouched and the statement is recorded redundant, so the student is told', () => {
+  it('the figure is untouched and the statement stands aside for the square, so nothing is applied twice', () => {
     const r = play(['ריבוע ABCD']);
     const before = derive3(r.st.facts, r.st.seed);
     const redundant: Fact3 = {
@@ -77,7 +76,9 @@ describe('#1988 — the issue’s own lines: an implied noun is «already there�
     };
     const after = derive3([...r.st.facts, redundant], r.st.seed);
     expect(after.status.x, 'the model’s lane commits it green, never refused').toBe('ok');
-    expect(after.notices.some((n) => n.kind === 'already-known' && n.rel === 'shape')).toBe(true);
+    // #2790 (ADR-3D-484 Am. 1): a ring twin of an enabled row stands aside for it (`standingTwins3`) — nothing of it is
+    // applied, so nothing is recorded twice; the typed line's held notice says it is already there
+    expect(after.construction.redundantShapes).toEqual(before.construction.redundantShapes);
     expect(after.construction.scalarPins.length, 'no inert pins accumulate').toBe(before.construction.scalarPins.length);
     for (const id of ['A', 'B', 'C', 'D']) {
       const p = after.positions.get(id)!;
@@ -101,8 +102,11 @@ describe('#1988 — what did NOT change', () => {
     );
   });
 
-  it('a trapezoid read so the OTHER pair is named is new information, not a restatement (ADR-3D-313)', () => {
-    expect(play(['טרפז ABCD', 'טרפז BCDA']).kinds).toEqual(['record', 'record']);
+  // #2790 (ADR-3D-484): never refused and never a twin of the first row. The apply already records it as a redundant
+  // shape (the figure does not change at any seed), which said «already known» on the #612 channel; that channel is the
+  // held notice now, so the verdict is a held record.
+  it('a trapezoid read so the OTHER pair is named is not refused, and is its own row (ADR-3D-313)', () => {
+    expect(play(['טרפז ABCD', 'טרפז BCDA']).kinds).toEqual(['record', 'held']);
   });
 
   it('an implied noun never re-enables a MUTED declaration', () => {

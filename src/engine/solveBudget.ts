@@ -1,4 +1,12 @@
+import { meterWork } from '../../shell/workMeter';
+import { withWorkLimit } from '../../shell/workLimit';
+
 /**
+ * #2893 ([ADR-831](../../docs/06-decisions.md#adr-831), ADR-W-210 phase 4): THERE IS NO CLOCK HERE ANY MORE. Every
+ * search is bounded in WORK (the work budget below, in charged units), so the same input stops at the same point on
+ * every machine, in the suite as in the browser. What follows is the history of the budget this file began as; the
+ * one non-work state it keeps is the indefinite-shape probe's "ladder spent" ({@link withLadderSpent}).
+ *
  * Cooperative wall-clock budget for the failure-path recruit ladder (docs/17 §7 — "no unbudgeted
  * sweeps"; issues #59/#41). The old search budgets (`SEARCH_BUDGET_MS`, `SAMPLE_BUDGET_MS`) are checked
  * BETWEEN replays, so one replay whose ladder ran tens of seconds blew straight through them. This
@@ -17,24 +25,29 @@
  * ladder was cut short (a budget-aborted fold is not THE fold for that content — caching it would pin a
  * degraded figure for every later, unbudgeted replay).
  */
-export const solveBudget: { deadlineAt: number | null; aborts: number } = { deadlineAt: null, aborts: 0 };
+export const solveBudget: { ladderSpent: boolean; aborts: number } = { ladderSpent: false, aborts: 0 };
 
-/** Has the armed budget run out? (Never true when unarmed — the default, and always under tests.) */
+/** Has the armed budget run out? (Never true when unarmed — the default, and the primary submit fold.) */
 export function budgetExceeded(): boolean {
   if (workExceeded()) return true;
-  if (solveBudget.deadlineAt === null || Date.now() <= solveBudget.deadlineAt) return false;
+  if (!solveBudget.ladderSpent) return false;
   solveBudget.aborts++;
   return true;
 }
 
-/** Arm the ladder budget for `fn` (nested arms keep the tighter deadline; always restored). */
-export function withSolveBudget<T>(deadlineAt: number, fn: () => T): T {
-  const prev = solveBudget.deadlineAt;
-  solveBudget.deadlineAt = prev === null ? deadlineAt : Math.min(prev, deadlineAt);
+/**
+ * #2480 ([ADR-757](../../docs/06-decisions.md#adr-757)) — run `fn` with the recruit ladder SPENT: every ladder consult
+ * answers "over" at once. The indefinite-shape probe asks a question that is true of the drawn figure without the
+ * failure path, so it never needs the ladder. It used to be spelled as a clock budget whose deadline was the epoch
+ * (`withSolveBudget(0, …)`), which was already deterministic; #2893 (ADR-831) names it, and the clock is gone.
+ */
+export function withLadderSpent<T>(fn: () => T): T {
+  const prev = solveBudget.ladderSpent;
+  solveBudget.ladderSpent = true;
   try {
     return fn();
   } finally {
-    solveBudget.deadlineAt = prev;
+    solveBudget.ladderSpent = prev;
   }
 }
 
@@ -42,15 +55,17 @@ export function withSolveBudget<T>(deadlineAt: number, fn: () => T): T {
  * #1601/#1599 (ADR-558): the WORK budget — the deterministic sibling of the wall clock above. Every
  * `evaluateCore` is one work unit (`work.done`), so a budget of N units stops at the same point on every
  * device and every run: the knowledge pool's verdicts can then never depend on how fast the machine was
- * (the operator's ruling on #1601 — "same input, same answer"). The interactive searches keep the wall
- * clock; only the knowledge pool is bounded this way.
+ * (the operator's ruling on #1601 — "same input, same answer"). Since #2893 (ADR-831) every search is: the
+ * interactive ones, the submit gates and the load's refresh and audit too ({@link withSearchLimit}).
  */
 export const work: { done: number; limitAt: number | null; executed: number } = { done: 0, limitAt: null, executed: 0 };
 
-/** One unit of work (called by `evaluateCore`). `executed` counts only the calls actually made — never a charged hit. */
+/** One unit of work (called by `evaluateCore`). `executed` counts only the calls actually made — never a charged hit.
+ *  #2873 (ADR-W-210): the same executed unit feeds the work meter, which adds the lane and the phase. */
 export function countWork(): void {
   work.done++;
   work.executed++;
+  meterWork();
   if (frame) frame.own++;
 }
 
@@ -145,6 +160,16 @@ export function chargeHit(cell: WorkCell | undefined): boolean {
   return true;
 }
 
+/**
+ * #2888 (ADR-827) registered here how to find the ledger cell of every identity memo (`evaluate`, `resolveDriven`, the
+ * DOF count), so that a cache could build a fresh object inside an epoch that had already charged one. #2893 (ADR-831)
+ * removed that emulation; the registry stays, read by nothing, so the three memos keep one place that names their cells.
+ */
+const ledgerLookups: ((key: object) => WorkCell | undefined)[] = [];
+export function registerLedger(lookup: (key: object) => WorkCell | undefined): void {
+  ledgerLookups.push(lookup);
+}
+
 /** #1671 (ADR-584): a ledger's total — every `own` in its closure once — the work a transplanted entry
  *  (a fold computed in the geometry worker) is charged on this thread, so a worker-warmed fold costs the
  *  same in a work budget as one this thread computed. */
@@ -176,6 +201,19 @@ export function withWorkEpoch<T>(fn: () => T): T {
   } finally {
     epochOpen = false;
   }
+}
+
+/** #2888 (ADR-827): is a work epoch open — may a work budget be reading the counter now? */
+export function inWorkEpoch(): boolean {
+  return epochOpen;
+}
+/**
+ * #2893 (ADR-831; it was ADR-827's `clockSpent`): is the code running now under a budget that has NOTHING LEFT — the
+ * ladder spent, or an armed work budget with no unit left? It only asks: no abort is counted. `>=`: a search handed a
+ * budget of zero examines no candidate, even one a memo would answer in microseconds.
+ */
+export function budgetSpent(): boolean {
+  return solveBudget.ladderSpent || (work.limitAt !== null && work.done >= work.limitAt);
 }
 
 /** Has the armed WORK budget run out? Never true when unarmed. Counted as a ladder abort, like the clock. */
@@ -211,7 +249,7 @@ export function withExecutedCap<T>(units: number, fn: () => T): { value: T; exha
   }
   const exhausted = solveBudget.aborts !== aborts0 && work.executed > at;
   const outerRanOut =
-    (solveBudget.deadlineAt !== null && Date.now() > solveBudget.deadlineAt) ||
+    solveBudget.ladderSpent ||
     (work.limitAt !== null && work.done > work.limitAt) ||
     (prev !== null && work.executed > prev);
   if (exhausted && !outerRanOut) solveBudget.aborts = aborts0;
@@ -230,4 +268,204 @@ export function withWorkBudget<T>(units: number, fn: () => T): T {
       work.limitAt = prev;
     }
   });
+}
+
+/**
+ * #2893 ([ADR-831](../../docs/06-decisions.md#adr-831), ADR-W-210 phase 4) — A SEARCH UNDER ITS LIMIT. Arms a work
+ * budget of `units` (so the solve ladder inside a candidate stops at the same unit too) and opens the shared work limit
+ * (`shell/workLimit`) on the same warmth-independent count, `work.done`: the search's loop asks `limitReached()` where
+ * it read a clock, and the caller learns whether the limit was reached. A search that reached it without an answer
+ * returns "not decided" (`shell/notDecided`), never a verdict.
+ */
+export function withSearchLimit<T>(units: number, fn: () => T, kind = 'search'): { value: T; reached: boolean; spent: number } {
+  const r = withWorkBudget(units, () => withWorkLimit(units, fn, () => work.done));
+  const st = (searchLimitStats[kind] ??= { runs: 0, reached: 0, maxSpent: 0 });
+  st.runs++;
+  if (r.reached) st.reached++;
+  st.maxSpent = Math.max(st.maxSpent, r.spent);
+  return r;
+}
+/** #2893 (ADR-831): per search kind, how many searches ran under a limit and how many reached it (the measurement's counter). */
+export const searchLimitStats: Record<string, { runs: number; reached: number; maxSpent: number }> = {};
+
+/**
+ * #2894 (ADR-W-210 phase 5) — AN EXACT REPEAT IS SERVED, AND CHARGED AS IF IT WERE COMPUTED.
+ *
+ * Measured over every 2-D fixture and the slow corpus: 44–47 % of the cost evaluations a `nelderMead` call makes are
+ * at a point that SAME call has already evaluated, bit for bit (a simplex that has contracted onto one point keeps
+ * reflecting and shrinking onto it). `f` is a pure function of `x` for the life of the call, so the value is the one
+ * already computed and the descent's path cannot change.
+ *
+ * What the repeat would have charged is charged again: `work.done`, `work.executed` and the open ledger frame's `own`
+ * advance by exactly what the first evaluation advanced them, so every work budget, the re-attempt cap
+ * (`withExecutedCap`) and every memo entry's ledger read the same numbers as before. Only the work meter (an executed
+ * count of THIS process's solving) sees the evaluation that did not happen. Scoped to one call: the map is the
+ * caller's, so nothing is kept between calls or depends on what ran before. A point with a NaN coordinate is never
+ * served (NaN has more than one bit pattern).
+ */
+/** #2893 (ADR-831): off only in the lock that a served repeat counts against a search limit exactly as a computed one. */
+export const repeatConfig = { serve: true };
+export function servingRepeats<T>(f: (x: number[]) => T): (x: number[]) => T {
+  if (!repeatConfig.serve) return f;
+  const seen = exactPointMap<{ value: T; done: number; executed: number; own: number }>();
+  return (x) => {
+    for (let i = 0; i < x.length; i++) if (Number.isNaN(x[i])) return f(x);
+    const hit = seen.get(x);
+    if (hit) {
+      work.done += hit.done;
+      work.executed += hit.executed;
+      if (frame) frame.own += hit.own;
+      return hit.value;
+    }
+    const at = frame;
+    const d0 = work.done;
+    const e0 = work.executed;
+    const o0 = at ? at.own : 0;
+    const value = f(x);
+    seen.set(x, { value, done: work.done - d0, executed: work.executed - e0, own: at && frame === at ? at.own - o0 : 0 });
+    return value;
+  };
+}
+
+/**
+ * #2894 ([ADR-833](../../docs/06-decisions.md#adr-833)) — A WHOLE COMPUTATION THAT WOULD BE RUN AGAIN TO THE SAME
+ * RESULT IS SERVED, AND CHARGED AS IF IT WERE RUN. The {@link servingRepeats} discipline, one level up: a driven solve's
+ * relaxed pass repeats its convex pass's Nelder–Mead descents call for call (same cost function, same start, same
+ * steps), and an anti-collapse retry whose barrier was zero at every point the plain search evaluated is the plain
+ * search again. What the run advanced (`work.done`, `work.executed`, the open ledger frame's `own`) is advanced again,
+ * so every budget, cap and ledger reads what it read when the computation ran twice.
+ *
+ * A run is never served past a limit: a run during which an armed limit was crossed (or the ladder was spent) is not
+ * {@link ChargedRun.whole}, and a hit whose charge would cross an armed limit is refused ({@link serveRun} returns
+ * false), so the caller computes it again and is cut exactly where a computation would be.
+ */
+export interface ChargedRun<T> {
+  value: T;
+  done: number;
+  executed: number;
+  own: number;
+  /** no limit was crossed while it ran, so running it again (under the same limits) runs it whole */
+  whole: boolean;
+  /**
+   * #2912: the memo entries the run touched (the open ledger frame's deps it added). A served run links them into the
+   * frame it is served in, so that frame's ledger holds the run's work as a run would have left it (a run's nested
+   * computations are cells of their own, not `own` units); without them a memo entry whose computation was served
+   * was later charged less than one that ran.
+   */
+  deps: WorkCell[];
+}
+const overLimit = (): boolean =>
+  solveBudget.ladderSpent || (work.limitAt !== null && work.done > work.limitAt) || (executedCap.limitAt !== null && work.executed > executedCap.limitAt);
+/** Run `fn` and record what it charged. */
+export function measuredRun<T>(fn: () => T): ChargedRun<T> {
+  const at = frame;
+  const d0 = work.done;
+  const e0 = work.executed;
+  const o0 = at ? at.own : 0;
+  const n0 = at ? at.deps.length : 0;
+  const whole0 = !overLimit();
+  const value = fn();
+  const same = at !== null && frame === at;
+  return { value, done: work.done - d0, executed: work.executed - e0, own: same ? at.own - o0 : 0, whole: whole0 && !overLimit(), deps: same ? at.deps.slice(n0) : [] };
+}
+/** Charge a recorded run as if it ran again; false (nothing charged) when it was cut, serving is off, or the charge
+ *  would cross an armed limit — the caller then runs it. */
+export function serveRun<T>(run: ChargedRun<T>): boolean {
+  if (!repeatConfig.serve || !run.whole || solveBudget.ladderSpent) return false;
+  if (work.limitAt !== null && work.done + run.done > work.limitAt) return false;
+  if (executedCap.limitAt !== null && work.executed + run.executed > executedCap.limitAt) return false;
+  work.done += run.done;
+  work.executed += run.executed;
+  if (frame) frame.own += run.own;
+  // what a run would have left: its cells in this frame's ledger, charged in this epoch (a run computes or charges them now)
+  for (const d of run.deps) {
+    if (epochOpen) markCharged(d);
+    link(d);
+  }
+  return true;
+}
+/** Mark a cell and everything it rests on as charged in the open epoch. */
+function markCharged(cell: WorkCell): void {
+  const stack = [cell];
+  while (stack.length) {
+    const c = stack.pop()!;
+    if (c.charged === epochId) continue;
+    c.charged = epochId;
+    for (const d of c.deps) stack.push(d);
+  }
+}
+/** A memo of whole runs by key, scoped to its caller: a hit is served by {@link serveRun}, a miss (or a refused hit)
+ *  runs and is kept when it ran whole. */
+export function servedRuns<T>(): (key: string, compute: () => T) => T {
+  const seen = new Map<string, ChargedRun<T>>();
+  return (key, compute) => {
+    const hit = seen.get(key);
+    if (hit && serveRun(hit)) return hit.value;
+    const run = measuredRun(compute);
+    if (run.whole) seen.set(key, run);
+    return run.value;
+  };
+}
+
+/**
+ * #2912 — A MAP KEYED BY A POINT'S EXACT IDENTITY, without building a key. Two points are the same key exactly when
+ * they have the same length and every coordinate is the same double (`Object.is`: −0 and +0 are different points),
+ * which is exactly when {@link exactKey} gives them the same text (the shortest round-trip text of a double is unique
+ * to it). The lookup hashes the coordinates' 64 bits and confirms a hit by comparing them, so it never allocates a
+ * string: the text key was 12–17 % of the self time of the slowest 2-D lines (#2912), for the same hits and misses.
+ * A point with a NaN coordinate must not be looked up (the callers never serve one; NaN has many bit patterns).
+ * The stored key is a copy, so a caller that later mutates its array cannot alter an entry.
+ */
+const hashView = new Float64Array(1);
+const hashBits = new Uint32Array(hashView.buffer);
+function pointHash(x: readonly number[]): number {
+  let h = Math.imul(x.length ^ 0x811c9dc5, 0x01000193);
+  for (let i = 0; i < x.length; i++) {
+    hashView[0] = x[i];
+    h = Math.imul(h ^ hashBits[0], 0x9e3779b1);
+    h = Math.imul(h ^ hashBits[1], 0x85ebca6b);
+    h ^= h >>> 15;
+  }
+  return h;
+}
+function samePoint(a: Float64Array, b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+  return true;
+}
+export interface ExactPointMap<V> {
+  get(x: readonly number[]): V | undefined;
+  set(x: readonly number[], v: V): void;
+}
+export function exactPointMap<V>(): ExactPointMap<V> {
+  const buckets = new Map<number, { x: Float64Array; v: V }[]>();
+  return {
+    get(x) {
+      const b = buckets.get(pointHash(x));
+      if (b) for (const e of b) if (samePoint(e.x, x)) return e.v;
+      return undefined;
+    },
+    set(x, v) {
+      const h = pointHash(x);
+      const b = buckets.get(h);
+      if (b) {
+        for (const e of b)
+          if (samePoint(e.x, x)) {
+            e.v = v;
+            return;
+          }
+        b.push({ x: Float64Array.from(x), v });
+      } else buckets.set(h, [{ x: Float64Array.from(x), v }]);
+    },
+  };
+}
+
+/** The exact identity of a point: every coordinate by its shortest round-trip text, −0 kept apart; null with a NaN. */
+export function exactKey(x: readonly number[]): string | null {
+  let key = '';
+  for (const v of x) {
+    if (Number.isNaN(v)) return null;
+    key += (Object.is(v, -0) ? '-0' : String(v)) + ',';
+  }
+  return key;
 }

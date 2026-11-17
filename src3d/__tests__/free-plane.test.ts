@@ -216,8 +216,8 @@ describe('#487 — honesty boundaries', () => {
     // #613 (ADR-W-031): still NOT an error — the restatement succeeds — but it no longer appends a
     // second row. M1 idempotency was already right at apply; the store was the half that leaked.
     expect(state().lastError, 're-declaring is not an error').toBeNull();
-    expect(state().facts, 'and it adds no row: the figure already says it').toHaveLength(1);
-    expect(state().lastNotice?.code, 'the success is announced, not silent').toBe('already-stated');
+    expect(state().facts, 'and it is its own row: the figure already held it (#2790)').toHaveLength(2);
+    expect(state().lastNotice?.code, 'the success is announced, not silent').toBe('already-held');
     state().clear();
     build(['המישור π1: z-3=0']);
     submit('מישור π1');

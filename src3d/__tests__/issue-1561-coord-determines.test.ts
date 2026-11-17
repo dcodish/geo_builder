@@ -31,7 +31,7 @@ function build(lines: readonly string[]): St {
 
 const verdict = (st: St, line: string) => {
   const v = decideSubmit3(st, line);
-  return v.kind === 'refused' ? v.error.code : v.kind;
+  return v.kind === 'refused' ? v.error.code : v.kind === 'record' && v.held ? 'held' : v.kind;
 };
 
 /** The point's position at every verification seed of the figure. */
@@ -65,7 +65,7 @@ describe('#1561 — the operator’s T13: K is placed at the midpoint', () => {
     const v = decideSubmit3(build(SEG), 'K(1,0,0)');
     if (v.kind !== 'record') throw new Error('setup');
     const st = { facts: v.facts, seed: v.seed };
-    expect(verdict(st, 'K(1,0,0)')).toBe('already-stated');
+    expect(verdict(st, 'K(1,0,0)')).toBe('held');
     expect(verdict(st, 'K(1.5,0,0)')).toBe('claim-refuted');
   });
 });

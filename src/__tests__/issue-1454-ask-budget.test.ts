@@ -10,7 +10,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { deserializeFigure } from '@/store/figureFile';
-import { computeValues, sampleStats, sharedSamples, WORKER_SEARCH_BUDGET_MS, POOL_WORK_CAP } from '@/replay/core';
+import { computeValues, sampleStats, sharedSamples, POOL_WORK_CAP } from '@/replay/core';
+/** The worker's old 12 s search clock (ADR-296), kept as this test's wall bound: #2893 removed the constant, not the bound. */
+const WORKER_SEARCH_BUDGET_MS = 12_000;
 import { work } from '@/engine/solveBudget';
 import { parseValueQuery } from '@/parser/valueQuery';
 

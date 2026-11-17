@@ -1,0 +1,110 @@
+{
+ "name": "round-2855-w3",
+ "title": "Fix round #2855, wave 3 (#2838, #2785, the #2813 browser-hang fix)",
+ "cases": [
+  {
+   "id": "T24",
+   "title": "3-D: an unlettered cube after a triangle takes new letters",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "קובייה"
+   ],
+   "lookFor": "A cube labelled D, E, F, G (with primes) beside triangle ABC; no error. (The cube row reads «קובייה»; the letters are on the canvas.)",
+   "before": "Refused «A כבר מוגדר».",
+   "expectAbsent": [
+    "כבר קיים",
+    "כבר מוגדר"
+   ]
+  },
+  {
+   "id": "T25",
+   "title": "3-D: «קובייה» typed twice draws two cubes",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה",
+    "קובייה"
+   ],
+   "lookFor": "Two cubes, one on A–D′ and one on E–H′; no «כבר קיים».",
+   "before": "The second answered «כבר קיים».",
+   "expectAbsent": [
+    "כבר קיים",
+    "כבר מוגדר"
+   ]
+  },
+  {
+   "id": "T26",
+   "title": "3-D: an unlettered pyramid after a triangle takes new letters",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "פירמידה ישרה שבסיסה משולש שווה שוקיים"
+   ],
+   "expectAbsent": [
+    "כבר מוגדר"
+   ],
+   "lookFor": "A pyramid on DEF with apex G beside ABC, DE = DF.",
+   "before": "Refused «A כבר מוגדר»."
+  },
+  {
+   "id": "T27",
+   "title": "3-D (refusal): «הקובייה» with two cubes asks which one",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה",
+    "קובייה",
+    "הקובייה"
+   ],
+   "expectRefusal": "הקובייה ABCDA'B'C'D'",
+   "lookFor": "Refused: the drawing has several cubes, naming both, with «הקובייה ABCDA'B'C'D'» as the example.",
+   "before": "The second cube was never drawn."
+  },
+  {
+   "id": "T28",
+   "title": "3-D: a letter in two points' coordinates has one value",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה SABCD",
+    "B(k,1,2)",
+    "C(k,3,4)",
+    "k = 1"
+   ],
+   "expectAbsent": [
+    "הטענה לא מתקיימת"
+   ],
+   "lookFor": "B and C at the same x, and «k = 1» puts both at x = 1.",
+   "before": "B and C drew k with two different values."
+  },
+  {
+   "id": "T29",
+   "title": "3-D (refusal): a letter that cannot hold a stated point is refused",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(2,15,-8)",
+    "B(2t,t,k)"
+   ],
+   "expectRefusal": "הטענה לא מתקיימת בציור",
+   "lookFor": "«B(2t,t,k)» refused «הטענה לא מתקיימת בציור — בדקו את החישוב».",
+   "before": "Answered «כבר קיים»."
+  }
+ ]
+}

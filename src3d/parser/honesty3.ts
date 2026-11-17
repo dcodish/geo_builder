@@ -492,6 +492,8 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
   //    π-size (n·π — volumes/areas of revolution solids), a glued ratio coefficient (`AK = 2KA'`
   //    → t = n/(n+1) or 1/(n+1)), a divided symbol (`k/6` → 1/n), a percent (n/100), or a degree
   //    value a rule lowered trigonometrically (cos/sin of n°).
+  //    #2062 (ADR-3D-479): the divided symbol carries its SIGN — «u/2 − v/2» lowers to 0.5·u and −0.5·v, so `−1/n` pays
+  //    for a denominator as `1/n` does (letters are blanked above, so the gate sees «/2- /2» and must take either sign).
   for (const m of s.matchAll(/\d+(?:\.\d+)?/g)) {
     const i = m.index!;
     if (inSpan(i)) continue;
@@ -503,6 +505,7 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
       n / (n + 1),
       1 / (n + 1),
       n === 0 ? NaN : 1 / n,
+      n === 0 ? NaN : -1 / n,
       n / 100,
       Math.cos((n * Math.PI) / 180),
       Math.sin((n * Math.PI) / 180),

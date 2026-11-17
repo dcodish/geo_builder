@@ -205,3 +205,14 @@ describe('#1888 — the class nets (ADR-3D-316)', () => {
     expect(swept).toBeGreaterThanOrEqual(200);
   });
 });
+
+// #2062 (ADR-3D-479): a subject frame's point is a co-reference to the statement's own label, never an unread part
+describe('#2062 — the subject of «הנקודה M מקיימת …» is not an unread label', () => {
+  it('exempt when the frame comes off', () => {
+    for (const u of ['הנקודה M מקיימת AM = 3', 'M מקיימת: AM = MB', 'the point M satisfies ∠AMB = 90', 'הנקודה M מקיימת M אמצע BC']) {
+      const r = parse3(u);
+      expect(r.ok, u).toBe(true);
+      if (r.ok) expect(unreadParts3(u, r.commands, ['A', 'B', 'C', 'M']), u).toBeNull();
+    }
+  });
+});

@@ -31,10 +31,11 @@ Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
 
 | Module | What it is |
 | --- | --- |
-| `engine/` | `Vec3` core, solids, the apply reducer, `derive3`/`resolve3`, `solve3.ts` (the pivot: numeric similarity + dims least-squares, LM with central-difference Jacobian, seed-reordered multi-start), `relationTable.ts` (the disposition map), `operands.ts` (the operand-thunk resolver), `arcs`/`baseShapes`/`defaultView`/`notices` |
+| `engine/` | `Vec3` core, solids, the apply reducer, `derive3`/`resolve3`, `solve3.ts` (the pivot: numeric similarity + dims least-squares, LM with central-difference Jacobian, seed-reordered multi-start), `relationTable.ts` (the disposition map), `operands.ts` (the operand-thunk resolver), `content3.ts` (one object per CONTENT: what `derive3` and `resolve3` key their memos on — never key a memo on a fact array or a construction object, both are rebuilt per action), `lazy3.ts` (a value the solve computes later is a plain cell on the figure, never a closure: a resolved figure must stay `structuredClone`-able, and `tsc` fails on a function in `Resolved3`; read a cell through `scalarConsumed3` / `placementFreedom3`), `arcs`/`baseShapes`/`defaultView`/`notices` |
 | `parser/` | `parse3.ts` — **context-free** rules; resolution happens at apply, so there is no `ParseContext` here (deliberately, and it is the better architecture — see docs/17 §3b). `catalog3.ts` is the coverage map with a guard test asserting every entry parses in He **and** En. `llmShared3.ts` holds the 3-D prompt |
 | `render/` | Orthographic-orbit SVG: `scene3.ts` (pure) + `Figure3.tsx`. Textbook dashed hidden edges via numeric outward normals. `notation.ts` formats vector notation |
-| `store/` | Zustand + zundo, derive-on-demand, keep-prior-on-error. Save/load `.geo3.json` (replay inputs only) |
+| `store/` | Zustand + zundo, derive-on-demand, keep-prior-on-error. Save/load `.geo3.json` (replay inputs only). `journal3.ts`: what an action wrote into the content-keyed memos, as plain data, and its adoption in another heap (a memo added to this tree joins it, or the work-meter gate, which walks two heaps, fails) |
+| `app/` | The App's seams. `work3.ts` (the work queue; every routed action), `offPage3.ts` + `ops3.ts` + `worker3.ts` + `readers3.ts` (#2890, ADR-3D-493: every action is solved by the worker; the page adopts the journal and runs its own action; the values follow the figure). A reader App3 adds that reaches the solver joins `readers3.ts`, or the page solves it and the gate fails |
 | `i18n/`, `App3.tsx` | RTL shell, He/En locales |
 | `__tests__/`, `fixtures3/` | The suite, and the fixture regression net — **a saved manual session dropped in `fixtures3/` becomes permanent coverage** (all-facts-OK + parser-drift asserted; regenerate seeds with `GEN_FIXTURES3=1`) |
 
@@ -62,7 +63,7 @@ Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
   exception: computed coordinates while the data panel is open (ADR-3D-014 Am. 3, ADR-W-118 B7). A number
   drawn must also be seed-invariant knowledge — one drawing's values are not a given. Agreement only sees
   what the resolver varies: the read-back samples the placement's MEASURED leftover rigid freedom
-  (`knowledgeSamples3({ readback: true })`, [ADR-3D-375](../docs/06b-decisions-3d.md#adr-3d-375)); an anchored figure's leftover turn and size are also counted by the cue and drawn sampled ([ADR-3D-379](../docs/06b-decisions-3d.md#adr-3d-379)).
+  (`knowledgeSamples3({ readback: true })`, [ADR-3D-375](../docs/06b-decisions-3d.md#adr-3d-375)), and every fanned root ([ADR-3D-498](../docs/06b-decisions-3d.md#adr-3d-498)); an anchored figure's leftover turn and size are also counted by the cue and drawn sampled ([ADR-3D-379](../docs/06b-decisions-3d.md#adr-3d-379)).
 - **Under-determination is welcome.** An unstated dimension stays a free, resampled DOF while the pinned
   parts stand still.
 

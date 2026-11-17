@@ -14,7 +14,7 @@
  * reads that evidence over the window the configuration search already walked (`collapsedByGivens`).
  */
 import { describe, expect, it } from 'vitest';
-import { derive } from '../engine/derive';
+import { clearAnalyticCaches, derive } from '../engine/derive';
 import { collapsedByGivens, evaluateStats } from '../engine/evaluate';
 import { decideSubmit } from '../app/submit';
 import { errorText } from '../app/errorText';
@@ -107,10 +107,11 @@ describe('#1849 — controls: what is not a collapse keeps its verdict', () => {
     for (const seed of SEEDS) expect(typed(['משולש ABC', 'זווית BAC = 3', 'AB = 5', 'AC = 5'], seed).kind, `seed ${seed}`).toBe('record');
   });
 
-  it('a length that cannot hold even flat (5, 3, 8.1) is no collapse: the search’s words stand', () => {
+  // #2894 (ADR-AG-483, ruling 2026-11-15 «The clearer reason everywhere»): no collapse, and now the triangle inequality's words
+  it('a length that cannot hold even flat (5, 3, 8.1) is no collapse: it is refused as the triangle inequality', () => {
     for (const seed of SEEDS) {
       const v = typed(['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8.1'], seed);
-      expect(v.kind === 'refused' && v.error.key, `seed ${seed}`).toBe('unsatisfiable');
+      expect(v.kind === 'refused' && v.error.key, `seed ${seed}`).toBe('lengths-impossible');
     }
   });
 
@@ -140,5 +141,20 @@ describe('#1849 — the evidence', () => {
     const before = evaluateStats.uncached;
     expect(collapsedByGivens(d.construction, 3)).toEqual(['poly-ABC']);
     expect(evaluateStats.uncached - before).toBe(0);
+  });
+
+  it('…at seed 0 too, whose walk is the `wide: false` window (#2894 part 2, ADR-AG-481): the refusal reads the walk’s own figures', () => {
+    for (const lines of [
+      ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'],
+      ['משולש ABC', 'AB = AC', '∠ABC = 90'],
+    ]) {
+      clearAnalyticCaches(); // a solved content is kept across derivations (ADR-AG-476): start this one cold
+      const before = evaluateStats.uncached;
+      const d = derive(lines, 0);
+      const derived = evaluateStats.uncached;
+      expect(collapsedByGivens(d.construction, 0), lines.join(' · ')).toEqual(['poly-ABC']);
+      expect(evaluateStats.uncached - derived, lines.join(' · ')).toBe(0);
+      expect(derived - before).toBeGreaterThan(0);
+    }
   });
 });

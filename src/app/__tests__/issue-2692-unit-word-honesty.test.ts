@@ -20,6 +20,7 @@ import type { SubmitDeps } from '../submitPipeline';
 import { droppedGivenNumbers, parse, statedNumberOccurrences } from '@/parser';
 import { replay, useGeoStore } from '@/store/geoStore';
 import { ctxOf } from '../../__tests__/scenario-pipeline';
+import { createWorkQueue } from '../../../shell/work';
 
 const triangle = async (): Promise<void> => {
   useGeoStore.getState().clear();
@@ -40,14 +41,13 @@ function makeDeps() {
   const deps: SubmitDeps = {
     t: (key, opts) => (opts ? `${key}:${JSON.stringify(opts)}` : key),
     locale: 'he',
-    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++, setBusy: () => {} },
+    ui: { setInputNote: (m) => calls.notes.push(m), setRenameNote: () => {}, setLlmDropped: () => {}, clearText: () => calls.cleared++ },
     view: () => {
       const st = useGeoStore.getState();
       const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
-    isBusy: () => false,
-    nextPaint: async () => {},
+    work: createWorkQueue(),
     resolveAfterCommit: () => {},
     llmAbortRef: { current: null },
     explainError: (raw) => raw ?? '',

@@ -2345,6 +2345,30 @@ over all four (ADR-041).
 
 **Guards against:** a fact the figure is forced to hold re-seating it through ADR-623's holes — the twin row thrown away as evidence (H1), an order row never released (H2), a re-sampled seed counted where the prior is the trapezoid's parallelogram root (H3); it moved 0.46 / 0.20 / 0.42 / 0.10 at the displayable seeds. **Asserts** AC = BD on the drawn figure, no point moves at seeds 0, 2, 3, 4 (each displayable before the line), the free-DOF count unchanged, and on «טרפז ABCD» · «AD = BC» · «AC = BD» unticking «AD = BC» leaves AC = BD holding.
 
+### `crossed-ring-circle-last-2811` — «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC»: the circle line is refused (#2811, ADR-826)
+
+**Guards against:** a line that puts four letters on one circle after two orders of them were declared, committed with one order drawn crossed. **Asserts** R5 and R4 refuse the circle line `crossed-ring`; a rider that completes the circle refuses the second order; the circle-first order and «המרובע ABCD חסום במעגל» still refuse; «מרובע ABDC» alone and one ring with its circle commit with every ring simple.
+
 ### `restated-rider-reversed-stays-put-2795` — «משולש ABC · D על AB · D על BA»: the reversed rider moves nothing (#2795, ADR-821)
 
 **Guards against:** the reversed rider's `collinear-order` claiming D's own parameter and re-solving D from another start (moved up to 3.3). **Asserts** no point moves at seeds 0–4, and with «D על AB» unticked «D על BA» alone keeps D on AB.
+
+### `stated-angle-interior-2813` — «מרובע ABCD · ∠DAB = 70° · ∠BCD = 110°»: a stated angle is the interior angle, so a second order of the letters is refused (#2813, ADR-823)
+
+**Guards against:** a stated corner read as the unsigned ray angle — «מרובע ABDC» committed and drawn crossed, or ABCD seated as a dart with the "110°" corner 250° inside. **Asserts** the three lines build convex at every view (seeds 0–5); «מרובע ABDC» (A1) and, with the angles last, «∠BCD = 110°» (A2) are refused `crossed-ring` with `input.ringContradictsAngles`, the Hebrew text naming both angle lines and «שנו את אחת הזוויות או את סדר האותיות»; the kite with the same angles refused; «מרובע ABCD · מרובע ABDC» still commits.
+
+### `right-angle-seat-cycles-on-drawn-triangle-2370` — «משולש ABC · המשולש ישר זווית»: «הציגו תצורה אחרת» moves the right angle from C to A, to B and back (#2370, ADR-828)
+
+**Guards against:** the right-triangle seat on a placed vertex writing `solve` into the vertex object of the construction it started from, which is the fold memo's held entry for «משולש ABC»: every candidate the button's search folded resumed from a triangle whose C was already driven, so each press answered «only-config» and the right angle stayed at C. **Asserts** the typed figure is green with the right angle at C; three presses on «משולש ABC · המשולש ישר זווית», on «משולש ABC · ABC ישר זווית» and on the one-line «משולש ישר זווית ABC» each find a new green view and the right angle visits C, A, B and C again; «משולש ABC» typed again in the same session has no right angle at seeds 0–3.
+
+### `same-facts-same-figure-whatever-was-built-before-2444` — three right-triangle figures built in one session: each shows what it shows from nothing (#2444, merged into #2370, ADR-828)
+
+**Guards against:** a replay that depends on what was built earlier in the session: after «משולש ישר זווית ABC», then «משולש ABC · ABC משולש ישר זווית», then «משולש ABC · משולש ישר זווית ABC חסום במעגל», the held fold of «משולש ABC» carried a driven C, and figures resumed from it showed a right angle nothing stated. **Asserts** the exact sequence: after the three figures, each of them and «משולש ABC» alone replays at seeds 0–3 to the positions and row statuses of a session that built nothing (caches cleared, a JSON clone of the rows); the held «משולש ABC» has no driven vertex and no right angle.
+
+### `lengths-clearer-reason-2894` — a length the figure already forces, stated otherwise, is refused with 3-D's reason, naming the statement it contradicts (#2894, ADR-835)
+
+**Guards against:** the 2-D refusal of a length conflict the metric closure decides drifting from 3-D's sentence (ADR-3D-495) or losing the earlier statement it names: «ריבוע ABCD · AB = 3 · AC = 10», a rectangle's diagonal, an equilateral side, a diameter longer than 2r, «ABCD ריבוע» over two unequal sides — each driven through the submit gate and read word for word; the control (a square with only its diagonal) commits.
+
+### `new-solutions-first-tangent-right-triangle-2831` — «משיק מ-A בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6»: the three triangles come on presses 0, 1 and 2 (#2831, ADR-824)
+
+**Guards against:** «הציגו תצורה אחרת» showing a mirror image of the drawing on the screen before a solution not yet shown (the odometer turned the tangent-point and side axes, both mirrors, faster than the right-angle seat: the triangles came on presses 0, 2 and 4). **Asserts** presses 0–2 are three different shapes, there is no fourth, and presses 3–5 repeat them in order, as other placements.

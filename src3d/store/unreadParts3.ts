@@ -31,7 +31,7 @@
  * ({@link withTrailing3}). A trailing clause that does not read keeps the line `not-understood`: the note never
  * teaches a line the tool cannot read (docs/17 §9).
  */
-import { parse3 } from '../parser/parse3';
+import { parse3, subjectFrameOf3 } from '../parser/parse3';
 import { HE_PREFIX, PART_HE, POLYGON_EN, POLYGON_HE, QUALIFIER_HE } from '../lexicon/nouns3';
 import type { Command3 } from '../engine/types';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
@@ -92,12 +92,18 @@ export function unreadParts3(utterance: string, commands: readonly Command3[], f
   // this line's reading: there is nothing to compare a substitution with
   if (reader3.read(utterance) !== lowering) return null;
   const known = new Set([...figure, ...carried(commands)]);
+  // #2062 (ADR-3D-479): the SUBJECT of a frame «הנקודה M מקיימת AM = 3» names the point its statement is about — a
+  // co-reference to the M inside «AM» (or to a lone M after it), which the shell's co-reference rule cannot see. The
+  // frame is read off only when its statement mentions the subject, so the reading never depends on it by design.
+  const frameSubject = subjectFrameOf3(utterance)?.subject;
   const occ = readLabelRuns(utterance, lowering, {
     ...reader3,
     run: LABEL_RUN3,
     label: LABEL3,
     figureLabels: figure,
-    exempt: (o) => SCENE_NOUN_BEFORE3.test(utterance.slice(0, o.at)) && o.parts.every((l) => known.has(l)),
+    exempt: (o) =>
+      (SCENE_NOUN_BEFORE3.test(utterance.slice(0, o.at)) && o.parts.every((l) => known.has(l))) ||
+      (frameSubject !== undefined && o.text === frameSubject),
   });
   if (occ.unread.length === 0) return null;
   const clauses = locate(utterance, [utterance.trim()]);

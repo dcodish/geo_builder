@@ -103,7 +103,7 @@ The figure is a set of **objects**, each with a *definition* referencing earlier
 - **Branches = alternatives:** when an object has N≥2 solutions, the branch index selects one. "Show another configuration" re-samples the unstated magnitudes and steps the discrete choices (every cyclable branch among them), keeping a candidate that meets every given (FR-ALT-2; #1861).
 - **What the shape fingerprint reads (ADR-065, ADR-514, #1005).** A candidate is offered only when it is a different drawing under a similarity-invariant fingerprint: every pairwise distance between named points and each drawn (non-`hidden`) circle's radius, over their mean — the only objects with an extent of their own.
 - **Stability:** DOF parameters (free-point coords, on-object `t`) and branch indices **persist across steps**. A new constraint re-evaluates only what depends on it; unrelated objects keep their parameters, so the figure does not jump.
-- **The re-stated given yields ([ADR-623](06-decisions.md#adr-623), #1943/#1819).** `driveOrCheck` picks a constraint's carrier EAGERLY, before anything is solved. For a row the figure is already FORCED to satisfy that pick both re-opens the configuration choice (the driven re-solve lands in another valid drawing — the jump) and removes the carrier from `freeDofs` (a freedom the figure never lost stops being sampled — the ADR-052 smell). `releaseImpliedOwnership` (`engine/step.ts`) wraps every ladder exit of `applyStep`/`applyCoupledStep` and gives the claim back when, on the prior figure, the row already holds (`isSatisfied`) **and** is forced — `impliedByFigure` (`engine/dofRank.ts`), ADR-536's own rank Jacobian, so the DOF count and the ownership decision read one definition of "this row adds nothing". The mirror of ADR-399's `ensureOwnership`, which states the same rule for the branch the eager pick did not claim. Try-and-verify, failing open at every rung: the released figure must evaluate (which checks the re-stated row), be a figure, sit exactly where it sat, and survive re-sampling. The constraint is never dropped — it stays a listed check the evaluator, the verifier, the givens list and the DOF count all read. Ladder token `implied:release`. **Its three holes closed ([ADR-821](06-decisions.md#adr-821), #2795):** `impliedByFigure` leaves out only the judged row, so a prior twin is evidence (an exact repeat); a `collinear-order` is released by its two halves — its collinearity through the rank test on `collinear` rows over its points, its sign through the re-sample rung; and a re-sampled seed counts only where the PRIOR is a figure (`declaredRingsHold`, the one trapezoid-morph rule `checkGivens` also reads), seeds 1..6 until 3 count. The submit gate's held test (`impliedByPrior`) reads order rows by `isSatisfied` and skips the same non-figure pool samples. **The held row ([ADR-822](06-decisions.md#adr-822), #2790):** a line `impliedByPrior` finds held — its own value and operand ink allowed, a first absolute magnitude never — commits with `restates: true`; `foldCommand(…, ownRow)` appends it beside an enabled twin (a muted twin is still re-enabled), and this release keeps it from moving the figure.
+- **The re-stated given yields ([ADR-623](06-decisions.md#adr-623), #1943/#1819).** `driveOrCheck` picks a constraint's carrier EAGERLY, before anything is solved. For a row the figure is already FORCED to satisfy that pick both re-opens the configuration choice (the driven re-solve lands in another valid drawing — the jump) and removes the carrier from `freeDofs` (a freedom the figure never lost stops being sampled — the ADR-052 smell). `releaseImpliedOwnership` (`engine/step.ts`) wraps every ladder exit of `applyStep`/`applyCoupledStep` and gives the claim back when, on the prior figure, the row already holds (`isSatisfied`) **and** is forced — `impliedByFigure` (`engine/dofRank.ts`), ADR-536's own rank Jacobian, so the DOF count and the ownership decision read one definition of "this row adds nothing". The mirror of ADR-399's `ensureOwnership`, which states the same rule for the branch the eager pick did not claim. Try-and-verify, failing open at every rung: the released figure must evaluate (which checks the re-stated row), be a figure, sit exactly where it sat, and survive re-sampling. The constraint is never dropped — it stays a listed check the evaluator, the verifier, the givens list and the DOF count all read. Ladder token `implied:release`. **Its three holes closed ([ADR-821](06-decisions.md#adr-821), #2795):** `impliedByFigure` leaves out only the judged row, so a prior twin is evidence (an exact repeat); a `collinear-order` is released by its two halves — its collinearity through the rank test on `collinear` rows over its points, its sign only when the prior STATES it (the same order either way round, or interior riders placing the middle point between the ends — `orderEntailedByPrior`), never from sampled layouts; and a re-sampled seed counts only where the PRIOR is a figure (`declaredRingsHold`, the one trapezoid-morph rule `checkGivens` also reads), seeds 1..6 until 3 count. The submit gate's held test (`impliedByPrior`) reads order rows by `isSatisfied` and skips the same non-figure pool samples. **The held row ([ADR-822](06-decisions.md#adr-822), #2790):** a line `impliedByPrior` finds held — its own value and operand ink allowed, a first absolute magnitude never — commits with `restates: true`; `foldCommand(…, ownRow)` appends it beside an enabled twin (a muted twin is still re-enabled), and this release keeps it from moving the figure.
 - **An owner must be able to move what it owns ([ADR-783](06-decisions.md#adr-783), #2590).** `constraintRefs` says what a constraint READS; `residualRefs` (`engine/solve.ts`) says what can CHANGE its residual, and every carrier choice reads the second: `driveOrCheck`'s witness marking and all of `recruitFreeDofs`. They differ for a `length-radius` against a stated radius: `|centre·witness|` is then a constant, so only the endpoints of the measured length count. A directive on anything else would make `ensureOwnership` read the constraint as owned and skip its probe, and the figure would hold only where the default drawing satisfies it by coincidence.
 - **Over-constraint / contradiction:** before committing a step, check satisfiability. If unsatisfiable, reject the step, keep the previous figure, and surface a clear message.
 - **A fact whose subject is gone (ADR-483, #926):** the fold asks `isSymbolBound` (`engine/lower.ts`) before applying a `set-var`; a value for an unbound letter is stamped into the "no longer available" register, and a definition re-added anywhere binds it again. The ✎ edit seam (`app/editPipeline.ts`) names the rows an edit orphaned while committing it.
@@ -116,7 +116,7 @@ The figure is a set of **objects**, each with a *definition* referencing earlier
 - **The letter system (ADR-681/682, #2165/#2135/#2133).** `buildSymTab` builds the table through `letterSystem(cmds, radiusOf)` (`engine/lower.ts`): the linear single-letter equations every statement states, keyed by target — a segment (unordered pair), an angle (vertex + unordered ray pair) or `radius(circle)` — judged in LIST ORDER. Sources: `set-var`; two expressions on one target, or an expression against a number (`measure-length/-angle`, `set-distance`, `set-angle`, a sized `circle`, `set-radius`); `radius-symbol`; the reserved R/r when exactly one circle has a stated size (`statedSizeCircles`). Before any of that, `reservedAmbiguity(cmds, i, radiusOf)` refuses a row that values or uses an unbound R/r while two or more circles, at least one sized, precede it (ADR-733, #2177): the raw `reserved radius ambiguous: r names no one circle of O, P (stated sizes|circles)` lands in `SymTab.refused` with `at` = the row itself (no `[vs]` tail) and renders `errors.reservedRadiusAmbiguous[Sized]_said`, a sentence that ends with its own next step, so `explainError` appends no retry hint (`Pattern.nextStep`). A consistent row adds nothing or determines a letter with an admissible value, stored as `derived` (`SymTab.vars[x].derived`; `value` is a STATED value only); an inconsistent row (`0 = c`, the same constant with another coefficient, a second value, an inadmissible value) lands in `SymTab.refused` keyed by its index, with `at` = the statement that supplied the earlier value, and its equations are dropped for the rows after it. Two numbers on one length or angle are left to the solve (a residual), a value for an unbound letter waits (#926), and multi-letter equations, powers and area/perimeter targets add nothing. `lowerOne` reads `value ?? derived` (a determined letter lowers to a pin); `measureLabelForms` reads `value` only, so the labels stay as typed. The fold's restatement pre-scan reads `symtab.refused` beside `measureRestatement` with the same `[vs #i]` tail; `dryRunOutcome`'s `bindsLetter` counts a symbolic measure binding a letter to a target in a new form as produced. A radius target renders `errors.restatedSize` (the #2119 frame, no reason clause). On a radius target two NUMBERS are judged too (a stated radius is a size, not a constraint, so no residual sees it — ADR-683): the latest earlier sizing statement is the `at`; and `foldCommand` resizes a re-stated standalone circle in place only when the earlier fact states no size or the same size, appending a different one so the pre-scan judges it.
 - **A ratio between two radii (ADR-649, #2100).** The parser's `radiusReferences` reads «רדיוס (של)? (ה)?מעגל X» / "radius of (the)? circle X"; `radiusRatio` (before `setRadius`) turns two references and a «פי k» / "k times" factor into `set-radius-ratio` — the relation «R = 2r» already lowers to (a `ratio` over centre/witness pairs in `apply.ts`). The comparative is read wherever it sits, a smaller-word inverts k, and the leftover must be ratio connectives (`onlyRatioWords`). `setRadius` does not read a sentence naming two radii. The factor slot is the one #2068's word-factor atom composes into. **A pair's circle by its role ([ADR-754](06-decisions.md#adr-754), #2459):** `radiusReferences(s, ctx)` returns each reference RESOLVED where it stands — the letter form; the role form «רדיוס (של)? (ה)?מעגל החיצוני/הפנימי/הגדול/הקטן» / "the radius of the outer/inner circle" (since [ADR-760](06-decisions.md#adr-760) a role reference reaches `radiusReferences` already in its letter form, rewritten at the parse boundary by `resolvePairRoles`; the role branch and `pairCircle` are retired); and a letter that is a pair's shared centre as `ambiguous` (asked, `ambiguous-circle`). The emitted `c1`/`c2` stay outside the post-pass's `CIRCLE_REF_KEYS`: that post-pass holds one role per utterance, so a relation between two circles is resolved per span by its reader. The pair's two circles at k = 1 are refused with ADR-713's `equal-circles-nested` sentence.
 - **A factor is paid only by a ratio coefficient ([ADR-754](06-decisions.md#adr-754), #2459).** `FACTOR_PI` / `FACTOR_TIMES` (`parse.ts`, over NUMEXPR) are the one spelling of «פי N» / «N פעמים» / "N times"; `measureRatioK` and `radiusRatio` compose them and `factorSpans` exports them. In `accountUtterance` a factor is paid only by a command's ratio coefficient (`k`, a measure's `coef` / `coefs`) or a declared `consumed.numbers`, never by a size `value`; an unpaid factor is a hard `number` span (its number as text), so the grammar seam escalates and the LLM seam refuses. This narrows what pays for a number (ADR-566), never widens it.
-- **Where the solve budget is consulted (ADR-515, #259).** The cooperative wall-clock budget (`engine/solveBudget.ts`) is armed only around view searches (the configuration searches, the submit gate's «כבר קיים» test), never the primary submit fold (ADR-281). It is consulted between recruit experiments (`step.ts`) and inside `nelderMead`'s descent (`evaluate.ts`); unarmed it is a null check. The knowledge pool is bounded by work, never seconds (`POOL_WORK_CAP`, ADR-558; see the knowledge pool).
+- **Where the solve budget is consulted (ADR-515, #259).** The cooperative budget (`engine/solveBudget.ts`) is armed only around searches, never the primary submit fold (ADR-281). It is consulted between recruit experiments (`step.ts`) and inside `nelderMead`'s descent (`evaluate.ts`); unarmed it is a null check. **Since #2893 ([ADR-831](06-decisions.md#adr-831)) there is no clock:** every search runs under `withSearchLimit(units, fn, kind)`, a work budget in charged units (ADR-582) plus the shared limit (`shell/workLimit`), and its loop asks `limitReached()` where it read `Date.now()`. The limits are `SEARCH_WORK_LIMIT` (`searchAnotherView`, `findValidConfig` with its seat and variant tiers, `firstSatisfyingSeed`, `searchResample`), `GATE_WORK_LIMIT` (the gates' narrow pool, ADR-605's walk, `settleVariantDefaults`), `LOAD_WORK_LIMIT` (`store/loadAudit.ts`), each named over `TEN_SECONDS_OF_WORK` (12 M charged units by the operator's ruling of 2026-11-15: the smallest round number at which every corpus search but the #1768 kite's decides in one round; ~15 s in the browser on a search that solves what it touches) with its measurement. A search that reaches its limit with nothing found answers "not decided" (`shell/notDecided`, `findValidConfigRound` / `searchAnotherViewRound`, `LoadAudit.resumeAt`); «המשיכו לחפש» sends the next `round`, whose limit is the rounds' sum (`roundLimit`), so it goes on from where it stopped and reads back what the earlier round solved. The two-outcome names throw `SearchNotDecidedError` rather than answer null. The spent ladder of the indefinite-shape probe is `withLadderSpent`. The knowledge pool is bounded by work too (`POOL_WORK_CAP`, ADR-558).
 - **A refusal names what the rule matched (ADR-528, #1266/#1267).** A rule that recognised a construct and rejected it answers through `Clarify` (mapped by `refusalOf`, armed by `runSubmit`), never `not-handled`. A cevian's stated side has one reader, `statedSide`, shared by median, altitude and bisector (the bisector also checks it); its stated triangle has one, `statedTriangle` (ADR-540, #1285), so the triangle form answers where the bare form asks `ambiguous-angle`, and a wrong lone vertex is `bisector-wrong-apex`. `cevianTriangle` wraps every cevian rule and prepends `triangle` when the sentence names one the figure lacks (ADR-571, #1720). The bisector's vertex has one reader for both forms (ADR-568, #1684). A cevian with no stated side or triangle resolves through `cevianShapeEdges`: one shape answers; shapes giving the apex different opposite sides ask (`ambiguous-cevian`). A NAMED foot is excluded as a base vertex while another opposite side remains; when that exclusion leaves none and the shape has exactly one opposite side holding the foot («משולש ABC» · «התיכון AB»), the foot names that side and `cevianFault` judges it as the long form ([ADR-642](06-decisions.md#adr-642), #1742). The altitude with no stated side picks its side in analytic's order of authority ([ADR-665](06-decisions.md#adr-665), #1965/#1966): `footNarrowedSide` (the opposite side the figure already puts the named foot on — the one reading `cevianShapeEdges` also calls), then `ringParallelBase` (the partner of the apex's base among the apex's OWN ring's parallel pairs, `ringParallelPairs`), then the stated triangle and `cevianShapeEdges`. `ringParallelPairs` is the one reader of a ring's parallel bases: the trapezoid midsegment, «… מקביל לבסיסים» (via `trapezoidBasePair`) and the valueless «גובה הטרפז» read it, never the whole `ctx.parallels`. When the side came from the figure (no stated side or triangle), the altitude and the median record the ring it belongs to (`noteCevianHost`, [ADR-797](06-decisions.md#adr-797), #1973), and `parse` reports it beside the commands as `host` (§ "The shape a cevian was resolved in rides on its facts").
 A height named by TWO EXISTING polygon vertices ([ADR-643](06-decisions.md#adr-643), #2064) is the right angle the
 pair names: with a stated side through one letter, that letter is the foot and the other the apex
@@ -229,7 +229,10 @@ src/
   replay/      core.ts — the pure replay layer: fold memo + deferral + HOIST + seed/config searches + the
                shared sample core; naming.ts; engine ← replay ← store enforced by test
   store/       geoStore.ts (Zustand + zundo: the fact list as source of truth, rename/swap/merge),
-               figureFile (save/load), loadAudit, geoWork/geoWorker (the Web-Worker seam)
+               figureFile (save/load), loadAudit, geoOps/geoWork/geoWorker (the Web-Worker seam: the
+               operations, the client over shell/workerClient, the entry over shell/workerHost; ADR-829).
+               Since ADR-830 EVERY decision runs in the worker (geoOps: decide, judge, act, edit, load,
+               audit, settle on a shadow store) and the page adopts the settled figure (app/workerJobs)
   render/      transform + scene (pure figure→primitives) + Figure.tsx (declarative SVG, pan/zoom, hover)
   theorems/    the authored theorem table + coverage disposition map + rank bands + audit harness
   validation/  the differential coordinate oracle (engine-import-free; dev/CI only)
@@ -852,6 +855,13 @@ must be one `readShapePhrase` lowers whole, its arity must match the letters and
 phrase's own or the generic «מרובע». Anything else is returned unchanged. It is the second copy of analytic's
 `frameAnalytic.ts` (copied, BOUNDARIES.json); a third copy (3-D, #1679/#1888) moves the pure part to `shell/`.
 
+**The subject frame** ([ADR-819](06-decisions.md#adr-819), #2062): `readSubjectFrame` reads «(ה)נקודה? X מקיי(ם|מת|מים|מות)
+:? rest» / "(the)? (point)? X satisf(ies|y) :? rest" and gives `rest` only when `rest` names X as a label; `readFrame`
+applies it after `UNWRAP`. `normalizeUtterance` = `readFrame(normalizeText(raw))`, and `subjectFrameOf(raw)` reads the
+frame off `normalizeText` before it comes off, for `unreadParts`' exemption: the frame's subject is a co-reference to
+its statement's label (the substitution probe would otherwise see it unread, since a frame about a substituted letter
+that the statement also names still comes off). Analytic's `satisfiesClause` and 3-D's `readSubjectFrame3` are copies.
+
 ### The bar spelling of a length, folded at the normalize boundary ([ADR-719](06-decisions.md#adr-719))
 
 `normalizeUtterance` folds a **two-label** absolute-value pair to the pair — `|AB|` → `AB`, `| A1B1 |` → `A1B1` — right
@@ -1259,7 +1269,7 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
   whether another variant / side / reflex assignment cures an erroring step; it runs under
   `CHOICE_RESCUE_WORK_CAP` charged units (`withWorkBudget`, every memo hit charged, ADR-582), so a line's verdict
   is the same cold and warm on every device. A fold the cap cuts ends the rescue uncured. `findValidConfig`'s
-  variant tier keeps its wall-clock deadline (`{ deadline }`) — an interactive view search, ADR-558's split.
+  variant tier runs under that search's work limit (`'under-limit'`, #2893; it was its wall-clock deadline).
 
 ### A one-line compound is all or nothing: the clause-coverage gate ([ADR-598](06-decisions.md#adr-598))
 
@@ -1452,6 +1462,28 @@ is sound because the line's own constraints only narrow the configurations. A hi
 `errRingContradictsNoun` text, verbatim), and never escalates; it precedes ADR-157's redefinition refusal. The test
 helper `gateVerdict` mirrors it (reason `crossed-ring`). The predicate is 2-D's own: `BOUNDARIES.json` keeps engine
 layers `copied-never-shared`.
+
+**A ring proved convex by its stated angles: one more reason for the same reader** (and a STORED reflex seat a later stated angle rules out is moved structurally at the top of `findValidConfig` — `reflexSeatsYieldToStatedCorners`, ADR-823 Am. 1 — so the worker never sweeps seeds that cannot help; `reflexAxes` never offers such a vertex) ([ADR-823](06-decisions.md#adr-823),
+#2813). A stated corner angle is the INTERIOR angle. Two halves, both in `replay/core.ts`: (1) the view floor —
+`polygonsConvex`'s simple-floor branch (a yielding, stated-concave or top-level ring) also requires every STATED corner
+(`statedRingCorners`: a `set-angle` or a corner `set-perpendicular` fact between the vertex's two ring neighbours, below
+180°) to turn with the ring's orientation, so no view seats it reflex; (2) the proof — reason `angles` of
+`ringConvexityProofs` (ADR-826, above; `anglesLeaveNoRoom`): a declared ring whose stated corners sum to at least
+(n − 3)·180° is in convex position (a reflex corner would leave the rest less). `ringOrderContradiction` refuses it
+unchanged; for an `angles` proof `ringOrderVerdict` gives `input.ringContradictsAngles` (the line, the angle lines as
+typed, the ring, the other order).
+
+**A ring a statement proves convex is refused structurally, from any line** ([ADR-826](06-decisions.md#adr-826), #2811).
+`forcedCrossedRing` reads only the rings the current line declares, so a line that declares none but proves the letters
+in convex position was never asked. `ringConvexityProofs(facts)` (`replay/core.ts`, beside `convexityYields`, memoized
+on the fact list) returns, per declared ring of four or more, the facts that prove it convex: a stated «קמור», or one
+circle through every letter — read off the COMMANDS (`circleMemberships`: a circumcircle's three points, a circle
+through a point, a rider, a crossing, an arc midpoint, a diameter's ends, a `set-concyclic`), never positions; a letter on
+the circle only through a derived point fails open. `ringOrderContradiction(facts, commands)` asks it of the TRIAL facts:
+a proved ring and another declared ring over its letters in another order is a contradiction, blamed on the LATEST of the
+declarations and the proof facts, refused only when that is a fact the line adds (a saved figure is never refused on an
+unrelated line). `app/ringOrder.ts`'s `ringOrderVerdict` is called by both seams before `forcedCrossedRing`
+(ADR-W-006), note `input.ringContradictsNoun`; `gateVerdict` mirrors it. `convexityYields` never yields a proved ring.
 
 **Search first, refuse last** ([ADR-613](06-decisions.md#adr-613), the operator's ruling of 2026-10-09). The prior pool
 is filtered by `meetsRequirements`, and so by FR-EN-16's convexity DEFAULT. A second declared ring over some of a
@@ -1764,8 +1796,138 @@ the shared memo saved and restored; a "not forced" subset settled by its first s
 fold key. The store keeps `narrowed: { list, facts }` beside `determinacy`; App.tsx renders it in the ⓘ strip through
 `app/narrowingText.ts` and the `figure.narrowed.*` keys.
 
+### Compute once: what the replay layer keeps, and what a budget sees ([ADR-827](06-decisions.md#adr-827), #2888)
+
+Phase 2 of [ADR-W-210](06w-decisions-workspace.md#adr-w-210) for 2-D. `replay(facts, seed)` is pure, and three memos in
+`replay/core.ts` (two of them new or changed here) decide how often its parts are computed. Each lives in the heap that
+solves: the page, the interactive worker and the detect worker each have their own (`store/geoWork.ts`).
+
+**Since [ADR-830](06-decisions.md#adr-830) the page solves nothing.** Every decision runs in the interactive worker
+(`geoOps`), which answers the SETTLED VIEW of the figure it ended on (`settleView`: the replay and its work, the fold,
+the evaluation, the baked construction and the DOF count of the drawn construction). The page ADOPTS it
+(`adoptSettled`): the replay under the identity of the facts array it puts in its store, the three engine memos under
+that replay's construction, the fold by content. The render's readers and the resolve gate then hit, measured at 0
+units over the corpus. An adopted entry carries a flat ledger of the work it saved (ADR-584). `hasReplay` and
+`peekReplay` read the memo without solving; `ensureSettled` asks the worker for a figure the page holds no view of
+(an undo past what it adopted).
+
+One thing crosses back to a worker: after a cancel or a crash the replacement worker is handed the page's fold of the figure on
+screen, its CHECKPOINT (`geoOps.takeCheckpoint`, [ADR-829](06-decisions.md#adr-829); the shared client's `seed`,
+[04w](04w-design-shell.md) § *The worker client*), so the next line resumes from it instead of folding in an empty heap.
+
+| Memo | Holds | Key | Bound | Since |
+|---|---|---|---|---|
+| the replay memo (`replayCache`) | a `Derived` | the facts ARRAY's identity, then the seed | 512 seeds per array; weak in the array | E1 |
+| the fold memo (`foldCache`) | a `FoldNode` (everything a seed does not change) | the fact list's CONTENT (`foldKey`) | `replayMemoConfig.folds`, least recently used out | [ADR-280](06-decisions.md#adr-280); the bound and the order are ADR-827's |
+| the sampled-construction memo (`sampledOnce`) | the sampled `Construction` of a fold at a seed, of a pool job, and of the tail's warm start | the construction it was sampled FROM + the lane + the slot | `replayMemoConfig.samples` in all, least recently used out | ADR-827 |
+
+- **The fold memo.** Reading an entry marks it used (`foldCacheGet`), and so does resuming from it as a prefix
+  ([ADR-406](06-decisions.md#adr-406)). The old memo held 8 entries, first in first out, so the candidates of one
+  «הציגו תצורה אחרת» search pushed out the figure's own fold, and a load's audit folded again the prefixes its refresh had
+  just folded. The bound is measured over long sessions (the ADR has the table).
+- **The sampled construction.** `runTail` asks `sampledOnce(cur, 'tail:<seed>')` for the construction it evaluates, and a
+  pool job asks `sampledOnce(c, 'pool:<s>')`. A second facts array of the same content (a gate's trial array, the committed
+  array, a worker's clone) gets the SAME object, so `evaluate`, `resolveDriven` and the DOF count answer from their own
+  identity memos. The table stores nothing the pure samplers would not rebuild: it decides which object, never what it
+  holds. A replay still builds its own `Derived`, and a sampled figure's `positions` map is a copy per replay, because the
+  pool tags a positions map by identity with a pool's own seed index (`seedOfSample`).
+- **Each lane its own.** Under node the three heaps are one module instance. A sample the worker lane solved is never a
+  hit for the page lane (`workLane()`, `shell/workMeter.ts`, in the table's key), and a fold is readable only by the
+  lane that folded or read it (`foldLanes`), as each heap holds its own in a browser. (ADR-827 let the lanes share the
+  old memo's eight entries; #2893, ADR-831, removed that with the rest of its emulation.)
+- **Under a budget the memos are read, and charged.** A budget charges a hit the work it saved, once per work epoch
+  ([ADR-582](06-decisions.md#adr-582)): `evaluate`'s and the DOF count's memos, the fold memo (its ledger), and the
+  sampled table (what BUILDING the object cost; a mirrored seed reads a solve). A second request inside the epoch is
+  served free, as a cold run serves it from the memo it just filled, so a warm and a cold run stop a budget at the same
+  unit. A hit a work budget cannot afford is recomputed, and cut, as before. Under a budget with nothing left
+  (`budgetSpent`: the probe's spent ladder, or a work budget at its limit) the sampled table builds a fresh object.
+  ADR-827 kept two emulations here so that no budgeted verdict moved while the memos grew (a fresh object inside an
+  epoch that had charged one, and only the old 8 folds readable under a budget); #2893 (ADR-831) re-bases every budget
+  in work units and removes both. A ledger still remembers the history it was computed in (ADR-827's known limit).
+  Nothing in `computeFold` reads the sampled table: the fold's re-attempt cap counts executed work
+  ([ADR-583](06-decisions.md#adr-583)); an uncut re-attempt is memoized under a budget too (#2893).
+- **A cut solve is never kept.** The sampled memo holds constructions, not results. `evaluate` and the fold memo refuse a
+  result a clock or a work budget cut short, as before, and an object whose BUILD a budget cut is not stored.
+- **What a memo holds is never written into: a resumed prefix is never mutated** ([ADR-828](06-decisions.md#adr-828), #2370).
+  A fold's construction is shared by every later fold that resumes from it, so `applyCommand` builds a new object for
+  anything it changes and leaves its input untouched. It copies `prev.objects` as an ARRAY, so an assignment into an
+  object found there is a write into `prev`: [ADR-624](06-decisions.md#adr-624) met the class first, and the
+  right-triangle seat on a placed vertex was a second site (after «משולש ABC» · «המשולש ישר זווית» the held «משולש ABC» had a
+  driven C, and «הציגו תצורה אחרת» could not move the right angle). Three locks: the engine's, which deep-freezes the
+  construction before every step of every fixture and catalog example (`engine/__tests__/apply-purity.test.ts`); the
+  memo's, resumed fold = cold fold at every seat and seed (`replay/__tests__/fold-resume.test.ts`); and the fixture
+  net's per-figure check, where each prefix is folded, then the whole figure, and no prefix's construction may have
+  changed.
+- **`clearReplayCaches`** (test-only) clears all of it. Each work-meter walk starts from it, so a count depends on
+  nothing run before the figure ([docs/08](08-testing-strategy.md), "The work meter"). It cannot empty the replay memo,
+  which is weak in the facts array; so the meter's `detect` action hands its lane a structured clone of the facts, as a
+  browser's detect worker receives them (ADR-827, step 4). Since [ADR-829](06-decisions.md#adr-829) the gate goes
+  further: each worker's operations are a module instance of their own and every message is cloned, so the two rules
+  above (the lane in the sampled table's key, a fold readable by the lane that folded it) are idle there, as they are
+  in a browser. They still hold for every suite that runs the operations in the page's instance.
+
 ## The knowledge pool
 
+
+**An exact repeat inside one Nelder–Mead call is served ([ADR-832](06-decisions.md#adr-832), #2894).** `nelderMead`
+(`engine/evaluate.ts`) wraps its cost in `servingRepeats` (`engine/solveBudget.ts`): a point the same call has already
+evaluated, bit for bit, is answered from the call's own table instead of being evaluated again (a simplex that has
+contracted onto one point keeps reflecting and shrinking onto it; measured, 44–47 % of every evaluation). The cost is a
+pure function of the point for the life of the call, so the descent is unchanged. A served repeat advances
+`work.done`, `work.executed` and the open ledger frame's `own` by exactly what the first evaluation advanced them, so
+every work budget, the re-attempt cap and every memo entry's ledger read what they read before; only the work meter's
+executed count falls. Nothing is kept between calls.
+
+**A run the solver would repeat is served, and a line no figure can hold is refused before the ladder climbs
+([ADR-833](06-decisions.md#adr-833), #2894).** Two repeats one level above the descent: `resolveFreeDriven`'s relaxed
+pass runs its convex pass's Nelder–Mead descents again, call for call (the same cost closure, start and steps;
+`servedNelderMead`), and the anti-collapse retry of a FAILED plain search whose barrier was zero at every point it
+evaluated is that search again (`regCostB` equals `regCost` there). Both are served by `servedRuns` / `serveRun`
+(`engine/solveBudget.ts`), charged exactly as run, and never past an armed limit: a run cut by a limit is not kept, and
+a hit whose charge would cross one is run instead, so it is cut where a run is. Separately, the failure ladder opens
+with the metric closure (`engine/metricClosure.ts`): an interval reading of every length the construction speaks
+about, from its obligations and its objects' parameter-free structure, closed under the law of cosines and the
+triangle inequality; an empty interval proves that no rung can succeed, and the ladder returns its own last refusal
+at once (docs/LADDER.md stage 2e⁰). Since [ADR-835](06-decisions.md#adr-835) that refusal gives the reason: `explainLengthConflict` leaves
+each stated length out in turn and reads, exactly, what the others force on its segment (or two lengths against the
+triangle inequality), and the error bank carries it as `lengths-value` / `lengths-triangle` in the over-constrained frame.
+
+**A point is keyed by its bits, a refusal the ladder reached is served, and the proof comes before the solve
+([ADR-836](06-decisions.md#adr-836), #2912).** Three changes of mechanism, each speed-only. (1) `servingRepeats` keys a
+point with `exactPointMap` (`engine/solveBudget.ts`): a hash of every coordinate's 64 bits and an exact compare on a hit
+(`Object.is`, so −0 is another point; a NaN point is never looked up), the same hits and misses as the old text key,
+without building a string per evaluation. (2) `runFailureLadder` (`engine/step.ts`) keeps the refusals it reached by
+the exact content of its inputs (both constructions, the prior positions, the primary evaluation, the stage prefix,
+the solver's tolerance scale; every number by its bits), and serves one to a later call on content-equal NEW objects —
+another fold reaching the same failing step, as the submit gate's choice rescue does after the prefold — charged
+exactly as climbed (`serveRun`): `work.done`, `work.executed`, the ledger frame's `own`, and now the memo entries the
+climb touched, linked into the serving frame and marked charged in its epoch (`ChargedRun.deps`), so a fold whose
+climb was served is charged later as one whose climb ran. A call handed any of the very objects the recorded climb
+was handed climbs: the identity memos inside answer it for less, and the recorded charge would be wrong. Only a whole
+climb (no limit crossed) is kept, never past an armed limit; the newest 32 are held. (3) The metric closure's proven
+refusal (stage 2e⁰) is asked BEFORE the primary solve in the main, M1 and coupled paths (`provenRefusal`), when it has
+its own reading (`explainLengthConflict`) and the step is not a composition with a mirror: the primary would fail and
+the ladder's first act is the same proof and the same sentence. The rider re-reads after a main refusal still run.
+
+**A side of a triangle circumscribed about a circle is longer than the diameter ([ADR-837](06-decisions.md#adr-837),
+#2601).** The metric closure reads a third kind of relation beside the ratio and the angle wedge: a one-sided FLOOR
+`|side| ≥ k·r`, which raises the side's lower bound and lowers the radius's upper bound and bounds nothing else. It is
+read from every triangle whose circle touches the sides within them, in the two shapes the engine builds an incircle
+in (`incircleTriangles`): the tangent ring (three tangents of one circle at points on it, crossing pairwise at the
+vertices) and the incentre (two internal bisectors' crossing, with its feet on the sides), each needing at least two
+sides' `collinear-order` [vertex, touch, vertex] obligations, which make the circle the incircle and not an excircle.
+k = 2·√(1 + ρ), ρ = f/(1 − f) with f the order's acceptance fraction (`ORDER_LEN_MIN_FRAC`): the incircle's tangent
+lengths obey z(xy − r²) = r²(x + y), and one accepted order beside the side gives xy > r²(1 + ρ). The floor has no
+reading of its own (it bounds, never fixes), so `explainLengthConflict` adds nothing and the refusal is the climb's
+plain one, asked at the ladder's entry (stage 2e⁰), in every fold that reaches the step, the drop-one search's included.
+
+**A view that fails at every seed is tried at one ([ADR-834](06-decisions.md#adr-834), #2894).** A seed enters a replay
+only in its tail (the sample and one evaluate); the fold is the fact list's alone. So a view whose fold failed (its build
+error, a row it filed as failed) or whose construction has nothing to sample fails at every seed, and the configuration
+searches (`firstSatisfyingSeed`, `findValidConfig`, the choice and seat sweeps under a search's limit, «הציגו תצורה
+אחרת») stop retrying it: `failsAtEverySeed` (`replay/core.ts`) reads the fold a Derived was drawn from, recorded only
+when that fold ran whole. The seeds skipped are seeds that fail, so which view a search returns is unchanged; under its
+work limit it gets further.
 ### The knowledge pool of a DETERMINED figure is its admissible set (#434, [ADR-509](06-decisions.md#adr-509))
 
 The relations layer's definite values, the values panel and the forced crossing dots read one shared pool
@@ -1785,8 +1947,9 @@ The relations layer's definite values, the values panel and the forced crossing 
 - **Work is a function of the input** ([ADR-582](06-decisions.md#adr-582), #1605): every memo entry (replay cache,
   fold memo, drop-one memo, the `evaluate` / `resolveDriven` / DOF memos) carries a work ledger
   (`engine/solveBudget.ts`), charged once per work epoch (the `sharedSamples` call), cold or warm; a budget-cut
-  computation is never memoized. The UI-thread «כבר קיים» test (`impliedByPrior`) keeps its fail-open wall-clock
-  bound (`sharedSamples(facts, { deadlineMs })`) on three seeds. The pool is memoized whether complete or not;
+  computation is never memoized. The submit gate's «כבר קיים» test (`impliedByPrior`) reads the narrow pool
+  (`sharedSamples(facts, { gate: true })`) on three seeds, bounded by `GATE_WORK_LIMIT` (#2893; it was a fail-open wall
+  clock), and still fails open at its limit. The pool is memoized whether complete or not;
   while values compute, an asked row reads `waitingNote`.
 - **The status cue reads the same pool** (#1444, [ADR-556](06-decisions.md#adr-556)): `figureDeterminacy`
   (`replay/core.ts`) returns `determined`, the number of distinct shapes (pairwise distances equal up to one
@@ -1830,6 +1993,18 @@ press); `admissibleRewrites` enumerates every axis but `variant` (sampled by `va
 `ADMISSIBLE_REWRITE_CAP`; `choiceRescue` (`findValidConfig`'s tier after the seat, and `dryRunOutcome`'s curable
 test) tries the `variant` and `side` axes, fewest changes first; `App.tsx` enables the button when any axis or free
 DOF exists.
+
+**The solution cycle ([ADR-824](06-decisions.md#adr-824), #2831).** On a figure with no shape freedom left
+(`freeDofCount` 0; its placement may still be sampled), `searchAnotherView` first calls `solutionCycleStep`: it gathers
+every axis assignment (counted from the all-default one, at most 64) that meets every requirement at the seed of the press that began
+gathering (the shape is determined, so the seed only places it; the cycle keeps that seed), groups them by `shapeFingerprint` within `SAME_SHAPE_TOL` (one solution up to a turn, shift, scale or mirror),
+puts #942's separated drawings first within a group, and interleaves the groups round-robin in order of first
+appearance. The press returns the successor of the assignment on the screen. A cycle with nothing but the drawing on
+the screen, or one the deadline cut, falls through to the odometer below, unchanged; so does every figure with shape
+freedom. The cycle is memoised per facts with every axis digit zeroed, the last 8 figures, so only the first press pays
+for the gathering. The gathering gets half the press's remaining budget; one the deadline cuts keeps what it found and
+the next press resumes it while the odometer answers, and an assignment whose solve the clock cuts twice is not
+offered, as the odometer treats a candidate its deadline cuts.
 
 The seat is **pinned** by the student's own right angle, read from one set, `explicitRightAngleVerts` (ADR-445), that the ADR-163 reseat pre-scan, `cyclableSeat` and `unpinnedSeats` all consult: a 90° `set-angle`, and since [ADR-658](06-decisions.md#adr-658) (#2082) a `set-perpendicular` whose two segments meet at one vertex V of an enabled right triangle with their other ends its other two vertices (every ⟂ spelling and every height that lowers to one; structure only, never positions). The set is in fact order, so of two right angles stated on one right triangle the earlier keeps the seat, and the later line meets the angle-sum prover's `no-room` verdict (LADDER stage 0f) and is refused at the door, naming the earlier statement through the fold's drop-one search ([ADR-508](06-decisions.md#adr-508)). A noun's default seat (`seat: true` ⟂ or perp-offset knee) is never read as a stated angle by that prover.
 
@@ -1914,6 +2089,17 @@ The engine leaves an unstated choice free (ADR-052) and cyclable (ADR-138); this
 - **Render:** on the fact's row, plus one cue beside «הציגו תצורה אחרת» (ADR-502 Am. 1, #996).
 
 ## Render and marks
+
+### A hidden segment takes what exists only for it ([ADR-825](06-decisions.md#adr-825), [ADR-W-207](06w-decisions-workspace.md#adr-w-207), #2852)
+
+`Figure.tsx` reads its scene into the shared decision `hiddenWith` (`shell/frame/segmentDisplay.ts`) before it builds
+the scene: the segments split by `segStyle`, the length labels, the right-angle marks, the declared equal classes,
+and the points every other mark touches. The scene is built from what it leaves — `buildScene`'s `suppress` drops the
+lone points, so their extensions go too. Which points may go is the facts' question, answered in
+`src/app/hideOwnership.ts` (`lonePoints`: never typed, at most one row names it, nothing but a segment or polygon built
+from it) and handed in as the `lonePoints` prop; `hiddenRowGroups` gives the rows that show «מוסתר».
+
+*Identifiers:* `hiddenWith` · `lonePoints` · `hiddenRowGroups` · `suppress` · `FactRow.hidden`
 
 ### An off-ink construction point's dashed extension ([ADR-612](06-decisions.md#adr-612), [ADR-W-124](06w-decisions-workspace.md#adr-w-124), #1971, #1937)
 

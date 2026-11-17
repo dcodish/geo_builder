@@ -16,7 +16,7 @@
  * - a DERIVED point whose rule puts it on a line of its inputs: `midpoint {a, b}` and `side-touch {a, b}` (the foot of
  *   a centre on the side `ab`) on line(a, b); `foot` on the line it is dropped onto (two points, an axis, a line
  *   object); `diagonals` on both diagonals. Every other rule in `derived.ts` (centroid, incentre, orthocentre,
- *   circumcentre, incircle-centre, circle-centre, parabola-focus, touch-point, regular-vertex) places its point on no
+ *   circumcentre, incircle-centre, circle-centre, parabola-point, touch-point, regular-vertex) places its point on no
  *   line of its inputs, and proves nothing. The same rules stated about an existing point (`derived-at`) prove the same.
  *
  * Conservative by construction: two carriers that are the same line by accident are never merged, and a `choice`
@@ -70,7 +70,7 @@ function ruleCarriers(c: Construction, rule: DerivedRule): string[] {
     case 'circumcentre':
     case 'incircle-centre':
     case 'circle-centre':
-    case 'parabola-focus':
+    case 'parabola-point':
     case 'ellipse-point':
     case 'touch-point':
     case 'common-touch':

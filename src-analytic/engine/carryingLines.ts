@@ -46,7 +46,7 @@ function ruleLines(r: DerivedRule): Array<[Id, Id]> {
     case 'circumcentre':
     case 'incircle-centre':
     case 'circle-centre':
-    case 'parabola-focus':
+    case 'parabola-point':
     case 'ellipse-point':
     case 'touch-point':
     case 'common-touch':

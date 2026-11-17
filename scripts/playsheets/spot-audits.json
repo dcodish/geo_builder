@@ -12,6 +12,617 @@
         "z1 = 3+4i"
       ],
       "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i»."
+    },
+    {
+      "sheet": "prod-2026-11-10-3",
+      "id": "P6",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-10",
+      "product": "analytic",
+      "base": "https://themathbible.com",
+      "path": "/analytic-builder/",
+      "lines": [
+        "נתונה פרבולה שמשוואתה y^2=4px",
+        "p > 0",
+        "K על הפרבולה",
+        "y_K = 12",
+        "F מוקד הפרבולה",
+        "KF = 20"
+      ],
+      "lookFor": "«p» answers «2 או 18»."
+    },
+    {
+      "sheet": "prod-2026-11-12",
+      "id": "P10",
+      "kind": "3d:assertion",
+      "queued": "2026-11-12",
+      "product": "3d",
+      "base": "https://themathbible.com",
+      "path": "/3d-builder/",
+      "lines": [
+        "תיבה ABCDA'B'C'D'",
+        "נסמן: AA' = w, AB = v, AD = u",
+        "הנקודה E היא אמצע המקצוע BB'",
+        "הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w",
+        "מישור AEC",
+        "האם הנקודה M נמצאת במישור AEC?"
+      ],
+      "lookFor": "Every line builds; the last one adds nothing and says the answer is in the data panel's point × plane row."
+    },
+    {
+      "sheet": "round-2855-w1",
+      "id": "T7",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "x^2+2y^2=16",
+        "AB מיתר באליפסה",
+        "M אמצע AB",
+        "AB מקביל לישר y=x"
+      ],
+      "lookFor": "Exactly one chip, «הצג מקום גאומטרי», on M's row; none on the chord row (read from the shot: only the M row carries it)."
+    },
+    {
+      "sheet": "prod-2026-11-12-2",
+      "id": "P9",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "https://themathbible.com",
+      "path": "/analytic-builder/",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "נקודה M",
+        "MA = MB"
+      ],
+      "lookFor": "M's row still has «הצג מקום גאומטרי»."
+    },
+    {
+      "sheet": "round-2855-w2",
+      "id": "T20",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "נתון מעגל O שמשוואתו x^2+y^2=25",
+        "AB הוא קוטר המעגל"
+      ],
+      "lookFor": "A and B on circle O, through its centre."
+    },
+    {
+      "sheet": "round-2855-w3",
+      "id": "T29",
+      "kind": "3d:assertion",
+      "queued": "2026-11-12",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "A(0,0,0)",
+        "B(2,15,-8)",
+        "B(2t,t,k)"
+      ],
+      "lookFor": "«B(2t,t,k)» refused «הטענה לא מתקיימת בציור — בדקו את החישוב»."
+    },
+    {
+      "sheet": "prod-2026-11-12-3",
+      "id": "P8",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "https://themathbible.com",
+      "path": "/analytic-builder/",
+      "lines": [
+        "x^2/25+y^2/9=1",
+        "קוטר האליפסה AB",
+        "CD מיתר האליפסה"
+      ],
+      "lookFor": "Both rows built: AB a diameter, CD a chord, all four points on the ellipse."
+    },
+    {
+      "sheet": "prod-2026-11-12-3",
+      "id": "P9",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "https://themathbible.com",
+      "path": "/analytic-builder/",
+      "lines": [
+        "נתון מעגל O שמשוואתו x^2+y^2=25",
+        "AB הוא קוטר המעגל"
+      ],
+      "lookFor": "A and B on circle O, through its centre."
+    },
+    {
+      "sheet": "round-2855-w4",
+      "id": "T42",
+      "kind": "3d:blind-review",
+      "queued": "2026-11-12",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "פירמידה SABCD",
+        "B(2t, t, k)",
+        "N(k,p,3)"
+      ],
+      "lookFor": "N at height 3, N.x equal to B.z; «הציגו תצורה אחרת» moves p."
+    },
+    {
+      "sheet": "round-2855-w4",
+      "id": "T43",
+      "kind": "3d:blind-review",
+      "queued": "2026-11-12",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "N(k,p,3)"
+      ],
+      "lookFor": "N is drawn at height 3; the freedom count shows 2."
+    },
+    {
+      "sheet": "round-2855-w4",
+      "id": "T44",
+      "kind": "analytic:blind-review",
+      "queued": "2026-11-12",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "נתונה פרבולה שמשוואתה y^2=8x",
+        "V קודקוד הפרבולה"
+      ],
+      "lookFor": "V is drawn at the origin, the parabola's vertex."
+    },
+    {
+      "sheet": "prod-2026-11-12-4",
+      "id": "P5",
+      "kind": "2d:assertion",
+      "queued": "2026-11-12",
+      "product": "2d",
+      "base": "https://themathbible.com",
+      "path": "/geo-builder/",
+      "lines": [
+        "משולש ABC"
+      ],
+      "lookFor": "A triangle."
+    },
+    {
+      "sheet": "feat-2874",
+      "id": "T3",
+      "kind": "3d:assertion",
+      "queued": "2026-11-13",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "lines": [
+        "ריבוע ABCD",
+        "קטע AS",
+        "|SA| = 5"
+      ],
+      "lookFor": "Un-ticking row 3 is quick and shows nothing. Ticking it again takes about 2 seconds: after a third of a second «הוסף» reads «חושב…» with the ring, until the figure; the three rows are there at the end. «הציגו תצורה אחרת» shows «חושב…» on its own button."
+    },
+    {
+      "sheet": "feat-2874",
+      "id": "T7",
+      "kind": "3d:assertion",
+      "queued": "2026-11-13",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "lines": [
+        "ריבוע ABCD",
+        "קטע AS",
+        "|SA| = 5"
+      ],
+      "lookFor": "Un-tick row 3 and tick it again; while «חושב…» shows (about 2 seconds) type «M אמצע AB» and press Enter. Enter is off while the tool works, from the tick itself: the line stays in the box, and a second Enter after «חושב…» is gone adds it."
+    },
+    {
+      "sheet": "feat-2874",
+      "id": "T2",
+      "kind": "2d:assertion",
+      "queued": "2026-11-13",
+      "product": "2d",
+      "base": "http://localhost:5174",
+      "path": "/",
+      "lines": [
+        "משולש ABC"
+      ],
+      "lookFor": "RULED 2026-11-13: an action pressed while the tool works waits its turn. Type the line. Press «טען» and choose src/__tests__/fixtures/hexagon-regular-by-angles-2797.geo.json (it loads for about 8 seconds). WHILE it still says «חושב…», press «בטל». The hexagon appears, and then the undo takes it back, so the session ends on the triangle ABC."
+    },
+    {
+      "sheet": "debt-2888",
+      "id": "T12",
+      "kind": "3d:assertion",
+      "queued": "2026-11-14",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCD",
+        "M אמצע BB'"
+      ],
+      "lookFor": "The cube and M on the edge BB′, both rows green."
+    },
+    {
+      "sheet": "debt-2888",
+      "id": "T13",
+      "kind": "3d:assertion",
+      "queued": "2026-11-14",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCD",
+        "∠BAC = 60",
+        "∠BAC = 60"
+      ],
+      "lookFor": "The claim is refused both times: «הטענה לא מתקיימת בציור — בדקו את החישוב»; one row only."
+    },
+    {
+      "sheet": "feat-2890-r1",
+      "id": "T9",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-14",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "path": "/analytic.html",
+      "lines": [
+        "A(1,2)",
+        "B(4,6)",
+        "קטע AB"
+      ],
+      "lookFor": "Three rows at the end, the segment AB drawn."
+    },
+    {
+      "sheet": "feat-2890-2d",
+      "id": "T10",
+      "kind": "2d:assertion",
+      "queued": "2026-11-14",
+      "product": "2d",
+      "base": "http://localhost:5180",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "ABC מקיים תכונה מסתורית"
+      ],
+      "lookFor": "The second line is not added: «לא הבנתי את הבקשה — נסו לנסח אחרת…» and the line stays in the box; one row."
+    },
+    {
+      "sheet": "feat-2890-analytic",
+      "id": "T7",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-14",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "lines": [
+        "A(1,2)",
+        "B(4,6)",
+        "קטע AB"
+      ],
+      "lookFor": "Three rows, the segment drawn again."
+    },
+    {
+      "sheet": "feat-2890-3d",
+      "id": "T8",
+      "kind": "3d:assertion",
+      "queued": "2026-11-14",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ABC",
+        "D על AB",
+        "AD = 3"
+      ],
+      "lookFor": "Three rows at the end, D on AB."
+    },
+    {
+      "sheet": "feat-2893-2d",
+      "id": "T4",
+      "kind": "complex:assertion",
+      "queued": "2026-11-15",
+      "product": "complex",
+      "base": "http://localhost:5180",
+      "path": "/complex.html",
+      "lines": [
+        "z1 = 1 + i",
+        "z1 = 2"
+      ],
+      "lookFor": "The second line is refused with today's sentence naming «z1 = 1 + i»; no «המשיכו לחפש»."
+    },
+    {
+      "sheet": "feat-2893-3d",
+      "id": "T4",
+      "kind": "3d:assertion",
+      "queued": "2026-11-14",
+      "product": "3d",
+      "base": "http://localhost:5188",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCD",
+        "∠BAC = 60"
+      ],
+      "lookFor": "«הטענה לא מתקיימת בציור — בדקו את החישוב»; one row; no «המשיכו לחפש»."
+    },
+    {
+      "sheet": "feat-2893-analytic",
+      "id": "T4",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-14",
+      "product": "analytic",
+      "base": "http://localhost:5189",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "A(0,0)",
+        "B(6,0)",
+        "שטח המשולש ABC הוא 12"
+      ],
+      "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2893",
+      "id": "T14",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5190",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "A(0,0)",
+        "B(6,0)",
+        "שטח המשולש ABC הוא 12"
+      ],
+      "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2893-2d",
+      "id": "T5",
+      "kind": "complex:assertion",
+      "queued": "2026-11-15",
+      "product": "complex",
+      "base": "http://localhost:5180",
+      "path": "/complex.html",
+      "lines": [
+        "z1 = 1 + i",
+        "z1 = 2"
+      ],
+      "lookFor": "The second line is refused with today's sentence naming «z1 = 1 + i»; no «המשיכו לחפש»."
+    },
+    {
+      "sheet": "feat-2893",
+      "id": "T15",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5190",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "A(0,0)",
+        "B(6,0)",
+        "שטח המשולש ABC הוא 12"
+      ],
+      "lookFor": "The press moves C to another place."
+    },
+    {
+      "sheet": "feat-2894-c-lengths-analytic",
+      "id": "T5",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5198",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "AB = 3",
+        "BC = 4",
+        "AC = 6"
+      ],
+      "lookFor": "Four rows; the triangle drawn."
+    },
+    {
+      "sheet": "feat-2894-e-2d",
+      "id": "T2",
+      "kind": "2d:assertion",
+      "queued": "2026-11-15",
+      "product": "2d",
+      "base": "http://localhost:5195",
+      "path": "/",
+      "lines": [
+        "ABCD דלתון חסום במעגל",
+        "AB=AD",
+        "CB=CD",
+        "E על DC",
+        "BE⊥DC",
+        "AC",
+        "N = חיתוך BE ו-AC",
+        "שטח משולש NCE = שטח משולש ACD"
+      ],
+      "lookFor": "After the eight lines, one press reads «אין תצורה אחרת»."
+    },
+    {
+      "sheet": "feat-2894-c-2d",
+      "id": "T2",
+      "kind": "2d:assertion",
+      "queued": "2026-11-15",
+      "product": "2d",
+      "base": "http://localhost:5194",
+      "path": "/",
+      "lines": [
+        "מלבן ABCD",
+        "AB = 3",
+        "BC = 4",
+        "AC = 7"
+      ],
+      "lookFor": "«AC = 7» is refused, naming «BC = 4»."
+    },
+    {
+      "sheet": "feat-2894-d-analytic",
+      "id": "T2",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5197",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "AB = 5"
+      ],
+      "lookFor": "The press moves the triangle to another configuration."
+    },
+    {
+      "sheet": "feat-2894-c-analytic",
+      "id": "T3",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-15",
+      "product": "analytic",
+      "base": "http://localhost:5199",
+      "path": "/analytic.html",
+      "lines": [
+        "ריבוע ABCD",
+        "AB = 3",
+        "AC = 10"
+      ],
+      "lookFor": "The third line is refused «לא נמצאה תצורה שבה מתקיים: «AC = 10»»; two rows stay."
+    },
+    {
+      "sheet": "feat-2894-c2-2d",
+      "id": "T2",
+      "kind": "2d:assertion",
+      "queued": "2026-11-15",
+      "product": "2d",
+      "base": "http://localhost:5196",
+      "path": "/",
+      "lines": [
+        "מלבן ABCD",
+        "AB = 3",
+        "BC = 4",
+        "AC = 7"
+      ],
+      "lookFor": "«AC = 7» is refused: «… «AC = 7» לא מתקיים יחד עם «BC = 4»: יחד הם נותנים לקטע AC שני אורכים שונים, 5 ו-7. …»"
+    },
+    {
+      "sheet": "feat-2894-c-3d",
+      "id": "T3",
+      "kind": "3d:assertion",
+      "queued": "2026-11-15",
+      "product": "3d",
+      "base": "http://localhost:5192",
+      "path": "/3d.html",
+      "lines": [
+        "ריבוע ABCD",
+        "|AB| = 3",
+        "|BC| = 4"
+      ],
+      "lookFor": "«…«|BC| = 4» לא מתקיים יחד עם «ריבוע ABCD», «|AB| = 3»: יחד הם נותנים לקטע BC שני אורכים שונים, 3 ו-4. בדקו איזה מהאורכים האלה לא נכון.»"
+    },
+    {
+      "sheet": "feat-2894-b-3d",
+      "id": "T2",
+      "kind": "3d:assertion",
+      "queued": "2026-11-15",
+      "product": "3d",
+      "base": "http://localhost:5201",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "מישור ABCD",
+        "שנה שם A ל-M"
+      ],
+      "lookFor": "Start from «נקה הכל». The rows read «קובייה MBCDA'B'C'D'» and «מישור MBCD»; M is drawn where A was, A' keeps its letter."
+    },
+    {
+      "sheet": "feat-2894-part2",
+      "id": "T5",
+      "kind": "2d:assertion",
+      "queued": "2026-11-16",
+      "product": "2d",
+      "base": "http://localhost:5203",
+      "path": "/",
+      "lines": [
+        "מרובע ABCD",
+        "AB = 3",
+        "BC = 4",
+        "ABCD ריבוע"
+      ],
+      "lookFor": "«ABCD ריבוע» is refused naming «AB = 3», «BC = 4», segment BC, 3 and 4."
+    },
+    {
+      "sheet": "feat-2894-part2",
+      "id": "T4",
+      "kind": "2d:assertion",
+      "queued": "2026-11-16",
+      "product": "2d",
+      "base": "http://localhost:5203",
+      "path": "/",
+      "lines": [
+        "מעגל O ברדיוס 2",
+        "AB קוטר במעגל",
+        "AB = 6"
+      ],
+      "lookFor": "«AB = 6» is refused naming «AB קוטר במעגל», segment AB, 4 and 6."
+    },
+    {
+      "sheet": "feat-2894-a2-3d",
+      "id": "T5",
+      "kind": "3d:assertion",
+      "queued": "2026-11-16",
+      "product": "3d",
+      "base": "http://localhost:5204",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCD",
+        "נסמן: AB = u, AD = v, AA' = w",
+        "D(0,0,0)",
+        "C(4,3,0)",
+        "A(3,n,p)",
+        "שיעור ה-z של C' חיובי",
+        "A = (3, -4, 0)"
+      ],
+      "lookFor": "Every line builds; «A = (3, -4, 0)» is accepted as its own row."
+    },
+    {
+      "sheet": "fix-2912-2d-waits",
+      "id": "T5",
+      "kind": "2d:assertion",
+      "queued": "2026-11-16",
+      "product": "2d",
+      "base": "http://localhost:5206",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "מעגל O",
+        "AB משיק למעגל בנקודה D",
+        "BC משיק למעגל בנקודה E",
+        "CA משיק למעגל בנקודה F"
+      ],
+      "lookFor": "אותו סירוב כמו ב-main: «… הסיבה: A, C, F על ישר אחד…» (נמדד: 4.6 ש׳ בענף, 5.8 ש׳ ב-main). הסירוב עצמו שגוי ונשאר ל-#2104"
+    },
+    {
+      "sheet": "fix-2601-side",
+      "id": "T2",
+      "kind": "2d:assertion",
+      "queued": "2026-11-16",
+      "product": "2d",
+      "base": "http://localhost:5208",
+      "path": "/",
+      "lines": [
+        "מעגל O ברדיוס 3",
+        "משולש ABC חוסם את מעגל O",
+        "AB = 6"
+      ],
+      "lookFor": "«AB = 6» נרשמת עם «לא נמצאה תצורה שמקיימת את כל הדרישות יחד…» — כמו ב-main"
     }
   ],
   "results": [

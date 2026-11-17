@@ -86,10 +86,16 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     case 'right-angle-vertex':
       return t('err.rightAngleVertex', { triangle: err.triangle, angle: err.angle, more: err.more });
     // #1666: the tool draws the givens; a claim to prove is named and left out. #2492 (ADR-W-194): the suite's sentence.
-    // No «where to check it» line here yet: 3-D's ask box shows no length on a figure with no stated size, so an
-    // equal-lengths claim has nothing to compare there; that arm waits for the operator (#2492).
+    // #2492 (ADR-W-205, the operator's ruling of 2026-11-10, option (b)): then where 3-D can check it. Not the suite's
+    // panel line: 3-D's ask box shows no length on a figure with no stated size, so the line names what it DOES answer
+    // (an angle, a perpendicular, a parallel). The panel's and the button's names are nested from the keys App3 draws.
     case 'proof-target':
-      return t(PROOF_TARGET_KEY, { sentence: err.sentence });
+      return `${t(PROOF_TARGET_KEY, { sentence: err.sentence })} ${t('err.proofTargetCheck')}`;
+    // #2062 (ADR-3D-480; the operator's ruling of 2026-10-14, card `d14b-2062-question` A): the exam's membership question
+    // is answered by pointing at the panel row that holds it; where the panel has none, the ask lane's undetermined note.
+    case 'answer-in-panel':
+      // one sentence, both surfaces: the ask lane's note keys
+      return err.known ? t('query.note.inPanel', { point: err.point, plane: err.plane }) : t('query.note.undetermined');
     // #1837 (ADR-W-142): an angle in radians — 2-D's ruled degrees sentence, verbatim (ADR-W-118 B1).
     case 'radian-angle':
       return t('err.radianAngle');
@@ -147,6 +153,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // student's own statement and what the figure actually holds, never internal state.
     // #1923 (ADR-3D-314): analytic's `errRingContradictsNoun`, word for word — the line that completed the crossing.
     case 'ring-crossed':
+      // #2813 (ADR-3D-490): proved by stated angles — 2-D's input.ringContradictsAngles, word for word
+      if (err.angles) return t('err.ringContradictsAngles', { detail: err.stated, ...err.angles });
       return t('err.ringContradictsNoun', { detail: err.stated });
     // #1918 (ADR-3D-313): a noun no quadrilateral can carry together with the one already known — what the ring
     // is known to be, and the name it does not take. The key keeps the `shapeLessSpecific` name it was written
@@ -162,6 +170,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // select here), never that the letter is undefined.
     case 'sign-not-selectable':
       return t('err.signNotSelectable', { id: err.id });
+    case 'param-bound-not-selectable':
+      return t('err.paramBoundNotSelectable', { id: err.id });
     case 'ambiguous-angle':
       return t('err.ambiguousAngle', { id: err.id });
     case 'no-prism-to-make-right':
@@ -172,7 +182,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     case 'ambiguous-definite-shape':
       return t('err.ambiguousDefiniteShape', {
         sentence: err.sentence ?? '',
-        plural: t(`err.shapePlural.${err.sides === 3 || err.sides === 4 ? err.sides : 'n'}`),
+        // #2838 (ADR-3D-486): a definite solid noun names its family («קוביות»)
+        plural: err.solid ? t(`err.solidPlural.${err.solid}`) : t(`err.shapePlural.${err.sides === 3 || err.sides === 4 ? err.sides : 'n'}`),
         shapes: err.shapes.join(', '),
         example: err.example ?? err.shapes[0],
       });
@@ -253,6 +264,12 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       });
     case 'angle-coef-conflict': // reported as `givens-contradict` by derive3; never reaches the student raw
       return t('err.givensContradictAlone', { stated: `∠${err.was.p}${err.was.vertex}${err.was.q}` });
+    // #2894 part 2 C (ADR-3D-495): the stated lengths break the metric — which lengths, and why
+    case 'lengths-impossible':
+      {
+      const { kind, ...why } = err.why; // the kind picks the sentence; only the student's letters and numbers are interpolated
+      return t(`err.lengthsImpossible.${kind}${err.others.length > 0 ? '' : 'Alone'}`, { stated: err.stated, others: quoteList(err.others), ...why });
+    }
     case 'givens-contradict':
       return err.others.length > 0
         ? t('err.givensContradict', { stated: err.stated, others: quoteList(err.others) })
@@ -301,6 +318,9 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return t('err.injectionUnsatisfiable');
     case 'sign-unsatisfiable':
       return t('err.signUnsatisfiable', { id: err.id });
+    // #1524 (ADR-3D-477): a stated RANGE on a letter («k ≥ 2») the givens do not leave room for, worded for a range
+    case 'param-bound-unsatisfiable':
+      return t('err.paramBoundUnsatisfiable', { id: err.id });
     case 'no-such-solid':
       // #1455: an engine solid NOUN («pyramid», «cone») is the student's word in their language
       return t('err.noSuchSolid', { id: SOLID_NOUNS.has(err.id) ? t(`solidNoun.${err.id}`) : err.id });

@@ -298,23 +298,23 @@
   {
    "source": "cases",
    "raw": "impossible: |AC| = 9 exceeds 8, the distance from A to C via B",
-   "he": "לא ניתן: ⁦|AC| = 9⁩ — סכום שתי צלעות תמיד גדול מהצלע השלישית, וכאן ⁦|AB| + |BC| = 8⁩. בדקו את הנתונים. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.",
-   "en": "Impossible: |AC| = 9 — the sum of two sides of a triangle is always greater than the third side, and |AB| + |BC| = 8. Check the givens. You can try a different order (enter the givens first), reword it, or build it in a few smaller steps."
+   "he": "הנתונים סותרים זה את זה: הם קובעים ⁦|AC| = 9⁩ ו-⁦|AB| + |BC| = 8⁩, אבל לפי אי־שוויון המשולש ⁦ABC⁩ תמיד ⁦|AC| ≤ |AB| + |BC|⁩. בדקו איזה מהאורכים האלה לא נכון.",
+   "en": "The givens contradict each other: they make |AC| = 9 and |AB| + |BC| = 8, but by the triangle inequality in ABC, always |AC| ≤ |AB| + |BC|. Check which of these lengths is wrong."
   },
   {
    "source": "cases",
    "raw": "impossible: |AC| = 9 exceeds 8, the distance from A to C via B",
    "said": "המשפט שהתלמיד הקליד",
-   "he": "לא ניתן: ⁦|AC| = 9⁩ — סכום שתי צלעות תמיד גדול מהצלע השלישית, וכאן ⁦|AB| + |BC| = 8⁩. בדקו את הנתונים. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.",
-   "en": "Impossible: |AC| = 9 — the sum of two sides of a triangle is always greater than the third side, and |AB| + |BC| = 8. Check the givens. You can try a different order (enter the givens first), reword it, or build it in a few smaller steps."
+   "he": "הנתונים ב«המשפט שהתלמיד הקליד» סותרים זה את זה: הם קובעים ⁦|AC| = 9⁩ ו-⁦|AB| + |BC| = 8⁩, אבל לפי אי־שוויון המשולש ⁦ABC⁩ תמיד ⁦|AC| ≤ |AB| + |BC|⁩. בדקו איזה מהאורכים האלה לא נכון.",
+   "en": "⁦The givens in⁩ «המשפט שהתלמיד הקליד» ⁦contradict each other: they make |AC| = 9 and |AB| + |BC| = 8, but by the triangle inequality in ABC, always |AC| ≤ |AB| + |BC|. Check which of these lengths is wrong⁩."
   },
   {
    "source": "cases",
    "raw": "impossible: |AC| = 9 exceeds 8, the distance from A to C via B",
    "said": "המשפט שהתלמיד הקליד",
    "other": "השורה הקודמת",
-   "he": "לא ניתן: ⁦|AC| = 9⁩ — סכום שתי צלעות תמיד גדול מהצלע השלישית, וכאן ⁦|AB| + |BC| = 8⁩. בדקו את הנתונים. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.",
-   "en": "Impossible: |AC| = 9 — the sum of two sides of a triangle is always greater than the third side, and |AB| + |BC| = 8. Check the givens. You can try a different order (enter the givens first), reword it, or build it in a few smaller steps."
+   "he": "הנתונים סותרים זה את זה — «המשפט שהתלמיד הקליד» לא מתקיים יחד עם «השורה הקודמת»: יחד הם קובעים ⁦|AC| = 9⁩ ו-⁦|AB| + |BC| = 8⁩, אבל לפי אי־שוויון המשולש ⁦ABC⁩ תמיד ⁦|AC| ≤ |AB| + |BC|⁩. בדקו איזה מהאורכים האלה לא נכון.",
+   "en": "⁦The givens contradict each other⁩ — «המשפט שהתלמיד הקליד» ⁦cannot hold together with⁩ «השורה הקודמת»: ⁦together they make |AC| = 9 and |AB| + |BC| = 8, but by the triangle inequality in ABC, always |AC| ≤ |AB| + |BC|. Check which of these lengths is wrong⁩."
   },
   {
    "source": "cases",
@@ -2807,8 +2807,8 @@
      }
     ]
    },
-   "he": "לא ניתן: ⁦|AC| = 9⁩ — סכום שתי צלעות תמיד גדול מהצלע השלישית, וכאן ⁦|AB| + |BC| = 8⁩. בדקו את הנתונים. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.",
-   "en": "Impossible: |AC| = 9 — the sum of two sides of a triangle is always greater than the third side, and |AB| + |BC| = 8. Check the givens. You can try a different order (enter the givens first), reword it, or build it in a few smaller steps."
+   "he": "הנתונים ב«⁦AC = 9⁩» סותרים זה את זה: הם קובעים ⁦|AC| = 9⁩ ו-⁦|AB| + |BC| = 8⁩, אבל לפי אי־שוויון המשולש ⁦ABC⁩ תמיד ⁦|AC| ≤ |AB| + |BC|⁩. בדקו איזה מהאורכים האלה לא נכון.",
+   "en": "The givens in «AC = 9» contradict each other: they make |AC| = 9 and |AB| + |BC| = 8, but by the triangle inequality in ABC, always |AC| ≤ |AB| + |BC|. Check which of these lengths is wrong."
   },
   {
    "source": "corpus:midpoint-membership-contradiction-refuses",

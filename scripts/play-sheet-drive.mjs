@@ -202,6 +202,8 @@ async function driveCase(browser, spec, outDir, prefix) {
         if (st.click !== undefined) {
           const btn = page.getByRole('button', { name: st.click, exact: true }).first();
           const label = page.locator('label', { hasText: st.click }).first();
+          // #2893: a control a search puts up when it ends («המשיכו לחפש») appears only then: wait for it, up to a minute
+          await btn.or(label).first().waitFor({ state: 'visible', timeout: 60000 }).catch(() => {});
           const target = (await btn.count()) ? btn : (await label.count()) ? label : null;
           if (!target) {
             steps.push({ line: `(press «${st.click}»)`, refusals: [`no control reading «${st.click}»`] });
@@ -293,6 +295,9 @@ async function driveCase(browser, spec, outDir, prefix) {
     steps.push({ line: '(driver)', refusals: [`driver error: ${e.message}`] });
   }
 
+  // #2893: a text a search puts up when it ends (a line's search runs after its own fold) appears only then: wait for it
+  if (Array.isArray(spec.expect) && spec.expect.length)
+    await page.waitForFunction((texts) => texts.every((t) => document.body.innerText.includes(t)), spec.expect, { timeout: 120000 }).catch(() => {});
   const bodyText = await page.evaluate(() => document.body.innerText).catch(() => '');
   // The givens list, row by row: the shared FactList marks each statement `data-fact-text`.
   const rowTexts = await page

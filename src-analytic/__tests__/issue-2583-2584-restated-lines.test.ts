@@ -172,6 +172,8 @@ describe('#2584 — a line stated again: one verdict in every spelling (ADR-AG-3
     const curves = derive(lines, 0).construction.objects.filter((o) => o.kind === 'curve');
     expect(curves).toHaveLength(1);
     expect(curves[0].kind === 'curve' && curves[0].label.name).toBe('l2');
+    // #2790 (ADR-AG-463 Am. 1, judged Q-2790b (a)): the renaming row is its own row, with the already-held notice
+    expect(lastVerdict(['נתון ישר y=2x+1', 'נתון ישר l2: y=2x+1']).v).toMatchObject({ kind: 'record', notice: { code: 'already-held', holder: 'l2' } });
   });
 
   it('the named-then-unnamed order stays known; a point’s second name records on it (#1595)', () => {

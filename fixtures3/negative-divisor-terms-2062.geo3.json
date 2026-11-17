@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-10T15:17:01.619Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "תיבה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "box",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "נסמן: AA' = w, AB = v, AD = u",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "A'"
+        },
+        {
+          "type": "name-vector",
+          "name": "w",
+          "from": "A",
+          "to": "A'"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "name-vector",
+          "name": "v",
+          "from": "A",
+          "to": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "D"
+        },
+        {
+          "type": "name-vector",
+          "name": "u",
+          "from": "A",
+          "to": "D"
+        }
+      ]
+    },
+    {
+      "utterance": "BN=u/2-v/2",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "B",
+          "to": "N",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0.5,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "u"
+              }
+            },
+            {
+              "coeff": {
+                "k": -0.5,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "BK=-v/2+w/4",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "B",
+          "to": "K",
+          "terms": [
+            {
+              "coeff": {
+                "k": -0.5,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            },
+            {
+              "coeff": {
+                "k": 0.25,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "w"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

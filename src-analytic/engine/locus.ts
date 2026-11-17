@@ -31,7 +31,8 @@
  * So: solve once, step along the null space of the Jacobian by a fixed arclength, re-solve, repeat —
  * outward in both directions, to the view box or to closure.
  */
-import { admissibleAt, carrierSystem, choiceSeedOf, configurationOf, drawableAt, drawnChoiceSeed, locusPartAt, seedNumber, someCrossingHasNoPoint, viewBox, type CarrierSystem, type Seed } from './evaluate';
+import { adoptAsks, admissibleAt, carrierSystem, choiceSeedOf, configurationKey, configurationOf, drawableAt, drawnChoiceSeed, locusPartAt, recordAsks, seedNumber, someCrossingHasNoPoint, viewBox, type CarrierSystem, type Seed } from './evaluate';
+import { ContentCache } from './content';
 import {
   agreeingUnion,
   conicPointsIn,
@@ -43,7 +44,7 @@ import {
   type LocusShape,
   type SymbolicCurve,
 } from './locusFit';
-import { isDirectionSymbol, isRadiusSymbol, paramRegister } from './carriers';
+import { inputsOf, isDirectionSymbol, isRadiusSymbol, paramRegister } from './carriers';
 import type { Conic } from './conic';
 import { jacobianRank, solveLM, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, withToleranceFactor } from './solve';
 import type { Env } from './expr';
@@ -517,6 +518,41 @@ export function hasLocus(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>
 }
 
 /**
+ * Is `id` stated ON a carrier that holds still over every way its part of the figure can move? (#2849, ADR-AG-472.)
+ *
+ * Operator, 2026-11-12: *"whenever a point is on a given curve, there is no point of giving it a chip. it just clutters the
+ * screen and is meaningless"*. Such a point's locus is the carrier the student already typed (the chord's ends A and B on
+ * the ellipse, «M על המעגל I», «D על האליפסה»), so the chip would only redraw it. The carriers are the incidence statements:
+ * `on-curve` (any named curve), `on-line` (a fixed line) and `on-line-2pt` (the line through two points). The carrier holds
+ * still when no point it is built from (`inputsOf`) moves along any free direction of the part (`jacobianRank`'s null
+ * basis), at the configuration shown and with the parameters fixed, as `hasLocus` measures. A point on a carrier that
+ * itself moves («P על הישר AB» while A moves) traces something else and is not this case.
+ */
+export function onFixedCarrier(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed = 0, choiceSeed?: number): boolean {
+  const c: Construction = locusPartAt(raw, seed, choiceSeed ?? choiceSeedOf(raw, seed), id);
+  const carriers: Id[][] = [];
+  for (const k of c.constraints) {
+    if (k.t === 'on-line' && k.id === id) carriers.push([]);
+    else if (k.t === 'on-curve' && k.id === id) carriers.push(inputsOf(c, k.curve).points);
+    else if (k.t === 'on-line-2pt' && k.id === id) carriers.push([k.a, k.b]);
+  }
+  if (carriers.length === 0) return false;
+  const sys = carrierSystem(c, env, { params: 'fixed' });
+  const x0 = sys.toVec(start);
+  if (x0.some((v) => !Number.isFinite(v))) return false;
+  const nullBasis = sys.ids.length === 0 || sys.residualsAt(x0).length === 0 ? [] : jacobianRank(x0, sys.residualsAt).nullBasis;
+  const ups = nullBasis.map((b) => sys.positionsAt(x0.map((v, k) => v + MOTION_STEP * b[k])));
+  const dns = nullBasis.map((b) => sys.positionsAt(x0.map((v, k) => v - MOTION_STEP * b[k])));
+  const still = (p: Id) =>
+    ups.every((up, j) => {
+      const a = up.get(p);
+      const b = dns[j].get(p);
+      return !a || !b || Math.hypot(a.x - b.x, a.y - b.y) / (2 * MOTION_STEP) <= MOVES;
+    });
+  return carriers.some((pts) => pts.every(still));
+}
+
+/**
  * THE LANE'S ONE ENTRY POINT — trace `id`'s locus and say what it is, honestly.
  *
  * Traces at TWO configurations and compares the SETS, which is ADR-AG-072 §4's determinacy gate and
@@ -644,10 +680,43 @@ export function locusOf(
   seeds: readonly [Seed, number] = [0, 1],
   bounds?: TraceOptions['bounds'],
 ): LocusResult | null {
+  let kept = locusMemo.get(c);
+  if (!kept) {
+    kept = new Map();
+    locusMemo.set(c, kept);
+  }
+  const key = JSON.stringify([id, configurationKey(seeds[0]), seeds[1], bounds ? [bounds.minX, bounds.minY, bounds.maxX, bounds.maxY] : null]);
+  let hit = kept.get(key);
+  if (!hit) {
+    const { value, askedOf } = recordAsks(() => tracedLocusOf(c, id, seeds, bounds));
+    hit = { result: value, asked: askedOf(c) };
+    if (kept.size >= LOCI_KEPT) kept.delete(kept.keys().next().value as string);
+    kept.set(key, hit);
+  }
+  // What the trace asked of the figure is asked by THIS reader too, whoever paid for the trace: a page's deferred pool
+  // has read exactly the configurations it would have read tracing it (ADR-AG-476, as `distinctConfigSeeds` does).
+  adoptAsks(c, hit.asked);
+  return hit.result;
+}
+
+/**
+ * A LOCUS IS TRACED ONCE PER FIGURE (#2890, [ADR-AG-477](../../docs/06c-decisions-analytic.md#adr-ag-477); ADR-W-210
+ * invariant 4). The ask lane answers every stored question inside the page's render, and again on every render after it
+ * (`App.tsx` `answers`): a traced locus was walked again each time a row was ticked, an undo pressed or another question
+ * asked. Measured over the saved figures: the 34 locus chips cost 3 386 703 units to answer once, and the same again per
+ * render. The trace is a pure function of the construction, the point, the two configurations and the frame, so it is
+ * kept under them, on the construction's content like every solver memo (`content.ts`), and travels with the line list
+ * in a settled result. Kept WITH what it asked of the figure, so a remembered trace leaves a reader's pool as a walked
+ * one does. Shared by every caller, so frozen.
+ */
+export const LOCI_KEPT = 64;
+const locusMemo = new ContentCache<Map<string, { result: LocusResult | null; asked: string[] }>>('locusMemo');
+
+function tracedLocusOf(c: Construction, id: Id, seeds: readonly [Seed, number], bounds: TraceOptions['bounds'] | undefined): LocusResult | null {
   const walked = walkedLocusOf(c, id, seeds, bounds);
   if (!walked) return null;
   const components = walked.components.filter((cp) => cp.trace.pieces.length > 0 && moves(cp.trace));
-  return components.length > 0 ? { components } : null;
+  return components.length > 0 ? Object.freeze({ components: Object.freeze(components) as LocusComponent[] }) : null;
 }
 
 /**

@@ -1,0 +1,203 @@
+{
+ "name": "round-2855-w1",
+ "title": "Fix round #2855, wave 1 (#2848, #2849, #2790 3-D + #2795, #2164)",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "Analytic: the tool's name for a point («P₁») can be used, so k is solved with both values",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+4y^2=4",
+    "נתונה הנקודה (k-1, k-2)",
+    "P1 על האליפסה"
+   ],
+   "asks": [
+    "k"
+   ],
+   "expect": [
+    "k = 1"
+   ],
+   "expectAbsent": [
+    "P₂"
+   ],
+   "lookFor": "One point P₁ on the ellipse, row 2 still says «הכלי קרא לנקודה P₁», and asking «k» answers «k = 1 או 13/5» (13/5 drawn as a fraction).",
+   "before": "The point was renamed P₂, P1 became a second point on the ellipse, and k was undetermined."
+  },
+  {
+   "id": "T2",
+   "title": "Analytic: «הציגו תצורה אחרת» reaches the other value of k",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+4y^2=4",
+    "נתונה הנקודה (k-1, k-2)",
+    "P1 על האליפסה"
+   ],
+   "cycles": 1,
+   "expectConfigsDiffer": true,
+   "lookFor": "Pressing «הציגו תצורה אחרת» moves P₁ to the other solution (k = 1, P₁ = (0, −1)).",
+   "before": "No second configuration: k was free."
+  },
+  {
+   "id": "T3",
+   "title": "Analytic: another letter is a new point, and P₁ keeps its name",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+4y^2=4",
+    "נתונה הנקודה (k-1, k-2)",
+    "P2 על האליפסה"
+   ],
+   "expect": [
+    "P₁",
+    "P₂"
+   ],
+   "lookFor": "P₁ = (k−1, k−2) plus a separate point P₂ on the ellipse. P₁ is not renamed.",
+   "before": "The two names were swapped: the coordinate point became P₁ and the new point P₂ only by accident."
+  },
+  {
+   "id": "T4",
+   "title": "Analytic (refusal): the tool's name used for a different point is refused",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונה הנקודה (1,2)",
+    "P1(2, 3)"
+   ],
+   "expectRefusal": "P1",
+   "lookFor": "«P1(2, 3)» is refused with the existing name-clash message; the point at (1, 2) keeps P₁.",
+   "before": "Recorded, and the earlier point was silently renamed P₂."
+  },
+  {
+   "id": "T5",
+   "title": "Analytic: the origin's name O can be used by a later line",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונה הנקודה (0,0)",
+    "משולש AOB"
+   ],
+   "lookFor": "The triangle's vertex O is the origin point itself: one O at (0, 0), no second free O.",
+   "before": "The origin was renamed P₁ and the triangle got a separate free O."
+  },
+  {
+   "id": "T6",
+   "title": "Analytic: the ends of a chord on an ellipse get no locus chip",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+2y^2=16",
+    "AB מיתר באליפסה",
+    "M אמצע AB"
+   ],
+   "expectAbsent": [
+    "הצג מקום גאומטרי"
+   ],
+   "lookFor": "No «הצג מקום גאומטרי» on any row.",
+   "before": "Chips for A and B on the chord row."
+  },
+  {
+   "id": "T7",
+   "title": "Analytic: a chord with a direction gives its midpoint a chip, and only it",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+2y^2=16",
+    "AB מיתר באליפסה",
+    "M אמצע AB",
+    "AB מקביל לישר y=x"
+   ],
+   "expect": [
+    "הצג מקום גאומטרי"
+   ],
+   "lookFor": "Exactly one chip, «הצג מקום גאומטרי», on M's row; none on the chord row (read from the shot: only the M row carries it).",
+   "before": "Chips for A, B and M."
+  },
+  {
+   "id": "T8",
+   "title": "Analytic: D on the ellipse in the focus triangle gets no chip",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "7x^2+9y^2=63",
+    "F1 מוקד ימני של האליפסה",
+    "F2 מוקד שמאלי",
+    "משולש F1F2D",
+    "D על האליפסה"
+   ],
+   "expectAbsent": [
+    "הצג מקום גאומטרי"
+   ],
+   "lookFor": "No chip on any row.",
+   "before": "A chip for D on the triangle row."
+  },
+  {
+   "id": "T9",
+   "title": "Analytic (unchanged): the perpendicular-bisector point keeps its chip",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "נקודה M",
+    "MA = MB"
+   ],
+   "expect": [
+    "הצג מקום גאומטרי"
+   ],
+   "lookFor": "M's row still has «הצג מקום גאומטרי».",
+   "before": "unchanged"
+  },
+  {
+   "id": "T10",
+   "title": "3-D: a fact the cube already holds is its own row, with the notice",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB מקביל למישור A'B'C'D'"
+   ],
+   "expect": [
+    "זה כבר קיים באיור — נוסף כנתון נפרד."
+   ],
+   "lookFor": "The last line is a second row with the notice «זה כבר קיים באיור — נוסף כנתון נפרד.»; the cube does not move.",
+   "before": "Answered «כבר קיים» and added no row (2-D, analytic and complex already did this since 12 Nov)."
+  },
+  {
+   "id": "T11",
+   "title": "3-D (refusal): a contradiction is still refused",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB ∥ AD"
+   ],
+   "expectRefusal": "הטענה לא מתקיימת בציור",
+   "lookFor": "«AB ∥ AD» is refused: «הטענה לא מתקיימת בציור — בדקו את החישוב».",
+   "before": "unchanged"
+  }
+ ]
+}

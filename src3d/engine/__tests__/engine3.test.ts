@@ -4,15 +4,19 @@
  * not move existing points).
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { applyCommand3, freeDims, unstatedPyramidReading3 } from '../apply';
-import { claimResidual3, residualHolds3, verifyClaim } from '../claims';
-import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, type QuadPreference3 } from '../evaluate';
+import { applyCommand3, coordLetterExprs3, freeDims, freeSolidRun3, renameIds3, resolveUnletteredSolid3, unstatedPyramidReading3 } from '../apply';
+import { claimResidual3, lettersAt3, residualHolds3, verifyClaim } from '../claims';
+import { admittedConfiguration3, evaluate3, firstSatisfyingSeed3, freeDofCount3, knowledgeSamples3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, statedLetterValue3, type QuadPreference3 } from '../evaluate';
 import { commandStatesCircle3, concaveSeatVertices3, quadDrawnDegenerate, statedConcyclic3 } from '../baseShapes';
 import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
 import { cross3, dist3, dot3, lerp3, norm3, ringSelfCrossing3, sub3, v3 } from '../vec3';
 import { configurationOrder3, congruentShapes3, intrinsicShape3, sameConfiguration3, type PoolConfig3 } from '../configs3';
+import { deserializeFigure3 } from '../../store/figureFile3';
+import { derive3, useGeo3 } from '../../store/store3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
 const PRISM_IDS = ['A', 'B', 'C', "A'", "B'", "C'"];
@@ -843,5 +847,168 @@ describe('#2814 — the pivot pick is over DISTINCT configurations, in an order 
     expect(congruentShapes3(rect(1), rect(-1))).toBe(true);
     const par = (dx: number) => new Map([['A', v3(0, 0, 0)], ['B', v3(5, 0, 0)], ['C', v3(5 + dx, 4, 0)], ['D', v3(dx, 4, 0)]]);
     expect(congruentShapes3(par(3), par(-3))).toBe(false);
+  });
+});
+
+describe('#2838 — an unlettered solid noun, read against the figure (ADR-3D-486)', () => {
+  const apply = (c: Construction3, k: Command3): Construction3 => {
+    const r = applyCommand3(c, k);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    return r.next;
+  };
+  const cube = (ids: string[]): SolidCommand => ({ type: 'solid', kind: 'cube', ids });
+  const DEFAULT = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
+
+  it('freeSolidRun3: the first free letters per root, primes following, a root taken in any primed form', () => {
+    const map = freeSolidRun3(DEFAULT, (id) => ['A', 'B', 'C'].includes(id));
+    expect(DEFAULT.map((id) => map.get(id))).toEqual(['D', 'E', 'F', 'G', "D'", "E'", "F'", "G'"]);
+    const primed = freeSolidRun3(DEFAULT, (id) => id === "E'");
+    expect(DEFAULT.map((id) => primed.get(id))).toEqual(['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"]);
+    const skip = freeSolidRun3(['A', 'B', 'C', 'D', 'S'], (id) => id === "B'" || id === 'A');
+    expect(['A', 'B', 'C', 'D', 'S'].map((id) => skip.get(id))).toEqual(['B', 'C', 'D', 'E', 'F']);
+  });
+
+  it('resolveUnletteredSolid3: indefinite keeps free default letters, moves off taken ones', () => {
+    expect(resolveUnletteredSolid3(emptyConstruction3(), cube(DEFAULT), 'indefinite')).toEqual({ ok: true, map: null });
+    const tri = apply(emptyConstruction3(), { type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] });
+    const r = resolveUnletteredSolid3(tri, cube(DEFAULT), 'indefinite');
+    expect(r.ok && r.map && r.map.get("A'")).toBe("D'");
+  });
+
+  it('resolveUnletteredSolid3: definite is the one drawn solid, ambiguous with two, a new one with none', () => {
+    const one = apply(emptyConstruction3(), cube(['E', 'F', 'G', 'H', "E'", "F'", "G'", "H'"]));
+    const r = resolveUnletteredSolid3(one, { type: 'solid', kind: 'box', ids: DEFAULT }, 'definite');
+    expect(r.ok && r.kind).toBe('cube');
+    expect(r.ok && r.map && renameIds3([{ type: 'solid', kind: 'box', ids: DEFAULT }], r.map)).toEqual([{ type: 'solid', kind: 'box', ids: ['E', 'F', 'G', 'H', "E'", "F'", "G'", "H'"] }]);
+    const two = apply(one, cube(DEFAULT));
+    expect(resolveUnletteredSolid3(two, cube(DEFAULT), 'definite')).toMatchObject({ ok: false, error: { code: 'ambiguous-definite-shape', solid: 'cube' } });
+    expect(resolveUnletteredSolid3(emptyConstruction3(), cube(DEFAULT), 'definite')).toEqual({ ok: true, map: null });
+  });
+});
+
+describe('#2785 (ADR-3D-488) — a coordinate letter written twice is one pin symbol; the claim judges it', () => {
+  it('coordLetterExprs3 lowers a bare letter to 1·k only where it is shared', () => {
+    const cmd = { x: null, y: 1, z: null, syms: ['k', null, 'p'] as [string | null, string | null, string | null] };
+    expect(coordLetterExprs3(cmd, (s) => s === 'k')).toEqual([{ terms: [{ sym: 'k', k: 1 }], c: 0 }, null, null]);
+  });
+
+  it('the second use promotes the first statement’s named component, and the coords-eq claim carries the letter', () => {
+    const c = build(
+      { type: 'point3', id: 'B', x: 2, y: 1, z: -8 },
+      { type: 'point3', id: 'C', x: 4, y: 5, z: 6 },
+      { type: 'point3', id: 'B', x: null, y: 1, z: -8, syms: ['k', null, null] },
+    );
+    expect(c.partialNames.map((b) => b.sym)).toEqual(['k']); // first use: a named free component (ADR-3D-175)
+    const r = applyCommand3(c, { type: 'point3', id: 'C', x: null, y: 5, z: 6, syms: ['k', null, null] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.next.partialNames).toEqual([]);
+    expect(r.next.pins.map((p) => p.x)).toEqual([{ terms: [{ sym: 'k', k: 1 }], c: 0 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }]);
+    const claims = r.next.claims.filter((cl) => cl.type === 'coords-eq');
+    expect(claims.every((cl) => cl.type === 'coords-eq' && cl.sym?.[0]?.terms[0].sym === 'k')).toBe(true);
+    // k = 2 (off B) and k = 4 (off C) cannot both hold: the least-squares k fails both claims
+    const res = resolve3(r.next, 0);
+    expect(lettersAt3(r.next, res).k).toBeCloseTo(3, 9);
+    expect(verifyClaim(claims[claims.length - 1], r.next, 0)).toBe(false);
+  });
+
+  it('a letter that agrees everywhere holds: «B(2,1,-8)» then «B(2t,t,k)» reads t = 1, k = −8', () => {
+    const c = build(
+      { type: 'point3', id: 'B', x: 2, y: 1, z: -8 },
+      { type: 'point3', id: 'B', x: null, y: null, z: null, syms: ['t', 't', 'k'], symExprs: [{ terms: [{ sym: 't', k: 2 }], c: 0 }, { terms: [{ sym: 't', k: 1 }], c: 0 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }] },
+    );
+    const res = resolve3(c, 0);
+    expect(lettersAt3(c, res).t).toBeCloseTo(1, 9);
+    expect(lettersAt3(c, res).k).toBeCloseTo(-8, 9);
+    expect(c.claims.filter((cl) => cl.type === 'coords-eq').every((cl) => verifyClaim(cl, c, 0))).toBe(true);
+  });
+});
+
+/**
+ * #2831 — «הציגו תצורה אחרת» shows every NEW solution before another placement of one already shown. Operator ruling
+ * 2026-11-12 "2831 - A": a mirror image (another placement of the drawing) is the SAME solution; new solutions first
+ * (ADR-W-206). 3-D needed no code change: measured at c82d767c, every fixture whose pool has more than one
+ * `configurationOrder3` group (or whose parameter has more than one branch) already reaches every group within G−1
+ * presses of the real `resample`, from its saved seed and from seed 0. This block locks that walk.
+ */
+describe('#2831 — new solutions first: a press reaches every configurationOrder3 group within G−1 presses', () => {
+  const FIXTURES = join(__dirname, '..', '..', '..', 'fixtures3');
+  const sameKey = (a: number[], b: number[]): boolean =>
+    a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 1e-3 * Math.max(1, Math.abs(v), Math.abs(b[i])));
+  /** The drawn configuration's group, by `configurationOrder3`'s own key: the intrinsic shape plus the letters' values. */
+  const drawnKey = (): number[] => {
+    const { facts, seed } = useGeo3.getState();
+    const d = derive3(facts, seed);
+    const symbols: Record<string, number> = { ...(d.resolved.pivot?.pinSymbols ?? {}), ...d.resolved.ratioSymbols };
+    if (d.resolved.param) symbols[`param:${d.resolved.param.name}`] = d.resolved.param.value;
+    return intrinsicShape3({ pos: d.positions, pinSymbols: symbols });
+  };
+  /** Load the fixture through the real path, press `resample` `presses` times; the group index of each drawing, by first appearance. */
+  const groupWalk = (file: string, presses: number): number[] => {
+    const r = deserializeFigure3(readFileSync(join(FIXTURES, file), 'utf8'));
+    if (!r.ok) throw new Error(`${file} did not load`);
+    useGeo3.getState().loadFigure(r.facts, r.seed);
+    const keys: number[][] = [];
+    const groupOf = (): number => {
+      const k = drawnKey();
+      const i = keys.findIndex((x) => sameKey(x, k));
+      if (i >= 0) return i;
+      keys.push(k);
+      return keys.length - 1;
+    };
+    const out = [groupOf()];
+    for (let p = 0; p < presses; p++) {
+      useGeo3.getState().resample();
+      out.push(groupOf());
+    }
+    return out;
+  };
+
+  it('SSA\'s two triangles (G = 2, each in two mirror placements): the presses alternate the two triangles', () => {
+    expect(groupWalk('ssa-two-triangles-2714.geo3.json', 4)).toEqual([0, 1, 0, 1, 0]);
+  });
+
+  it('a parameter with three branches (G = 3, outside the pivot pool): presses 0–2 are three solutions, press 3 returns to the first', () => {
+    expect(groupWalk('param-three-branches-1474.geo3.json', 3)).toEqual([0, 1, 2, 0]);
+  });
+});
+
+/**
+ * #2916 (ADR-3D-533) — ONLY ADMITTED CONFIGURATIONS ARE KNOWLEDGE. The ADR-3D-032 exam box states «A.y < 0»; on `main` the
+ * read-back sample at seed + 3041 put A at y > 0, and the ask lane's plane row lost its A′ anchor. The commands are the
+ * fixture's own (`fixtures3/exam-box-sign-2916.geo3.json`), applied by the reducer.
+ */
+describe('#2916 — the knowledge samples admit only configurations that keep every stated given', () => {
+  const file = JSON.parse(readFileSync(join(__dirname, '..', '..', '..', 'fixtures3', 'exam-box-sign-2916.geo3.json'), 'utf8')) as { facts: { cmds: Command3[] }[] };
+  const c = build(...file.facts.flatMap((f) => f.cmds));
+  const RB = { readback: true } as const;
+  const seedsOf = (s: number) => [s, s + 1013, s + 2027, s + 3041]; // the ask lane's
+
+  it('the predicate refuses a configuration whose stated sign is broken, and admits the one that keeps it', () => {
+    const r = resolve3(c, 0, { solvedFrame: true });
+    expect(r.positions.get('A')!.y).toBeLessThan(0);
+    expect(admittedConfiguration3(c, r)).toBe(true);
+    const flipped = new Map(r.positions);
+    const a = r.positions.get('A')!;
+    flipped.set('A', v3(a.x, -a.y, a.z));
+    expect(admittedConfiguration3(c, { ...r, positions: flipped })).toBe(false);
+    // ...and the letter sign «k חיובי» is read by the verifier's own reader
+    expect(statedLetterValue3(c, r, 'k')).toBeGreaterThan(0);
+  });
+
+  it('every read-back sample keeps «A.y < 0» and «k > 0», and the gauge keeps its witnesses (seeds 0 and 23: where main broke)', () => {
+    for (const s of [0, 23]) {
+      const samples = knowledgeSamples3(c, seedsOf(s), RB);
+      expect(samples.length, `seed ${s}`).toBeGreaterThanOrEqual(4);
+      for (const r of samples) {
+        expect(r.positions.get('A')!.y, `seed ${s}`).toBeLessThan(0);
+        expect(admittedConfiguration3(c, r), `seed ${s}`).toBe(true);
+      }
+    }
+  }, 120_000);
+
+  it('a figure that states no selector is sampled exactly as before (no admission, no reserve seed)', () => {
+    const cube = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
+    expect(knowledgeSamples3(cube, [0, 1013])).toHaveLength(2);
   });
 });

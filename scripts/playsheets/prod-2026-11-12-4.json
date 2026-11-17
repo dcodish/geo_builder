@@ -1,0 +1,109 @@
+{
+ "name": "prod-2026-11-12-4",
+ "title": "Prod smoke — deploy prod/2026-11-12-4 (round #2855 wave 4)",
+ "cases": [
+  {
+   "id": "P1",
+   "title": "3-D: «N(k,p,3)» on a blank page",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "N(k,p,3)"
+   ],
+   "lookFor": "N is drawn at height 3; the freedom count shows 2.",
+   "before": "Not understood.",
+   "expectAbsent": [
+    "לא הבנתי",
+    "שגיאה"
+   ]
+  },
+  {
+   "id": "P2",
+   "title": "«V קודקוד הפרבולה» names the vertex",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=8x",
+    "V קודקוד הפרבולה"
+   ],
+   "lookFor": "V is drawn at the origin, the parabola's vertex.",
+   "before": "Not understood.",
+   "expectAbsent": [
+    "לא הבנתי",
+    "שגיאה"
+   ]
+  },
+  {
+   "id": "P3",
+   "title": "the vertex of a moved parabola, and asking for it",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "(y-3)^2=8(x-2)",
+    "V קודקוד הפרבולה"
+   ],
+   "asks": [
+    "שיעורי קודקוד הפרבולה"
+   ],
+   "lookFor": "V at (2, 3), and the question answers (2, 3).",
+   "before": "Not understood; the question was unreadable.",
+   "expectAbsent": [
+    "לא הבנתי",
+    "שגיאה"
+   ]
+  },
+  {
+   "id": "P4",
+   "title": "PR #2864 (refusal) · a parabola has no centre — the refusal teaches the vertex",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "y^2=8x",
+    "O מרכז הפרבולה"
+   ],
+   "lookFor": "Refused: «לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, כתבו «O קודקוד הפרבולה».»",
+   "before": "Refused without pointing to the vertex.",
+   "expectRefusal": "לפרבולה אין מרכז"
+  },
+  {
+   "id": "P5",
+   "title": "2-D loads and builds",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "משולש ABC"
+   ],
+   "expectRows": [
+    "משולש ABC"
+   ],
+   "lookFor": "A triangle.",
+   "before": "unchanged"
+  },
+  {
+   "id": "P6",
+   "title": "Complex loads and builds",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z1 = 3+4i"
+   ],
+   "expect": [
+    "3+4i"
+   ],
+   "lookFor": "z₁.",
+   "before": "unchanged"
+  }
+ ]
+}

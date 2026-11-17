@@ -14,6 +14,7 @@ import type { InputError } from '../store/useAnalyticStore';
 import type { HostRef } from '../engine/apply';
 import { hostKey, rangeText } from './hostKey';
 import { EN_SHAPE } from '../engine/shapes';
+import { fmtAnalytic } from '../format';
 
 /** The slice of i18next's `t` this needs — a key and its interpolation values, back a string. */
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -187,6 +188,14 @@ export function errorText(error: InputError, t: Translate): string {
   // #1618 / #1666: a claim to prove is named and left out. #2492 (ADR-W-194): the suite's sentence, then where the claim
   // can be checked: this panel's ask box, named by the labels the panel and its button carry (`dataTitle`, `askAdd`).
   if (error.key === 'proof-target') return proofTargetPanelText(t, error.detail, { panel: t('dataTitle'), ask: t('askAdd') });
+  // #2894 (ADR-AG-483) — 3-D's sentence (ADR-3D-495), word for word: which lengths, and why; the numbers in this tool's form.
+  if (error.key === 'lengths-impossible' && error.why) {
+    const why = error.why;
+    const others = (error.others ?? []).map((s) => `«${s}»`).join(', ');
+    const alone = others === '' ? 'Alone' : '';
+    if (why.kind === 'value') return t(`errLengthsImpossibleValue${alone}`, { detail: error.detail, others, seg: why.seg, lenA: fmtAnalytic(why.a), lenB: fmtAnalytic(why.b) });
+    return t(`errLengthsImpossibleTriangle${alone}`, { detail: error.detail, others, tri: why.tri, long: why.long, longLen: fmtAnalytic(why.longLen), sideA: why.a, sideB: why.b, lenSum: fmtAnalytic(why.sum) });
+  }
   const kind: RefKind | undefined = 'expected' in error ? error.expected : undefined;
   const host = error.key === 'ambiguous-shape' ? error.host : undefined;
   // #1775 (ADR-AG-423): a perpendicular's candidate is its description, `from:onto`, worded here. The engine holds no locale.
@@ -212,8 +221,9 @@ export function errorText(error: InputError, t: Translate): string {
     'arc-length-unread': 'errArcLengthUnread',
     // #2625 (ADR-AG-454) — a parabola has no centre, so no diameter: its own reason, not the generic refusal
     'parabola-no-diameter': 'errParabolaNoDiameter',
-    // #2625 (ADR-AG-454 Am. 1) — the same reason for its centre; the vertex the student may mean is not read yet, said so
-    'parabola-no-centre': 'errParabolaNoCentre',
+    // #2625 (ADR-AG-454 Am. 1) — the same reason for its centre; #2835 (ADR-AG-470): the vertex it may mean is read, so
+    // the sentence names it as the next step, in the student's own letter
+    'parabola-no-centre': error.key === 'parabola-no-centre' && error.name ? 'errParabolaNoCentre' : 'errParabolaNoCentreNoName',
     // #1919 — the operator chose THIS sentence for a name the tool cannot read, in every builder.
     'unread-name': 'errRenameBadName',
     'unread-word': 'errUnreadWord',
@@ -266,6 +276,8 @@ export function errorText(error: InputError, t: Translate): string {
     'not-canonical': 'errNotCanonical',
     'does-not-exist': 'errDoesNotExist',
     'ring-contradicts-noun': 'errRingContradictsNoun',
+    // #2813 (ADR-AG-471) — 2-D's input.ringContradictsAngles, verbatim
+    'ring-contradicts-angles': 'errRingContradictsAngles',
     // #1849 (ADR-AG-247) — the givens flatten a declared polygon: the polygon and both statements named
     'polygon-collapsed': 'errPolygonCollapsed',
     'inscribed-contradicts-noun': 'errInscribedContradictsNoun',
@@ -300,6 +312,8 @@ export function errorText(error: InputError, t: Translate): string {
       ? (error.declared ? 'errLengthNameTaken_vs' : 'errLengthNameTaken')
       : error.key === 'name-taken' && error.declared ? 'errAngleNameTaken_vs' : 'errAngleNameTaken',
     'measure-contradicts': error.key === 'measure-contradicts' && error.declared ? 'errMeasureContradicts' : 'errMeasureContradictsAlone',
+    // #2894 (ADR-AG-483): worded above; without its reason (never raised so) it is the search’s sentence
+    'lengths-impossible': 'errUnsatisfiable',
     // #2119 (ADR-684) — 2-D's errors.restatedSize, verbatim; with no line to name, the old conflict sentence
     'radius-contradicts': error.key === 'radius-contradicts' && error.declared ? 'errRadiusContradicts' : 'errConflict',
     // #2388 (ADR-AG-307) — one name, one thing: the reading the figure held first, and the line that gave it
@@ -406,6 +420,8 @@ export function errorText(error: InputError, t: Translate): string {
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
     vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',
     polygonNoun: error.key === 'bisector-is-side' ? t(polygonNounKey(error.polygonKind)) : '',
+    // #2835 (ADR-AG-470): the letter the student gave the point (none given: `errParabolaNoCentreNoName`'s own «V»)
+    name: error.key === 'parabola-no-centre' ? (error.name ?? '') : '',
     // #2386: the position word the student used, in the locale's spelling
     word: (error.key === 'side-of-vertical' || error.key === 'side-of-horizontal') && error.side ? t(SIDE_WORD_KEY[error.side]) : '',
   }) + near;

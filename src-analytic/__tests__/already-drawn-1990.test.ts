@@ -84,7 +84,7 @@ describe('#2790 — the App words a held row with the suite key, through the rec
   it('no no-row branch is left, and the retired note is not read', () => {
     expect(app).not.toContain("case 'already-known':");
     expect(app).not.toContain("'suite.notice.alreadyDrawn'");
-    expect(app).toContain('commitRecord(verdict, recordLine, t)');
+    expect(app).toContain('commitRecord(verdict, jobStoreAn().recordLine, t)'); // #2874: the commit runs inside the submit's job
   });
   it('the key reads the ruled sentence in both languages', () => {
     for (const lng of ['he', 'en'] as const) expect(plain(analyticI18n.getFixedT(lng)(HELD_NOTICE.key) as string)).toBe(HELD_NOTICE[lng]);

@@ -16,13 +16,17 @@
  * (`שיעור ה-z של C' חיובי`) select among the surviving solutions, else the seed.
  */
 
+import { boundHolds3, boundReflect3, signBound3, type Bound3 } from './bound3';
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
-import { carrierParams3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
+import { carrierParams3, detachedPinLetters3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { congruentShapes3 } from './configs3';
-import { evalAffine, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
+import { lengthsImpossible3 } from './metricBounds3';
+import { evalAffine, openPinSymsOf, pinSymAnchor3, pinSymsOf, scalarPinOrigin3, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
+import { hasLetters3, vecEqLetters3 } from './vecExpr';
 import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
+import { meterWork } from '../../shell/workMeter';
 import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
@@ -71,6 +75,28 @@ export function relDiff3(p: number, q: number): number {
   return (p - q) / Math.max(p + q, REL_DIFF_FLOOR);
 }
 
+/** #2894 part 2 A (ADR-3D-499): a cold sweep's solve whose full error fell by less than this factor's complement over 8
+ *  accepted steps, its givens' rows exact, has only the anchors' creep left (see `creepStop` in `solvePivot`). */
+export const CREEP_GAIN = 0.9;
+/** #2894 part 2 A (ADR-3D-499): the settle's rounds, the givens' rows' weight in its tangent step, and its ridge. */
+const SETTLE_ROUNDS = 12;
+const SETTLE_HOLD = 1e8;
+const SETTLE_RIDGE = 1e-14;
+/** #2894 A2: the settle stops once its tangent step's predicted gain (the Gauss–Newton model's g·d) is below this share of
+ *  the error: the anchored point is reached to what the knowledge samples can tell apart, and a further round only pays a
+ *  Jacobian and up to six projection solves to find no improving step. */
+const SETTLE_STALL = 1e-3;
+/** #2894 A: a Gauss–Newton step of the givens' rows cuts their error at least this much at a regular point of their
+ *  solution set (quadratic convergence); at a tangential (double-root) point it cuts it by 16 only. */
+const SETTLE_REGULAR = 1e-4;
+/** #2894 A: the certification's ridge, relative to the givens' rows' largest normal entry. */
+const SETTLE_ROW_RIDGE = 1e-12;
+/** #2894 A: an unknown whose Jacobian column is below this share of the largest takes no part in the settle's tangent step. */
+const SETTLE_LIVE = 1e-8;
+/** #2894 A: a result whose givens' error is under this is already on their set to 1e-10 in position, far inside the
+ *  knowledge samples' comparison; it is not projected (the projection's Jacobian is the cost). */
+const ON_SET_FLOOR = 1e-20;
+
 export function leastSquares(
   residuals0: (x: number[]) => number[],
   x0: number[],
@@ -81,11 +107,12 @@ export function leastSquares(
    * and exact" — an attractor LM only approaches geometrically (the scale halves, the error never reaches 1e-24), so
    * the full iteration budget was spent on a candidate the acceptance sites then reject.
    */
-  stop?: (x: number[]) => boolean,
+  stop?: (x: number[], err: number) => boolean,
 ): { x: number[]; err: number } {
   leastSquaresStats.solves++;
   const residuals = (y: number[]): number[] => {
     leastSquaresStats.evals++;
+    meterWork(); // #2873 (ADR-W-210): one residual evaluation is 3-D's unit of work
     return residuals0(y);
   };
   let x = [...x0];
@@ -100,7 +127,7 @@ export function leastSquares(
   // failure, and paid a full central-difference Jacobian for each rung. Cached here and invalidated only
   // where x actually moves, so the trajectory is identical and the tail costs one residual call a rung.
   let jac: { J: number[][]; JtJ: number[][]; Jtr: number[] } | null = null;
-  if (stop && stop(x)) return { x, err };
+  if (stop && stop(x, err)) return { x, err };
   let accepted = 0;
 
   for (let iter = 0; iter < iterations; iter++) {
@@ -157,7 +184,7 @@ export function leastSquares(
       jac = null; // x moved — the Jacobian must be recomputed there
       lambda = Math.max(lambda / 3, 1e-12);
       if (err < 1e-24) break;
-      if (stop && ++accepted % 8 === 0 && stop(x)) break;
+      if (stop && ++accepted % 8 === 0 && stop(x, err)) break;
     } else {
       lambda *= 10;
       if (lambda > 1e12) break;
@@ -243,10 +270,18 @@ export interface PivotResult {
    *  rank of the scalar residuals' response to a perturbation of each dim. Lazy and memoised — the cue is
    *  the only reader, so the residual evaluations happen on the display path, never on a submit. */
   scalarConsumed?: () => { dims: number; block: number };
+  /** #2795 (ADR-3D-483) — lazy: the scalar pins this solution holds without driving them (see `heldPinsAt`). */
+  heldPins?: () => ScalarPin[];
   /** #2368 (ADR-3D-375) — lazy: the placement's LEFTOVER rigid freedom at this solution (set by the
    *  measuring / walking probes only — see {@link PlacementFreedom3}). */
   placementFreedom?: () => PlacementFreedom3;
   err: number;
+  /**
+   * #2907 (ADR-3D-498) — a configuration only the BRANCH FAN reached (see `freeLaneFan`). It is admissible and joins
+   * every record of the admissible set (`pointRoots`, `symRoots`, the knowledge samples), but the drawing's pick keeps
+   * to the configurations the cold starts and walks found, so no figure is redrawn by it.
+   */
+  reach?: Id;
   /** The solved parameter vector [t, w, logScale, dims…] — the warm-start vehicle: a
    *  later DRIVE (ADR-3D-033) perturbs the pinned figure from here, so it lands in the
    *  same basin (branch choices preserved) instead of gambling on the rotation starts. */
@@ -733,6 +768,8 @@ export function scalarPinRows3(
     /** #2806: the dims-only `invariantOnly` solve, gauge frozen at identity — no scale unknown to shrink, so the
      *  ratio rows keep their raw form there and every figure without a pin solves bit-identically to before. */
     gaugeFrozen?: boolean;
+    /** #2795 (ADR-3D-483): when given, receives the first row of each pin (in `c.scalarPins` order). */
+    starts?: number[];
   },
 ): void {
   // #2806 (ADR-3D-462): a magnitude ratio, degree 0 in the gauge scale wherever the scale is an unknown
@@ -762,6 +799,7 @@ export function scalarPinRows3(
     return acc;
   };
   for (const pin of c.scalarPins) {
+    env.starts?.push(out.length);
     if (pin.kind === 'free-joint') {
       // #2684 (ADR-3D-421): the enrolled unknowns ride the rider lane; one that no residual reads keeps its sample
       const u0 = new Map(pin.unknowns.map((u) => [u.key, u.t0]));
@@ -840,6 +878,21 @@ export function scalarPinRows3(
       // #1183: a VECTOR equation drives — three SIGNED component residuals, so the descent crosses
       // zero instead of touching it (the ADR-3D-006 lesson `concyclic` records below). `exprAt`
       // already evaluates a `VecExpr`, so a named vector and a point pair reach this by one path.
+      // #1551 (ADR-3D-472): a LETTER in a coefficient is solved at this drawing by least squares, so the residual is
+      // the part no letter can absorb — the shape moves until the relation can hold, and no new pivot unknown exists.
+      // Over the atoms' size like the numeric row (#2806): scale-free, so a shrinking figure cannot zero it.
+      if (hasLetters3(pin.lhs) || hasLetters3(pin.rhs)) {
+        // #1551 + #2785 (ADR-3D-472 Am. 1): a letter a coordinate also carries is the pivot's own unknown (`symAt`), so
+        // the relation and the coordinate read one value; a letter only coefficients carry is solved here
+        const sol = vecEqLetters3(pin.lhs, pin.rhs, dirOf, (sym) => env.symAt(sym) ?? symbolValueOf(c, sym));
+        if (!sol) {
+          out.push(10, 10, 10);
+          continue;
+        }
+        const den = env.gaugeFrozen ? 1 : Math.max(sol.scale, REL_DIFF_FLOOR);
+        out.push(sol.residual.x / den, sol.residual.y / den, sol.residual.z / den);
+        continue;
+      }
       const l = exprAt(pin.lhs);
       const r = exprAt(pin.rhs);
       if (!l || !r) {
@@ -1151,6 +1204,8 @@ export function solvePivot(
     figPlanePerps.length === 0 && gaugeLineRels.length === 0
   )
     return [];
+  // #2894 part 2 C (ADR-3D-495): stated lengths the metric forbids — no start can meet them, so none is paid
+  if (!probe && lengthsImpossible3(c)) return [];
 
   // V8-c: a symbol coupled to a solid dim (`DF = t·… ⟂ plane` where the plane's height
   // is a free dim) becomes an EXTRA pivot unknown, appended after the dims; its ⟂/∥
@@ -1175,18 +1230,37 @@ export function solvePivot(
     const v = symbolValueOf(c, sym);
     if (v !== undefined) pinnedSyms.set(sym, v);
   }
-  const pinSyms: string[] = openPinSymsOf(c);
+  // #2563 (ADR-3D-489): a pool letter no driver reads stands at its seed anchor and holds no slot (#820's rider rule)
+  const detached = detachedPinLetters3(c);
+  const pinSyms: string[] = openPinSymsOf(c).filter((s) => !detached.has(s));
   const nPinSym = pinSyms.length;
   /** A pin symbol's value at the trial unknowns: its stated value, or its slot; null for a stranger. */
   const symAt = (x: number[], sym: string): number | null => {
     const pinned = pinnedSyms.get(sym);
     if (pinned !== undefined) return pinned;
     const i = pinSyms.indexOf(sym);
-    return i < 0 ? null : x[7 + nDims + nSym + i];
+    if (i < 0) return detached.has(sym) ? pinSymAnchor3(c, seed, sym) : null;
+    return x[7 + nDims + nSym + i];
   };
   /** The solved symbol record: every pin symbol, the open ones at their slot, the pinned at their value. */
   const pinSymbolsAt = (x: number[]): Record<string, number> | undefined =>
     pinSymsAll.length > 0 ? Object.fromEntries(pinSymsAll.map((sym) => [sym, symAt(x, sym) ?? NaN])) : undefined;
+  /**
+   * #2563 (ADR-3D-489): the symbol values the canonical evaluation places by. A `sym-coord` point («N(k,p,3)») stands
+   * where its pool letters put it, so with one in the figure every pin symbol rides the override beside the coupled
+   * symbols; without one the map is exactly the coupled symbols', as before.
+   */
+  const hasSymCoord = [...c.points.values()].some((d) => d.kind === 'sym-coord');
+  const overrideAt = (x: number[]): Map<string, number> | undefined => {
+    const m = coupled ? new Map(coupled.syms.map((s, i): [string, number] => [s, x[7 + nDims + i]])) : undefined;
+    if (!hasSymCoord) return m;
+    const out = m ?? new Map<string, number>();
+    for (const s of pinSymsAll) {
+      const v = symAt(x, s);
+      if (v !== null) out.set(s, v);
+    }
+    return out;
+  };
   /**
    * #820 (ADR-3D-204) — A FREE RIDER'S PARAMETER IS A PIVOT UNKNOWN, NOT A SAMPLE.
    *
@@ -1224,7 +1298,7 @@ export function solvePivot(
   // lane (the drift that left «נקודה E במישור ABC»'s two in-plane parameters unknowable). A `zero`-
   // anchored parameter is an OFFSET from the sampled seat (placement adds it there), so an undriven
   // figure stays byte-identical; `bis-dist` is the rider's sampled distance from its ray's apex.
-  let riders: { id: string; t0: number; lo: number; hi: number; spread: boolean }[] = [];
+  let riders: { id: string; t0: number; lo: number; hi: number; spread: boolean; point?: Id }[] = [];
   /** #1415 — the rider indices that belong to a BLOCK-ENROLLED point (`free3`/`partial`): their
    *  coordinates are counted as free by the cue whether or not a residual drove them, so the
    *  scalar-consumption rank probe must measure over them too (the refinement ADR-3D-204's note
@@ -1251,7 +1325,7 @@ export function solvePivot(
           t0 = p ? p[cp.t0.slice(-1) as 'x' | 'y' | 'z'] : null;
         }
         if (t0 !== null) {
-          riders.push({ id: cp.key, t0, lo: cp.lo, hi: cp.hi, spread: cp.spread });
+          riders.push({ id: cp.key, t0, lo: cp.lo, hi: cp.hi, spread: cp.spread, point: id });
           if (blockEnrolled) blockRiderIdx.add(riders.length - 1); // #1415
         }
       }
@@ -1277,13 +1351,7 @@ export function solvePivot(
   // panel would print an invented `t = 6/5`). Each open symbol gets a SEED-DEPENDENT soft
   // anchor (the dims0 mechanism), sign-aware so a stated «t חיובי» parks on the stated side;
   // a genuinely determining given overrides the 1e-4 pull exactly like it overrides dims0.
-  const symAnchorTargets = pinSyms.map((sym, i) => {
-    const frac = (Math.abs(Math.sin((seed + 1) * 12.9898 + (i + 1) * 78.233)) * 43758.5453) % 1;
-    const raw = -1.6 + 3.2 * frac;
-    const sgn = c.paramSigns.find((ps) => ps.sym === sym);
-    if (!sgn) return raw;
-    return sgn.positive ? 0.4 + Math.abs(raw) : -(0.4 + Math.abs(raw));
-  });
+  const symAnchorTargets = pinSyms.map((sym) => pinSymAnchor3(c, seed, sym)); // #2563: the one sampler, shared (#1524: range-aware)
 
   // When EVERY pin is similarity-INVARIANT (angles, ⟂/∥-to-plane — no coordinate,
   // length or dot given anywhere), the gauge is pure null-space: solving it invites
@@ -1312,6 +1380,8 @@ export function solvePivot(
   /** #990: the index range the scalar pins' rows occupy in the residual vector — recorded by every
    *  evaluation, so the rank probe below reads exactly the rows those pins wrote. */
   let scalarRows: [number, number] = [0, 0];
+  /** #2795 (ADR-3D-483): the first row of each scalar pin (in `c.scalarPins` order), recorded with {@link scalarRows}. */
+  let scalarPinStarts: number[] = [];
   /**
    * #990 ([ADR-3D-248](../../docs/06b-decisions-3d.md#adr-3d-247)) — MEASURE what the scalar pins consume.
    * `− scalarPins.length` subtracted one shape dim per pin unconditionally — a count that infers what the
@@ -1356,6 +1426,66 @@ export function solvePivot(
       const allCols = [...dimCols, ...blockIdx.map(colAt)];
       const rankAll = blockIdx.length ? numericRank(allCols) : rankDims;
       return (memo = { dims: rankDims, block: Math.max(0, rankAll - rankDims) });
+    };
+  };
+  /**
+   * #2795 ([ADR-3D-483](../../docs/06b-decisions-3d.md#adr-3d-483)) — THE PINS THIS SOLUTION HOLDS WITHOUT DRIVING THEM.
+   * A restatement («AB = AC» · «זווית ABC = זווית ACB») adds a pin whose rows lie in the span of the others': it removes
+   * no freedom, yet joins the Levenberg–Marquardt residual set, changes its path, and the solve stops at another point of
+   * the same solution set (≈1e-3 on a free triangle) — the drawing moves. Measured here, at this solution: the response of
+   * each pin's rows to every unknown (central differences, the #990 probe), and, newest stating fact first, a fact's pins
+   * are DEPENDENT when leaving their rows out keeps the rank. Only pins whose origin is known (`scalarPinOrigin3`: a fact
+   * and the claim they drive) are candidates, all of one fact together; a fact's own pins never release each other.
+   * Lazy + memoised: the caller (`resolveHeld3`) asks only when some pin is a candidate.
+   */
+  const heldPinsAt = (x: number[], mirror: boolean): (() => ScalarPin[]) => {
+    let memo: ScalarPin[] | null = null;
+    return () => {
+      if (memo !== null) return memo;
+      const byFact = new Map<number, number[]>();
+      c.scalarPins.forEach((pin, i) => {
+        const o = scalarPinOrigin3.get(pin);
+        const k = o?.fact ?? -1;
+        byFact.set(k, [...(byFact.get(k) ?? []), i]);
+      });
+      const facts = [...byFact.keys()]
+        .filter((k) => k >= 0 && byFact.get(k)!.every((i) => scalarPinOrigin3.get(c.scalarPins[i])?.claim !== undefined))
+        .sort((a, b) => b - a);
+      if (facts.length === 0) return (memo = []);
+      const f = residualsFor(mirror);
+      f(x);
+      const [s, e] = scalarRows;
+      const starts = scalarPinStarts;
+      if (starts.length !== c.scalarPins.length) return (memo = []);
+      const rowsOf = (i: number): number[] => {
+        const end = i + 1 < starts.length ? starts[i + 1] : e;
+        return Array.from({ length: end - starts[i] }, (_, k) => starts[i] + k - s);
+      };
+      const cols = x.map((_, at) => {
+        const h = 1e-4 * Math.max(1, Math.abs(x[at]));
+        const xp = [...x];
+        xp[at] += h;
+        const xm = [...x];
+        xm[at] -= h;
+        const rp = f(xp).slice(s, e);
+        const rm = f(xm).slice(s, e);
+        return rp.map((v, r) => (v - rm[r]) / (2 * h));
+      });
+      const rankOf = (rows: number[]): number => (rows.length === 0 ? 0 : numericRank(cols.map((col) => rows.map((r) => col[r]))));
+      let kept = c.scalarPins.flatMap((_, i) => rowsOf(i));
+      let rank = rankOf(kept);
+      const out: ScalarPin[] = [];
+      for (const k of facts) {
+        const group = byFact.get(k)!;
+        const drop = new Set(group.flatMap(rowsOf));
+        const without = kept.filter((r) => !drop.has(r));
+        const r2 = rankOf(without);
+        if (r2 !== rank) continue;
+        out.push(...group.map((i) => c.scalarPins[i]));
+        kept = without;
+        rank = r2;
+      }
+      return (memo = out);
     };
   };
   /** #2368 (ADR-3D-375): the rank probe over the six rigid gauge unknowns — see {@link PlacementFreedom3}. */
@@ -1422,7 +1552,7 @@ export function solvePivot(
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
     const g = { ...unpack(x), mirror };
     const dims = x.slice(7, 7 + nDims);
-    const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
+    const override = overrideAt(x);
     const riderTs = riderMap(x);
     const pos = evalCanonical(dims, override, riderTs);
     /**
@@ -1589,9 +1719,11 @@ export function solvePivot(
     }
 
     const scalarStart = out.length; // #990: the scalar pins' rows begin here
+    const pinStarts: number[] = []; // #2795 (ADR-3D-483): where each pin's own rows begin
     scalarPinRows3(c, at, out, {
       lines,
       gaugeFrozen: invariantOnly,
+      starts: pinStarts,
       symAt: (sym) => symAt(x, sym),
       riderAt: (key) => {
         const i = riders.findIndex((r) => r.id === key);
@@ -1599,6 +1731,7 @@ export function solvePivot(
       },
     });
     scalarRows = [scalarStart, out.length]; // #990: …and end here
+    scalarPinStarts = pinStarts;
     // V8-c coupled symbol conditions: the vec-defined endpoint is baked into `pos` at the
     // trial symbol value (via `override`), so its ⟂/∥-to-plane residual drives the symbol
     // AND the free dim jointly (a perp adds 2 residuals, a parallel 1).
@@ -1733,7 +1866,7 @@ export function solvePivot(
     const s = Math.exp(x[6]);
     if (!(s < Infinity)) return null;
     const dims = x.slice(7, 7 + nDims);
-    const override = coupled ? new Map(coupled.syms.map((sy, i) => [sy, x[7 + nDims + i]])) : undefined;
+    const override = overrideAt(x);
     const pos = evalCanonical(dims, override, riderMap(x));
     for (const solid of c.solids) {
       const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
@@ -1756,7 +1889,7 @@ export function solvePivot(
     // coincide. The threshold is a hard collapse (1e-4 of the solid's own span), so a figure with
     // legitimately close vertices is untouched.
     const dims = x.slice(7, 7 + nDims);
-    const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
+    const override = overrideAt(x);
     const pos = evalCanonical(dims, override, riderMap(x));
     for (const solid of c.solids) {
       const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
@@ -2026,7 +2159,7 @@ export function solvePivot(
       transform: (p) => applyGauge(p, g), mirror, dims: x.slice(7, 7 + nDims),
       ...(nPinSym > 0 ? { pinSymbols: pinSymbolsAt(x) } : {}),
       ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, x[riderBase + i]])) } : {}),
-      scalarConsumed: scalarConsumedAt(x, mirror),
+      scalarConsumed: scalarConsumedAt(x, mirror), heldPins: heldPinsAt(x, mirror),
       err: residualsFor(mirror)(x).reduce((sum, v) => sum + v * v, 0),
       x: [...x],
     }];
@@ -2287,7 +2420,7 @@ export function solvePivot(
         ? [{
             transform: (p) => p, mirror: false, dims: [], err: primary,
             ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, x0[7 + i]])) } : {}),
-            scalarConsumed: scalarConsumedAt(x0, false), // #990 (no dims ⇒ 0)
+            scalarConsumed: scalarConsumedAt(x0, false), heldPins: heldPinsAt(x0, false), // #990 (no dims ⇒ 0)
             x: x0,
           }]
         : [];
@@ -2339,7 +2472,7 @@ export function solvePivot(
       const invSol: PivotResult[] = [{
         transform: (p) => p, mirror: false, dims: bx.slice(0, nDims), err: primary,
         ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, bx[nDims + i]])) } : {}),
-        scalarConsumed: scalarConsumedAt([0, 0, 0, 0, 0, 0, 0, ...bx], false), // #990
+        scalarConsumed: scalarConsumedAt([0, 0, 0, 0, 0, 0, 0, ...bx], false), heldPins: heldPinsAt([0, 0, 0, 0, 0, 0, 0, ...bx], false), // #990
         x: [0, 0, 0, 0, 0, 0, 0, ...bx],
       }];
       const uncollapsed = settleFlatRings(invSol); // #1499 / #1849: a declared ring the solve collapsed — retried, else refused
@@ -2454,16 +2587,17 @@ export function solvePivot(
   // #818: the stated SIGNS, as conditions over a candidate — a coordinate sign given on a point and a
   // sign on a named free component (#814) are one kind here, exactly as `applySolutions`' filter treats
   // them. A `partial` point is absolute and sign-honoured at sample time (ADR-3D-094): not a condition.
-  const signConds: { positive: boolean; value: (at: (id: Id) => Vec3 | undefined) => number | undefined }[] = [
+  // #1524 (ADR-3D-477): a named component's condition may be a RANGE; a coordinate sign is its interval.
+  const signConds: { bound: Bound3; value: (at: (id: Id) => Vec3 | undefined) => number | undefined }[] = [
     ...c.signGivens
       .filter((g) => c.points.get(g.id)?.kind !== 'partial')
-      .map((g) => ({ positive: g.positive, value: (at: (id: Id) => Vec3 | undefined) => at(g.id)?.[g.axis] })),
-    ...positionalComponentSigns3(c).map((g) => ({ positive: g.positive, value: (at: (id: Id) => Vec3 | undefined) => componentValue(c, g.target, g.axis, at) })),
+      .map((g) => ({ bound: signBound3(g.positive), value: (at: (id: Id) => Vec3 | undefined) => at(g.id)?.[g.axis] })),
+    ...positionalComponentSigns3(c).map((g) => ({ bound: g.bound, value: (at: (id: Id) => Vec3 | undefined) => componentValue(c, g.target, g.axis, at) })),
   ];
   /** A candidate's FINAL positions (gauge applied to gauge points; absolute points verbatim). */
   const atFor = (mirror: boolean, x: number[]): ((id: Id) => Vec3 | undefined) => {
     const g = { ...unpack(x), mirror };
-    const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
+    const override = overrideAt(x);
     const riders = riderMap(x);
     const pos = evalCanonical(x.slice(7, 7 + nDims), override, riders);
     // #1498, #2798: the one lane rule — see `frameOf`
@@ -2518,7 +2652,7 @@ export function solvePivot(
         transform: (q) => applyGauge(q, g), mirror, dims: xr.slice(7, 7 + nDims),
         symbols: coupled ? xr.slice(7 + nDims, 7 + nDims + nSym) : undefined, pinSymbols: pinSymbolsAt(xr),
         riderTs: nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, xr[riderBase + i]])) : undefined,
-        scalarConsumed: scalarConsumedAt(xr, mirror), placementFreedom: placementFreedomAt(xr, mirror),
+        scalarConsumed: scalarConsumedAt(xr, mirror), heldPins: heldPinsAt(xr, mirror), placementFreedom: placementFreedomAt(xr, mirror),
         err: pErr(xr), x: [...xr],
       };
     };
@@ -2647,11 +2781,17 @@ export function solvePivot(
         if (v0 === undefined || v1 === undefined) continue;
         const d = v1 - v0;
         if (Math.abs(d) < 1e-9) {
-          if (sc.positive ? !(v0 > 1e-9) : !(v0 < -1e-9)) feasible = false;
+          if (!boundHolds3(sc.bound, v0)) feasible = false;
           continue;
         }
-        if ((d > 0) === sc.positive) lo = Math.max(lo, -v0 / d);
-        else hi = Math.min(hi, -v0 / d);
+        // #1524 (ADR-3D-477): each stated END of the condition's interval (a sign's 0, a range's lo/hi) bounds the step:
+        // v0 + d·s past `end` on the interval's side. A sign gives exactly the old −v0/d cut.
+        for (const [end, below] of [[sc.bound.lo, false], [sc.bound.hi, true]] as const) {
+          if (end === null) continue;
+          const cut = (end - v0) / d;
+          if ((d > 0) !== below) lo = Math.max(lo, cut);
+          else hi = Math.min(hi, cut);
+        }
       }
       if (feasible && lo < hi) {
         const m = Math.min(0.25 * unit, (hi - lo) / 4);
@@ -2689,7 +2829,7 @@ export function solvePivot(
     const symbols = coupled ? xr.slice(7 + nDims, 7 + nDims + nSym) : undefined;
     const pinSymbols = pinSymbolsAt(xr);
     const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, xr[riderBase + i]])) : undefined;
-    return [{ transform: (q) => applyGauge(q, g), mirror: probe.mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt(xr, probe.mirror), err: pErr(xr), x: [...xr] }];
+    return [{ transform: (q) => applyGauge(q, g), mirror: probe.mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt(xr, probe.mirror), heldPins: heldPinsAt(xr, probe.mirror), err: pErr(xr), x: [...xr] }];
   }
   /** #1735: per mirror, the deferred re-seat of its off-host candidates — run only when the pool is empty. */
   const reseatStages: (() => void)[] = [];
@@ -2731,7 +2871,7 @@ export function solvePivot(
         results.push({
           transform: (p) => applyGauge(p, g), mirror, dims: dims0, err: bestA.err,
           ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r) => [r.id, r.t0])) } : {}),
-          scalarConsumed: scalarConsumedAt([...bestA.x, 0, ...dims0, ...symPad, ...riders.map((r) => r.t0)], mirror),
+          scalarConsumed: scalarConsumedAt([...bestA.x, 0, ...dims0, ...symPad, ...riders.map((r) => r.t0)], mirror), heldPins: heldPinsAt([...bestA.x, 0, ...dims0, ...symPad, ...riders.map((r) => r.t0)], mirror),
           x: [...bestA.x, 0, ...dims0, ...symPad, ...riders.map((r) => r.t0)],
         });
         continue; // this mirror solved by placement alone
@@ -2766,6 +2906,202 @@ export function solvePivot(
     /** #2799 (ADR-3D-464): the cold sweeps' early-out — drawn at a point AND exact on the givens' rows: every acceptance
      *  site rejects it (`collapsed`) and `noteFlatSolid` records it, so further iterations only shrink it further. */
     const exactAtPoint = (x: number[]): boolean => atPoint(x) && primaryErr(x) < 1e-10;
+    /**
+     * #2894 part 2 A (ADR-3D-499) — THE CREEP STOP of the cold sweeps. An anchored solve (a rider, a pin letter, a plane
+     * drive) meets its givens' rows in a few steps; what follows is the anchors' 1e-4 pull dragging the free unknowns
+     * toward the seed's sample along the curved solution set, a few per cent of the error per ten steps, until the
+     * 120-iteration bail — and the polish restarts it three more times. Measured on the fixtures, that creep is most of
+     * every resolve's work. Asked every 8th accepted step: once the givens' rows are exact (two orders under the
+     * acceptance) and the full error fell less than {@link CREEP_GAIN} over those 8 steps, the solve stops where it
+     * stands. The point is a solution of the givens; only where its free unknowns rest differs (ruling 1, 2026-11-15).
+     * A fresh one per solve: it keeps the error it last saw.
+     */
+    const creepStop = (): ((x: number[], err: number) => boolean) & { crept: boolean } => {
+      let mark = Infinity;
+      const stop = Object.assign(
+        (x: number[], err: number): boolean => {
+          if (exactAtPoint(x)) return true;
+          const stalled = err > mark * CREEP_GAIN;
+          mark = err;
+          stop.crept = stalled && primaryErr(x) < ACCEPT * 1e-2;
+          return stop.crept;
+        },
+        { crept: false },
+      );
+      return stop;
+    };
+    /**
+     * #2894 part 2 A (ADR-3D-499) — SETTLE A CREEPING SOLVE AT ITS ANCHORED POINT. Where the creep stop ended a solve, the
+     * point meets the givens and the anchors' pull is all that is left: the place the creep was walking to is the point of
+     * the solution set nearest the seed's samples (the anchored minimum). It is reached here directly, as the #518 park and
+     * the #1854 settle reach theirs, instead of by a few per cent per ten steps. Each round takes the Gauss–Newton step of
+     * the full anchored rows with the givens' rows held by their Jacobian (the tangent step), returns to the solution set
+     * by a solve of the givens' rows alone (the projection), and keeps the result only while the full error falls and the
+     * givens stay exact; it ends when the step is negligible. Every residual it evaluates is metered.
+     *
+     * ONLY ON A REGULAR POINT OF THE SOLUTION SET. A small residual of the givens' rows says the point is ON the set only
+     * where their Jacobian is regular. Where a given meets the set tangentially (a double root: the exam cube's
+     * «A(3,n,p)» forces p² = 0, so a residual of 1e-12 leaves p at 1e-3), the residual test passes far from the set, and
+     * the creep was what carried the point the rest of the way (the #518 note below: anchors stall LM on tangential
+     * directions). So the point is certified first: one Gauss–Newton step of the givens' rows alone must cut their error
+     * quadratically (by {@link SETTLE_REGULAR} at least), as it does at a regular point and never at a tangential one
+     * (there it cuts by 16). An uncertified point returns null, and the caller solves exactly as before the creep stop.
+     */
+    const regularOnSet = (x: number[], r0: number[], J: number[][], nP: number): number[] | null => {
+      const n = x.length;
+      let e0 = 0;
+      for (let m = 0; m < nP; m++) e0 += r0[m] * r0[m];
+      if (e0 < 1e-24) return x;
+      // the minimum-norm Gauss–Newton step of the givens' rows, solved in their row space (nP × nP: the rows are few and
+      // independent where the set is regular, while the unknowns' normal matrix is singular along the set by design)
+      const S: number[][] = [];
+      let scale = 0;
+      for (let a = 0; a < nP; a++) {
+        S.push([]);
+        for (let b = 0; b < nP; b++) {
+          let v = 0;
+          for (let j = 0; j < n; j++) v += J[j][a] * J[j][b];
+          S[a].push(v);
+        }
+        scale = Math.max(scale, S[a][a]);
+      }
+      if (!(scale > 0)) return null;
+      for (let a = 0; a < nP; a++) S[a][a] += scale * SETTLE_ROW_RIDGE;
+      const y = solveLinear(
+        S.map((row) => row.map((v) => v / scale)),
+        r0.slice(0, nP).map((v) => v / scale),
+      );
+      if (!y) return null;
+      const d = Array.from({ length: n }, (_, j) => -J[j].slice(0, nP).reduce((acc, v, a) => acc + v * y[a], 0));
+      meterWork();
+      const e1 = fPrimary(x.map((v, i) => v + d[i])).reduce((acc, v) => acc + v * v, 0);
+      return e1 < 1e-24 || e1 <= e0 * SETTLE_REGULAR ? x.map((v, i) => v + d[i]) : null;
+    };
+    /**
+     * A cold sweep's solve from `x0`: the creep stop, then the settle where it fired. Where the settle cannot certify the
+     * point, or reaches a trial point where the residuals are not defined (an undamped tangent step can take a rider's
+     * plane through three collinear points, which the frame refuses to normalise: `plane-both-forms-2367` without its box),
+     * the solve is exactly the one before the creep stop: the 120 iterations with the #2799 early-out. The damped LM steps
+     * never visit such points; the settle's trial points are its own, so they are its own to refuse.
+     */
+    const sweepSolve = (x0: number[]): { x: number[]; err: number } => {
+      const stop = creepStop();
+      const r = leastSquares(fSeed, x0, 120, stop);
+      if (!stop.crept) return r;
+      let settled: { x: number[]; err: number } | null = null;
+      try {
+        settled = settleAnchored(fSeed, r);
+      } catch {
+        settled = null; // a residual undefined at a trial point: no settle, the solve as before
+      }
+      // the settle reaches the point the creep was walking to, in the creep's own basin: one that ends degenerate (a
+      // collapsed solid, a point off its host) from a point that was not has left that basin (#863: A onto C), so the
+      // start is solved as before
+      if (settled && degenerate(settled.x) && !degenerate(r.x)) settled = null;
+      return settled ?? leastSquares(fSeed, x0, 120, exactAtPoint);
+    };
+    /**
+     * #2894 A — EVERY CANDIDATE THE POOL ADMITS ON THE GIVENS' SOLUTION SET, to working precision. The full objective's minimum is not
+     * on the set: the anchors' pull holds the givens' rows at a residual of about 1e-12 (the ACCEPT note), so a coordinate
+     * the givens fix comes out a few 1e-7 off, differently at each knowledge sample, and the samples' 1e-6 comparison
+     * withholds it or not by chance (main read «A(-3, ?, 13)» or «A(-3, 11, 13)» for «B(0,7,8)» · «BA→=(-3,4,5)», seed by
+     * seed). A solve of the givens' rows alone from the result moves it to the nearest point of the set (a shift of that
+     * order, invisible), so a fixed quantity agrees across the samples and a free one still differs at its own scale.
+     *
+     * ONLY ON WHAT `collect` ADMITS, never on the sweep's search path (#2894 A2, ADR-3D-499). Projected inside the sweep,
+     * each polish restart began on the set instead of where LM left it, and the restarts fell into other basins: the
+     * search then reached fewer of a figure's discrete placements, and exact samples turned that into a fact the givens
+     * do not fix («A'(0, 0, 2)» on #2368's control at 9 of 24 seeds, where z = −2 is admissible). The search runs as it
+     * always ran; only its admitted results are made exact.
+     */
+    const onSet = (r: { x: number[]; err: number }): { x: number[]; err: number } => {
+      const e0 = primaryErr(r.x);
+      if (!(e0 > ON_SET_FLOOR)) return r;
+      // only at a regular point: at a tangential one (a double root) the projection crawls, and leaves the samples apart
+      const rp = fPrimary(r.x);
+      const Jp: number[][] = r.x.map((v, j) => {
+        const h = 1e-6 * Math.max(1, Math.abs(v));
+        const xp = [...r.x];
+        const xq = [...r.x];
+        xp[j] += h;
+        xq[j] -= h;
+        meterWork();
+        const a = fPrimary(xp);
+        meterWork();
+        const b = fPrimary(xq);
+        return a.map((u, i) => (u - b[i]) / (2 * h));
+      });
+      // the certifying step IS the projection: at a regular point one minimum-norm Gauss–Newton step of the givens' rows
+      // lands on the set to the square of the residual (no further solve needed)
+      const on = regularOnSet(r.x, rp, Jp, rp.length);
+      if (!on || degenerate(on)) return r;
+      meterWork();
+      return { x: on, err: fSeed(on).reduce((acc, v) => acc + v * v, 0) };
+    };
+    const settleAnchored = (f: (x: number[]) => number[], r: { x: number[]; err: number }): { x: number[]; err: number } | null => {
+      const nP = fPrimary(r.x).length;
+      const fm = (y: number[]): number[] => {
+        meterWork();
+        return f(y);
+      };
+      let x = r.x;
+      let err = r.err;
+      for (let round = 0; round < SETTLE_ROUNDS; round++) {
+        const r0 = fm(x);
+        const n = x.length;
+        const J: number[][] = [];
+        for (let j = 0; j < n; j++) {
+          const h = 1e-6 * Math.max(1, Math.abs(x[j]));
+          const xp = [...x];
+          const xq = [...x];
+          xp[j] += h;
+          xq[j] -= h;
+          const a = fm(xp);
+          const b = fm(xq);
+          J.push(a.map((v, i) => (v - b[i]) / (2 * h)));
+        }
+        if (round === 0 && !regularOnSet(x, r0, J, nP)) return null;
+        // the tangent step: the anchors' Gauss–Newton step with the givens' rows weighted to hold (their own GN rows).
+        // Only the unknowns some row reads take part: an unknown no row reads (an undriven dim, which the #518 park
+        // places after the sweep) has a zero column, so its step is the ridge dividing rounding noise; it stays put.
+        const colNorm = J.map((col) => Math.hypot(...col));
+        const maxCol = Math.max(...colNorm);
+        const live = colNorm.map((v) => v > maxCol * SETTLE_LIVE);
+        const A: number[][] = [];
+        const g: number[] = [];
+        for (let i = 0; i < n; i++) {
+          A.push([]);
+          let gi = 0;
+          for (let k = 0; k < n; k++) {
+            let v = 0;
+            if (live[i] && live[k]) for (let m = 0; m < r0.length; m++) v += (m < nP ? SETTLE_HOLD : 1) * J[i][m] * J[k][m];
+            A[i].push(v + (i === k ? (live[i] ? SETTLE_RIDGE : 1) : 0));
+          }
+          if (live[i]) for (let m = nP; m < r0.length; m++) gi -= J[i][m] * r0[m];
+          g.push(gi);
+        }
+        const d = solveLinear(A, g);
+        if (!d) break;
+        if (!(d.reduce((acc, v, i) => acc + v * g[i], 0) > err * SETTLE_STALL)) break; // the model predicts nothing worth a round
+        let step = 1;
+        let moved = false;
+        for (let half = 0; half < 6 && !moved; half++, step /= 2) {
+          const back = leastSquares(fPrimary, x.map((v, i) => v + step * d[i]), 30);
+          if (back.err >= ACCEPT * 1e-2) continue;
+          const e = fm(back.x).reduce((acc, v) => acc + v * v, 0);
+          if (e < err) {
+            const shift = Math.hypot(...back.x.map((v, i) => v - x[i]));
+            x = back.x;
+            moved = true;
+            const gain = err - e;
+            err = e;
+            if (shift < 1e-9 || gain < err * 1e-9) return { x, err };
+          }
+        }
+        if (!moved) break;
+      }
+      return { x, err };
+    };
     /**
      * #518 (ADR-3D-133) — park an UNDRIVEN scale at the seed's target, POST-HOC. In-solve anchors were
      * tried at two weights and both failed a full-suite calibration: 1e-4 measurably displaced
@@ -2839,6 +3175,7 @@ export function solvePivot(
     };
     let best: { x: number[]; err: number } | null = null;
     const seen = new Set<string>();
+    let reaching: Id | null = null; // #2907: the fanned point, while the branch fan offers its candidates to `collect`
     /** #1735: exact candidates of this mirror discarded ONLY because a rider left its host. */
     const offHostRejects: number[][] = [];
     const noteOffHost = (x: number[]): void => {
@@ -2868,7 +3205,8 @@ export function solvePivot(
       // #1769 (ADR-3D-395): the same release closes a candidate that is exact on `ACCEPT` but outside the member
       // pins' verifier bar (`membersHold`) — an anchor equilibrium inside the solver's tolerance and outside the
       // validation's. It admits nothing by itself: the candidate is judged again below by the one root predicate.
-      let cand = cand0;
+      if (!collectAll) return; // a solve that builds no pool admits nothing here (#2894 A2: and projects nothing)
+      let cand: { x: number[]; err: number } | null = null;
       if (anchored) {
         const pe = primaryErr(cand0.x);
         const offBar = pe < ACCEPT && !membersHold(mirror, cand0.x);
@@ -2877,8 +3215,11 @@ export function solvePivot(
           if (!degenerate(rel.x) && (primaryErr(rel.x) < pe || (offBar && primaryErr(rel.x) < ACCEPT && membersHold(mirror, rel.x)))) cand = rel;
         }
       }
+      // #2894 A (ADR-3D-499): a candidate the release did not replace goes onto the givens' set to working precision (a
+      // regular point only), so a value the givens fix agrees across the knowledge samples
+      cand ??= onSet(cand0);
       const rAccept = anchored ? primaryErr(cand.x) : cand.err;
-      if (!collectAll || rAccept >= ACCEPT) return;
+      if (rAccept >= ACCEPT) return;
       const parked = parkScale(cand.x); // #518: an undriven scale parks at the seed target, exactly
       // #1769 (ADR-3D-395): THE ROOT PREDICATE — exact on the primary residuals, not collapsed (above), and every
       // member pin holding by the verifier's bar. A candidate outside it is dropped here exactly as stage 4's
@@ -2902,14 +3243,132 @@ export function solvePivot(
       const symbols = coupled ? cx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
       const pinSymbols = pinSymbolsAt(cx);
       const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, cx[riderBase + i]])) : undefined;
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...cx], mirror), err: rAccept, x: [...cx] });
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...cx], mirror), heldPins: heldPinsAt([...cx], mirror), err: rAccept, x: [...cx], ...(reaching !== null ? { reach: reaching } : {}) });
     };
     const fSeed = fFor(symAnchorTargets);
+    /**
+     * #2907 (ADR-3D-498) — THE BRANCH FAN: a free lane's other discrete roots, reached WARM from the found solution.
+     *
+     * Every cold start puts a free lane (a never-positioned point's coordinates, a rider's offset on its line, plane or
+     * circle) at the seed's ONE sample — the eight starts spread only the placement, which coordinate points pin — so the
+     * pool holds the root nearest that sample and nothing else. «A'K : A'C = 2 : 3» on a free A' has two roots on the line
+     * CK (K between A' and C, or A' between them); every seed's pool carried the first, and every knowledge gate, which
+     * judges agreement across the pools, read the first as the only one. The #797 walk (pin symbols), #820's spread
+     * (segment riders), #2714 / #2814's fans (shape dims) each reach a neighbour of this lane, never this one.
+     *
+     * The #2714 pattern, one lane over: from this mirror's first root that honours every stated sign, with the placement
+     * held, ONE free-lane point at a time — only one the givens DETERMINE (measured by rank below; a free point's other
+     * positions are a continuum, never a second root) — is pinned just beside every other point of the figure, on its
+     * own side and the far side, and released on the anchored rows as a cold start is. A fixed step, a reflection through
+     * another point and a deflation of the found root were each measured on the issue's figure and reached the second
+     * root at some seeds only: the length-ratio residual's basins meet AT a point of the figure (A' = K) and it runs away
+     * past C. An exact, open, member-holding result whose point stands somewhere new joins the pool flagged `reach`.
+     * Cost (docs/17 §7): paid only on the pooled path, only when this mirror found a root, only per determined point —
+     * one rank probe (2 residual evaluations per unknown), then 2 × (the figure's distinct points − 1) pinned solves
+     * (40 iterations) and as many anchored releases (120).
+     */
+    function freeLaneFan(): void {
+      if (!collectAll || nRider === 0 || probe) return;
+      // the base honours every stated sign when one of this mirror's roots does: a root the selector drops fans nothing it keeps
+      const signsHold = (x: number[]): boolean => {
+        const at = atFor(mirror, x);
+        return signConds.every((cd) => {
+          const v = cd.value(at);
+          return v === undefined ? true : boundHolds3(cd.bound, v); // #1524: a sign is a range — the selector's own test
+        });
+      };
+      const mine = results.filter((r) => r.mirror === mirror && !r.reach);
+      const base = mine.find((r) => signsHold(r.x)) ?? mine[0];
+      if (!base) return;
+      const bx = base.x;
+      const groups = new Map<Id, number[]>();
+      riders.forEach((r, i) => {
+        if (r.point === undefined || r.spread || r.lo > -Infinity || r.hi < Infinity) return; // a host-bounded lane is #820's
+        const list = groups.get(r.point) ?? [];
+        if (list.length === 0) groups.set(r.point, list);
+        list.push(i);
+      });
+      if (groups.size === 0) return;
+      const atBase = atFor(mirror, bx);
+      let extent = 1;
+      for (const id of c.points.keys()) {
+        const q = atBase(id);
+        if (q) extent = Math.max(extent, Math.abs(q.x), Math.abs(q.y), Math.abs(q.z));
+      }
+      const tol = 1e-3 * extent;
+      // the placement is HELD: the cold starts' rotations own it, and a fanned lane must not turn the rest of the figure
+      const gauge = bx.slice(0, 7);
+      const held = (f: (y: number[]) => number[]) => (y: number[]): number[] => f([...gauge, ...y.slice(7)]);
+      // DETERMINED, measured: the point's position adds no rank to the givens' rows over the free unknowns (central
+      // differences, the #2368 probe's chart), so its other positions are discrete roots, never a continuum
+      const n = bx.length;
+      const h = 1e-4;
+      const colsJ: number[][] = [];
+      const colsP = new Map<Id, number[][]>();
+      for (let j = 7; j < n; j++) {
+        const xp = [...bx];
+        const xm = [...bx];
+        xp[j] += h;
+        xm[j] -= h;
+        const rp = fPrimary(xp);
+        const rm = fPrimary(xm);
+        colsJ.push(rp.map((v, i) => (v - rm[i]) / (2 * h)));
+        const ap = atFor(mirror, xp);
+        const am = atFor(mirror, xm);
+        for (const id of groups.keys()) {
+          const p = ap(id);
+          const m = am(id);
+          const col = p && m ? [(p.x - m.x) / (2 * h * extent), (p.y - m.y) / (2 * h * extent), (p.z - m.z) / (2 * h * extent)] : [0, 0, 0];
+          const list = colsP.get(id) ?? [];
+          if (list.length === 0) colsP.set(id, list);
+          list.push(col);
+        }
+      }
+      const rank0 = colsJ.length === 0 || colsJ[0].length === 0 ? 0 : numericRank(colsJ);
+      const sites: Vec3[] = [];
+      for (const q of c.points.keys()) {
+        const p = atBase(q);
+        if (p && !sites.some((t) => norm3(sub3(t, p)) <= tol)) sites.push(p);
+      }
+      const fP = held(fPrimary);
+      const fS = held(fSeed);
+      for (const id of groups.keys()) {
+        const pc = colsP.get(id)!;
+        if (numericRank(colsJ.map((col, j) => [...col, ...pc[j]])) !== rank0) continue; // free on the solution set
+        const here = atBase(id);
+        if (!here) continue;
+        const roots: Vec3[] = [here];
+        for (const site of sites) {
+          const away = sub3(here, site);
+          const d = norm3(away);
+          if (d <= tol) continue;
+          // the figure's points cut the point's carrier into the stretches its discrete roots live in (between K and C,
+          // or beyond K): the point is pinned just beside each other point, on its own side and on the far side, then
+          // released as a cold start is
+          for (const side of [1, -1]) {
+            const target = add3(site, scale3(away, (side * 0.1 * extent) / d));
+            const pinned = (y: number[]): number[] => {
+              const p = atFor(mirror, [...gauge, ...y.slice(7)])(id);
+              return [...fP(y), ...(p ? [1e3 * (p.x - target.x), 1e3 * (p.y - target.y), 1e3 * (p.z - target.z)] : [])];
+            };
+            const r0 = leastSquares(fS, leastSquares(pinned, [...bx], 40).x, 120, exactAtPoint);
+            const x = [...gauge, ...r0.x.slice(7)];
+            if (degenerate(x) || primaryErr(x) >= ACCEPT || !membersHold(mirror, x)) continue;
+            const got = atFor(mirror, x)(id);
+            if (!got || roots.some((q) => norm3(sub3(q, got)) <= tol)) continue;
+            roots.push(got);
+            reaching = id;
+            collect({ x, err: fSeed(x).reduce((acc, v) => acc + v * v, 0) });
+            reaching = null;
+          }
+        }
+      }
+    }
     for (const x0 of starts) {
-      let r0 = leastSquares(fSeed, x0, 120, exactAtPoint);
+      let r0 = sweepSolve(x0); // #2894 A: the creep's destination, reached directly
       // polish: restart LM (fresh damping) from the found point until it stops improving
       for (let polish = 0; polish < 3 && r0.err > 1e-24 && r0.err < 1e-4; polish++) {
-        const r2 = leastSquares(fSeed, r0.x, 120, exactAtPoint);
+        const r2 = sweepSolve(r0.x);
         if (r2.err >= r0.err * 0.99) break;
         r0 = r2;
       }
@@ -3021,7 +3480,7 @@ export function solvePivot(
         const at = atFor(mirror, x);
         return signConds.every((cd) => {
           const v = cd.value(at);
-          return v === undefined ? true : cd.positive ? v > 1e-9 : v < -1e-9;
+          return v === undefined ? true : boundHolds3(cd.bound, v);
         });
       };
       const mine = results.filter((r) => r.mirror === mirror);
@@ -3030,8 +3489,8 @@ export function solvePivot(
           const at = atFor(mirror, sol.x);
           for (const cd of signConds) {
             const v = cd.value(at);
-            if (v === undefined || (cd.positive ? v > 1e-9 : v < -1e-9)) continue; // this sign already holds
-            const target = -v;
+            if (v === undefined || boundHolds3(cd.bound, v)) continue; // this sign already holds
+            const target = boundReflect3(cd.bound, v); // a sign's −v; a range's reflection about its violated end
             const fPin = (y: number[]) => [...fPrimary(y), 1e3 * ((cd.value(atFor(mirror, y)) ?? 0) - target)];
             const rp = leastSquares(fPin, [...sol.x], 40);
             collect(leastSquares(fFor(symAnchorTargets), rp.x));
@@ -3079,9 +3538,9 @@ export function solvePivot(
         for (const f of variants) {
           const widened = dims0.map(f);
           for (const x0 of starts) {
-            let r = leastSquares(fSeed, [...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)], 120, exactAtPoint);
+            let r = sweepSolve([...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)]);
             for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
-              const r2 = leastSquares(fSeed, r.x, 120, exactAtPoint);
+              const r2 = sweepSolve(r.x);
               if (r2.err >= r.err * 0.99) break;
               r = r2;
             }
@@ -3101,6 +3560,7 @@ export function solvePivot(
         symbolWalk();
       }
     }
+    freeLaneFan();
     // #1735 (ADR-3D-306): deferred — fired below only when the WHOLE pool is empty after the #1499
     // frozen-dims retry, so every figure that builds today is bit-identical. Each kept candidate is
     // re-seated (its off-host riders pinned back at their samples, then released on the anchored
@@ -3126,7 +3586,7 @@ export function solvePivot(
         const symbols = coupled ? sx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
         const pinSymbols = pinSymbolsAt(sx);
         const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, sx[riderBase + i]])) : undefined;
-        results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...sx], mirror), err, x: [...sx] });
+        results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...sx], mirror), heldPins: heldPinsAt([...sx], mirror), err, x: [...sx] });
       };
       pushSolution(bx, bestAccept);
       /**

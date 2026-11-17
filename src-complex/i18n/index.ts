@@ -83,6 +83,8 @@ const he = {
   symGe: 'גדול או שווה',
   symDist: 'מרחק בין שתי נקודות',
   anotherConfig: 'הציגו תצורה אחרת', // #739: ONE wording for the row, every tool
+  // #2874 (ADR-W-210): the working indicator — the suite's one busy wording (suite-vocabulary.test.ts)
+  thinking: 'חושב…',
   // #1452: the row's undo/redo had no keys and printed «undo»/«redo» in both languages — the siblings' wording
   undo: 'בטל',
   redo: 'בצע שוב',
@@ -309,6 +311,7 @@ const en: typeof he = {
   symGe: 'greater than or equal',
   symDist: 'distance between two points',
   anotherConfig: 'Show another configuration',
+  thinking: 'Working…',
   undo: 'Undo',
   redo: 'Redo',
   // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.

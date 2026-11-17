@@ -12,7 +12,10 @@
  * Samples are keyed by object identity (ids), never insertion order — the stability rule.
  */
 
-import { sample } from './rng';
+import { sample, withSampleNames3 } from './rng';
+import { chargeHit3, chargedWork3, costed3 } from './workLedger3';
+import { limitReached, withWorkLimit } from '../../shell/workLimit';
+import { notDecided, type NotDecided } from '../../shell/notDecided';
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { defaultViewFrame } from './defaultView';
 import {
@@ -40,24 +43,26 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
-import { configurationOrder3 } from './configs3';
+import { configurationOrder3, samePointConfig3 } from './configs3';
 import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3, type CanonicalEval3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
-import { absolutePointCount, claimPointIds, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, orientationStated3, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
+import { absolutePointCount, claimPointIds, evalAffine, scalarPinOrigin3, type ScalarPin, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, orientationStated3, pinSymAnchor3, pinSymsOf, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol, type SymComp } from './types';
 import { carrierParams3, determinationReach3, figureLanes3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Claim3, Construction3, Determination3, Id, LinExpr, Operand3, PointDef, Positions3, Requirement3, SolidKind, SolidObj } from './types';
-import { claimResidual3, claimSeeds, residualHolds3 } from './claims';
+import { claimHoldsAt3, claimResidual3, claimSeeds, residualHolds3 } from './claims';
+import { ContentTable } from './content3';
+import { computeHere3, computesHere3, forgetLazy3, holdLazy3, lazy3, lazyHeld3, type Lazy3, type Uncloneable3 } from './lazy3';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
   lineCrossing3,
   ringSelfCrossing3} from './vec3';
-import { canonicalSeed3, partsOf3, seedNumber3, seedOfPart3, type Part3, type Seed3 } from './components3';
+import { seedKey3, canonicalSeed3, partsOf3, seedNumber3, seedOfPart3, type Part3, type Seed3 } from './components3';
 import { baseRingOf, boundSolidDimCount3, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
@@ -282,6 +287,8 @@ export function solidDimsAt(c: Construction3, i: number, seed: number): number[]
  * `perSolidDims` and the DOF count all read the same draws. #1855's per-solid similarity added seven keys to every
  * further solid, and sampling them again in each one-shot placement took two-solid figures past the #863 ceiling.
  */
+/** #2893: the draws kept per solid list (a configuration search walks thousands of seeds; the oldest are dropped). */
+const SOLID_DIMS_PER_FIGURE3 = 1024;
 const solidDimsMemo3 = new WeakMap<readonly unknown[], Map<number | string, readonly (readonly number[])[]>>();
 export function solidDimsAll3(c: Construction3, seed: number): readonly (readonly number[])[] {
   let bySeed = solidDimsMemo3.get(c.solids);
@@ -291,6 +298,7 @@ export function solidDimsAll3(c: Construction3, seed: number): readonly (readonl
   const concave = c.solids.map((solid) => (CONCAVE_SEAT_KINDS3.has(solid.kind) && !solid.bound ? concaveSeatVertices3(c, baseRingOf(solid)!) : null));
   const memoKey = concave.some(Boolean) ? `${seed}|${concave.map((v) => (v ? v.join('') : '-')).join('|')}` : seed;
   let all = bySeed.get(memoKey);
+  if (!all && bySeed.size >= SOLID_DIMS_PER_FIGURE3) bySeed.delete(bySeed.keys().next().value as number | string); // #2893: a search walks thousands of seeds
   if (!all) {
     all = c.solids.map((solid, i) => {
       // #2490 (ADR-3D-434): a bound solid's dims are its apex's alone — no layout, no similarity of its own
@@ -584,7 +592,7 @@ export interface Resolved3 {
    *  the pool holds more than one solution, since that is the only case where a coordinate can be a
    *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
    *  branch pick reads seed-stable and prints as fact. */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => { dims: number; block: number }; /** #1815 (ADR-3D-309): no solution because every one collapsed a flat ring that only a rider's incidence forced. */ collapse?: InventedCollapse3; /** #2368 (ADR-3D-375): lazy — the applied placement's LEFTOVER rigid freedom, measured under every placement given (the read-back sampler reads this). */ placementFreedom?: () => PlacementFreedom3 } | null;
+  pivot: { solutions: number; chosen: number; err: number; /** #2907 (ADR-3D-498): how many admissible configurations OTHER than the drawn one this pool holds — the knowledge sampler resolves each ({@link Resolve3Opts.configuration}). */ others?: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this, through {@link scalarConsumed3}). #2890 (ADR-3D-492): a plain cell, never a closure. */ scalarConsumed?: Lazy3<{ dims: number; block: number }>; /** #2795 (ADR-3D-483): lazy — the scalar pins the chosen solution holds without driving them, by their PLACE in `c.scalarPins` (`resolveHeld3` reads this, on the figure it has just solved). */ heldPins?: Lazy3<readonly number[]>; /** #1815 (ADR-3D-309): no solution because every one collapsed a flat ring that only a rider's incidence forced. */ collapse?: InventedCollapse3; /** #2368 (ADR-3D-375): lazy — the applied placement's LEFTOVER rigid freedom, measured under every placement given (the read-back sampler reads this, through {@link placementFreedom3}). */ placementFreedom?: Lazy3<PlacementFreedom3> } | null;
   /** #930 (ADR-3D-236) — each vec-def RATIO symbol's solved value («SN = k·SC» → k), so a consumer can
    *  read what the branch pick actually chose. The sign verifier needs it: without it a correctly
    *  honoured «k חיובי» reported `sign-unsatisfiable`, because the verifier knew how to read a figure
@@ -1157,7 +1165,8 @@ import { memberHolds3, onLineHolds3 } from './operands';
 // #814's `componentValue` / `componentSignsHold` live in operands.ts (#818: the pivot's sign-axis
 // continuation reads them too, and solve3 must never import evaluate) — re-exported for the store.
 export { componentValue, componentSignsHold } from './operands';
-import { componentSignsHold, positionalComponentSigns3 } from './operands';
+import { boundHolds3, boundWindow3, symBound3 } from './bound3';
+import { componentSignsHold, componentValue, positionalComponentSigns3 } from './operands';
 
 
 /**
@@ -1184,7 +1193,10 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number, param
   // difference structural. Sign givens are applied HERE for the first time: they were honoured on the
   // paramGivens path (`pinParam`) but silently ignored on this one, so `k הוא פרמטר חיובי` plus a ⟂
   // given could draw the negative root — a figure contradicting a stated given.
-  const signed = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+  // #1524 (ADR-3D-477): the parameter's OWN stated range (a sign or a range), folded — a range stated on another
+  // letter never filters this one's roots.
+  const own = symBound3(c, c.param);
+  const signed = own ? roots.filter((t) => boundHolds3(own, t)) : roots;
   const pool = signed.length > 0 ? signed : roots; // an unsatisfiable sign is refused downstream, not here
   const pick = (branches: number[], value: number) => ({ value, roots, branches });
 
@@ -1215,8 +1227,8 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number, param
 /** The half-line an UNPINNED parameter is sampled on — a stated sign narrows it (ADR-3D-032). `reach` (#1986,
  *  ADR-3D-418, analytic's ADR-AG-256) widens the window's OPEN side(s) only; 1 is the default window, bit-identical. */
 function openParamRange3(c: Construction3, reach = 1): [number, number] {
-  const sign = c.paramSigns.find(() => true);
-  return sign ? (sign.positive ? [0.3, 3 * reach] : [-3 * reach, -0.3]) : [-3 * reach, 3 * reach];
+  // #1524 (ADR-3D-477): a stated range narrows the window the way a sign did — a sign gives the same half-windows
+  return boundWindow3(symBound3(c, c.param), -3 * reach, 3 * reach, 0.3);
 }
 
 /**
@@ -1249,7 +1261,28 @@ function ringReachValue3(c: Construction3, seed: number): number | null {
   let per = ringReachMemo3.get(c);
   if (!per) ringReachMemo3.set(c, (per = new Map()));
   const known = per.get(seed);
-  if (known !== undefined) return known;
+  if (known !== undefined) {
+    chargeHit3(ringReachCost3.get(per)?.get(seed)); // #2893: what finding it cost
+    return known;
+  }
+  const { value: out, cost } = costed3(() => ringReachSearch3(c, rings, seed));
+  let costs = ringReachCost3.get(per);
+  if (!costs) ringReachCost3.set(per, (costs = new Map()));
+  if (per.size >= RING_REACH_SEEDS3) {
+    const old = per.keys().next().value as number; // #2893: a configuration search walks thousands of seeds
+    per.delete(old);
+    costs.delete(old);
+  }
+  per.set(seed, out);
+  costs.set(seed, cost);
+  if (engineJournal3) engineJournal3.reaches.push({ figure: c, seed, out });
+  return out;
+}
+/** #2893: what each kept reach cost (a hit is charged it), and how many seeds a construction keeps. */
+const ringReachCost3 = new WeakMap<Map<number, number | null>, Map<number, number>>();
+const RING_REACH_SEEDS3 = 1024;
+/** {@link ringReachValue3}'s search for one seed. */
+function ringReachSearch3(c: Construction3, rings: Id[][], seed: number): number | null {
   const crossed = (r: Resolved3): boolean =>
     rings.some((ring) => {
       const pts = ring.map((id) => r.positions.get(id));
@@ -1270,7 +1303,6 @@ function ringReachValue3(c: Construction3, seed: number): number | null {
       }
     }
   }
-  per.set(seed, out);
   return out;
 }
 
@@ -1392,7 +1424,11 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
     for (const p of [...c.pins, ...c.vectorPins, ...c.pairPins])
       pinCount += (p.x !== null ? 1 : 0) + (p.y !== null ? 1 : 0) + (p.z !== null ? 1 : 0);
     // #902: a value-pinned symbol is a number, not an unknown — only the OPEN ones count.
-    dims += openPinSymsOf(c).length;
+    // #2563 (ADR-3D-489): with a `sym-coord` point on a figure the pivot does not move (no solid, no free point), its
+    // letters are read off the placed points, so the open ones are those the coordinates leave undetermined
+    dims += !pivotRuns3(c) && [...c.points.values()].some((d) => d.kind === 'sym-coord')
+      ? readPinLetters3(c, seedNumber3(resolved.seed), resolved.positions).free
+      : openPinSymsOf(c).length;
     // #803 (ADR-3D-180): the absolute-membership drives consume placement DOF exactly like pins — a
     // plane pin is one residual per member, a pin-symbol line membership two (a line is two planes),
     // an equation-plane membership one. The count omitted all of them, so the exam's fully determined
@@ -1419,7 +1455,7 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
     // #990 (ADR-3D-248): what the scalar pins CONSUME is measured by the resolution (the rank of their
     // residuals' response to the dims), not inferred from their count — a pin the corner's construction
     // already satisfies consumes nothing. The count is the fallback only where no solution recorded it.
-    const sc = resolved.pivot.scalarConsumed?.();
+    const sc = scalarConsumed3(resolved);
     const consumed = sc?.dims ?? c.scalarPins.length;
     const blockConsumed = sc?.block ?? 0;
     // #370 (ADR-3D-247 — the 2026-08-13 ruling "count them"): when the placement is SAMPLED (an absolute
@@ -1439,8 +1475,10 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
     // same measurement the drawing samples, so the count and the sampling share one source (ADR-3D-124).
     return Math.max(0, dims + placement - Math.max(0, pinCount - (7 - placement)) - consumed) + Math.max(0, freeT - blockConsumed) + param + leftoverPlacement3(c, resolved);
   }
+  // #2563 (ADR-3D-489): where the pivot does not run, the pool letters the coordinates leave open (a blank «N(k,p,3)»: 2)
+  const openLetters = resolved.pivot === null && [...c.points.values()].some((d) => d.kind === 'sym-coord') ? readPinLetters3(c, seedNumber3(resolved.seed), resolved.positions).free : 0;
   // #370: a floating figure beside an absolute object — its placement is sampled, and counted.
-  return dims + (placementSampled3(c) ? 6 : 0) + freeT + param;
+  return dims + (placementSampled3(c) ? 6 : 0) + freeT + param + openLetters;
 }
 
 // ---------------------------------------------------------------------------
@@ -1454,7 +1492,7 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
 type VecDef = Construction3['vecDefs'][number];
 
 /** Solve the relation for its unknown point at a fixed symbol value; null when degenerate. */
-function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>): Vec3 | null {
+function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>, letterVal?: (sym: string) => number): Vec3 | null {
   const evalR = (P: Vec3): Vec3 | null => {
     const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
     const from = get(vd.from);
@@ -1477,7 +1515,8 @@ function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: numb
         vvec = a && b ? sub3(b, a) : null;
       }
       if (!vvec) return null;
-      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * kValue));
+      // #1551 (ADR-3D-472): a term naming its own letter (a definition with several) reads that letter's number
+      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * (t.sym !== undefined && letterVal ? letterVal(t.sym) : kValue)));
     }
     return acc;
   };
@@ -1604,8 +1643,8 @@ function firstNonDegenerateRoot(
   // Filtered by `sym` deliberately. The other sign consumers in this file apply `paramSigns.every`
   // to every root regardless of which symbol each sign names — sound while a figure has one symbol,
   // and not something to copy: here a second vec-def's sign must not constrain this one's branch.
-  const signs = c.paramSigns.filter((g) => g.sym === vd.symbol);
-  const eligible = signs.length ? roots.filter((k) => signs.every((g) => (g.positive ? k > 1e-9 : k < -1e-9))) : roots;
+  const own = symBound3(c, vd.symbol); // #1524: a sign or a range, folded
+  const eligible = own ? roots.filter((k) => boundHolds3(own, k)) : roots;
   for (const k of eligible) if (pinDrivenSegLen(c, pin, vd, pos, k) > tol) return k;
   // No root honours the sign: return nothing, so the point stays UNPLACED and the store's existing
   // vec-rel check refuses honestly. A sign that cannot be satisfied must never fall back to a root
@@ -1827,7 +1866,7 @@ export function rotationAnchored3(c: Construction3): boolean {
  */
 export function leftoverPlacement3(c: Construction3, resolved: Resolved3): number {
   if (!leftoverPlacementApplies3(c)) return 0;
-  return resolved.pivot?.placementFreedom?.().counted ?? 0;
+  return placementFreedom3(resolved)?.counted ?? 0;
 }
 
 /** The figures {@link leftoverPlacement3} reads: a solid, rotation anchored, placement not already sampled. */
@@ -2084,6 +2123,371 @@ export const resolveStats3 = { uncached: 0, hits: 0, images: 0 };
  * This memo replaces the claim verifier's narrower one; do not add another beside it (docs/17 M3).
  */
 const resolveMemo3 = new WeakMap<Construction3, Map<string, Resolved3>>();
+
+/**
+ * #2888 ([ADR-3D-491](../../docs/06b-decisions-3d.md#adr-3d-491); ADR-W-210 invariant 4) — ONE CONSTRUCTION OBJECT PER
+ * CONSTRUCTION CONTENT. The memo above, the pivot's recorded pools, the released constructions and the parts all hung off
+ * the construction OBJECT, and the store's fold builds a new one every time it runs. The construction does not depend on
+ * the configuration, so a figure asked for at another seed, a part no line touched, and a list whose fold leaves the same
+ * figure (a row that stands aside for its twin, a row unticked) were each a new object and were solved again.
+ * `resolve3` now asks this table first: a construction whose content it has seen (`engine/content3.ts`: the same graph,
+ * exactly, with the same pin origins) is solved as the object first seen (its representative), so the solve, the pools,
+ * the released constructions and the parts are found there (`sharedResolves3`, below, holds the answers). `resolve3` is
+ * a pure function of the construction's content, its pin origins and the configuration, and nothing a reader takes from
+ * a `Resolved3` is compared with its own construction's objects, so the answer is the one this object would have
+ * computed.
+ *
+ * ONLY A SETTLED CONSTRUCTION IS SHARED: one whose every scalar pin carries the list position of the row that stated it
+ * (`scalarPinOrigin3.fact`, written by the store's fold when the row has applied). A construction solved while its row
+ * is still applying (a right pyramid's apply asks the verifier about its base), or built outside the fold (a probe
+ * with a temporary pin, an engine test), has pins whose origin is not written yet or never will be. Its content could
+ * still change under it, so it keeps the identity rule and is never a representative.
+ *
+ * Bounded: {@link FIGURE_CONTENT_ENTRIES} constructions, the least recently used dropped first.
+ */
+export const FIGURE_CONTENT_ENTRIES = 64;
+const pinOriginOf3 = (node: object): unknown => {
+  const o = scalarPinOrigin3.get(node as ScalarPin);
+  return o ? [o.fact, o.claim] : undefined;
+};
+const pinsSettled3 = (c: Construction3): boolean => c.scalarPins.every((p) => scalarPinOrigin3.get(p)?.fact !== undefined);
+export const figureContent3 = new ContentTable<Construction3>(FIGURE_CONTENT_ENTRIES, pinOriginOf3, pinsSettled3);
+
+/**
+ * #2888 — THE RESOLVE MEMO HAS TWO TIERS. `resolveMemo3` stays what it was: each construction OBJECT's own answers, so
+ * a figure the session comes back to (an undo, a redo, a derive still in the store's memo) finds what it asked for,
+ * whatever other configurations of that content were solved since. Under it, `sharedResolves3` holds the answers of
+ * the CONTENT, on its representative: an object that has not asked yet takes the answer from there. Both hold at most
+ * {@link RESOLVE_MEMO_PER_FIGURE} configurations, the oldest written dropped first, as the one tier always did.
+ */
+const sharedResolves3 = new WeakMap<Construction3, Map<string, Resolved3>>();
+const keepResolve3 = (memo: Map<string, Resolved3>, key: string, out: Resolved3): void => {
+  memo.set(key, out);
+  if (memo.size > RESOLVE_MEMO_PER_FIGURE) memo.delete(memo.keys().next().value as string);
+};
+/** The object's own answers. */
+function ownResolves3(figure: Construction3): Map<string, Resolved3> {
+  let own = resolveMemo3.get(figure);
+  if (!own) resolveMemo3.set(figure, (own = new Map()));
+  return own;
+}
+/**
+ * #2893 ([ADR-3D-494](../../docs/06b-decisions-3d.md#adr-3d-494)) — WHAT EACH ANSWER COST (`engine/workLedger3.ts`): a hit is
+ * charged it, so a work limit counts the same in a warm session as in a cold one. Carried with the answer in a journal.
+ */
+const resolveCost3 = new WeakMap<Resolved3, number>();
+/** A hit in the resolve memo: charged what computing it cost. */
+function chargedResolve3(hit: Resolved3 | undefined): Resolved3 | undefined {
+  if (hit) chargeHit3(resolveCost3.get(hit));
+  return hit;
+}
+/** A computed answer, with its cost recorded. */
+function costedResolve3(compute: () => Resolved3): Resolved3 {
+  const { value, cost } = costed3(compute);
+  if (!resolveCost3.has(value)) resolveCost3.set(value, cost);
+  return value;
+}
+/** An answer the content already has, taken into the object's own. `home`: where the figure's solve lives (the journal's). */
+function sharedResolve3(figure: Construction3, own: Map<string, Resolved3>, c: Construction3, key: string, home: () => ResolvedHome3): Resolved3 | undefined {
+  const hit = sharedResolves3.get(c)?.get(key);
+  if (hit) {
+    keepResolve3(own, key, hit);
+    if (engineJournal3) journalResolve3(figure, key, home(), hit);
+  }
+  return hit;
+}
+/** A new answer: the object's own, and the content's. Its lazy cells are given their home. */
+function rememberResolve3(figure: Construction3, own: Map<string, Resolved3>, c: Construction3, key: string, home: () => ResolvedHome3, out: Resolved3): Resolved3 {
+  const at = home();
+  homeLazies3(out, at);
+  if (!resolveHomes3.has(out)) resolveHomes3.set(out, at);
+  keepResolve3(own, key, out);
+  let shared = sharedResolves3.get(c);
+  if (!shared) sharedResolves3.set(c, (shared = new Map()));
+  keepResolve3(shared, key, out);
+  if (engineJournal3) journalResolve3(figure, key, at, out);
+  return out;
+}
+/**
+ * #2890 ([ADR-3D-492](../../docs/06b-decisions-3d.md#adr-3d-492); ADR-W-210 phase 3) — THE PIVOT'S LAZY VALUES, READ.
+ *
+ * The pivot's outcome holds three values a reader may ask for after the solve (`scalarConsumed`, `heldPins`,
+ * `placementFreedom`), each a plain cell (`engine/lazy3.ts`). {@link lazyValue3} is the one reader:
+ *  1. this heap has the value in hand (it computed it, or took it in): that is the answer;
+ *  2. this heap solved the figure: it computes the value, as the closure did, and keeps it;
+ *  3. this heap did NOT solve the figure (it was put in the memo by {@link keepResolved3}) and the value has FOLLOWED
+ *     the figure ({@link keepLazyValue3}): that is the answer. A value is addressed like the figure it belongs to (the
+ *     construction's content, the resolve key, the value's name): `resolve3` is a pure function of that address, so
+ *     every object that stands for the figure shares the one value;
+ *  4. otherwise the figure is SOLVED AGAIN HERE, and counted (`lazyStats3.solvedAgain`, and the work meter through
+ *     the solve): a value is never answered with a default.
+ * A heap that solves its own figures stops at 2, exactly as before; 3 and 4 are for a figure that crossed.
+ */
+export type LazyName3 = 'scalarConsumed' | 'heldPins' | 'placementFreedom';
+export const LAZY_NAMES3: readonly LazyName3[] = ['scalarConsumed', 'heldPins', 'placementFreedom'];
+/** Where a resolved figure lives: its construction's representative, its key in the resolve memo, and what solves it. */
+export interface ResolvedHome3 {
+  c: Construction3;
+  key: string;
+  seed: Seed3;
+  opts: Resolve3Opts;
+  /** a figure of several parts (`resolveParts3`), as against one (`resolveHeld3`) */
+  parts: boolean;
+}
+const lazyHome3 = new WeakMap<Lazy3<unknown>, ResolvedHome3 & { name: LazyName3 }>();
+/** #2890 round 2: the home of every answer this heap holds (solved here or taken in), for the page's checkpoint. */
+const resolveHomes3 = new WeakMap<Resolved3, ResolvedHome3>();
+/**
+ * #2890 round 2 (ADR-3D-493) — WHAT THIS HEAP HOLDS FOR A CONSTRUCTION OBJECT: its own answers, each with the memo
+ * key it is held under and the home of the solve it came from. Reads only: nothing is solved. The page hands these
+ * to a fresh worker (the checkpoint), so the worker does not solve again the figure the student is looking at.
+ */
+export function heldResolves3(figure: Construction3): { key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3; cost?: number }[] {
+  const out: { key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3; cost?: number }[] = [];
+  for (const [key, r] of resolveMemo3.get(figure) ?? []) {
+    const home = resolveHomes3.get(r);
+    if (home) out.push({ key, home: { key: home.key, seed: home.seed, opts: home.opts, parts: home.parts }, out: r, cost: resolveCost3.get(r) });
+  }
+  return out;
+}
+/** The values that followed their figure, per construction content: `<resolve key>|<name>` → value. */
+let lazyValues3 = new WeakMap<Construction3, Map<string, unknown>>();
+const LAZY_VALUES_PER_FIGURE = 512;
+/** #2890: by count — figures solved again because a value of theirs was asked for and had not followed them. */
+export const lazyStats3 = { solvedAgain: 0 };
+
+/** Give a figure's cells their home, once (a cell shared by the solved and the drawn frame keeps the first). */
+function homeLazies3(out: Resolved3, home: ResolvedHome3): Resolved3 {
+  if (!out.pivot) return out;
+  for (const name of LAZY_NAMES3) {
+    const cell = out.pivot[name];
+    if (cell && !lazyHome3.has(cell)) lazyHome3.set(cell, { ...home, name });
+  }
+  return out;
+}
+
+/** A value that follows its figure: kept by content, for every object that stands for that figure in this heap. */
+export function keepLazyValue3(figure: Construction3, key: string, name: LazyName3, value: unknown): void {
+  const c = figureContent3.of(figure);
+  let per = lazyValues3.get(c);
+  if (!per) lazyValues3.set(c, (per = new Map()));
+  per.set(`${key}|${name}`, value);
+  if (per.size > LAZY_VALUES_PER_FIGURE) per.delete(per.keys().next().value as string);
+}
+
+/** The figure at `home`, solved here (never read from the memo: the memo's copy is the one that lacks the value). */
+function solveAgain3(home: ResolvedHome3): Resolved3 {
+  return home.parts ? solveParts3(home.c, partsOf3(home.c), home.seed, home.opts) : resolveHeld3(home.c, seedNumber3(home.seed), home.opts);
+}
+
+/** THE READER of a pivot's lazy value (see the block above). `undefined`: the pivot holds no such value. */
+function lazyValue3<T>(cell: Lazy3<T> | undefined): T | undefined {
+  if (!cell) return undefined;
+  const inHand = lazyHeld3(cell);
+  if (inHand !== undefined) return inHand;
+  const home = lazyHome3.get(cell);
+  if (computesHere3(cell)) {
+    const v = computeHere3(cell);
+    if (engineJournal3 && home) engineJournal3.late.push({ cell, figure: home.c, key: home.key, name: home.name });
+    return v;
+  }
+  if (!home) throw new Error('a lazy value of a resolved figure that is in no memo of this heap: put the figure there first (keepResolved3)');
+  const followed = lazyValues3.get(home.c)?.get(`${home.key}|${home.name}`) as T | undefined;
+  if (followed !== undefined) return holdLazy3(cell, followed);
+  lazyStats3.solvedAgain++;
+  const v = lazyValue3(solveAgain3(home).pivot?.[home.name] as Lazy3<T> | undefined);
+  if (v === undefined) throw new Error(`the figure solved again holds no ${home.name}: resolve3 is not the pure function this memo assumes`);
+  keepLazyValue3(home.c, home.key, home.name, v);
+  return holdLazy3(cell, v);
+}
+/** The value of a cell if it is in hand (computed, or followed its figure), without computing it: `null` if not. */
+export function peekLazy3(resolved: Resolved3, name: LazyName3): unknown {
+  const cell = resolved.pivot?.[name] as Lazy3<unknown> | undefined;
+  if (!cell) return null;
+  const inHand = lazyHeld3(cell);
+  if (inHand !== undefined) return inHand;
+  const home = lazyHome3.get(cell);
+  return (home && lazyValues3.get(home.c)?.get(`${home.key}|${home.name}`)) ?? null;
+}
+/** #990 (ADR-3D-248): what the scalar pins consume at this figure's solution; `undefined` where no solution recorded it. */
+export const scalarConsumed3 = (resolved: Resolved3): { dims: number; block: number } | undefined => lazyValue3(resolved.pivot?.scalarConsumed);
+/** #2368 (ADR-3D-375): this figure's leftover placement freedom; `undefined` where no probe applies. */
+export const placementFreedom3 = (resolved: Resolved3): PlacementFreedom3 | undefined => lazyValue3(resolved.pivot?.placementFreedom);
+
+/**
+ * #2890 (ADR-3D-492) — PUT A RESOLVED FIGURE THIS HEAP DID NOT SOLVE INTO ITS MEMO, at the home it was solved for: the
+ * construction's own answers and its content's (an answer already held is kept), with its cells given that home so
+ * that a value asked for later is found or solved (`lazyValue3`). The caller has written the construction's pin
+ * origins (`scalarPinOrigin3`) first: they are part of its content.
+ */
+export function keepResolved3(figure: Construction3, key: string, home: Omit<ResolvedHome3, 'c'>, out: Resolved3, cost?: number): void {
+  const c = figureContent3.of(figure);
+  if (cost !== undefined && !resolveCost3.has(out)) resolveCost3.set(out, cost);
+  homeLazies3(out, { ...home, c });
+  if (!resolveHomes3.has(out)) resolveHomes3.set(out, { ...home, c });
+  const own = ownResolves3(figure);
+  let shared = sharedResolves3.get(c);
+  if (!shared) sharedResolves3.set(c, (shared = new Map()));
+  for (const memo of [own, shared]) {
+    if (memo.has(key)) continue;
+    memo.set(key, out);
+    if (memo.size > RESOLVE_MEMO_PER_FIGURE) adoptedOver3.add(memo);
+  }
+}
+/**
+ * #2890 (ADR-3D-492) — AN ADOPTED ANSWER OUTLIVES ITS JOB'S REPLAY. The memo holds {@link RESOLVE_MEMO_PER_FIGURE}
+ * answers a construction, the oldest dropped. A job's answers arrive when the solving heap has FINISHED, so this heap's
+ * tier would end where that one's ended, while the action this heap then runs starts where that one started: the first
+ * answer it asks for is the first that was dropped (a 200-seed search writes 409). So an arriving answer is not
+ * dropped on arrival. The surplus goes when the next journal arrives, by which time the action has run; a caller that
+ * knows it has run may say so sooner.
+ */
+const adoptedOver3 = new Set<Map<string, Resolved3>>();
+export function releaseAdopted3(): void {
+  for (const memo of adoptedOver3) while (memo.size > RESOLVE_MEMO_PER_FIGURE) memo.delete(memo.keys().next().value as string);
+  adoptedOver3.clear();
+}
+
+/**
+ * #2890 ([ADR-3D-492](../../docs/06b-decisions-3d.md#adr-3d-492) part 2) — THE ENGINE'S HALF OF A JOB'S JOURNAL: every
+ * answer written into a content-keyed memo of this file while a recording is on, in the order written. `figure` is the
+ * construction object that was asked; its content names the entry in any heap. Plain data (`store/journal3.ts` adds
+ * the store's half and the pin origins, and is the one caller).
+ */
+export interface EngineJournal3 {
+  /** an answer of `resolve3`: the memo key it is held under, and the home of the solve it came from */
+  resolves: { figure: Construction3; key: string; home: Omit<ResolvedHome3, 'c'>; out: Resolved3; cost?: number }[];
+  /** a seed's verdict (`seedVerdict3`), with what judging it cost (#2893) */
+  verdicts: { figure: Construction3; key: string; out: boolean; cost?: number }[];
+  /** #2893: a configuration search's outcome, for the page's run of the same action ({@link searchSeed3}) */
+  searches?: { figure: Construction3; key: string; out: SeedSearch3 }[];
+  /** a ring-reach value (`ringReachValue3`) */
+  reaches: { figure: Construction3; seed: number; out: number | null }[];
+  /** a lazy value in hand, addressed like its figure: of a figure in this journal, or of one an earlier journal carried (it follows) */
+  lazies: { figure: Construction3; key: string; name: LazyName3; value: unknown }[];
+}
+let engineJournal3: (Omit<EngineJournal3, 'lazies'> & { late: { cell: Lazy3<unknown>; figure: Construction3; key: string; name: LazyName3 }[] }) | null = null;
+function journalResolve3(figure: Construction3, key: string, home: ResolvedHome3, out: Resolved3): void {
+  // a construction that is not settled (a probe with a temporary pin) has no content: its answers serve no other heap
+  if (!pinsSettled3(figure)) return;
+  const entry = { figure, key, home: { key: home.key, seed: home.seed, opts: home.opts, parts: home.parts }, out, cost: resolveCost3.get(out) };
+  engineJournal3!.resolves.push(entry);
+}
+/** Start, or stop, recording what this file's memos are given. One recording at a time. */
+export function recordEngineJournal3(on: boolean): void {
+  if (on && engineJournal3) throw new Error('a journal is already being recorded');
+  engineJournal3 = on ? { resolves: [], verdicts: [], reaches: [], late: [], searches: [] } : null;
+}
+/** What was written since the last take (the recording goes on). */
+export function takeEngineJournal3(): EngineJournal3 {
+  if (!engineJournal3) throw new Error('no journal is being recorded');
+  const { resolves, verdicts, reaches, late, searches } = engineJournal3;
+  engineJournal3 = { resolves: [], verdicts: [], reaches: [], late: [], searches: [] };
+  // A figure's cell holds no value, so every value in hand crosses here, addressed like its figure: those of the
+  // figures in this take, and those computed since on a figure an earlier take carried. Each once.
+  const sent = new Set<Lazy3<unknown>>();
+  const lazies: EngineJournal3['lazies'] = [];
+  const send = (cell: Lazy3<unknown>, figure: Construction3, key: string, name: LazyName3): void => {
+    const value = lazyHeld3(cell);
+    if (value === undefined || sent.has(cell)) return;
+    sent.add(cell);
+    lazies.push({ figure, key, name, value });
+  };
+  for (const r of resolves) for (const name of LAZY_NAMES3) if (r.out.pivot?.[name]) send(r.out.pivot[name] as Lazy3<unknown>, r.figure, r.home.key, name);
+  for (const l of late) send(l.cell, l.figure, l.key, l.name);
+  return { resolves, verdicts, reaches, lazies, searches };
+}
+/** Take a journal's entries into this heap's memos, under the same content keys. The pin origins are written first (the caller's). */
+export function adoptEngineJournal3(j: EngineJournal3): void {
+  releaseAdopted3();
+  for (const l of j.lazies) keepLazyValue3(l.figure, l.key, l.name, l.value);
+  for (const r of j.resolves) keepResolved3(r.figure, r.key, r.home, r.out, r.cost);
+  if (j.searches?.length) handedSearches3 = new WeakMap(); // a job's outcomes replace the last job's
+  for (const h of j.searches ?? []) {
+    const of = figureContent3.of(h.figure);
+    let per = handedSearches3.get(of);
+    if (!per) handedSearches3.set(of, (per = new Map()));
+    per.set(h.key, h.out);
+  }
+  for (const v of j.verdicts) {
+    const of = figureContent3.of(v.figure);
+    let per = seedVerdicts3.get(of);
+    if (!per) seedVerdicts3.set(of, (per = new Map()));
+    if (per.has(v.key)) continue;
+    per.set(v.key, { v: v.out, cost: v.cost ?? 0 });
+    if (per.size > SEED_VERDICTS_PER_FIGURE) per.delete(per.keys().next().value as string);
+  }
+  for (const r of j.reaches) {
+    const of = figureContent3.of(r.figure);
+    let per = ringReachMemo3.get(of);
+    if (!per) ringReachMemo3.set(of, (per = new Map()));
+    if (!per.has(r.seed)) per.set(r.seed, r.out);
+  }
+}
+/** A construction's pin origins, aligned with `c.scalarPins`: what must cross BESIDE it, for they are part of its content. */
+export type PinOrigins3 = ({ claim?: Claim3; fact?: number } | null)[];
+export const pinOrigins3 = (c: Construction3): PinOrigins3 => c.scalarPins.map((pin) => scalarPinOrigin3.get(pin) ?? null);
+/** Write a crossed construction's pin origins back onto its pin objects, BEFORE anything asks for its content. */
+export function writePinOrigins3(c: Construction3, origins: PinOrigins3): void {
+  c.scalarPins.forEach((pin, i) => {
+    const o = origins[i];
+    if (o) scalarPinOrigin3.set(pin, o);
+  });
+}
+
+/**
+ * #2888 (ADR-3D-491) — A SEED'S VERDICT IS KEPT PER CONSTRUCTION CONTENT. The configuration search
+ * ({@link firstSatisfyingSeed3}) asks of each seed "does this drawing meet the requirements, and the preferences?".
+ * Each answer needs the figure resolved at that seed, and it is a pure function of the construction's content, the seed
+ * and the preferences asked. A figure whose givens force a special case is answered "no" at every seed, so the search
+ * walks its whole window, and the next action on the same figure (a press of «הציגו תצורה אחרת» starts one seed on) walked
+ * the same seeds again: the resolve memo holds {@link RESOLVE_MEMO_PER_FIGURE} figures per construction, far fewer than
+ * the window, and a resolved figure is the wrong thing to keep for a yes or a no. So the VERDICT is kept: one boolean
+ * per (representative construction, question, seed, preference set), {@link SEED_VERDICTS_PER_FIGURE} per construction,
+ * the oldest written dropped. It is not a limit on the search and it changes no answer: a seed that was judged is not
+ * judged again.
+ */
+export const SEED_VERDICTS_PER_FIGURE = 1024;
+let seedVerdicts3 = new WeakMap<Construction3, Map<string, { v: boolean; cost: number }>>();
+/** #2888: seed verdicts by count: `asked` every question that reached the memo, `hits` those it answered. */
+export const seedVerdictStats3 = { asked: 0, hits: 0 };
+/** #2888: how many verdicts are kept for this construction's content (the bound's lock reads it). */
+export const seedVerdictCount3 = (c: Construction3): number => seedVerdicts3.get(figureContent3.of(c))?.size ?? 0;
+function seedVerdict3(c: Construction3, key: string, judge: () => boolean): boolean {
+  const of = figureContent3.of(c);
+  let per = seedVerdicts3.get(of);
+  if (!per) seedVerdicts3.set(of, (per = new Map()));
+  seedVerdictStats3.asked++;
+  const hit = per.get(key);
+  if (hit !== undefined) {
+    seedVerdictStats3.hits++;
+    chargeHit3(hit.cost); // #2893: what judging it cost
+    return hit.v;
+  }
+  const { value: out, cost } = costed3(judge);
+  per.set(key, { v: out, cost });
+  if (per.size > SEED_VERDICTS_PER_FIGURE) per.delete(per.keys().next().value as string);
+  if (engineJournal3) engineJournal3.verdicts.push({ figure: of, key, out, cost });
+  return out;
+}
+
+/**
+ * #2888 — TEST-ONLY: forget everything the engine keeps by content (`store3.clearSolveCaches3`, the one clear, is the
+ * one caller): which constructions share a content, the seed verdicts, and the parameter's two older memos
+ * (`identityMemo`, `rootsMemo`), whose misses scan and do not solve.
+ */
+export function clearEngineCaches3(): void {
+  figureContent3.clear();
+  figureContent3.stats.shared = figureContent3.stats.fresh = figureContent3.stats.opaque = figureContent3.stats.dropped = 0;
+  seedVerdicts3 = new WeakMap();
+  seedVerdictStats3.asked = seedVerdictStats3.hits = 0;
+  handedSearches3 = new WeakMap();
+  lazyValues3 = new WeakMap();
+  lazyStats3.solvedAgain = 0;
+  adoptedOver3.clear();
+  identityMemo.clear();
+  rootsMemo.clear();
+}
 const RESOLVE_MEMO_PER_FIGURE = 64;
 /** #2368 (ADR-3D-375): a plain resolve's pivot pools, in call order — replayed by its read-back image only. */
 const pivotStageMemo3 = new WeakMap<Construction3, Map<string, PivotPool[]>>();
@@ -2096,35 +2500,36 @@ const pivotStageMemo3 = new WeakMap<Construction3, Map<string, PivotPool[]>>();
  * joined, then turned onto the floor once (`drawnFrame3`, read from the first solid, which is in the first part). A figure
  * of one part takes the path below, at its part's seed.
  */
-export function resolve3(c: Construction3, seedIn: Seed3, opts: Resolve3Opts = {}): Resolved3 {
+export function resolve3(figure: Construction3, seedIn: Seed3, opts: Resolve3Opts = {}): Resolved3 {
+  // #2894 part 2 B (ADR-3D-497): a figure is solved under the names its points were first given — a rename keeps its samples
+  return withSampleNames3(figure.sampleNames, () => resolveNamed3(figure, seedIn, opts));
+}
+function resolveNamed3(figure: Construction3, seedIn: Seed3, opts: Resolve3Opts): Resolved3 {
+  const c = figureContent3.of(figure); // #2888: the construction's content, whichever object carries it
   const parts = partsOf3(c);
-  if (parts.length > 1) return resolveParts3(c, parts, seedIn, opts);
+  if (parts.length > 1) return resolveParts3(figure, c, parts, seedIn, opts);
   const seed = seedOfPart3(seedIn, parts[0].key);
   // #1986 (ADR-3D-418): a coordinate letter whose default draw crosses a declared ring is drawn at a widened reach
   if (opts.paramValue === undefined && c.param) {
     const reached = ringReachValue3(c, seed);
-    if (reached !== null) return resolve3(c, seed, { ...opts, paramValue: reached });
+    if (reached !== null) return resolve3(figure, seed, { ...opts, paramValue: reached });
   }
-  const base = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '');
-  let per = resolveMemo3.get(c);
-  if (!per) resolveMemo3.set(c, (per = new Map()));
-  const memo = per;
-  const remember = (key: string, out: Resolved3): Resolved3 => {
-    memo.set(key, out);
-    if (memo.size > RESOLVE_MEMO_PER_FIGURE) memo.delete(memo.keys().next().value as string);
-    return out;
-  };
+  const base = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '') + (opts.configuration ? `|cfg${opts.configuration}` : '');
+  const own = ownResolves3(figure);
   /**
    * #2630 (ADR-3D-400 §3): ONE solve per configuration, in the solved frame — the knowledge gates read it as is, and
    * the drawing is that same solution turned onto the floor (`drawnFrame3`, no second solve). A figure the
    * normalisation leaves alone is served the SAME object both ways, so no consumer can see two figures (#863).
    */
   const solvedKey = `${base}|raw`;
-  let solved = memo.get(solvedKey);
+  // #2890: the figure's home is its SOLVE's: the drawn frame is that solution turned, and shares its lazy cells
+  const home = (): ResolvedHome3 => ({ c, key: solvedKey, seed, opts, parts: false });
+  let solved = chargedResolve3(own.get(solvedKey) ?? sharedResolve3(figure, own, c, solvedKey, home));
   if (solved) resolveStats3.hits++;
-  else solved = remember(solvedKey, resolveJoint3(c, seed, opts));
+  else solved = rememberResolve3(figure, own, c, solvedKey, home, costedResolve3(() => resolveHeld3(c, seed, opts)));
   if (opts.solvedFrame) return solved;
-  return memo.get(base) ?? remember(base, drawnFrame3(c, solved));
+  const drawn = solved;
+  return chargedResolve3(own.get(base) ?? sharedResolve3(figure, own, c, base, home)) ?? rememberResolve3(figure, own, c, base, home, costedResolve3(() => drawnFrame3(c, drawn)));
 }
 
 /**
@@ -2132,28 +2537,27 @@ export function resolve3(c: Construction3, seedIn: Seed3, opts: Resolve3Opts = {
  * the seeds its parts are at (two spellings of one configuration share an entry); each part's own resolve is memoised on
  * the part. A figure split into parts has no coordinate letter (`wholeFigure3`), so `paramValue` never reaches here.
  */
-function resolveParts3(c: Construction3, parts: readonly Part3[], seed: Seed3, opts: Resolve3Opts): Resolved3 {
+function resolveParts3(figure: Construction3, c: Construction3, parts: readonly Part3[], seed: Seed3, opts: Resolve3Opts): Resolved3 {
   const at = parts.map((p) => seedOfPart3(seed, p.key));
-  const base = `parts:${at.join(',')}` + (opts.placementImage ? '|img' : '');
-  let memo = resolveMemo3.get(c);
-  if (!memo) resolveMemo3.set(c, (memo = new Map()));
-  const per = memo;
-  const remember = (key: string, out: Resolved3): Resolved3 => {
-    per.set(key, out);
-    if (per.size > RESOLVE_MEMO_PER_FIGURE) per.delete(per.keys().next().value as string);
-    return out;
-  };
+  const base = `parts:${at.join(',')}` + (opts.placementImage ? '|img' : '') + (opts.configuration ? `|cfg${opts.configuration}` : '');
+  const own = ownResolves3(figure);
   const solvedKey = `${base}|raw`;
-  let solved = per.get(solvedKey);
+  const home = (): ResolvedHome3 => ({ c, key: solvedKey, seed, opts, parts: true });
+  let solved = chargedResolve3(own.get(solvedKey) ?? sharedResolve3(figure, own, c, solvedKey, home));
   if (solved) resolveStats3.hits++;
-  else {
-    const partOpts: Resolve3Opts = { ...opts, solvedFrame: true };
-    const outs = parts.map((p, i) => resolve3(p.construction, at[i], partOpts));
-    const drawnAt = canonicalSeed3(seedNumber3(seed), Object.fromEntries(parts.map((p, i) => [p.key, at[i]])));
-    solved = remember(solvedKey, joinParts3(c, outs, drawnAt));
-  }
+  else solved = rememberResolve3(figure, own, c, solvedKey, home, costedResolve3(() => solveParts3(c, parts, seed, opts)));
   if (opts.solvedFrame) return solved;
-  return per.get(base) ?? remember(base, drawnFrame3(c, solved));
+  const drawn = solved;
+  return chargedResolve3(own.get(base) ?? sharedResolve3(figure, own, c, base, home)) ?? rememberResolve3(figure, own, c, base, home, costedResolve3(() => drawnFrame3(c, drawn)));
+}
+
+/** {@link resolveParts3}'s solve: each part in the solved frame (its own resolve is memoised on the part), joined. */
+function solveParts3(c: Construction3, parts: readonly Part3[], seed: Seed3, opts: Resolve3Opts): Resolved3 {
+  const at = parts.map((p) => seedOfPart3(seed, p.key));
+  const partOpts: Resolve3Opts = { ...opts, solvedFrame: true };
+  const outs = parts.map((p, i) => resolve3(p.construction, at[i], partOpts));
+  const drawnAt = canonicalSeed3(seedNumber3(seed), Object.fromEntries(parts.map((p, i) => [p.key, at[i]])));
+  return joinParts3(c, outs, drawnAt);
 }
 
 type Pivot3 = NonNullable<Resolved3['pivot']>;
@@ -2187,26 +2591,29 @@ function joinParts3(c: Construction3, rs: readonly Resolved3[], seed: Seed3): Re
     const symRoots = merged((p) => p.symRoots);
     const pointRoots = merged((p) => p.pointRoots);
     const riderTs = merged((p) => p.riderTs);
+    const others = Math.max(0, ...pivots.map((p) => p.others ?? 0));
     const collapse = pivots.find((p) => p.collapse)?.collapse;
     const scalarConsumed = pivots.some((p) => p.scalarConsumed)
-      ? () =>
+      ? lazy3(() =>
           pivots.reduce(
             (acc, p) => {
-              const sc = p.scalarConsumed?.();
+              const sc = lazyValue3(p.scalarConsumed);
               return { dims: acc.dims + (sc?.dims ?? 0), block: acc.block + (sc?.block ?? 0) };
             },
             { dims: 0, block: 0 },
-          )
+          ),
+        )
       : undefined;
     const placementFreedom = pivots.some((p) => p.placementFreedom)
-      ? () =>
+      ? lazy3(() =>
           pivots.reduce<PlacementFreedom3>(
             (acc, p) => {
-              const f = p.placementFreedom?.() ?? NO_PLACEMENT_FREEDOM3;
+              const f = lazyValue3(p.placementFreedom) ?? NO_PLACEMENT_FREEDOM3;
               return { dim: acc.dim + f.dim, generators: [], counted: acc.counted + f.counted, rotation: [], scaleFree: acc.scaleFree || f.scaleFree, translation: [] };
             },
             { ...NO_PLACEMENT_FREEDOM3 },
-          )
+          ),
+        )
       : undefined;
     pivot = {
       solutions: Math.min(...pivots.map((p) => p.solutions)),
@@ -2216,6 +2623,7 @@ function joinParts3(c: Construction3, rs: readonly Resolved3[], seed: Seed3): Re
       ...(symRoots ? { symRoots } : {}),
       ...(pointRoots ? { pointRoots } : {}),
       ...(riderTs ? { riderTs } : {}),
+      ...(others > 0 ? { others } : {}),
       ...(collapse ? { collapse } : {}),
       ...(scalarConsumed ? { scalarConsumed } : {}),
       ...(placementFreedom ? { placementFreedom } : {}),
@@ -2267,6 +2675,40 @@ function resolveJoint3(c: Construction3, seed: number, opts: Resolve3Opts): Reso
   return first;
 }
 
+/**
+ * #2795 ([ADR-3D-483](../../docs/06b-decisions-3d.md#adr-3d-483)) — A RESTATEMENT NEVER MOVES THE DRAWING (the ADR-623 port).
+ * A pin the figure is already forced to hold (the pivot's measured `heldPins`: its rows add no rank, newest stating fact
+ * first) is left out, and the figure is solved as it was before that fact: the same rows from the same `dims0`, so the same
+ * drawing. Kept only when every left-out pin's claim holds there at the verifier's own tolerance (`claimHoldsAt3`) and the
+ * solve placed the figure; otherwise today's solution stands. A left-out pin stays a claim, so nothing is dropped: delete the
+ * earlier given and the restated pin is no longer held, so it drives. The released construction is memoised per pin set,
+ * so its solves (and a read-back image's replay) are shared across seeds.
+ */
+const releasedMemo3 = new WeakMap<Construction3, Map<string, Construction3>>();
+/** #2795 (docs/17 §9): exercised counters — solves that found a held pin, and those whose release was kept. */
+export const heldReleaseStats3 = { held: 0, released: 0 };
+function resolveHeld3(c: Construction3, seed: number, opts: Resolve3Opts): Resolved3 {
+  const first = resolveJoint3(c, seed, opts);
+  if (!c.scalarPins.some((p) => scalarPinOrigin3.get(p)?.claim !== undefined)) return first;
+  const held = first.pivot && first.pivot.solutions > 0 ? (lazyValue3(first.pivot.heldPins) ?? []).map((i) => c.scalarPins[i]) : [];
+  if (held.length === 0) return first;
+  heldReleaseStats3.held++;
+  const key = held.map((p) => c.scalarPins.indexOf(p)).join(',');
+  let per = releasedMemo3.get(c);
+  if (!per) releasedMemo3.set(c, (per = new Map()));
+  let released = per.get(key);
+  if (!released) per.set(key, (released = { ...c, scalarPins: c.scalarPins.filter((p) => !held.includes(p)) }));
+  const retry = resolveJoint3(released, seed, opts);
+  if (retry.pivot && retry.pivot.solutions === 0) return first;
+  if (first.freeHolds && !retry.freeHolds) return first;
+  const holds = held.every((p) => {
+    const claim = scalarPinOrigin3.get(p)?.claim;
+    return claim !== undefined && claimHoldsAt3(claim, c, retry);
+  });
+  if (holds) heldReleaseStats3.released++;
+  return holds ? retry : first;
+}
+
 /** What a configuration is resolved at. */
 export interface Resolve3Opts {
   /** #1474: an explicit parameter branch. */
@@ -2279,6 +2721,12 @@ export interface Resolve3Opts {
    */
   placementImage?: boolean;
   /**
+   * #2907 (ADR-3D-498): the k-th (from 1) admissible configuration OTHER than the one the seed draws, standing in for the
+   * pick wherever a pool holds that many (`pivot.others`). For the knowledge gates only (`knowledgeSamples3({ readback:
+   * true })`), never for a drawing: the pools are replayed from the plain configuration, so only the pick moves.
+   */
+  configuration?: number;
+  /**
    * #2630 (ADR-3D-400): the configuration as SOLVED, before the gauge normalisation turns it onto the floor. The
    * normalisation is a drawing convention: it makes a placement-only number (the components of a vector on a figure
    * nothing orients) the same at every seed, so agreement across seeds would read it as knowledge. The knowledge gates
@@ -2287,8 +2735,127 @@ export interface Resolve3Opts {
   solvedFrame?: boolean;
 }
 
+/** #2563 (ADR-3D-489): a `sym-coord` point at its letters' values. */
+export function symCoordAt3(def: Extract<PointDef, { kind: 'sym-coord' }>, valueOf: (sym: string) => number): Vec3 {
+  const at = (comp: number | SymComp): number => (typeof comp === 'number' ? comp : evalAffine(comp, valueOf));
+  return v3(at(def.x), at(def.y), at(def.z));
+}
+
+/**
+ * #2785 (ADR-3D-488), #2563 (ADR-3D-489) — THE COORDINATE LETTERS WHERE THE PIVOT DOES NOT RUN. Nothing moves, so the
+ * letters are READ from the figure: every point pin («B(2t,t,k)» on a placed B) and every pin on a `sym-coord` point
+ * («N(k,p,3)» then «N(1,2,3)») is an equation Σ kᵢ·letterᵢ + c = coordinate, solved jointly by least squares
+ * (Gauss–Newton from the seed anchors, so a letter no equation reaches stays at its anchor; a value-pinned letter is its
+ * number). A letter whose equations disagree takes the least-squares value, and the coordinate claims fail there.
+ * `free` is the number of open letters the equations leave undetermined (the DOF cue's count).
+ */
+export function readPinLetters3(c: Construction3, seed: number, pos: ReadonlyMap<Id, Vec3>): { values: Record<string, number>; free: number } {
+  const all = pinSymsOf(c);
+  const values: Record<string, number> = {};
+  for (const s of all) {
+    const v = symbolValueOf(c, s);
+    if (v !== undefined) values[s] = v;
+  }
+  const open = all.filter((s) => values[s] === undefined);
+  if (open.length === 0) return { values, free: 0 };
+  const AX = ['x', 'y', 'z'] as const;
+  const eqs: ((at: (s: string) => number) => number)[] = [];
+  const val = (comp: number | null | SymComp, at: (s: string) => number): number =>
+    comp === null ? NaN : typeof comp === 'number' ? comp : evalAffine(comp, at);
+  const reads = (comp: number | null | SymComp | undefined): boolean =>
+    comp !== null && comp !== undefined && typeof comp === 'object' && comp.terms.some((t) => open.includes(t.sym));
+  for (const pin of c.pins) {
+    const def = c.points.get(pin.id);
+    const sc = def?.kind === 'sym-coord' ? def : null;
+    const p = pos.get(pin.id);
+    for (const ax of AX) {
+      const comp = pin[ax];
+      if (comp === null) continue;
+      if (sc) {
+        if (!reads(comp) && !reads(sc[ax])) continue;
+        const own = sc[ax];
+        eqs.push((at) => val(comp, at) - val(own, at));
+      } else if (p && reads(comp)) {
+        const target = p[ax];
+        eqs.push((at) => val(comp, at) - target);
+      }
+    }
+  }
+  const anchors = open.map((s) => pinSymAnchor3(c, seed, s));
+  if (eqs.length === 0) {
+    open.forEach((s, j) => {
+      values[s] = anchors[j];
+    });
+    return { values, free: open.length };
+  }
+  const resid = (x: number[]): number[] => {
+    const at = (s: string) => {
+      const j = open.indexOf(s);
+      return j >= 0 ? x[j] : values[s];
+    };
+    return eqs.map((e) => e(at));
+  };
+  const jac = (x: number[], r0: number[]): number[][] =>
+    open.map((_, j) => {
+      const h = 1e-6 * Math.max(1, Math.abs(x[j]));
+      const xh = [...x];
+      xh[j] += h;
+      return resid(xh).map((v, i) => (v - r0[i]) / h);
+    });
+  const sq = (v: number[]) => v.reduce((a, b) => a + b * b, 0);
+  const n = open.length;
+  let best: { x: number[]; f: number } | null = null;
+  for (const shift of [0, 1, -1, 3, -3]) {
+    let x = anchors.map((a) => a + shift);
+    for (let it = 0; it < 40; it++) {
+      const r0 = resid(x);
+      const J = jac(x, r0);
+      // Levenberg damping: a direction no equation reaches has a zero gradient, so it never moves off its anchor
+      const M = Array.from({ length: n }, (_, a) => Array.from({ length: n }, (__, b) => J[a].reduce((acc, v, i) => acc + v * J[b][i], 0) + (a === b ? 1e-6 : 0)));
+      const g = Array.from({ length: n }, (_, a) => -J[a].reduce((acc, v, i) => acc + v * r0[i], 0));
+      const d = solveSmall(M, g);
+      if (!d) break;
+      x = x.map((v, j) => v + d[j]);
+      if (Math.max(...d.map(Math.abs)) <= 1e-13 * Math.max(1, ...x.map(Math.abs))) break;
+    }
+    const f = sq(resid(x));
+    if (x.every(Number.isFinite) && (!best || f < best.f - 1e-18)) best = { x, f };
+    if (best && best.f <= 1e-20) break;
+  }
+  if (best) {
+    const bx = best.x;
+    open.forEach((s, j) => {
+      values[s] = bx[j];
+    });
+  }
+  // the rank of the equations' response at the solution: the letters they determine
+  const xs = best ? best.x : anchors;
+  return { values, free: n - matrixRank3(jac(xs, resid(xs))) };
+}
+
+/** Numerical rank of the columns-by-equations Jacobian (Gaussian elimination, relative tolerance). */
+function matrixRank3(cols: number[][]): number {
+  const a = cols.map((r) => [...r]);
+  const m = a.length; // unknowns
+  const n = m > 0 ? a[0].length : 0; // equations
+  const scale = Math.max(1e-300, ...a.flat().map(Math.abs));
+  let rank = 0;
+  for (let row = 0; row < m && rank < n; row++) {
+    let piv = -1;
+    for (let i = rank; i < n; i++) if (Math.abs(a[row][i]) > 1e-8 * scale && (piv < 0 || Math.abs(a[row][i]) > Math.abs(a[row][piv]))) piv = i;
+    if (piv < 0) continue;
+    for (const r of a) [r[rank], r[piv]] = [r[piv], r[rank]];
+    for (let r = row + 1; r < m; r++) {
+      const f = a[r][rank] / a[row][rank];
+      for (let k = rank; k < n; k++) a[r][k] -= f * a[row][k];
+    }
+    rank++;
+  }
+  return rank;
+}
+
 function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): Resolved3 {
-  if (opts.placementImage) resolveStats3.images++;
+  if (opts.placementImage || opts.configuration) resolveStats3.images++;
   else resolveStats3.uncached++;
   const pos: Positions3 = new Map<Id, Vec3>();
 
@@ -2304,6 +2871,12 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   // (provisional) parameter value — re-placed post-pivot when a paramGiven pins k.
   for (const [id, def] of c.points) {
     if (def.kind === 'coord-sym') pos.set(id, v3(linVal(def.x, a), linVal(def.y, a), linVal(def.z, a)));
+  }
+  // #2563 (ADR-3D-489): where the pivot does not run, a `sym-coord` point stands at its letters read off the placed
+  // points (a letter another coordinate pins) or at its seed anchor (an open letter). Where it runs, the pivot places it.
+  if (!pivotRuns3(c) && [...c.points.values()].some((d) => d.kind === 'sym-coord')) {
+    const letters = readPinLetters3(c, seed, pos).values;
+    for (const [id, def] of c.points) if (def.kind === 'sym-coord') pos.set(id, symCoordAt3(def, (s) => letters[s] ?? pinSymAnchor3(c, seed, s)));
   }
 
   // #801 (ADR-3D-174): an object whose coefficients are in a PIN SYMBOL is resolved by the PIVOT, which
@@ -2355,7 +2928,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   // earlier position included); a solve probed from one state and applied over another would land elsewhere.
   let determined: ReadonlyMap<Id, Determined3> = new Map();
   if (c.determinations.length > 0 && !pivotRuns3(c)) {
-    const absolute = [...c.points].filter(([, def]) => def.kind === 'coord' || def.kind === 'coord-sym').map(([id]) => [id, pos.get(id)!] as const);
+    const absolute = [...c.points].filter(([, def]) => def.kind === 'coord' || def.kind === 'coord-sym' || def.kind === 'sym-coord').map(([id]) => [id, pos.get(id)!] as const);
     const solved = solveDeterminations(c, (ts) => {
       const p2: Positions3 = new Map(absolute);
       evaluateSolidsAndPoints(c, seed, p2, new Map(planes), new Map(lines), undefined, undefined, undefined, undefined, undefined, ts);
@@ -2402,7 +2975,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       // snapped first, so the value the verifier's own predicate judges is the value drawn (ADR-3D-286 §3)
       roots = snapAndDedupe(candidates).filter(holdsAll);
     }
-    const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+    const ownBound = symBound3(c, c.param); // #1524 (ADR-3D-477): the parameter's own sign or range
+    const pool0 = ownBound ? roots.filter((t) => boundHolds3(ownBound, t)) : roots;
     const pool = pool0.length > 0 ? pool0 : roots;
     if (pool.length > 0) {
       const value = opts.paramValue !== undefined ? nearestBranch(pool, opts.paramValue) : pool[seed % pool.length]; // #1474
@@ -2508,8 +3082,15 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     // V8-c: a symbol pinned ⟂/∥ a plane is a candidate to co-solve with a free dim.
     const coupledPins = c.symbolPins.filter((p) => p.rel === 'perp' || p.rel === 'parallel');
     const coupledSyms = [...new Set(coupledPins.map((p) => p.sym))];
-    const overrideOf = (sol: PivotResult): Map<string, number> | undefined =>
-      sol.symbols ? new Map(coupledSyms.map((s, i) => [s, sol.symbols![i]])) : undefined;
+    const hasSymCoord = [...c.points.values()].some((d) => d.kind === 'sym-coord');
+    const overrideOf = (sol: PivotResult): Map<string, number> | undefined => {
+      const m = sol.symbols ? new Map(coupledSyms.map((s, i) => [s, sol.symbols![i]])) : undefined;
+      // #2563 (ADR-3D-489): a `sym-coord` point stands where the solution's pin symbols put it
+      if (!hasSymCoord || !sol.pinSymbols) return m;
+      const out = m ?? new Map<string, number>();
+      for (const [s, v] of Object.entries(sol.pinSymbols)) if (Number.isFinite(v)) out.set(s, v);
+      return out;
+    };
     /** #820: the rider twin of `overrideOf` — every re-evaluation of a solution must place a DRIVEN
      *  rider where the pivot put it, or the positions written back would contradict the residuals
      *  that accepted them. */
@@ -2528,7 +3109,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
      * image READS the record; a plain resolve only writes it, so the drawing's path is unchanged.
      */
     const baseKey = opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`;
-    const replay = opts.placementImage ? pivotStageMemo3.get(c)?.get(baseKey) : undefined;
+    const replay = opts.placementImage || opts.configuration ? pivotStageMemo3.get(c)?.get(baseKey) : undefined;
     const record: PivotPool[] = [];
     const solveStage = (run: () => PivotPool): PivotPool => {
       const n = record.length;
@@ -2546,6 +3127,23 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       reseatMixed3(c, seed, out, planes, lines, ridersOf(sol));
       return out;
     };
+    /**
+     * #2795 (ADR-3D-483): a lazy probe asked AFTER the resolve evaluates the canonical figure at trial unknowns, and that
+     * evaluation writes this resolve's plane and line maps — the very maps the resolved figure carries. The probe is run
+     * with both restored afterwards, so asking it never changes the figure it measured.
+     */
+    const keepMaps = <T,>(probe: () => T): (() => T) => () => {
+      const savedPlanes = [...planes];
+      const savedLines = [...lines];
+      try {
+        return probe();
+      } finally {
+        planes.clear();
+        for (const [k, v] of savedPlanes) planes.set(k, v);
+        lines.clear();
+        for (const [k, v] of savedLines) lines.set(k, v);
+      }
+    };
     const applySolutions = (solutions: PivotPool): void => {
       const satisfiesSigns = (sol: PivotResult): boolean => {
         const p2 = evalCanonical(sol.dims, false, overrideOf(sol), ridersOf(sol));
@@ -2553,7 +3151,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         // among pivot solutions, exactly like a coordinate sign given
         const symsOk = c.paramSigns.every((s) => {
           const v = sol.pinSymbols?.[s.sym];
-          return v === undefined ? true : s.positive ? v > 1e-9 : v < -1e-9;
+          const b = symBound3(c, s.sym); // #1524: the letter's folded sign or range
+          return v === undefined || !b ? true : boundHolds3(b, v);
         });
         if (!symsOk) return false;
         // #814: the same selection for a letter that NAMES a free component («p חיובי» after
@@ -2570,8 +3169,13 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           return g.positive ? val > 1e-9 : val < -1e-9;
         });
       };
-      const satisfying = solutions.filter(satisfiesSigns);
-      const solverOrder = satisfying.length > 0 ? satisfying : solutions;
+      const satisfyingAll = solutions.filter(satisfiesSigns);
+      const satisfying = satisfyingAll.filter((s) => !s.reach);
+      // #2907 (ADR-3D-498): the branch fan's configurations are ADMISSIBLE (they join every record below) but never drawn,
+      // and never stand in for a pool the drawing would otherwise read as empty or unsigned
+      const drawable = solutions.filter((s) => !s.reach);
+      const solverOrder = satisfying.length > 0 ? satisfying : drawable;
+      const reached = satisfying.length > 0 ? satisfyingAll.filter((s) => s.reach) : [];
       /**
        * #2814 (ADR-3D-461, extends ADR-3D-168 Am. 1's interleave) — THE PICK IS OVER DISTINCT CONFIGURATIONS, in an
        * order the configurations alone decide (`configurationOrder3`). `pool[seed % pool.length]` over the raw pool
@@ -2583,14 +3187,42 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       const order = frames ? configurationOrder3(solverOrder.map((sol, i) => ({ pos: frames[i], pinSymbols: sol.pinSymbols }))) : solverOrder.map((_, i) => i);
       const pool = order.map((i) => solverOrder[i]);
       const poolFrames = frames ? order.map((i) => frames[i]) : null;
+      // #2907 (ADR-3D-498): the ADMISSIBLE set the records describe — the drawn pool, then what only the fan reached
+      const admissible = [...pool, ...reached];
       if (pool.length > 0) {
-        const chosen = pool[seed % pool.length];
+        const drawnAt = seed % pool.length;
+        /**
+         * #2907 (ADR-3D-498) — THE ROOTS THIS SEED DOES NOT DRAW: for each point the branch fan reached a root of (a point the givens
+         * determine — the fan's own test), one admissible configuration per other position of that point, in admissible order. A
+         * knowledge image (`opts.configuration = k`) stands on the k-th; a drawing never does. Entries are told apart by
+         * the fanned point ALONE: the pool also holds the scatter of a continuum (every cold start's creep stops at its
+         * own point of it), which is no second configuration and would cost a resolve each.
+         */
+        const allFrames: Positions3[] | null = admissible.length > 1 ? [...(poolFrames ?? [finalFrameOf(pool[0])]), ...reached.map(finalFrameOf)] : null;
+        const others: number[] = [];
+        if (allFrames) {
+          // every position a fanned point takes in the admissible set, other than where this seed draws it — the pool's
+          // own entries included (a cold start may have found the root the drawing skips), judged on that point alone
+          const stand: { id: Id; at: Vec3 }[] = [];
+          for (const id of new Set(reached.map((sol) => sol.reach!))) {
+            const drawnP = allFrames[drawnAt].get(id);
+            if (drawnP) stand.push({ id, at: drawnP });
+            allFrames.forEach((frame, i) => {
+              const at = frame.get(id);
+              if (!at || stand.some((q) => q.id === id && samePointConfig3(q.at, at))) return;
+              stand.push({ id, at });
+              if (!others.includes(i)) others.push(i);
+            });
+          }
+        }
+        const pickAt = opts.configuration && opts.configuration <= others.length ? others[opts.configuration - 1] : drawnAt;
+        const chosen = admissible[pickAt];
         // #797 (ADR-3D-168 Am. 1): the ADMISSIBLE pool's distinct values per pin symbol —
         // post sign-filtering, so a sign given that narrows to one root makes it determined.
         // The panel prints a value only when this set is a singleton at every sampled seed:
         // «k = 1» while k ∈ {1,2} was a branch choice masquerading as knowledge.
         const symRoots: Record<string, number[]> = {};
-        for (const sol of pool) {
+        for (const sol of admissible) {
           for (const [s, v] of Object.entries(sol.pinSymbols ?? {})) {
             const list = (symRoots[s] ??= []);
             if (!list.some((r) => Math.abs(r - v) <= 1e-3 * Math.max(1, Math.abs(r)))) list.push(v);
@@ -2613,8 +3245,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
          * no branch to miss, and this is the solver's hot path.
          */
         const pointRoots: Record<string, Vec3[]> = {};
-        if (pool.length > 1 && poolFrames) {
-          for (const frame of poolFrames) {
+        if (allFrames) {
+          for (const frame of allFrames) {
             // the same lane rule the chosen solution below uses (`finalFrameOf`) — an equation-plane point is
             // Lane-A absolute and must NOT be transformed, or every branch would look distinct; a mixed point is
             // re-derived in the solution's own frame (#2798)
@@ -2630,16 +3262,20 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         // #2814 (ADR-3D-461): the drive's warm start stays the SOLVER-order entry — measured, warming from the new pick
         // moved stage 4's drive start and the #1769 prism's drive lost its k = −1 root. The drawing changes; the
         // drive's search does not.
-        const warmFrom = solverOrder[seed % solverOrder.length];
+        // #2907 (ADR-3D-498): a knowledge image warms its later stages from the configuration it stands on
+        const warmFrom = pickAt === drawnAt ? solverOrder[seed % solverOrder.length] : chosen;
         warm.x = [...warmFrom.x];
         warm.mirror = warmFrom.mirror;
         // the figure lane rides the chosen similarity, the fixed lane stays verbatim, and a mixed point is re-derived
         // from its own definition in the final frame (#2798, ADR-3D-456)
-        for (const [id, q] of poolFrames ? poolFrames[seed % pool.length] : finalFrameOf(chosen)) pos.set(id, q);
+        for (const [id, q] of allFrames ? allFrames[pickAt] : poolFrames ? poolFrames[drawnAt] : finalFrameOf(chosen)) pos.set(id, q);
+        const heldOf = chosen.heldPins;
         pivot = {
-          solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols,
+          solutions: pool.length, chosen: pickAt, err: chosen.err, pinSymbols: chosen.pinSymbols,
+          ...(others.length > 0 ? { others: others.length } : {}),
           ...(chosen.riderTs ? { riderTs: chosen.riderTs } : {}),
-          ...(chosen.scalarConsumed ? { scalarConsumed: chosen.scalarConsumed } : {}), // #990: lazy, display-path only
+          ...(chosen.scalarConsumed ? { scalarConsumed: lazy3(chosen.scalarConsumed) } : {}), // #990: lazy, display-path only
+          ...(heldOf ? { heldPins: lazy3(keepMaps(() => heldOf().map((p) => c.scalarPins.indexOf(p)))) } : {}), // #2795 (ADR-3D-483): lazy, read by `resolveHeld3`
           ...(Object.keys(symRoots).length > 0 ? { symRoots } : {}),
           ...(Object.keys(pointRoots).length > 0 ? { pointRoots } : {}),
         };
@@ -2954,7 +3590,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       }
     }
 
-    if (!opts.placementImage) {
+    if (!opts.placementImage && !opts.configuration) {
       let per = pivotStageMemo3.get(c);
       if (!per) pivotStageMemo3.set(c, (per = new Map()));
       per.set(baseKey, record);
@@ -2980,11 +3616,13 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       };
       let xAt = [...warm.x];
       let mirrorAt = warm.mirror ?? false;
-      let measured: PlacementFreedom3 | null = null;
-      const placementFreedom = (): PlacementFreedom3 =>
-        (measured ??=
+      // #2890 (ADR-3D-492): a cell on the pivot, never a closure; `measured()` is this resolve's own ask
+      const placementFreedom = lazy3<PlacementFreedom3>(
+        () =>
           solvePivot(c, ECat, dims0, seed, undefined, members, undefined, linesAt, { x: xAt, mirror: mirrorAt, freedom: 'measure' })[0]
-            ?.placementFreedom?.() ?? NO_PLACEMENT_FREEDOM3);
+            ?.placementFreedom?.() ?? NO_PLACEMENT_FREEDOM3,
+      );
+      const measured = (): PlacementFreedom3 => lazyHeld3(placementFreedom) ?? computeHere3(placementFreedom);
       pivot = { ...pivot, placementFreedom };
       // #2378 (ADR-3D-379) — THE DRAWING TURNS. The operator's 2026-10-23 ruling (#2378, card d04 A): "Each
       // press turns the cube about AB to a new angle. The first drawing may no longer sit square on the floor."
@@ -2996,7 +3634,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       // #2504 (ADR-3D-379): the SIZE first (the operator's d03b ruling: "Every anchored cube whose size no given
       // fixes changes size on the button"), so the turn's exactness test then runs at the drawn size. One park,
       // on the path every figure takes; the solver's own #518 park still runs where it always did.
-      if (leftoverPlacementApplies3(c) && placementFreedom().scaleFree) {
+      if (leftoverPlacementApplies3(c) && measured().scaleFree) {
         const posBefore = new Map(pos);
         const paramBefore = paramOut;
         const pivotBefore = pivot;
@@ -3035,7 +3673,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           } else if (warm.x) {
             xAt = [...warm.x];
             mirrorAt = warm.mirror ?? false;
-            measured = null;
+            forgetLazy3(placementFreedom);
             pivot = {
               ...pivot!, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen, placementFreedom,
               ...(pivotBefore.symRoots ? { symRoots: pivotBefore.symRoots } : {}),
@@ -3044,7 +3682,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           }
         }
       }
-      if (leftoverPlacementApplies3(c) && placementFreedom().rotation.length > 0) {
+      if (leftoverPlacementApplies3(c) && measured().rotation.length > 0) {
         const posBefore = new Map(pos);
         const paramBefore = paramOut;
         const pivotBefore = pivot;
@@ -3078,7 +3716,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           turnWalked = true;
           xAt = [...warm.x];
           mirrorAt = warm.mirror ?? false;
-          measured = null;
+          forgetLazy3(placementFreedom);
           pivot = {
             ...pivot!, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen, placementFreedom,
             ...(pivotBefore.symRoots ? { symRoots: pivotBefore.symRoots } : {}),
@@ -3086,7 +3724,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           };
         }
       }
-      if (opts.placementImage && placementFreedom().dim > 0) {
+      if (opts.placementImage && measured().dim > 0) {
         // transactional, exactly as stage 5: an image that breaks a sign given or the parameter is no image
         const posBefore = new Map(pos);
         const paramBefore = paramOut;
@@ -3848,7 +4486,7 @@ function solveLengthDetermination(
 }
 
 /** Gaussian elimination with partial pivoting for the ≤ 3×3 normal equations; null when singular. */
-function solveSmall(M: number[][], r: number[]): number[] | null {
+export function solveSmall(M: number[][], r: number[]): number[] | null {
   const n = r.length;
   const a = M.map((row, i) => [...row, r[i]]);
   const norm = Math.max(1e-300, ...M.flat().map(Math.abs));
@@ -3896,21 +4534,58 @@ export function paramConfigValues3(c: Construction3, seed: number, r: Resolved3 
 const RAW: Resolve3Opts = { solvedFrame: true };
 
 export function knowledgeSamples3(c: Construction3, baseSeeds: readonly number[], opts: { readback?: boolean } = {}): Resolved3[] {
-  return baseSeeds.flatMap((s) => {
-    const r0 = resolve3(c, s, RAW);
-    const vals = paramConfigValues3(c, s, r0);
-    const confs: { r: Resolved3; paramValue?: number }[] =
-      vals.length <= 1 ? [{ r: r0 }] : vals.map((v) => (v === r0.param!.value ? { r: r0 } : { r: resolve3(c, s, { ...RAW, paramValue: v }), paramValue: v }));
-    if (!opts.readback) return confs.map((k) => k.r);
-    // #2368 (ADR-3D-375): READ-BACK adds, per configuration whose placement keeps a measured leftover rigid
-    // freedom, its exact IMAGE along it — agreement can only see what is varied, and the multi-start never
-    // varies that freedom. The image's one-entry pool keeps the «או» rows and `branchAgrees` honest (a
-    // moved point is not a second configuration). Claims and narrowing stay on the plain samples.
-    return confs.flatMap(({ r, paramValue }) =>
-      (r.pivot?.placementFreedom?.().dim ?? 0) > 0
-        ? [r, resolve3(c, s, { ...RAW, ...(paramValue !== undefined ? { paramValue } : {}), placementImage: true })]
-        : [r],
-    );
+  const all = (s: number): Resolved3[] => samplesAtSeed3(c, s, opts);
+  if (!hasStatedSelectors3(c)) return baseSeeds.flatMap(all);
+  /**
+   * #2916 ([ADR-3D-533](../../docs/06b-decisions-3d.md#adr-3d-533)) — ONLY ADMITTED CONFIGURATIONS ARE EVIDENCE. A sample that
+   * breaks a stated selector ({@link admittedConfiguration3}) is dropped; a base seed left with none is replaced by the
+   * next seed of its reserve walk (s + k·{@link RESERVE_STEP3}), at most one reserve seed per base seed in all, so the
+   * gauge keeps as many witnesses as it was given (one picture always agrees with itself — analytic's #1642) and the work
+   * stays bounded. Nothing admitted anywhere: the figure itself breaks a given, and its own line already says so (the
+   * store's verifier) — the plain samples stand, as before, rather than an empty set that every gate would read as agreement.
+   */
+  const out: Resolved3[] = [];
+  let spare = baseSeeds.length;
+  for (const s of baseSeeds) {
+    let got = all(s).filter((r) => admittedConfiguration3(c, r));
+    for (let k = 1; got.length === 0 && spare > 0; k++, spare--) got = all(s + k * RESERVE_STEP3).filter((r) => admittedConfiguration3(c, r));
+    out.push(...got);
+  }
+  return out.length > 0 ? out : baseSeeds.flatMap(all);
+}
+
+/** #2916: the reserve walk's stride — clear of every lane's base offsets (1013, 2027, 3041, 4057). */
+const RESERVE_STEP3 = 6089;
+
+/** #2916: does the figure state anything {@link admittedConfiguration3} judges? None: every sample is admitted, at no cost. */
+function hasStatedSelectors3(c: Construction3): boolean {
+  return (
+    c.signGivens.length > 0 ||
+    c.componentSigns.length > 0 ||
+    c.paramSigns.length > 0 ||
+    c.memberships.some((m) => m.side !== undefined) ||
+    c.requirements.some((req) => req.kind !== 'quad-general')
+  );
+}
+
+/** One base seed's knowledge samples: every configuration of the parameter, and with `readback` the image and the fanned roots. */
+function samplesAtSeed3(c: Construction3, s: number, opts: { readback?: boolean }): Resolved3[] {
+  const r0 = resolve3(c, s, RAW);
+  const vals = paramConfigValues3(c, s, r0);
+  const confs: { r: Resolved3; paramValue?: number }[] =
+    vals.length <= 1 ? [{ r: r0 }] : vals.map((v) => (v === r0.param!.value ? { r: r0 } : { r: resolve3(c, s, { ...RAW, paramValue: v }), paramValue: v }));
+  if (!opts.readback) return confs.map((k) => k.r);
+  // #2368 (ADR-3D-375): READ-BACK adds, per configuration whose placement keeps a measured leftover rigid
+  // freedom, its exact IMAGE along it — agreement can only see what is varied, and the multi-start never
+  // varies that freedom. The image's one-entry pool keeps the «או» rows and `branchAgrees` honest (a
+  // moved point is not a second configuration). Claims and narrowing stay on the plain samples.
+  // #2907 (ADR-3D-498): READ-BACK also stands on every OTHER admissible configuration of the configuration's pool — the
+  // seeds sample the gauge and `pool[seed % n]` reaches the rest only by arithmetic (the #1474 lesson, one lane over),
+  // so a value that differs on a configuration no seed draws read as fact
+  return confs.flatMap(({ r, paramValue }) => {
+    const at = paramValue !== undefined ? { paramValue } : {};
+    const others = Array.from({ length: r.pivot?.others ?? 0 }, (_, k) => resolve3(c, s, { ...RAW, ...at, configuration: k + 1 }));
+    return (placementFreedom3(r)?.dim ?? 0) > 0 ? [r, resolve3(c, s, { ...RAW, ...at, placementImage: true }), ...others] : [r, ...others];
   });
 }
 
@@ -4071,6 +4746,10 @@ function evaluateSolidsAndPoints(
         return sgn * mag;
       };
       pos.set(id, v3(comp('x'), comp('y'), comp('z')));
+    } else if (def.kind === 'sym-coord') {
+      // #2563 (ADR-3D-489): absolute, at its letters' values — the pivot's (the override), a stated value, or the seed
+      // anchor. A placement the caller already made (the no-pivot read in `resolve3`) stands.
+      if (!pos.has(id)) pos.set(id, symCoordAt3(def, (s) => symbolOverride?.get(s) ?? symbolValueOf(c, s) ?? pinSymAnchor3(c, seed, s)));
     } else if (def.kind === 'circle-centre3') {
       // #2611 stage B (ADR-3D-420): the circle's members precede it (`pointParents3`), and it stands where they say
       const k = c.circles3.find((x) => x.id === def.circle);
@@ -4189,22 +4868,38 @@ function evaluateSolidsAndPoints(
           // and «k שלילי» falsely `sign-unsatisfiable`: the figure can perfectly well put N beyond S on
           // the SC line, the sampler just never looked there. A default that survives a contradicting
           // statement is asserting a given the student never gave (ADR-052), so the range follows the sign.
-          const neg = c.paramSigns.some((g) => g.sym === vd.symbol && !g.positive);
+          // #1524 (ADR-3D-477): ...and a stated RANGE is the student choosing which part of it; a sign gives the
+          // same windows as before ((0.2, 0.8) / (−0.8, −0.2)).
           // #1829 (ADR-3D-471): ONE LETTER, ONE NUMBER — the draw is keyed by the letter's FIRST definition, so
           // «DF = t·DC» and «BE = t·BC» place F and E at the same t (keyed per point, they drew two different t's).
           // A letter with one definition keeps its key, so its drawing is unchanged.
           const keyPt = c.vecDefs.find((d) => d.symbol === vd.symbol)?.unknown ?? vd.unknown;
-          k = neg
-            ? sample(seed, `sym-${vd.symbol}-${keyPt}`, -0.8, -0.2)
-            : sample(seed, `sym-${vd.symbol}-${keyPt}`, 0.2, 0.8);
+          const [k0, k1] = boundWindow3(symBound3(c, vd.symbol), 0.2, 0.8, 0.2);
+          k = sample(seed, `sym-${vd.symbol}-${keyPt}`, k0, k1);
         }
       }
       // #930 (ADR-3D-236): record the value ACTUALLY used, on every path — the pinned root pick above
       // and the sampled free DOF alike. Recording per-branch missed the sampled case, and the sign
       // verifier then reported `sign-unsatisfiable` on a figure whose k was a perfectly positive sample.
       if (vd.symbol) ratioSymbols?.set(vd.symbol, k);
+      /**
+       * #1551 (ADR-3D-472): a definition with SEVERAL letters («EN = a·EA + b·EC») — each letter a free number, given its
+       * stated value or sampled like a one-letter ratio (one letter, one number: keyed by its first definition, the sign
+       * given choosing the side). No relation drives these letters; a point placed by them has one free DOF per letter.
+       */
+      const letterVals = new Map<string, number>();
+      for (const sym of vd.symbols ?? []) {
+        const given = symbolValueOf(c, sym);
+        const keyPt = c.vecDefs.find((d) => d.symbols?.includes(sym) || d.symbol === sym)?.unknown ?? vd.unknown;
+        // #1524 (ADR-3D-477): the letter's stated sign or range, as the one-letter ratio above reads it (a sign gives the
+        // half-windows [0.2, 0.8] / [−0.8, −0.2] bit for bit)
+        const [w0, w1] = boundWindow3(symBound3(c, sym), 0.2, 0.8, 0.2);
+        const v = given ?? sample(seed, `sym-${sym}-${keyPt}`, w0, w1);
+        letterVals.set(sym, v);
+        ratioSymbols?.set(sym, v);
+      }
       // #1188 step 2: a definition over a free vector reads its pure value (apply admits only pure, symbol-free ones)
-      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined);
+      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined, (sym) => letterVals.get(sym) ?? 0);
       if (P) pos.set(id, P);
     } else if (def.kind === 'vec-pair') {
       // the cevian intersection: each relation traces an affine line in its own symbol
@@ -4910,7 +5605,16 @@ export function checkInSpan(
 export function meetsRequirements3(c: Construction3, seed: Seed3): boolean {
   const hard = c.requirements.filter((req) => req.kind !== 'quad-general');
   if (hard.length === 0) return true;
-  const r = resolve3(c, seed);
+  return seedVerdict3(c, `requirements|${seedKey3(seed)}`, () => requirementsMetAt3(c, seed, hard)); // #2888
+}
+
+/** {@link meetsRequirements3}'s judgement of one seed (the figure resolved there). */
+function requirementsMetAt3(c: Construction3, seed: Seed3, hard: readonly Exclude<Requirement3, { kind: 'quad-general' }>[]): boolean {
+  return requirementsHoldOn3(c, resolve3(c, seed), hard);
+}
+
+/** The stated requirements judged on one resolved configuration — the seed search's predicate and the knowledge admission's. */
+function requirementsHoldOn3(c: Construction3, r: Resolved3, hard: readonly Exclude<Requirement3, { kind: 'quad-general' }>[]): boolean {
   return hard.every((req) => {
     if (req.kind === 'mutual') {
       // S4 (#378): the drawn configuration must actually SHOW the stated position. For `skew` this
@@ -4931,6 +5635,59 @@ export function meetsRequirements3(c: Construction3, seed: Seed3): boolean {
     const deg = (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2) / (n1 * n2)))) * 180) / Math.PI;
     return (req.min === undefined || deg > req.min) && (req.max === undefined || deg < req.max);
   });
+}
+
+/**
+ * THE VALUE A STATED LETTER TAKES IN ONE CONFIGURATION — the one reader of «k חיובי»'s k (#2916 moved it here from the store's
+ * verifier, so the knowledge admission and the verifier cannot read a letter two ways). A letter is the figure parameter, a
+ * pivot pin symbol (#325), a vec-def ratio symbol (#930), a free-vector system's letter (#2684) or the NAME of a free
+ * component (#814, #1188). `undefined` when the letter names nothing in this configuration.
+ */
+export function statedLetterValue3(c: Construction3, r: Resolved3, sym: string): number | undefined {
+  if (r.param?.name === sym) return r.param.value;
+  const bound = c.partialNames.find((b) => b.sym === sym);
+  return (
+    r.pivot?.pinSymbols?.[sym] ??
+    r.ratioSymbols?.[sym] ??
+    r.freeSyms.get(sym) ??
+    (bound ? componentValue(c, bound.target, bound.axis, (id) => r.positions.get(id), r.freeVectors) : undefined)
+  );
+}
+
+/**
+ * #2916 ([ADR-3D-533](../../docs/06b-decisions-3d.md#adr-3d-533)) — IS THIS CONFIGURATION ADMITTED AS KNOWLEDGE? Every stated
+ * selector holds on it: each coordinate sign («שיעור ה-y של A שלילי»), each named component's sign (#814), each letter's
+ * sign («k חיובי»), each side of a plane («מעל המישור»), and each stated requirement (an angle bound, a mutual position).
+ *
+ * The selectors determine nothing — the sampler resolves a configuration and the pivot's sign walk usually lands on the
+ * honouring root, but nothing guaranteed it (seed + 3041 on the ADR-3D-032 exam box put A at y > 0). A configuration that
+ * breaks a given is not one the givens allow, so a value read off it is no evidence either way: 2-D's and analytic's rule
+ * (every printed value is witnessed by an ADMITTED configuration). The predicates are the verifier's own, at its tolerances.
+ */
+export function admittedConfiguration3(c: Construction3, r: Resolved3): boolean {
+  const at = (id: Id): Vec3 | undefined => r.positions.get(id);
+  for (const g of c.signGivens) {
+    const v = at(g.id)?.[g.axis];
+    if (!(v !== undefined && (g.positive ? v > 1e-9 : v < -1e-9))) return false;
+  }
+  if (!componentSignsHold(c, at)) return false;
+  for (const g of c.paramSigns) {
+    const v = statedLetterValue3(c, r, g.sym);
+    // #1524 (ADR-3D-477): a stated sign is a range — the verifier's own test (`boundHolds3`), so a stated range admits too
+    if (v !== undefined && Number.isFinite(v) && !boundHolds3(g.bound, v)) return false;
+  }
+  for (const m of c.memberships) {
+    if (!m.side || m.plane === 'any') continue;
+    const p = at(m.id);
+    const pl = r.planes.get(m.plane);
+    if (!p || !pl) continue; // unresolvable: the verifier's own refusal, never this gate's
+    const nz = pl.n.z / norm3(pl.n);
+    if (Math.abs(nz) <= 1e-9) continue;
+    const signed = ((dot3(pl.n, p) + pl.d) / norm3(pl.n)) * (nz < 0 ? -1 : 1);
+    if (signed * (m.side === 'above' ? 1 : -1) <= 1e-9) return false;
+  }
+  const hard = c.requirements.filter((req): req is Exclude<Requirement3, { kind: 'quad-general' }> => req.kind !== 'quad-general');
+  return hard.length === 0 || requirementsHoldOn3(c, r, hard);
 }
 
 /**
@@ -5031,58 +5788,166 @@ export function meetsShapePreferences3(c: Construction3, seed: Seed3, prefs: rea
   // givens force a crossing still resolves, at the seed it resolved at before.
   const rings = c.solids.length > 0 || c.quadShapes.length > 0 || c.claims.some((k) => k.type === 'polygon-open');
   if (prefs.length === 0 && !rings) return true;
-  const r = resolve3(c, seed);
-  if (solidFaceCollapsed(c, r.positions)) return false;
-  if (declaredRingCrossed3(c, r.positions)) return false;
-  return prefs.every((req) => !preferenceFails3(req, r.positions));
+  const judge = (): boolean => {
+    const r = resolve3(c, seed);
+    if (solidFaceCollapsed(c, r.positions)) return false;
+    if (declaredRingCrossed3(c, r.positions)) return false;
+    return prefs.every((req) => !preferenceFails3(req, r.positions));
+  };
+  // #2888: WHICH preferences were asked is part of the verdict's key: each by its place among the figure's own (the
+  // search asks all of them, then the ones the givens leave possible). A preference that is not the figure's own has
+  // no place, and the seed is judged without the memo.
+  const own = quadPreferences3(c);
+  const places = prefs.map((req) => own.indexOf(req));
+  if (places.includes(-1)) return judge();
+  return seedVerdict3(c, `preferences|${seedKey3(seed)}|${places.join(',')}`, judge);
 }
 
 /**
- * The first seed from `from` whose configuration meets every requirement, or null within `budget`
- * tries. Deterministic — the same figure always lands on the same drawing (ADR-3D-053).
+ * #2893 ([ADR-3D-494](../../docs/06b-decisions-3d.md#adr-3d-494); ADR-W-210 invariant 3) — THE CONFIGURATION SEARCH IS
+ * BOUNDED IN WORK, AND A SEARCH THE LIMIT CUT SHORT SAYS SO.
  *
- * #615: TWO TIERS in ONE sweep (the ADR-267 lesson — never a second full pass): a seed that also draws
- * every stated shape visibly as itself wins outright; otherwise the first merely-valid seed is
- * remembered and returned when the sweep ends. So a figure whose givens FORCE a special case still
- * draws, at exactly the seed it would have drawn at before.
+ * The first seed from `from` whose configuration meets every requirement. Deterministic: the same figure always lands on
+ * the same drawing (ADR-3D-053). The search is DEFINED by its count, {@link SEARCH_SEEDS3} seeds from the start: a walk that
+ * judges them all and finds none is a FINISHED search (operator 2026-11-15, #2893: *"1a"*, *"a fixed try-count is a
+ * FINISHED search, like analytic"*), and the store refuses the line with today's `bound-unsatisfiable`. Now also:
+ *  - the walk is bounded by {@link SEED_SEARCH_LIMIT3} units of work (`shell/workLimit`), counted by
+ *    {@link searchWork3} (a memo hit is charged what it saved, and a judged seed at least {@link SEED_FLOOR3}: the same
+ *    outcome in a warm session as in a cold one), and checked before each seed is judged;
+ *  - reaching it before the count is spent, with no seed that meets the requirements, is "not decided"
+ *    (`shell/notDecided`): never a refusal, and it carries where the walk stopped ({@link SeedResume3}), so the next
+ *    round («המשיכו לחפש») goes on through the same window and judges no seed twice.
+ *
+ * #615: TWO TIERS in ONE sweep (the ADR-267 lesson — never a second full pass): a seed that also draws every stated
+ * shape visibly as itself wins outright; otherwise the first merely-valid seed is remembered (the fallback) and returned
+ * when the window ends — or when the limit is reached first: a valid seed exists, so that is an answer, not a run-out.
+ * So a figure whose givens FORCE a special case still draws, at exactly the seed it would have drawn at before.
  *
  * #2749 (ADR-3D-451): at the first valid seed a preference vetoes, the preferences the givens made impossible are
  * dropped ({@link possibleShapePreferences3}) and that seed is judged again — so a forced special case costs four
- * samples, not the budget, and lands on the seed the full sweep fell back to. Asked only on the failure path: a
- * figure whose first valid seed is preferred pays nothing new.
+ * samples, not the window, and lands on the seed the full sweep fell back to.
+ *
+ * #2764 (ADR-3D-454): a figure of several parts walks each part on its own, from its own entry; a part already drawn as
+ * it should be is answered by the first seed it is asked at.
  */
-export function firstSatisfyingSeed3(c: Construction3, from: Seed3 = 0, budget = 200): Seed3 | null {
-  const parts = partsOf3(c);
-  if (parts.length === 1) return firstSatisfyingSeedOf3(c, seedOfPart3(from, parts[0].key), budget);
-  // #2764 (ADR-3D-454): each part is judged and walked on its own, from its own entry. A part already drawn as it should
-  // be is answered by the first seed it is asked at, so nothing earlier moves when a line touches another part.
-  const entries: Record<string, number> = {};
-  for (const p of parts) {
-    const found = firstSatisfyingSeedOf3(p.construction, seedOfPart3(from, p.key), budget);
-    if (found === null) return null;
-    entries[p.key] = found;
+export interface SeedResume3 {
+  /** the parts already settled, by part key: the seed each landed on */
+  entries: Record<string, number>;
+  /** the part being walked (its index among the figure's parts) */
+  part: number;
+  /** the next seed to judge, as an offset from that part's own start */
+  next: number;
+  /** the first seed met that meets the requirements (null: none yet) */
+  fallback: number | null;
+  /** the preferences still asked, by place among the part's own, once the #2749 guard dropped some (null: all) */
+  prefs: number[] | null;
+  /** the #2749 guard has run */
+  guarded: boolean;
+}
+/** A search's outcome: a seed; `none` (the window was walked and no seed meets the requirements: finished); or "not
+ *  decided" (the work limit came first), with where it stopped. */
+export type SeedSearch3 = { kind: 'found'; seed: Seed3 } | { kind: 'none' } | NotDecided<SeedResume3>;
+
+/**
+ * #2893 — THE LIMIT, in the search's units (one residual evaluation of `leastSquares`, a memo hit charged what it saved,
+ * a judged seed at least {@link SEED_FLOOR3}): about 10 s of the configuration search on the dev PC (operator 2026-11-13,
+ * *"10s is an ok number"*). Calibrated in ADR-3D-494. One limit for every caller of the search (a typed line, an edit,
+ * «הציגו תצורה אחרת», a load), and the same on every machine: it counts work, not seconds.
+ */
+export const SEED_SEARCH_LIMIT3 = 2_500_000;
+/** The seeds that define the search, counted from its start (ADR-3D-053, #615): a walk that spends them is finished. */
+export const SEARCH_SEEDS3 = 200;
+/** #615's preference window is the same count. */
+export const PREFERENCE_SEEDS3 = SEARCH_SEEDS3;
+/**
+ * #2893 — THE LEAST A JUDGED SEED COSTS, in the same units. A figure placed in closed form (a cube, a pyramid over a
+ * square) is resolved with no `leastSquares` call at all, so its seeds cost nothing on the meter. Each seed judged is
+ * charged at least this (measured in ADR-3D-494), so the count is never blind to a walk.
+ */
+export const SEED_FLOOR3 = 2;
+/** The search's count: the charged work, plus each judged seed's floor where its own cost was below it. Monotone. */
+let seedFloors3 = 0;
+const searchWork3 = (): number => chargedWork3() + seedFloors3;
+
+/**
+ * #2893 — THE OUTCOMES A JOB HANDED OVER: the worker's search outcomes, for the page's run of the same action. Each is
+ * taken once, and the next job's outcomes replace any left; never written by a search of this heap, never asked by one
+ * that is not the same round (the key is the figure's content, the start, where the round resumes, and the limit). It is
+ * what that round found, not a memo of verdicts.
+ */
+let handedSearches3 = new WeakMap<Construction3, Map<string, SeedSearch3>>();
+
+/** One round of the configuration search, from `from` or from where an earlier round stopped. */
+export function searchSeed3(c: Construction3, from: Seed3, resume?: SeedResume3, limit: number = SEED_SEARCH_LIMIT3): SeedSearch3 {
+  const of = figureContent3.of(c);
+  const key = `${seedKey3(from)}|${resume ? JSON.stringify(resume) : ''}|${limit}`;
+  const handed = handedSearches3.get(of)?.get(key);
+  if (handed) {
+    handedSearches3.get(of)!.delete(key); // taken once: the page's run of the round it was handed for
+    return handed;
   }
-  return canonicalSeed3(seedNumber3(from), entries);
+  const { value, spent } = withWorkLimit(limit, () => walkParts3(c, from, resume), searchWork3);
+  const out: SeedSearch3 = value.kind === 'stopped' ? notDecided(value.resume, spent) : value;
+  if (engineJournal3 && pinsSettled3(of)) engineJournal3.searches!.push({ figure: of, key, out });
+  return out;
 }
 
-/** {@link firstSatisfyingSeed3} for one part: the walk over its plain seeds. */
-function firstSatisfyingSeedOf3(c: Construction3, from: number, budget: number): number | null {
-  let fallback: number | null = null;
-  let prefs = quadPreferences3(c);
-  let guarded = false;
-  for (let i = 0; i < budget; i++) {
+/** {@link searchSeed3} as it was asked before #2893: the seed, or null when the round found none (finished or cut short). */
+export function firstSatisfyingSeed3(c: Construction3, from: Seed3 = 0): Seed3 | null {
+  const r = searchSeed3(c, from);
+  return r.kind === 'found' ? r.seed : null;
+}
+
+type PartWalk3 = { kind: 'found'; seed: number } | { kind: 'none' } | { kind: 'stopped'; at: Omit<SeedResume3, 'entries' | 'part'> };
+
+function walkParts3(c: Construction3, from: Seed3, resume?: SeedResume3): { kind: 'found'; seed: Seed3 } | { kind: 'none' } | { kind: 'stopped'; resume: SeedResume3 } {
+  const parts = partsOf3(c);
+  const entries: Record<string, number> = { ...(resume?.entries ?? {}) };
+  for (let k = resume?.part ?? 0; k < parts.length; k++) {
+    const p = parts[k];
+    const r = walkPart3(parts.length === 1 ? c : p.construction, seedOfPart3(from, p.key), resume && k === resume.part ? resume : null);
+    if (r.kind === 'stopped') return { kind: 'stopped', resume: { entries, part: k, ...r.at } };
+    if (r.kind === 'none') return r;
+    entries[p.key] = r.seed;
+  }
+  if (parts.length === 1) return { kind: 'found', seed: entries[parts[0].key] };
+  return { kind: 'found', seed: canonicalSeed3(seedNumber3(from), entries) };
+}
+
+/** One part's walk over its window of plain seeds, from its start or from where a round stopped. */
+function walkPart3(c: Construction3, from: number, at: Omit<SeedResume3, 'entries' | 'part'> | null): PartWalk3 {
+  const own = quadPreferences3(c);
+  let fallback = at?.fallback ?? null;
+  let prefs = at?.prefs ? at.prefs.map((i) => own[i]) : own;
+  let guarded = at?.guarded ?? false;
+  for (let i = at?.next ?? 0; i < SEARCH_SEEDS3; i++) {
+    if (limitReached()) {
+      if (fallback !== null) return { kind: 'found', seed: fallback };
+      return { kind: 'stopped', at: { next: i, fallback, prefs: prefs === own ? null : prefs.map((r) => own.indexOf(r)), guarded } };
+    }
     const seed = from + i;
-    if (!meetsRequirements3(c, seed)) continue;
-    if (meetsShapePreferences3(c, seed, prefs)) return seed;
-    if (fallback === null) fallback = seed;
-    if (!guarded) {
-      guarded = true;
-      const kept = possibleShapePreferences3(c, from, prefs);
-      if (kept.length < prefs.length) {
-        prefs = kept;
-        if (meetsShapePreferences3(c, seed, prefs)) return seed;
+    const judged = chargedWork3();
+    try {
+      if (!meetsRequirements3(c, seed)) continue;
+      if (meetsShapePreferences3(c, seed, prefs)) return { kind: 'found', seed };
+      if (fallback === null) fallback = seed;
+      if (!guarded) {
+        guarded = true;
+        const kept = possibleShapePreferences3(c, from, prefs);
+        if (kept.length < prefs.length) {
+          prefs = kept;
+          if (meetsShapePreferences3(c, seed, prefs)) return { kind: 'found', seed };
+        }
       }
+    } finally {
+      seedFloors3 += Math.max(0, SEED_FLOOR3 - (chargedWork3() - judged));
     }
   }
-  return fallback;
+  return fallback === null ? { kind: 'none' } : { kind: 'found', seed: fallback };
 }
+
+/**
+ * #2890 (ADR-3D-492) — A RESOLVED FIGURE HOLDS NOTHING `structuredClone` REFUSES. A function (or a symbol) added to
+ * `Resolved3`, at any depth, makes this line fail `tsc`: a figure that cannot cross cannot be handed to the page.
+ */
+export const RESOLVED_CROSSES3: [Uncloneable3<Resolved3>] extends [never] ? true : never = true;

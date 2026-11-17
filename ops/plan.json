@@ -1,0 +1,850 @@
+{
+  "$comment": "The teaching plan (#2868, ADR-W-209), moved here from the roadmap page's database (plan/current, version 31, 2026-11-13). The management page reads it from GitHub; a pull from the page is a commit to this file. name/goal are the page's Hebrew; nameEn, why, done and schedule are the plan's original English record.",
+  "title": "תוכנית ההוראה",
+  "start": "2026-10-27",
+  "end": "2026-12-20",
+  "weeks": [
+    {
+      "from": "2026-10-27",
+      "label": "27 Oct",
+      "n": 1
+    },
+    {
+      "from": "2026-11-03",
+      "label": "3 Nov",
+      "n": 2
+    },
+    {
+      "from": "2026-11-10",
+      "label": "10 Nov",
+      "n": 3
+    },
+    {
+      "from": "2026-11-17",
+      "label": "17 Nov",
+      "n": 4
+    },
+    {
+      "from": "2026-11-24",
+      "label": "24 Nov",
+      "n": 5
+    },
+    {
+      "from": "2026-12-01",
+      "label": "1 Dec",
+      "n": 6
+    },
+    {
+      "from": "2026-12-08",
+      "label": "8 Dec",
+      "n": 7
+    },
+    {
+      "from": "2026-12-15",
+      "label": "15 Dec",
+      "n": 8
+    }
+  ],
+  "groups": [
+    {
+      "label": "עכשיו · אנליטית: מקום גיאומטרי, אחר כך אליפסה, אחר כך פרבולה",
+      "p": "an"
+    },
+    {
+      "label": "הבא · 3-D: וקטורים מכ-1 בדצמ׳",
+      "p": "v3"
+    },
+    {
+      "label": "תחזוקה · 2-D",
+      "p": "d2"
+    },
+    {
+      "label": "איך אנחנו עובדים",
+      "p": "pr"
+    }
+  ],
+  "workstreams": [
+    {
+      "done": "A point with one degree of freedom offers its locus on screen; the equation is complete (with the parameter where there is one); the stated figure stays in view.",
+      "from": 1,
+      "goal": "תלמיד מגלה מקום גיאומטרי ומשתמש בו בלי משפט קסם.",
+      "id": "locus",
+      "issues": [
+        1182,
+        1177,
+        1186,
+        1138,
+        1825,
+        2608,
+        2628,
+        2673,
+        2849
+      ],
+      "name": "למצוא מקום גיאומטרי ולהשתמש בו בלי לדעת את המשפט המדויק",
+      "order": 1,
+      "p": "an",
+      "schedule": "W1–W2, done before ellipse starts on 14 Nov. #1182 after #1687 (same solver code). The chip (#1177) and the equation with its letter (#1186) are features, each its own PR. Ruled 26 Oct: the chip and guide row are the only way in; the path shows only on request; the freedom line only reports.",
+      "to": 2,
+      "why": "Locus is next in class, and it is the most-asked construct in the analytic corpus (13 of 20 first questions). The engine already computes loci, but the commands guide has no locus row and nothing on screen says a locus exists.",
+      "nameEn": "Find and use a locus without knowing the exact sentence"
+    },
+    {
+      "done": "«D על BC» after «משולש ABC» leaves the triangle in place; a new length resizes rather than redraws.",
+      "from": 1,
+      "goal": "הוספת נתון לא מזיזה נקודות שכבר מסורטטות.",
+      "id": "stability",
+      "issues": [
+        1687,
+        2039,
+        2631,
+        2632,
+        2633,
+        2784
+      ],
+      "name": "נתון חדש משאיר את הנקודות במקומן",
+      "order": 2,
+      "p": "an",
+      "schedule": "W1–W2, pulled forward 30 Oct: a figure that jumps breaks locus. #1687 first (option A, line provenance, ruled 30 Oct), then #2039.",
+      "to": 2,
+      "why": "It is the core promise of the tool and the heart of its positioning against AI pictures.",
+      "nameEn": "Adding a given keeps existing points in place"
+    },
+    {
+      "done": "The locus bagrut questions and the book examples you pick build step by step, easily and correctly. You play the sheet.",
+      "from": 2,
+      "goal": "האנליטית מוכנה להמשך שיעורי המקום הגיאומטרי.",
+      "id": "locusready",
+      "issues": [],
+      "milestone": true,
+      "name": "אתה בודק: שיעורי המקום הגיאומטרי מוכנים",
+      "order": 3,
+      "p": "an",
+      "schedule": "Play the locus sheet by 12 Nov.",
+      "to": 3,
+      "why": "The exit of the current phase.",
+      "nameEn": "You check: locus lessons are ready"
+    },
+    {
+      "done": "Every ellipse exercise in the sweep builds or has an issue; the foci are marked on the canvas (ruled 7 Oct).",
+      "from": 2,
+      "goal": "תרגילי האליפסה שאתה מלמד, כולל המקום הגיאומטרי של נקודה על אליפסה, נבנים צעד אחר צעד.",
+      "id": "ellipse",
+      "issues": [
+        2613,
+        2614,
+        2616,
+        2617,
+        2618,
+        2619,
+        1218,
+        1863,
+        2620,
+        2615,
+        2621,
+        2672,
+        2732,
+        2733,
+        2734,
+        2851,
+        2853
+      ],
+      "name": "תרגילי האליפסה נבנים, מוכנים ל-14 בנוב׳",
+      "order": 4,
+      "p": "an",
+      "schedule": "Sweep done 30 Oct (about 40 book exercises): no figure that builds is wrong except two printing/locus bugs; the book’s phrasing mostly does not parse. W2: the two wrong answers (#2613, #2614), the foci and vertices (#2616) and the sizes (#2617), which block about 20 exercises. W2–W3: the circle’s relations for the ellipse (#2618), the book’s clauses (#2619), the foci marks (#1218, #1863). W3: the locus wordings (#2620). Later: #2615, #2621.",
+      "to": 3,
+      "why": "You start ellipses on 14 Nov, for about two weeks, and teach their loci as part of the shape.",
+      "nameEn": "Ellipse exercises build, ready for 14 Nov"
+    },
+    {
+      "done": "You play the ellipse sheet before 14 Nov.",
+      "from": 3,
+      "goal": "האנליטית מוכנה ללמד אליפסה.",
+      "id": "ellipseready",
+      "issues": [],
+      "milestone": true,
+      "name": "אתה בודק: שיעורי האליפסה מוכנים",
+      "order": 5,
+      "p": "an",
+      "schedule": "W3 (by 13 Nov).",
+      "to": 3,
+      "why": "The exit of the ellipse preparation.",
+      "nameEn": "You check: ellipse lessons are ready"
+    },
+    {
+      "done": "Every parabola exercise in the sweep builds or has an issue; the focus and directrix are marked (ruled 7 Oct).",
+      "from": 4,
+      "goal": "תרגילי הפרבולה שאתה מלמד, כולל המקום הגיאומטרי שלה, נבנים צעד אחר צעד.",
+      "id": "parabola",
+      "issues": [
+        1752,
+        2625,
+        2664,
+        2731,
+        2835
+      ],
+      "name": "תרגילי הפרבולה נבנים, מוכנים לכ-28 בנוב׳",
+      "order": 6,
+      "p": "an",
+      "schedule": "W4: the sweep. W4–W5: the focus and directrix marks (#1752) and the sweep’s findings.",
+      "to": 5,
+      "why": "Parabola follows ellipse, from about 28 Nov.",
+      "nameEn": "Parabola exercises build, ready for ~28 Nov"
+    },
+    {
+      "done": "You play the parabola sheet before about 28 Nov.",
+      "from": 5,
+      "goal": "האנליטית מוכנה ללמד פרבולה.",
+      "id": "parabolaready",
+      "issues": [],
+      "milestone": true,
+      "name": "אתה בודק: שיעורי הפרבולה מוכנים",
+      "order": 7,
+      "p": "an",
+      "schedule": "W5 (by 27 Nov).",
+      "to": 5,
+      "why": "The exit of the parabola preparation.",
+      "nameEn": "You check: parabola lessons are ready"
+    },
+    {
+      "done": "Every issue here is closed or ruled.",
+      "from": 3,
+      "goal": "שום דבר שגוי לא מוצג כנכון באנליטית, ומה שנתקלת בו בכיתה עובד.",
+      "id": "anwrong",
+      "issues": [
+        2506,
+        2286,
+        2057,
+        2032,
+        2491,
+        2075,
+        1812,
+        1806,
+        1774,
+        1772,
+        1775,
+        2231,
+        2266,
+        2074,
+        1973,
+        1809,
+        2566,
+        2492,
+        1497,
+        1454,
+        1808,
+        2639,
+        2848
+      ],
+      "name": "האנליטית לא מראה דבר שגוי, ומה שנתקלת בו בכיתה עובד",
+      "order": 8,
+      "p": "an",
+      "schedule": "W3–W6, alongside the conic work, wrong answers first, as room allows.",
+      "to": 6,
+      "why": "Placed 30 Oct from outside the plan: wrong answers and issues a person hit, in the tool you teach with.",
+      "nameEn": "Analytic shows nothing false, and what you hit in class works"
+    },
+    {
+      "done": "Two circles with «המעגל הראשון», the common external tangent and clickable centres all build in analytic.",
+      "from": 1,
+      "goal": "מה שנתקלת בו בכיתה השבוע עובד.",
+      "id": "classreports",
+      "issues": [
+        2552,
+        2553,
+        2554,
+        2547
+      ],
+      "name": "מה שנתקלת בו בכיתה ב-25 באוק׳ עובד",
+      "order": 9,
+      "p": "an",
+      "schedule": "W1. Ruled 26 Oct: only the exam’s two «המעגל הראשון» sentences (D8); «P מרכז מעגל» creates a new circle (D9); analytic refuses a chord through the centre like 2-D for now (D10).",
+      "to": 1,
+      "why": "Real class inputs: what a person actually hit comes first.",
+      "nameEn": "What you hit in class on 25 Oct works"
+    },
+    {
+      "done": "Every issue here is closed or ruled.",
+      "from": 6,
+      "goal": "אפשר לכתוב ישרים ונקודות כמו שספר הלימוד כותב אותם.",
+      "id": "antext",
+      "issues": [
+        2227,
+        2226,
+        1956,
+        1237,
+        1126,
+        1121,
+        1211,
+        2541,
+        1594,
+        1951,
+        1908
+      ],
+      "name": "לכתוב ישרים ונקודות כמו בספר הלימוד",
+      "order": 10,
+      "p": "an",
+      "schedule": "W6–W8.",
+      "to": 8,
+      "why": "Placed 30 Oct from outside the plan. Moved after the conic lessons: they are capabilities, not things anyone hit.",
+      "nameEn": "Write lines and points the way the textbook does"
+    },
+    {
+      "done": "Several free vectors, sums drawn head to tail, a vector from a known point creates its end point, and «AB = k» / «AB = AC» read sensibly.",
+      "from": 1,
+      "goal": "בדף ריק: «וקטור u», «וקטור v», «w = u + v»: וקטורים צפים ותמונת ראש לזנב.",
+      "id": "freevectors",
+      "issues": [
+        1188,
+        1310,
+        1613,
+        2092,
+        1680,
+        2603,
+        1184,
+        1595,
+        2630,
+        2684
+      ],
+      "name": "וקטורים חופשיים בדף ריק, בחיבור ראש לזנב",
+      "order": 5,
+      "p": "v3",
+      "schedule": "W1: step 1. W2: steps 2–3, #1613 #1680 #2092. W3: steps 4–5, #1310. W5: buffer.",
+      "to": 5,
+      "why": "You ruled it required for the first classes of the unit (18 Sep). It is the largest item on the plan: the engine has no free vector object yet, so it must start in week 1.",
+      "nameEn": "Free vectors on a blank page, added head to tail"
+    },
+    {
+      "done": "Points, lines and planes named before they exist are created; guide examples work on an empty canvas.",
+      "from": 1,
+      "goal": "«M אמצע AB» בדף ריק יוצר את A ו-B עם הודעה וביטול בלחיצה, בכל הכלים.",
+      "id": "mention",
+      "issues": [
+        1467,
+        2489,
+        2484,
+        1566,
+        2609,
+        2610,
+        2611
+      ],
+      "name": "מתן שם לנקודה, ישר או מישור יוצר אותם",
+      "order": 6,
+      "p": "v3",
+      "schedule": "W1–W2: #1566 (load the needed line when a guide example is clicked on an empty canvas). W3–W4: the three classes the 30 Oct sweep found (#2609 placing created points, #2610 four-letter faces, #2611 a point on a circle). 66 of 238 guide examples still fail on a blank 3-D canvas (was 147).",
+      "to": 4,
+      "why": "Ruled 27 Sep, not yet built. It unblocks a second free vector (#1310); on 30 Oct, 66 of 238 guide examples still fail on a blank 3-D canvas (147 of 230 before #1467).",
+      "nameEn": "Naming a point, line or plane creates it"
+    },
+    {
+      "done": "Points on cube edges with lengths or ratios, letters in coordinates, |AC| = |BD|, both values of k — all build; a crash never loses the figure.",
+      "from": 3,
+      "goal": "תרגילי וקטורים רגילים אף פעם לא נדחים בטעות ולא מסורטטים חלקית.",
+      "id": "lessonbugs",
+      "issues": [
+        1782,
+        1783,
+        1816,
+        1896,
+        1848,
+        1769,
+        1528,
+        1507,
+        2361,
+        2285,
+        1986,
+        2490,
+        2341,
+        2335,
+        1549,
+        1542,
+        2592,
+        1593,
+        2749,
+        2746,
+        2787
+      ],
+      "name": "תרגילי וקטורים רגילים לא נדחים ולא מסורטטים חלקית",
+      "order": 7,
+      "p": "v3",
+      "schedule": "W3–W5. The 3-D bugs placed 30 Oct join in W4–W5.",
+      "to": 5,
+      "why": "Each is a standard textbook input that fails today.",
+      "nameEn": "Standard vector exercises are never refused or half-drawn"
+    },
+    {
+      "done": "«AE = u + t·v», «EM = a·EA + b·EC» solved, the exam's own question wording, a line's equation on request.",
+      "from": 4,
+      "goal": "שאלות מאוחרות ביחידה עונות ב-t, a ו-b במקום «לא נקבע».",
+      "id": "letters",
+      "issues": [
+        1829,
+        1551,
+        2062,
+        1541,
+        2563,
+        1524,
+        2735,
+        2785
+      ],
+      "name": "התשובות שומרות על האותיות t, a ו-b",
+      "order": 8,
+      "p": "v3",
+      "schedule": "W4–W5.",
+      "to": 5,
+      "why": "Uniqueness of representation is curriculum item 2 of the unit; the exam (572 Q2) asks these.",
+      "nameEn": "Answers keep the letters t, a and b"
+    },
+    {
+      "done": "The 572 Q2 bagrut questions and your book examples build step by step, easily and correctly. You play the sheet before the first lesson.",
+      "from": 5,
+      "goal": "ה-3-D מוכן מספיק כדי ללמד וקטורים.",
+      "id": "vectorsready",
+      "issues": [],
+      "milestone": true,
+      "name": "אתה בודק: שיעורי הוקטורים מוכנים",
+      "order": 9,
+      "p": "v3",
+      "schedule": "W5 (around 30 Nov).",
+      "to": 5,
+      "why": "The gate for the next phase.",
+      "nameEn": "You check: vector lessons are ready"
+    },
+    {
+      "done": "Every issue here is closed or ruled.",
+      "from": 6,
+      "goal": "היכולות ב-3-D ששיעורי הוקטורים המאוחרים נשענים עליהן.",
+      "id": "d3extra",
+      "issues": [
+        1838,
+        863
+      ],
+      "name": "יכולות 3-D לשיעורי הוקטורים המאוחרים",
+      "order": 9,
+      "p": "v3",
+      "schedule": "W6–W8.",
+      "to": 8,
+      "why": "Placed 30 Oct from outside the plan; not needed for the first lessons.",
+      "nameEn": "3-D features for the later vector lessons"
+    },
+    {
+      "done": "The three open wrong-answer bugs are fixed.",
+      "from": 1,
+      "goal": "שום שרטוט 2-D לא שגוי כשהוא נראה נכון, בקלט רגיל.",
+      "id": "wrong2d",
+      "issues": [
+        2545,
+        2538,
+        2499
+      ],
+      "name": "שום שרטוט 2-D לא נראה נכון כשהוא שגוי",
+      "order": 10,
+      "p": "d2",
+      "schedule": "W1–W2. Ruled 26 Oct: #2499 ships now, accepting one slower refusal (D6); #2538 uses one general rule plus a failure-path fix (D7).",
+      "to": 2,
+      "why": "#2499 you hit yourself (play case T30), so it stays P1. #2538 and #2545 were found by sessions: under the approved scheme they are P2 with a wrong-answer mark.",
+      "nameEn": "No 2-D figure looks right while being wrong"
+    },
+    {
+      "done": "New priority scheme (#2556) and this roadmap written down with an ADR; milestones created; the open queue re-ranked after you review the summary.",
+      "from": 1,
+      "goal": "העדיפויות בתור עוקבות אחרי מפת הדרכים.",
+      "id": "process",
+      "issues": [
+        2556
+      ],
+      "name": "עדיפויות התור עוקבות אחרי מפת הדרכים",
+      "order": 11,
+      "p": "pr",
+      "schedule": "Ruled 26 Oct (D5): the scheme is approved, and a 2-D wrong answer found by a session is P2. Next: one PR (labels, docs, ADR, skills), then the re-rank summary for your review before any relabelling.",
+      "to": 2,
+      "why": "Today P1/P2/P3 measure only how bad a defect is, so 2-D and complex items compete with locus and vectors.",
+      "nameEn": "Queue priorities follow this roadmap"
+    }
+  ],
+  "calendar": {
+    "capacityNote": "Measured pace since September: ~90 issues closed a week (~20 features, ~30 analytic). About a quarter of each week is kept for what you or a student hit; anything beyond moves to the next week.",
+    "note": "Operator, 2026-10-30: \"I start elipses on nov-14. that will be about 2 weeks and then parabola. locus of allipses and parabola will be taught as part of the shape. dec. 1 is a good guess for starting vectors\"",
+    "topics": [
+      {
+        "from": "2026-10-26",
+        "name": "מקום גיאומטרי",
+        "to": "2026-11-13"
+      },
+      {
+        "from": "2026-11-14",
+        "name": "אליפסה",
+        "to": "2026-11-27"
+      },
+      {
+        "from": "2026-11-28",
+        "name": "פרבולה",
+        "to": "2026-12-12"
+      },
+      {
+        "from": "2026-12-01",
+        "name": "וקטורים במרחב (3-D)",
+        "to": null
+      }
+    ]
+  },
+  "pulled": [
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2591,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2533,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2646,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2642,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2590,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2518,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2408,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2130,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2677,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2674,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: pull into this week your recommendations",
+      "issue": 2675,
+      "week": 2
+    },
+    {
+      "at": "2026-11-03",
+      "by": "operator in chat: I want it tonight",
+      "issue": 2688,
+      "week": 2
+    },
+    {
+      "at": "2026-11-04",
+      "by": "operator in chat: you can start a new fix round with the 6 issues + any issues from the roadmap",
+      "issue": 2680,
+      "week": 2
+    },
+    {
+      "at": "2026-11-04",
+      "by": "operator in chat: you can start a new fix round with the 6 issues + any issues from the roadmap",
+      "issue": 2681,
+      "week": 2
+    },
+    {
+      "at": "2026-11-04",
+      "by": "operator in chat: you can start a new fix round with the 6 issues + any issues from the roadmap",
+      "issue": 2689,
+      "week": 2
+    },
+    {
+      "at": "2026-11-04",
+      "by": "operator in chat: you can start a new fix round with the 6 issues + any issues from the roadmap",
+      "issue": 2692,
+      "week": 2
+    },
+    {
+      "at": "2026-11-04",
+      "by": "operator in chat: you can start a new fix round with the 6 issues + any issues from the roadmap",
+      "issue": 2696,
+      "week": 2
+    },
+    {
+      "at": "2026-11-05",
+      "by": "operator in chat: we should put this issue into the next fix round",
+      "issue": 253,
+      "week": 2
+    },
+    {
+      "at": "2026-11-05",
+      "by": "operator in chat: both ok and pull the streach tot he week of 21.11",
+      "issue": 2622,
+      "week": 4
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2731,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2758,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2713,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2700,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2240,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2624,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 1840,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2648,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2705,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2764,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2782,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2757,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2151,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2704,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2703,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2707,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2702,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: if we are ahead of track we can go with option A today and close many issues",
+      "issue": 2714,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: I agree with the recommendation so start a fix round with those items",
+      "issue": 2806,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: I agree with the recommendation so start a fix round with those items",
+      "issue": 2798,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: I agree with the recommendation so start a fix round with those items",
+      "issue": 2799,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: I agree with the recommendation so start a fix round with those items",
+      "issue": 2797,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: I agree with the recommendation so start a fix round with those items",
+      "issue": 2804,
+      "week": 2
+    },
+    {
+      "at": "2026-11-09",
+      "by": "operator in chat: I agree with the recommendation so start a fix round with those items",
+      "issue": 2789,
+      "week": 2
+    },
+    {
+      "at": "2026-11-10",
+      "by": "operator on the Rulings Inbox (d-pull-2822): (a) Pull all three",
+      "issue": 2819,
+      "week": 3
+    },
+    {
+      "at": "2026-11-10",
+      "by": "operator on the Rulings Inbox (d-pull-2822): (a) Pull all three",
+      "issue": 2820,
+      "week": 3
+    },
+    {
+      "at": "2026-11-10",
+      "by": "operator on the Rulings Inbox (d-pull-2822): (a) Pull all three",
+      "issue": 2790,
+      "week": 3
+    },
+    {
+      "at": "2026-11-10",
+      "by": "operator on the Rulings Inbox (d-pull-2822): (a) Pull all three",
+      "issue": 2795,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 2709,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 2849,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 2502,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 2831,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 2813,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 2838,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 2164,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 2852,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 2817,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 1551,
+      "week": 3
+    },
+    {
+      "at": "2026-11-12",
+      "by": "operator in chat 2026-11-12: \"2848 A\" (the round composition offered with option A)",
+      "issue": 1524,
+      "week": 3
+    }
+  ],
+  "afterPlan": {
+    "issues": [
+      1018,
+      778,
+      1868,
+      1565
+    ],
+    "note": "Placed 30 Oct after the plan: not scheduled yet."
+  }
+}

@@ -25,12 +25,14 @@ import {
 /** One verdict, in the rows' vocabulary. An `ambiguous-*` refusal is a question to the student. */
 function verdictOf3D(v: Verdict3): StepVerdict {
   switch (v.kind) {
-    case 'record':
-      return { verdict: 'builds' };
-    case 'already-stated':
-      return { verdict: 'builds', code: 'already-stated' };
+    case 'record': // #2790 (ADR-3D-484): a held line is its own row too
+      return v.held ? { verdict: 'builds', code: 'held' } : { verdict: 'builds' };
+    case 'retick':
+      return { verdict: 'builds', code: 'retick' };
     case 'not-understood':
       return { verdict: 'not-handled' };
+    case 'not-decided': // #2893 (ADR-3D-494): the search reached its limit; the student is asked whether to go on
+      return { verdict: 'asks', code: 'not-decided' };
     case 'refused':
       return { verdict: /^ambiguous/.test(v.error.code) ? 'asks' : 'refused', code: v.error.code };
     case 'rename':

@@ -1,0 +1,235 @@
+{"_":"THE WORK-METER BASELINE (#2873, ADR-W-210). One line per figure-action, sorted by key: solver work in units, never seconds (total = all of it, page = on the UI thread, prePaint = before the figure can paint). Never edited by hand: `npm run work:record -- <builder>` rewrites it, and docs/08 says when."}
+{"k":"#2749 narrowed AC|another#1","total":17505,"page":0,"prePaint":17346}
+{"k":"#2749 narrowed AC|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed AC|ask#2","total":4393,"page":0,"prePaint":4393}
+{"k":"#2749 narrowed AC|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed AC|delete","total":9374,"page":0,"prePaint":9230}
+{"k":"#2749 narrowed AC|edit","total":17339,"page":0,"prePaint":17180}
+{"k":"#2749 narrowed AC|load","total":17339,"page":0,"prePaint":17180}
+{"k":"#2749 narrowed AC|panel","total":159,"page":0,"prePaint":0}
+{"k":"#2749 narrowed AC|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed AC|rename","total":17339,"page":0,"prePaint":17180}
+{"k":"#2749 narrowed AC|retick","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed AC|submit#1","total":5942,"page":0,"prePaint":3402}
+{"k":"#2749 narrowed AC|submit#2","total":2970,"page":0,"prePaint":1697}
+{"k":"#2749 narrowed AC|submit#3","total":17339,"page":0,"prePaint":17180}
+{"k":"#2749 narrowed AC|swap","total":17339,"page":0,"prePaint":17180}
+{"k":"#2749 narrowed AC|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed AC|untick","total":9374,"page":0,"prePaint":9230}
+{"k":"#2749 narrowed|another#1","total":161160,"page":0,"prePaint":161016}
+{"k":"#2749 narrowed|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed|ask#2","total":43255,"page":0,"prePaint":43255}
+{"k":"#2749 narrowed|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed|delete","total":109353,"page":0,"prePaint":109179}
+{"k":"#2749 narrowed|edit","total":109691,"page":0,"prePaint":109547}
+{"k":"#2749 narrowed|load","total":109691,"page":0,"prePaint":109547}
+{"k":"#2749 narrowed|panel","total":144,"page":0,"prePaint":0}
+{"k":"#2749 narrowed|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed|rename","total":109691,"page":0,"prePaint":109547}
+{"k":"#2749 narrowed|retick","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed|submit#1","total":5942,"page":0,"prePaint":3402}
+{"k":"#2749 narrowed|submit#2","total":2970,"page":0,"prePaint":1697}
+{"k":"#2749 narrowed|submit#3","total":2970,"page":0,"prePaint":1697}
+{"k":"#2749 narrowed|submit#4","total":109691,"page":0,"prePaint":109547}
+{"k":"#2749 narrowed|swap","total":109691,"page":0,"prePaint":109547}
+{"k":"#2749 narrowed|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2749 narrowed|untick","total":109353,"page":0,"prePaint":109179}
+{"k":"#2787 control apex|another#1","total":15720,"page":0,"prePaint":15576}
+{"k":"#2787 control apex|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2787 control apex|ask#2","total":5196,"page":0,"prePaint":5196}
+{"k":"#2787 control apex|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#2787 control apex|delete","total":8968,"page":0,"prePaint":8794}
+{"k":"#2787 control apex|edit","total":17596,"page":0,"prePaint":17467}
+{"k":"#2787 control apex|load","total":17596,"page":0,"prePaint":17467}
+{"k":"#2787 control apex|panel","total":129,"page":0,"prePaint":0}
+{"k":"#2787 control apex|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 control apex|rename","total":17596,"page":0,"prePaint":17467}
+{"k":"#2787 control apex|retick","total":0,"page":0,"prePaint":0}
+{"k":"#2787 control apex|submit#1","total":5942,"page":0,"prePaint":3402}
+{"k":"#2787 control apex|submit#2","total":7918,"page":0,"prePaint":4546}
+{"k":"#2787 control apex|submit#3","total":17596,"page":0,"prePaint":17467}
+{"k":"#2787 control apex|swap","total":17596,"page":0,"prePaint":17467}
+{"k":"#2787 control apex|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 control apex|untick","total":8968,"page":0,"prePaint":8794}
+{"k":"#2787 rectangle|another#1","total":157578,"page":0,"prePaint":157429}
+{"k":"#2787 rectangle|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2787 rectangle|ask#2","total":44362,"page":0,"prePaint":44362}
+{"k":"#2787 rectangle|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#2787 rectangle|delete","total":175098,"page":0,"prePaint":174954}
+{"k":"#2787 rectangle|edit","total":99460,"page":0,"prePaint":99316}
+{"k":"#2787 rectangle|load","total":99460,"page":0,"prePaint":99316}
+{"k":"#2787 rectangle|panel","total":144,"page":0,"prePaint":0}
+{"k":"#2787 rectangle|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 rectangle|rename","total":99460,"page":0,"prePaint":99316}
+{"k":"#2787 rectangle|retick","total":0,"page":0,"prePaint":0}
+{"k":"#2787 rectangle|submit#1","total":5942,"page":0,"prePaint":3402}
+{"k":"#2787 rectangle|submit#2","total":5942,"page":0,"prePaint":3402}
+{"k":"#2787 rectangle|submit#3","total":99460,"page":0,"prePaint":99316}
+{"k":"#2787 rectangle|swap","total":99460,"page":0,"prePaint":99316}
+{"k":"#2787 rectangle|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 rectangle|untick","total":175098,"page":0,"prePaint":174954}
+{"k":"#2787 square|another#1","total":158245,"page":0,"prePaint":158086}
+{"k":"#2787 square|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2787 square|ask#2","total":46200,"page":0,"prePaint":46200}
+{"k":"#2787 square|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#2787 square|delete","total":175098,"page":0,"prePaint":174954}
+{"k":"#2787 square|edit","total":109353,"page":0,"prePaint":109179}
+{"k":"#2787 square|load","total":109353,"page":0,"prePaint":109179}
+{"k":"#2787 square|panel","total":174,"page":0,"prePaint":0}
+{"k":"#2787 square|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 square|rename","total":109353,"page":0,"prePaint":109179}
+{"k":"#2787 square|retick","total":0,"page":0,"prePaint":0}
+{"k":"#2787 square|submit#1","total":3050,"page":0,"prePaint":1737}
+{"k":"#2787 square|submit#2","total":3050,"page":0,"prePaint":1737}
+{"k":"#2787 square|submit#3","total":109353,"page":0,"prePaint":109179}
+{"k":"#2787 square|swap","total":109353,"page":0,"prePaint":109179}
+{"k":"#2787 square|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2787 square|untick","total":175098,"page":0,"prePaint":174954}
+{"k":"#2806 kite|another#1","total":14549,"page":0,"prePaint":14036}
+{"k":"#2806 kite|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2806 kite|ask#2","total":1704,"page":0,"prePaint":1704}
+{"k":"#2806 kite|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#2806 kite|delete","total":0,"page":0,"prePaint":0}
+{"k":"#2806 kite|edit","total":6027,"page":0,"prePaint":5579}
+{"k":"#2806 kite|load","total":6027,"page":0,"prePaint":5579}
+{"k":"#2806 kite|panel","total":448,"page":0,"prePaint":0}
+{"k":"#2806 kite|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 kite|rename","total":6027,"page":0,"prePaint":5579}
+{"k":"#2806 kite|retick","total":0,"page":0,"prePaint":0}
+{"k":"#2806 kite|submit#1","total":49715,"page":0,"prePaint":29138}
+{"k":"#2806 kite|submit#2","total":6027,"page":0,"prePaint":5579}
+{"k":"#2806 kite|swap","total":6027,"page":0,"prePaint":5579}
+{"k":"#2806 kite|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 kite|untick","total":0,"page":0,"prePaint":0}
+{"k":"#2806 origin|another#1","total":7365,"page":0,"prePaint":7221}
+{"k":"#2806 origin|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2806 origin|ask#2","total":1890,"page":0,"prePaint":1890}
+{"k":"#2806 origin|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#2806 origin|delete","total":0,"page":0,"prePaint":0}
+{"k":"#2806 origin|edit","total":7347,"page":0,"prePaint":7173}
+{"k":"#2806 origin|load","total":7347,"page":0,"prePaint":7173}
+{"k":"#2806 origin|panel","total":174,"page":0,"prePaint":0}
+{"k":"#2806 origin|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 origin|rename","total":7347,"page":0,"prePaint":7173}
+{"k":"#2806 origin|retick","total":0,"page":0,"prePaint":0}
+{"k":"#2806 origin|submit#1","total":3050,"page":0,"prePaint":1737}
+{"k":"#2806 origin|submit#2","total":7347,"page":0,"prePaint":7173}
+{"k":"#2806 origin|swap","total":7347,"page":0,"prePaint":7173}
+{"k":"#2806 origin|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 origin|untick","total":0,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|another#1","total":12418,"page":0,"prePaint":11903}
+{"k":"#2806 rhombus|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|ask#2","total":1842,"page":0,"prePaint":1842}
+{"k":"#2806 rhombus|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|delete","total":0,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|edit","total":11962,"page":0,"prePaint":11514}
+{"k":"#2806 rhombus|load","total":6376,"page":0,"prePaint":5915}
+{"k":"#2806 rhombus|panel","total":461,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|rename","total":6376,"page":0,"prePaint":5915}
+{"k":"#2806 rhombus|retick","total":0,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|submit#1","total":108513,"page":0,"prePaint":78619}
+{"k":"#2806 rhombus|submit#2","total":6047,"page":0,"prePaint":5599}
+{"k":"#2806 rhombus|swap","total":6376,"page":0,"prePaint":5915}
+{"k":"#2806 rhombus|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 rhombus|untick","total":0,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|another#1","total":8025,"page":0,"prePaint":7538}
+{"k":"#2806 x-axis|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|ask#2","total":2026,"page":0,"prePaint":2026}
+{"k":"#2806 x-axis|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|delete","total":0,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|edit","total":7918,"page":0,"prePaint":7457}
+{"k":"#2806 x-axis|load","total":7918,"page":0,"prePaint":7457}
+{"k":"#2806 x-axis|panel","total":461,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|rename","total":7918,"page":0,"prePaint":7457}
+{"k":"#2806 x-axis|retick","total":0,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|submit#1","total":3050,"page":0,"prePaint":1737}
+{"k":"#2806 x-axis|submit#2","total":7918,"page":0,"prePaint":7457}
+{"k":"#2806 x-axis|swap","total":7918,"page":0,"prePaint":7457}
+{"k":"#2806 x-axis|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 x-axis|untick","total":0,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|another#1","total":7953,"page":0,"prePaint":7492}
+{"k":"#2806 z-axis|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|ask#2","total":2056,"page":0,"prePaint":2056}
+{"k":"#2806 z-axis|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|delete","total":0,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|edit","total":7821,"page":0,"prePaint":7334}
+{"k":"#2806 z-axis|load","total":7821,"page":0,"prePaint":7334}
+{"k":"#2806 z-axis|panel","total":487,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|redo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|rename","total":7821,"page":0,"prePaint":7334}
+{"k":"#2806 z-axis|retick","total":0,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|submit#1","total":3050,"page":0,"prePaint":1737}
+{"k":"#2806 z-axis|submit#2","total":7821,"page":0,"prePaint":7334}
+{"k":"#2806 z-axis|swap","total":7821,"page":0,"prePaint":7334}
+{"k":"#2806 z-axis|undo","total":0,"page":0,"prePaint":0}
+{"k":"#2806 z-axis|untick","total":0,"page":0,"prePaint":0}
+{"k":"#863 equation|another#1","total":929255,"page":0,"prePaint":362209}
+{"k":"#863 equation|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 equation|ask#2","total":160107,"page":0,"prePaint":160107}
+{"k":"#863 equation|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#863 equation|delete","total":3368,"page":0,"prePaint":3368}
+{"k":"#863 equation|edit","total":1281433,"page":0,"prePaint":589011}
+{"k":"#863 equation|load","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 equation|panel","total":417272,"page":0,"prePaint":0}
+{"k":"#863 equation|redo","total":0,"page":0,"prePaint":0}
+{"k":"#863 equation|rename","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 equation|retick","total":0,"page":0,"prePaint":0}
+{"k":"#863 equation|submit#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 equation|submit#2","total":113797,"page":0,"prePaint":32003}
+{"k":"#863 equation|submit#3","total":1281433,"page":0,"prePaint":589011}
+{"k":"#863 equation|swap","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 equation|undo","total":0,"page":0,"prePaint":0}
+{"k":"#863 equation|untick","total":0,"page":0,"prePaint":0}
+{"k":"#863 fixture|another#1","total":929255,"page":0,"prePaint":362209}
+{"k":"#863 fixture|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 fixture|ask#2","total":160107,"page":0,"prePaint":160107}
+{"k":"#863 fixture|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#863 fixture|delete","total":3368,"page":0,"prePaint":3368}
+{"k":"#863 fixture|edit","total":1281433,"page":0,"prePaint":589011}
+{"k":"#863 fixture|load","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 fixture|panel","total":417272,"page":0,"prePaint":0}
+{"k":"#863 fixture|redo","total":0,"page":0,"prePaint":0}
+{"k":"#863 fixture|rename","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 fixture|retick","total":0,"page":0,"prePaint":0}
+{"k":"#863 fixture|submit#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 fixture|submit#2","total":113797,"page":0,"prePaint":32003}
+{"k":"#863 fixture|submit#3","total":1281433,"page":0,"prePaint":589011}
+{"k":"#863 fixture|swap","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 fixture|undo","total":0,"page":0,"prePaint":0}
+{"k":"#863 fixture|untick","total":0,"page":0,"prePaint":0}
+{"k":"#863 on-line|another#1","total":929255,"page":0,"prePaint":362209}
+{"k":"#863 on-line|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 on-line|ask#2","total":160107,"page":0,"prePaint":160107}
+{"k":"#863 on-line|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#863 on-line|delete","total":3368,"page":0,"prePaint":3368}
+{"k":"#863 on-line|edit","total":1281433,"page":0,"prePaint":589011}
+{"k":"#863 on-line|load","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 on-line|panel","total":417272,"page":0,"prePaint":0}
+{"k":"#863 on-line|redo","total":0,"page":0,"prePaint":0}
+{"k":"#863 on-line|rename","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 on-line|retick","total":0,"page":0,"prePaint":0}
+{"k":"#863 on-line|submit#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 on-line|submit#2","total":113797,"page":0,"prePaint":32003}
+{"k":"#863 on-line|submit#3","total":1281433,"page":0,"prePaint":589011}
+{"k":"#863 on-line|swap","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 on-line|undo","total":0,"page":0,"prePaint":0}
+{"k":"#863 on-line|untick","total":0,"page":0,"prePaint":0}
+{"k":"#863 pair|another#1","total":929255,"page":0,"prePaint":362209}
+{"k":"#863 pair|ask#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 pair|ask#2","total":160107,"page":0,"prePaint":160107}
+{"k":"#863 pair|ask#3","total":0,"page":0,"prePaint":0}
+{"k":"#863 pair|delete","total":3368,"page":0,"prePaint":3368}
+{"k":"#863 pair|edit","total":1281433,"page":0,"prePaint":589011}
+{"k":"#863 pair|load","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 pair|panel","total":417272,"page":0,"prePaint":0}
+{"k":"#863 pair|redo","total":0,"page":0,"prePaint":0}
+{"k":"#863 pair|rename","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 pair|retick","total":0,"page":0,"prePaint":0}
+{"k":"#863 pair|submit#1","total":0,"page":0,"prePaint":0}
+{"k":"#863 pair|submit#2","total":113797,"page":0,"prePaint":32003}
+{"k":"#863 pair|submit#3","total":1281433,"page":0,"prePaint":589011}
+{"k":"#863 pair|swap","total":732842,"page":0,"prePaint":315570}
+{"k":"#863 pair|undo","total":0,"page":0,"prePaint":0}
+{"k":"#863 pair|untick","total":0,"page":0,"prePaint":0}
