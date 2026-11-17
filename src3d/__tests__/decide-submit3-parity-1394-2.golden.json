@@ -21,6 +21,8 @@
  "suite:[\"משולש ABC\",\"מעגל חוסם את ABC\"]": "7d2bd61b6051a808",
  "fixture:circum-and-incircle-2125.geo3.json": "ff05b6c18f205934",
  "suite:[\"משולש ABC\",\"מעגל חוסם את ABC\",\"מעגל חסום במשולש ABC\"]": "ff05b6c18f205934",
+ "fixture:ring-circle-rider-simple-2829.geo3.json": "84e6c65e64c9e205",
+ "suite:[\"משולש ABC\",\"מעגל חוסם את ABC\",\"D על המעגל\",\"מרובע ABCD\"]": "84e6c65e64c9e205",
  "suite:[\"משולש ABC\",\"מעגל חוסם את ABC\",\"D על המעגל\",\"מרובע ABCD\",\"מרובע ABDC\"]": "bd2e259324840462",
  "suite:[\"משולש ABC\",\"AB = AC\"]": "490ff617dec0f016",
  "fixture:held-row-2790.geo3.json": "3af030ec7e893903",
