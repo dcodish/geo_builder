@@ -11,6 +11,7 @@
  * `findValidConfig`, below the app's autoResolve, which the scenario harness's plain replay does
  * not run (recorded in the ADR).
  */
+import type { Seed } from '@/engine';
 import { describe, expect, it } from 'vitest';
 import { factsOf } from './scenarios-harness';
 import { cyclableSeat, findValidConfig, meetsRequirements, replay, searchAnotherView } from '@/replay/core';
@@ -98,7 +99,7 @@ describe('#566 — the unstated right-angle seat yields to a later constraint (A
  * press.
  */
 describe('#569 — «הציגו תצורה אחרת» reaches the right-angle seat (ADR-481)', () => {
-  const seatOf = (facts: Parameters<typeof replay>[0], seed: number): string => {
+  const seatOf = (facts: Parameters<typeof replay>[0], seed: Seed): string => {
     const fig = replay(facts, seed);
     const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));
     const cos = (P: typeof A, Q: typeof A, R: typeof A) =>
@@ -111,7 +112,7 @@ describe('#569 — «הציגו תצורה אחרת» reaches the right-angle se
     const facts = factsOf(['משולש ישר זווית ABC', 'משולש ABC חסום במעגל']);
     expect(seatOf(facts, 0), 'the default seat is the last id').toBe('C');
     const seen = new Set<string>([seatOf(facts, 0)]);
-    let cur: { facts: typeof facts; seed: number } = { facts, seed: 0 };
+    let cur: { facts: typeof facts; seed: Seed } = { facts, seed: 0 };
     for (let i = 0; i < 4; i++) {
       const next = searchAnotherView(cur.facts, cur.seed);
       if (!next) break;
@@ -136,7 +137,7 @@ describe('#569 — «הציגו תצורה אחרת» reaches the right-angle se
 
   it('a seat the student PINNED is never cycled out from under them', () => {
     const facts = factsOf(['משולש ישר זווית ABC', 'זווית ACB = 90', 'משולש ABC חסום במעגל']);
-    let cur: { facts: typeof facts; seed: number } = { facts, seed: 0 };
+    let cur: { facts: typeof facts; seed: Seed } = { facts, seed: 0 };
     for (let i = 0; i < 4; i++) {
       const next = searchAnotherView(cur.facts, cur.seed);
       if (!next) break;

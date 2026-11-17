@@ -25,7 +25,7 @@ import { decideDeterministic2D } from '@/app/decideDeterministic';
 import { commitVerdict } from '@/app/submitPipeline';
 import { replay, useGeoStore, type Fact } from '@/store/geoStore';
 import { searchAnotherView } from '@/replay/core';
-import { checkGivens, roleSidesOf } from '@/engine';
+import { checkGivens, roleSidesOf, type Seed } from '@/engine';
 
 const st = () => useGeoStore.getState();
 type P = { x: number; y: number };
@@ -65,8 +65,8 @@ const lineOf = (p: Map<string, P>, foot: string) => {
   return null;
 };
 /** The view the commit shows and every distinct view the button reaches from it (up to `n` presses). */
-function views(facts: Fact[], seed: number, foot: string, n = 6) {
-  let cur: { facts: Fact[]; seed: number } | null = { facts, seed };
+function views(facts: Fact[], seed: Seed, foot: string, n = 6) {
+  let cur: { facts: Fact[]; seed: Seed } | null = { facts, seed };
   const out: { apex: string; side: string | null; line: string | null; green: boolean }[] = [];
   for (let k = 0; k <= n && cur; k++) {
     const r = replay(cur.facts, cur.seed);

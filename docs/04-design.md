@@ -1585,7 +1585,8 @@ is never re-read.
   (`main-thread-sweeps.test.ts` records `firstSatisfyingSeed` at 0).
 - **The resolve** is `resolveAfterCommit` (App) → `runViewResolve` (`app/resolveView.ts`) → `geoWork.autoResolve`
   (the worker): `meetsRequirements` decides whether anything is wrong, and `findValidConfig(facts, seed)` sweeps
-  from the current seed (M2). The found view merges into the commit's history entry, so one undo removes both.
+  from the current seed (M2). In a figure of independent parts it walks only the parts that fail (ADR-853), so a
+  separate shape the new line did not touch keeps its configuration entry. The found view merges into the commit's history entry, so one undo removes both.
 - **The search basis** ([ADR-812](06-decisions.md#adr-812), #2757). Every worker search result carries the `(facts, seed)`
   it ran on (`ViewBasis`, `store/geoWork.ts`), and `applyView` is a compare-and-set on it: a view that lands after
   an undo, redo, clear, edit or new line is dropped. A store subscription supersedes such a search on the change
@@ -1619,6 +1620,30 @@ reports `factsAfter[k]`; `figureAtStep` re-derives the figure with the `(facts, 
 reads `replaySession`. `main.tsx` mounts it under `import.meta.env.DEV`, which production folds to `false`.
 
 ## Fold and replay
+
+### A figure of independent parts is solved, sampled and judged part by part (#2796, [ADR-853](06-decisions.md#adr-853))
+
+`partsOf(c)` (`engine/components.ts`) is a union–find over the construction's objects: two objects are one part when
+either names the other (any string inside an object — parents, `solve`, `avoid`, `between` — that is an object id),
+and every constraint, stated side (`requirements`) and `sideChoices` record joins the objects it names; the replay
+tail also links the objects each enabled fact names (`foldParts`), so one typed line is one figure even where only the
+facts carry the relation («שני מעגלים»: the pair's unstated mutual position, ADR-815). A generic walk,
+never a per-kind list; a record naming no object keeps the figure whole. A part with no drawn object (polygon, segment,
+line, circle, arc) rides with the first part that has one. **One part ⇒ the construction itself**, so every connected
+figure takes its old path bit for bit. The part's key is its first object id in construction order.
+
+- **Solve.** `resolveDriven` and `evaluate` split a multi-part construction: each part's sub-construction is resolved
+  and evaluated on its own (memoised by identity), and the results are joined (`joinParts`, `joinEvals`). A forced
+  coincidence is recorded inside a part only; a stack across parts is a default the search separates (FR-ALT-5).
+- **Sample.** `runTail` → `tailSample` per part, at the part's own number (`seedOfPart`): the spin about the part's own
+  centroid, the jitter from its own span, the reflection mask over its own `reflectableFreePoints` (so `REFLECT_MAX`
+  applies per part), and the ADR-400 warm retry per part. The joined figure adopts its parts (`adoptParts`), so its
+  `evaluate` re-solves only a part whose sample changed. The fold is unchanged (the ladder already works on the new
+  statement's component, `jointFirst`).
+- **Judge.** `figureMeetsRequirements` of a multi-part figure is the build plus `partMeetsRequirements` of every part:
+  the same bar over the part's own facts (a fact belongs to the parts whose objects it names, or to every part when it
+  names none), positions, violations and coincidences — `pointsDistinct` at the part's own span — and the canvas once:
+  no point of the part within 1.5 % of its span of another part's point.
 
 ### The within-segment gate and its structural exemption (#944, [ADR-489](06-decisions.md#adr-489))
 
@@ -1974,6 +1999,28 @@ The relations layer's definite values, the values panel and the forced crossing 
   (`render/MathValue.tsx`) typesets «±v» or «a או label = b», and `valueText(row, words)` is the text twin.
 
 ## The configuration registry and searches
+
+### The per-part configuration (`Seed`) and the part walk (#2796, [ADR-853](06-decisions.md#adr-853))
+
+The configuration is `Seed = number | { seed, parts }` (`engine/components.ts`): a plain number is every part at it;
+`parts[key]` is the full number (base and reflection mask) of the part keyed `key`, and a part with no entry sits at
+`seed`. Helpers: `seedNumber`, `seedOfPart`, `withPartSeed`, `canonicalSeed` (no entry equal to the base; none ⇒ the
+number), `seedKey` (the replay memo key; a number spells as before), `sameSeed` (zundo's equality), `cleanSeed`,
+`seedPartsOf`. When parts join, the joined part takes the earliest key's entry (it keeps that key); a part with no
+entry samples at the base. Branch, variant and seat choices were already per fact.
+
+`findValidConfig` (`findValidConfigByPart`) searches a one-part figure exactly as before. In a figure of parts it runs
+every tier **for each failing part only**, from that part's entry, under `withPartFocus`: while a part is walked, a
+plain number handed to `replay` names that part's number (every other part at its entry), the bar judges that part
+alone, the reflection count and `reflectMaskForFailing` read the part's construction, `spreadOk`/`separatedView` read
+the part's view, and the seat, variant/side and branch tiers rewrite only the part's facts (`focusOwns`) — the branch
+tier takes the part's branchable facts, not the first four of the whole. Parts that pass keep their entries (NFR-ST-1).
+The answer is judged whole; one that is not falls back to the whole search. «הציגו תצורה אחרת» (`searchAnotherView`,
+`searchResample`) stays a plain-number press that moves every part; the press's fingerprint compares the whole
+drawing. The gate's readers (`dryRunOutcome`, `forcedCrossedRing`, `settleVariantDefaults`, `seatSweepWarmup`, …)
+take the `Seed` through, so a new line is read at its own part's number; knowledge pools stay plain numbers around
+the base. On disk `seed` stays the base number and the entries ride in a sibling `seedParts` (file, share link,
+session), so an older build ignores them; a malformed entry is dropped (`cleanSeed`).
 
 ### One registry of unstated discrete choices ([ADR-593](06-decisions.md#adr-593))
 

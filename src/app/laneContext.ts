@@ -9,12 +9,13 @@
  * `facts` and `seed` are read when a later line needs them (after the model answered), so the figure is the current
  * one. One replay per line that follows a built line; the fold memo makes the shared prefix a tail replay.
  */
+import type { Seed } from '@/engine';
 import { buildParseCtx, type ParseContext } from '@/parser';
 import type { LaneContext } from '@/parser/llm';
 import type { AnyCommand } from '@/engine';
 import { replay, trialFacts, type Fact } from '@/store/geoStore';
 
-export function laneContext(first: ParseContext, now: () => { facts: Fact[]; seed: number }): LaneContext {
+export function laneContext(first: ParseContext, now: () => { facts: Fact[]; seed: Seed }): LaneContext {
   let memo: { n: number; ctx: ParseContext } | null = null;
   return (built: readonly AnyCommand[]): ParseContext => {
     if (built.length === 0) return first;

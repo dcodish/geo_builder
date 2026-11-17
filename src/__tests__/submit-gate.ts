@@ -28,7 +28,7 @@
 import { parse, droppedNewLabels, droppedGivenNumbers } from '@/parser';
 import { useGeoStore, dryRunOutcome, deferralWorthwhile, forcedCrossedRing, replay, seatSweepWarmup } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
-import type { AnyCommand } from '@/engine';
+import type { AnyCommand, Seed } from '@/engine';
 import { ctxOf } from './scenario-pipeline';
 import { vertexPairVerdict } from '@/app/vertexPairCevian';
 import { ROLE_READING_WORK_CAP } from '@/app/decideDeterministic';
@@ -65,7 +65,7 @@ export type GateVerdict =
  * `dryRunOutcome` → commit when it PRODUCED something, or when it errored and the constraint is
  * deferral-worthy (ADR-104's order-independence), else refuse.
  */
-export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVerdict {
+export function gateVerdict(facts: Fact[], utterance: string, seed: Seed = 0): GateVerdict {
   const ctx = ctxOf(facts);
   // #2064 (ADR-643): a height named by two existing vertices — the app's own predicate, called, never mirrored
   const vp = vertexPairVerdict(utterance, ctx, facts, seed, ROLE_READING_WORK_CAP);

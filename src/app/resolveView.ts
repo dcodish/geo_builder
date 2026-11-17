@@ -13,6 +13,7 @@
  * real search (`resolve-view.test.ts`), not through a rendered App. (There is no session-restore
  * path — the store resets on refresh — so post-commit + file-load are the event's only reach-points.)
  */
+import type { Seed } from '@/engine';
 import type { Fact } from '@/store/geoStore';
 import type { FoldNode, SearchResume } from '@/replay/core';
 import { isNotDecided, type NotDecided } from '../../shell/notDecided';
@@ -20,7 +21,7 @@ import { isStaleBasis, type ViewBasis } from '@/store/geoWork';
 
 export interface ViewResolveFound {
   facts: Fact[];
-  seed: number;
+  seed: Seed;
   /** The worker's fold, transplanted by the caller (`primeFoldFor`) so main replays at tail speed. */
   fold: FoldNode | null;
   /** #2757 (ADR-812): the `(facts, seed)` the search ran on — `applyView` refuses it once stale. */
@@ -28,11 +29,11 @@ export interface ViewResolveFound {
 }
 
 export interface ResolveViewDeps {
-  getState(): { facts: Fact[]; seed: number };
-  meetsRequirements(facts: Fact[], seed: number): boolean;
+  getState(): { facts: Fact[]; seed: Seed };
+  meetsRequirements(facts: Fact[], seed: Seed): boolean;
   /** The worker search: 'ok' = already fine (worker-side check), found = a validated composite view. #2893 (ADR-831):
    *  "not decided" = it reached its work limit before it decided; `round` is the round to run (0 first). */
-  autoResolve(facts: Fact[], seed: number, round: number): Promise<'ok' | ViewResolveFound | null | NotDecided<SearchResume>>;
+  autoResolve(facts: Fact[], seed: Seed, round: number): Promise<'ok' | ViewResolveFound | null | NotDecided<SearchResume>>;
   /** Apply the found composite as part of the SAME user action (temporal paused at the caller). */
   applyView(found: ViewResolveFound): void;
   /** #573: while true the App keeps rendering the last GOOD view (the ADR-293 keep-prior slot) —
@@ -46,7 +47,7 @@ export interface ResolveViewDeps {
    * #2893 (ADR-831): the search reached its work limit before it decided. Not "exhausted": the page shows the operator's
    * sentence with «המשיכו לחפש», which runs {@link runViewResolve} again with `round` (the figure stays, as on exhaustion).
    */
-  onNotDecided?(round: number, basis: { facts: Fact[]; seed: number }): void;
+  onNotDecided?(round: number, basis: { facts: Fact[]; seed: Seed }): void;
   isCancelled(err: unknown): boolean;
 }
 
