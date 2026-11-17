@@ -280,49 +280,74 @@ describe('#2736 — a run of a few named test files shares the machine (ADR-W-19
     expect(withWorkerCap(['npx', 'vitest', 'run', 'a.test.ts', '--maxWorkers=2'], 4)).toEqual(['npx', 'vitest', 'run', 'a.test.ts', '--maxWorkers=2']);
   });
 
-  it('light runs overlap each other, and never overlap an exclusive run', async () => {
+  it('two light runs are admitted together, and never overlap an exclusive run', async () => {
+    // #2917: this once asserted that two busy-looping light runs OVERLAPPED in wall time. That is OS scheduling, not
+    // the lock: under load the second process could be scheduled after the first had already finished. Every step is
+    // now a handshake. A run logs its start and then holds until the test opens its gate; the test waits on what the
+    // lock itself writes (a slot file, its own "waiting" line) or on a run's start line, never on a clock.
     const dir = mkdtempSync(join(tmpdir(), 'geo-lock-'));
     const lock = join(dir, 'geo-suite.lock');
     const log = join(dir, 'log.txt');
-    // A stand-in for vitest: `vitest.mjs run <id>.test.ts …` records its interval around a busy period.
+    const lightGate = join(dir, 'open-the-light-runs');
+    const exclusiveGate = join(dir, 'open-the-exclusive-run');
+    // A FILE, not `node -e`: the CLI spawns with a shell on Windows, which mangles quotes and `&&`.
+    const gated = (gate: string) =>
+      `import fs from 'node:fs';const id=process.argv.find(a=>a.endsWith('.test.ts'))??process.argv[2];` +
+      `const say=(w)=>fs.appendFileSync(${JSON.stringify(log)},w+' '+id+String.fromCharCode(10));say('start');` +
+      `const t=Date.now();while(!fs.existsSync(${JSON.stringify(gate)})){if(Date.now()-t>55000)process.exit(9);` +
+      `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20);}say('end');`;
+    // Named `vitest.mjs`, so the lock reads `node vitest.mjs run <id>.test.ts` as a LIGHT run.
     const fake = join(dir, 'vitest.mjs');
-    const body = (ms: number) =>
-      `import fs from 'node:fs';const id=process.argv.find(a=>a.endsWith('.test.ts'))??process.argv[2];const s=Date.now();` +
-      `while(Date.now()-s<${ms}){}fs.appendFileSync(${JSON.stringify(log)},id+' '+s+' '+Date.now()+String.fromCharCode(10));`;
-    writeFileSync(fake, body(600));
+    writeFileSync(fake, gated(lightGate));
     const heavy = join(dir, 'heavy.mjs');
-    writeFileSync(heavy, body(400));
-    const env: NodeJS.ProcessEnv = { ...process.env, GEO_SUITE_LOCK_PATH: lock, GEO_SUITE_LOCK_POLL_MS: '25' };
+    writeFileSync(heavy, gated(exclusiveGate));
+    const env: NodeJS.ProcessEnv = { ...process.env, GEO_SUITE_LOCK_PATH: lock, GEO_SUITE_LOCK_POLL_MS: '25', GEO_SUITE_LIGHT_SLOTS: '4' };
     delete env.GEO_SUITE_LOCK_HELD;
-    const run = (args: string[], delay = 0) =>
-      new Promise<number>((done) =>
-        setTimeout(() => {
-          const p = spawn(process.execPath, [CLI, ...args], { env, stdio: 'ignore' });
-          p.on('exit', (code) => done(code ?? 1));
-        }, delay),
-      );
+    const start = (args: string[]) => {
+      const p = spawn(process.execPath, [CLI, ...args], { env, stdio: ['ignore', 'ignore', 'pipe'] });
+      let said = '';
+      p.stderr!.on('data', (d) => (said += String(d)));
+      return { said: () => said, done: new Promise<number>((r) => p.on('exit', (c) => r(c ?? 1))) };
+    };
+    const lines = () => (existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean) : []);
+    const logged = (line: string) => lines().includes(line);
+    const heldSlots = () => [0, 1, 2, 3].filter((i) => existsSync(`${lock}.light.${i}`)).length;
     try {
-      const codes = await Promise.all([
-        run(['node', fake, 'run', 'l1.test.ts']),
-        run(['node', fake, 'run', 'l2.test.ts']),
-        run(['node', heavy, 'EX'], 150),
-        run(['node', fake, 'run', 'l3.test.ts'], 300),
-      ]);
-      expect(codes).toEqual([0, 0, 0, 0]);
-      const spans = Object.fromEntries(
-        readFileSync(log, 'utf8').trim().split('\n').map((l) => {
-          const [id, s, e] = l.split(' ');
-          return [id, [Number(s), Number(e)]];
-        }),
-      ) as Record<string, [number, number]>;
-      const overlap = (a: [number, number], b: [number, number]) => a[0] < b[1] && b[0] < a[1];
-      expect(Object.keys(spans).sort()).toEqual(['EX', 'l1.test.ts', 'l2.test.ts', 'l3.test.ts']);
-      expect(overlap(spans['l1.test.ts'], spans['l2.test.ts']), 'two light runs share the machine').toBe(true);
-      for (const l of ['l1.test.ts', 'l2.test.ts', 'l3.test.ts']) expect(overlap(spans[l], spans.EX), `${l} vs the exclusive run`).toBe(false);
+      // 1. Two light runs: neither can finish until the gate opens, so both starting means the second was ADMITTED
+      //    while the first still held its slot. Neither takes the exclusive lock.
+      const l1 = start(['node', fake, 'run', 'l1.test.ts']);
+      const l2 = start(['node', fake, 'run', 'l2.test.ts']);
+      await waitFor(() => logged('start l1.test.ts') && logged('start l2.test.ts'), 'both light runs to be admitted');
+      expect(heldSlots(), 'each light run holds its own slot').toBe(2);
+      expect(existsSync(lock), 'a light run never takes the exclusive lock').toBe(false);
+
+      // 2. An exclusive run wins the lock, then waits for the light runs to drain: it does not start beside them.
+      const ex = start(['node', heavy, 'EX']);
+      await waitFor(() => /waiting for 2 light run\(s\) to finish first/.test(ex.said()), 'the exclusive run to wait on the light runs');
+      expect(logged('start EX'), 'the exclusive run has not started while light runs are inside').toBe(false);
+
+      // 3. Release the light runs: only then does the exclusive run start, with every slot already given back.
+      writeFileSync(lightGate, '');
+      await waitFor(() => logged('start EX'), 'the exclusive run to start once the light runs finished');
+      expect(heldSlots(), 'every light slot was released before the exclusive run started').toBe(0);
+
+      // 4. A light run arriving while the exclusive run holds the machine waits for it.
+      const l3 = start(['node', fake, 'run', 'l3.test.ts']);
+      await waitFor(() => /light run waiting — .* holds the machine/.test(l3.said()), 'a later light run to wait on the exclusive run');
+      expect(logged('start l3.test.ts'), 'the later light run has not started beside the exclusive run').toBe(false);
+
+      writeFileSync(exclusiveGate, '');
+      expect(await Promise.all([l1.done, l2.done, ex.done, l3.done])).toEqual([0, 0, 0, 0]);
+      const order = lines();
+      expect(new Set(order.slice(0, 2))).toEqual(new Set(['start l1.test.ts', 'start l2.test.ts']));
+      expect(new Set(order.slice(2, 4))).toEqual(new Set(['end l1.test.ts', 'end l2.test.ts']));
+      expect(order.slice(4)).toEqual(['start EX', 'end EX', 'start l3.test.ts', 'end l3.test.ts']);
       expect(existsSync(lock)).toBe(false);
-      for (let i = 0; i < 4; i += 1) expect(existsSync(`${lock}.light.${i}`), `slot ${i} released`).toBe(false);
+      expect(heldSlots(), 'every slot released').toBe(0);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      // On a failure, open both gates so no gated run outlives the test.
+      for (const g of [lightGate, exclusiveGate]) if (existsSync(dir)) writeFileSync(g, '');
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
     }
-  }, 30_000);
+  }, 60_000);
 });

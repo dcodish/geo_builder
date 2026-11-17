@@ -5,10 +5,10 @@
  * which one in advance:
  *   1. a JSON locale table — 2-D `src/i18n/locales`, 3-D `src3d/i18n/locales`, the suite's `shell/locales`;
  *   2. a TS locale table — the `he`/`en` objects of `src-analytic/i18n/index.ts` and `src-complex/i18n/index.ts`.
- *      They STAY TypeScript (their per-key comments record operator rulings a JSON conversion would delete), so they
- *      are loaded by an import: esbuild (a declared devDependency) bundles the module in memory with the shell's
- *      i18n bootstrap and the suite tables stubbed out, so what comes back is the product's OWN table and a
- *      `suite.*` key is reported once, in `shell/` (where it lives — ADR-W-148), never again under each product;
+ *      They STAY TypeScript (their per-key comments record operator rulings a JSON conversion would delete), so their
+ *      `const he = { … }` / `const en = { … }` literals are READ with the TypeScript compiler API, never run. What
+ *      comes back is the product's OWN table (the suite's keys are merged in only at the `createProductI18n` call,
+ *      which is not read), so a `suite.*` key is reported once, in `shell/` (where it lives — ADR-W-148);
  *   3. an inline literal in code — the files the inline-Hebrew ratchet still allows
  *      (`shell/__tests__/fixtures/inline-hebrew-baseline.json`, ADR-W-153), grepped line by line;
  *   4. a 2-D engine refusal CODE (the error bank, ADR-756) — `src/i18n/humanizeError.ts`'s `wordingOf` switch is
@@ -21,7 +21,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
 import ts from 'typescript';
 
 export const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -63,41 +62,52 @@ export function jsonEntries(root = REPO_ROOT) {
 }
 
 /**
- * Import a TS locale module and return its own `he`/`en` tables. The module only exports the i18n instance built by
- * `createProductI18n({ resources: { he: { ...suiteHe, ...he }, … } })`, so the bootstrap is stubbed to hand its
- * options back and the suite JSON to `{}`: `resources.he` is then exactly the product's `he` (no i18next runs).
+ * Read a TS locale module's own `he`/`en` tables: the initializers of its top-level `const he` / `const en`, evaluated
+ * statically from the syntax tree. #2917: this used to BUNDLE and import the module with esbuild — a Go child process
+ * whose cold start made the first search ≈ 1 s alone and 10–50 s on a loaded machine, past a test's 30 s limit. A
+ * table is data (strings, string concatenation, arrays, nested objects), so reading it needs no bundler and runs no
+ * code; anything else in a table is refused by name rather than guessed at, so a table that grows a computed value
+ * fails loudly here instead of being reported wrong.
  */
-export async function loadTsTable(rel, root = REPO_ROOT) {
-  const stub = {
-    name: 'find-message-stubs',
-    setup(b) {
-      b.onResolve({ filter: /shell[\\/]i18n(\.ts)?$/ }, (a) => ({ path: a.path, namespace: 'fm-i18n' }));
-      b.onResolve({ filter: /shell[\\/]locales[\\/].*\.json$/ }, (a) => ({ path: a.path, namespace: 'fm-suite' }));
-      b.onLoad({ filter: /.*/, namespace: 'fm-i18n' }, () => ({ contents: 'export const createProductI18n = (o) => o;', loader: 'js' }));
-      b.onLoad({ filter: /.*/, namespace: 'fm-suite' }, () => ({ contents: 'export default {};', loader: 'js' }));
-    },
+export function loadTsTable(rel, root = REPO_ROOT) {
+  const src = ts.createSourceFile(rel, readFileSync(join(root, rel), 'utf8'), ts.ScriptTarget.Latest, true);
+  const value = (n) => {
+    if (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n)) return value(n.expression);
+    if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) return n.text;
+    if (ts.isNumericLiteral(n)) return Number(n.text);
+    if (n.kind === ts.SyntaxKind.TrueKeyword) return true;
+    if (n.kind === ts.SyntaxKind.FalseKeyword) return false;
+    if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken) return value(n.left) + value(n.right);
+    if (ts.isArrayLiteralExpression(n)) return n.elements.map(value);
+    if (ts.isObjectLiteralExpression(n)) {
+      const obj = {};
+      for (const p of n.properties) {
+        if (!ts.isPropertyAssignment(p) || ts.isComputedPropertyName(p.name)) refuse(p);
+        obj[p.name.text] = value(p.initializer);
+      }
+      return obj;
+    }
+    return refuse(n);
   };
-  const out = await build({
-    entryPoints: [join(root, rel)],
-    bundle: true,
-    write: false,
-    format: 'esm',
-    platform: 'node',
-    logLevel: 'silent',
-    plugins: [stub],
-  });
-  const code = out.outputFiles[0].text;
-  const mod = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
-  const instance = Object.values(mod).find((v) => v && typeof v === 'object' && v.resources && v.resources.he);
-  if (!instance) throw new Error(`find-message: no createProductI18n({ resources }) export in ${rel}`);
-  return instance.resources;
+  const refuse = (n) => {
+    const { line } = src.getLineAndCharacterOfPosition(n.getStart(src));
+    throw new Error(`find-message: ${rel}:${line + 1} is not a plain table value (\`${n.getText(src).slice(0, 60)}\`)`);
+  };
+  const tables = {};
+  for (const stmt of src.statements) {
+    if (!ts.isVariableStatement(stmt)) continue;
+    for (const d of stmt.declarationList.declarations)
+      if (ts.isIdentifier(d.name) && LANGS.includes(d.name.text) && d.initializer) tables[d.name.text] = value(d.initializer);
+  }
+  for (const lang of LANGS) if (!tables[lang]) throw new Error(`find-message: no top-level \`const ${lang} = { … }\` in ${rel}`);
+  return tables;
 }
 
 /**
- * ONE SCAN PER PROCESS (#2894). Bundling the TS tables with esbuild and parsing the code switch are the costly parts of
- * a search (≈ 0.6 s alone, ≈ 28 s under a full suite's load, where a 30 s test limit then fails at random). Their
- * inputs do not change between two searches of one process, so each is read once, keyed by the root and the source
- * files' modification times: an edit between two searches (a long-lived process) is still read fresh.
+ * ONE SCAN PER PROCESS (#2894). Parsing the TS tables and the code switch are the costly parts of a search (#2917
+ * removed the esbuild bundle that dominated them). Their inputs do not change between two searches of one process, so
+ * each is read once, keyed by the root and the source files' modification times: an edit between two searches (a
+ * long-lived process) is still read fresh.
  */
 const scanCache = new Map();
 const stamp = (root, rels) => `${root}|${rels.map((r) => { const a = join(root, r); return existsSync(a) ? statSync(a).mtimeMs : 0; }).join(',')}`;
@@ -112,10 +122,10 @@ export function tsEntries(root = REPO_ROOT) {
   return once('ts', root, TS_LOCALE_MODULES, () => scanTsEntries(root));
 }
 
-async function scanTsEntries(root) {
+function scanTsEntries(root) {
   const rows = [];
   for (const rel of TS_LOCALE_MODULES) {
-    const resources = await loadTsTable(rel, root);
+    const resources = loadTsTable(rel, root);
     for (const lang of LANGS)
       for (const [key, value] of flatten(resources[lang])) rows.push({ file: `${rel} [${lang}]`, key, value });
   }
@@ -214,7 +224,7 @@ const covers = (pattern, key) => (pattern.endsWith('*') ? key.startsWith(pattern
 export async function findMessage(query, root = REPO_ROOT) {
   const q = String(query ?? '').trim().toLowerCase();
   if (!q) throw new Error('find-message: give a text or a key to search for');
-  const tables = [...jsonEntries(root), ...(await tsEntries(root))];
+  const tables = [...jsonEntries(root), ...tsEntries(root)];
   const hit = (r) => r.key.toLowerCase().includes(q) || r.value.toLowerCase().includes(q);
   const rows = tables.filter(hit);
 
