@@ -41,7 +41,7 @@ import { workLane } from '../../shell/workMeter';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
 import { DOUBLE_ROOT_SPLIT } from '@/engine/geometry';
-import { solveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, isSatisfied, declaredRingsHold, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
+import { enumerateFreePointRoots, applyRootChoice, type FreePointRoots, solveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, isSatisfied, declaredRingsHold, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
 import { resolveBinds } from './naming';
 import { clearNarrowingMemo, narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
@@ -2583,6 +2583,21 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
  * marks, the givens verifier, coincidences). This is all a new seed — a sweep candidate,
  * a "show another configuration" probe, a detection sample — ever pays.
  */
+/**
+ * #2744 ([ADR-856](../../docs/06-decisions.md#adr-856)): the listed roots of the fold's determined free points
+ * (`enumerateFreePointRoots`) — seed-independent, so computed once per committed construction and read by every seed's
+ * tail. A listing a work budget cut is not kept.
+ */
+const freePointRootsMemo = new WeakMap<Construction, FreePointRoots[]>();
+function freePointRootsOf(cur: Construction): FreePointRoots[] {
+  const hit = freePointRootsMemo.get(cur);
+  if (hit) return hit;
+  const aborts0 = solveBudget.aborts;
+  const listed = enumerateFreePointRoots(cur);
+  if (solveBudget.aborts === aborts0) freePointRootsMemo.set(cur, listed);
+  return listed;
+}
+
 function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   const { cur, applied, pending } = fold;
   const status: Record<string, FactStatus> = {};
@@ -2610,7 +2625,10 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
     const fullMask = reflectMaskOf(seed);
     let preMask = 0, postMask = 0;
     refl.forEach((id, i) => { if (fullMask & (1 << i)) (helpers.has(id) ? (postMask |= 1 << i) : (preMask |= 1 << i)); });
-    return applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
+    const spun = applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
+    // #2744 (ADR-856): a free point its own givens fix up to a discrete choice starts at the root this seed chooses —
+    // seed 0 never (the first drawing is unchanged), the listing once per fold.
+    return baseSeedOf(seed) ? applyRootChoice(spun, freePointRootsOf(cur), baseSeedOf(seed)) : spun;
   });
   let figure = sampled;
   let e = evaluate(figure);

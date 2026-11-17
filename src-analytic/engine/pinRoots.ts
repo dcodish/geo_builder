@@ -274,6 +274,11 @@ export interface BlockRootSearch {
   same: number;
   /** At most this many roots, the anchor included. */
   cap: number;
+  /**
+   * #2744 (ADR-AG-502): starts tried first, each polished on the real residuals alone (no deflation) — a vertex's
+   * mirror images. A ridge between two roots holds a deflated descent from a near start; a start past it needs none.
+   */
+  images?: readonly number[][];
 }
 
 export interface BlockRoots {
@@ -307,6 +312,15 @@ export function enumerateBlockRoots(s: BlockRootSearch): BlockRoots {
     const d = Math.abs(s.delta(probe, s.anchor, i));
     return d > 0 ? 1 / d : 1;
   });
+  for (const x0 of s.images ?? []) {
+    if (roots.length >= s.cap) break;
+    if (x0.length !== n || known(x0)) continue;
+    const b = s.solve([...x0], s.residuals);
+    solves += 1;
+    if (!b.ok || b.values.some((v) => !Number.isFinite(v)) || known(b.values)) continue;
+    roots.push(b.values);
+    admitted.push(s.admit(b.values));
+  }
   for (let round = 0; round < BLOCK_ROUNDS && roots.length < s.cap; round += 1) {
     let found = false;
     for (let k = 0; k < BLOCK_STARTS && roots.length < s.cap; k += 1) {
@@ -331,4 +345,66 @@ export function enumerateBlockRoots(s: BlockRootSearch): BlockRoots {
     if (!found) break;
   }
   return { roots, admitted, solves };
+}
+
+/**
+ * #2744 ([ADR-AG-502](../../docs/06c-decisions-analytic.md#adr-ag-502)) — A VERTEX'S ROOT IN ITS ANCHORS' FRAME, so a
+ * configuration that places the rest of the figure elsewhere (moved, turned, mirrored) puts the root where it belongs.
+ * The frame is [a0, a1] or [a0, a1, a2]: a0 the origin, a1 − a0 the first axis, the second a2 − a0 or, with two
+ * anchors, the left perpendicular of the first (2-D's `engine/blockRoots.ts` holds the same three, copied: product
+ * trees are isolated).
+ */
+interface FramePt {
+  x: number;
+  y: number;
+}
+const frameAxes = (f: readonly FramePt[]): [FramePt, FramePt] => {
+  const e1 = { x: f[1].x - f[0].x, y: f[1].y - f[0].y };
+  return [e1, f.length > 2 ? { x: f[2].x - f[0].x, y: f[2].y - f[0].y } : { x: -e1.y, y: e1.x }];
+};
+/** A point as coordinates in the frame `f` (anchor positions); null when the frame is degenerate. */
+export function toFrame(p: FramePt, f: readonly FramePt[]): { u: number; v: number } | null {
+  const [e1, e2] = frameAxes(f);
+  const det = e1.x * e2.y - e1.y * e2.x;
+  if (!(Math.abs(det) > 1e-12)) return null;
+  const px = p.x - f[0].x;
+  const py = p.y - f[0].y;
+  return { u: (px * e2.y - py * e2.x) / det, v: (e1.x * py - e1.y * px) / det };
+}
+/** The inverse of {@link toFrame}. */
+export function fromFrame(r: { u: number; v: number }, f: readonly FramePt[]): FramePt {
+  const [e1, e2] = frameAxes(f);
+  return { x: f[0].x + r.u * e1.x + r.v * e2.x, y: f[0].y + r.u * e1.y + r.v * e2.y };
+}
+/** The two most separated anchors, then the one farthest off their line (by more than a hundredth of the span). */
+export function anchorFrameOf(anchors: readonly string[], at: (id: string) => FramePt, span: number): string[] | null {
+  let a0: string | null = null;
+  let a1: string | null = null;
+  let best = 0;
+  for (let i = 0; i < anchors.length; i += 1)
+    for (let j = i + 1; j < anchors.length; j += 1) {
+      const p = at(anchors[i]);
+      const q = at(anchors[j]);
+      const d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d > best) {
+        best = d;
+        a0 = anchors[i];
+        a1 = anchors[j];
+      }
+    }
+  if (!a0 || !a1 || best < span * 1e-6) return null;
+  const P = at(a0);
+  const Q = at(a1);
+  let a2: string | null = null;
+  let off = span * 1e-2;
+  for (const r of anchors) {
+    if (r === a0 || r === a1) continue;
+    const R = at(r);
+    const h = Math.abs((Q.x - P.x) * (R.y - P.y) - (Q.y - P.y) * (R.x - P.x)) / best;
+    if (h > off) {
+      off = h;
+      a2 = r;
+    }
+  }
+  return a2 ? [a0, a1, a2] : [a0, a1];
 }

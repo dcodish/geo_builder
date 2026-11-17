@@ -2057,6 +2057,23 @@ keeps its vertex order; chords stated to meet within a segment (`line-line-inter
 their ends; otherwise, or when unsatisfiable, the default stays. It runs before the jitter, adds no evaluate, and is
 reached by every view search's seed sweep (ADR-106) — the counterpart of the stated-side seat (ADR-594).
 
+### A determined free point's other roots are listed once per fold, and the seed chooses one ([ADR-856](06-decisions.md#adr-856))
+
+A free point two scalar givens fix («E על הישר AB» · «DE = 12») is solved by descent from the sampled start, which
+`applySeed` barely moves, so every seed reached the same root. `engine/blockRoots.ts` `enumerateFreePointRoots(cur)` lists,
+for each non-pinned free point that ADR-166's reflection does not own (`reflectableFreePoints`) and whose own rows fix it
+(every constraint reading it or a point that moves with it, every other point held: a rank-2 Jacobian over its two
+coordinates), its roots: polished descents from its mirror images through the points its rows name and across the lines
+through two of them, then deflated LM (`r·Π(1 + 1/‖x − root‖²)`) from `ROOT_STARTS` fixed nudges at a quarter and a whole
+span, for at most `ROOT_ROUNDS`, at most `ROOT_CAP` roots, inside `ROOT_REACH` spans. A root counts when every constraint
+holds there, no polygon is defective and no two named points meet. Each is stored in the frame of those points
+(`frameOf`: the two farthest, and one off their line). `replay/core.ts` memoises the list per committed construction
+(`freePointRootsOf`); `runTail` calls `applyRootChoice` on the sampled construction for every base seed but 0, which
+starts each listed point at root `rootChoice(seed, id, n)` placed in its anchors as the seed sampled them (one
+`evaluateCore` without a solve). A start, never a verdict: `evaluate` converges from it and ADR-400's warm retry still
+runs. Nothing else reads it: the seed resample of `searchAnotherView` and the knowledge pool see the other root because
+the seeds now reach it.
+
 ### A free point's admissible region rides on the point (#556, [ADR-511](06-decisions.md#adr-511))
 
 A construction needing a free operand on one side of a circle (a tangent's or secant's apex, «M מחוץ למעגל») emits

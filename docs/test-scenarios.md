@@ -2376,3 +2376,7 @@ over all four (ADR-041).
 ### `new-solutions-first-tangent-right-triangle-2831` — «משיק מ-A בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6»: the three triangles come on presses 0, 1 and 2 (#2831, ADR-824)
 
 **Guards against:** «הציגו תצורה אחרת» showing a mirror image of the drawing on the screen before a solution not yet shown (the odometer turned the tangent-point and side axes, both mirrors, faster than the right-angle seat: the triangles came on presses 0, 2 and 4). **Asserts** presses 0–2 are three different shapes, there is no fourth, and presses 3–5 repeat them in order, as other placements.
+
+### `square-E-beyond-A-2744` — a point its givens fix up to a choice shows each solution, and «BE» lists both values (#2744, ADR-856)
+
+**Guards against:** «ריבוע ABCD שצלעו 10 · E על הישר AB · DE = 12» drawing E between A and B at every seed, «הציגו תצורה אחרת» finding nothing, and the panel stating BE = 3.37 as known. **Asserts** seed 0 at BE 3.37, both roots over seeds 0–23 (each at least 6), a press reaching 16.63, «BE» answering both values in the panel and the question box, the angle and area siblings reaching both roots; controls: «BE > 10» draws 16.63 at seed 0, the segment form has no other configuration, the SSA triangle keeps both shapes.
