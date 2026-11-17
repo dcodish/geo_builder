@@ -35,6 +35,9 @@ All the stage-0 provers are SOUND one way only: a violation proves impossibility
 passing proves nothing. The same provers run inside the classifier's `constraintIsPending` (stage 5), so a
 proven contradiction is never filed as ADR-104's pending state — and, because they run before anything
 mutates, the refusal is also the CHEAP path (#1335 measured 19.6 s → 2.2 s on its own sequence).
+Since [ADR-859](06-decisions.md#adr-859) (#2572) stage 2e⁰'s proof joins them there: a trial the metric closure proves
+impossible, when the figure before the line is not, is concluded, never pending (a chord past the diameter, a side of a
+circumscribed triangle under it).
 
 ## Stage 1 — the conflict / M1 branch (`commandConflict` ≠ null)
 

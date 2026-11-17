@@ -1264,6 +1264,11 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
   Am. 1) — and even then it is refused when the dry run's seat sweep finished and cured nothing (`StepOutcome.seatsExhausted`,
   [ADR-584](06-decisions.md#adr-584), #1671). `seatSweep` is bounded by `SEAT_SWEEP_WORK_CAP` charged units; the
   worker warms the rotated folds first (`seatSweepWarmup`; a transplanted fold carries `FoldNode.work`).
+- **Pending is within reach** ([ADR-859](06-decisions.md#adr-859), #2572): `constraintIsPending` — the one predicate both
+  the gate and the classifier ask — returns NOT pending when the metric closure (`metricClosureImpossibility`, ADR-833/837)
+  proves the trial's lengths hold in no configuration and proves nothing of the figure before the line. The flex probe
+  asks whether a residual moves; the closure, whether it can reach zero. A chord or inscribed side past the diameter and a
+  side of a circumscribed triangle under it are concluded, so the gate refuses them in the dry run's words.
 - **The gate's budgets are work, never the clock** ([ADR-709](06-decisions.md#adr-709), #1857). After the seat
   sweep, the dry run's unstated-choice rescue (`choiceRescue(all, { workCap: choiceRescueConfig.cap })`) decides
   whether another variant / side / reflex assignment cures an erroring step; it runs under
