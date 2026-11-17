@@ -19,6 +19,7 @@ import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GeoObject, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, pinnedAngleWedges, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { reachImpossibility } from '@/engine/reachFeasibility';
+import { metricClosureImpossibility } from '@/engine/metricClosure';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
 import { DIAGONAL_HEIGHT_VS, diagonalHeightError, diagonalHeightImpossibility } from '@/engine/heightFeasibility';
@@ -34,13 +35,15 @@ import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, statedSizeCircles } from '@/engine';
 import { crossingPastSecond } from '@/engine/extensionSide';
 import { budgetSpent, chargeHit, computeWithCell, flatLedger, ledgerTotal, registerLedger, work, withExecutedCap, withSearchLimit, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
-import { limitReached } from '../../shell/workLimit';
+import { limitReached, unitsLeft } from '../../shell/workLimit';
 import { isNotDecided, notDecided, type NotDecided } from '../../shell/notDecided';
 import { workLane } from '../../shell/workMeter';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
 import { DOUBLE_ROOT_SPLIT } from '@/engine/geometry';
-import { solveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, isSatisfied, declaredRingsHold, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
+import { enumerateFreePointRoots, applyRootChoice, type FreePointRoots, solveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, isSatisfied, declaredRingsHold, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
+import { partsOf, joinParts, adoptParts, seedNumber, seedOfPart, seedKey, withPartSeed, type Part, type Seed } from '@/engine/components';
+import type { EvalResult } from '@/engine/evaluate';
 import { resolveBinds } from './naming';
 import { clearNarrowingMemo, narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
@@ -341,7 +344,7 @@ let namingDepth = 0;
  * responsible one. Statements are the student's units (a fact's group), so a multi-command line names
  * itself once. Costs one replay per prefix, only when a degeneracy exists.
  */
-function nameDegeneracies(facts: Fact[], seed: number, flat: DegeneratePolygon[]): DegenerateNotice[] {
+function nameDegeneracies(facts: Fact[], seed: Seed, flat: DegeneratePolygon[]): DegenerateNotice[] {
   if (namingDepth > 0) return flat.map((d) => ({ object: d.vertices.join(''), vertices: d.vertices, ratio: d.ratio, statements: [] }));
   namingDepth++;
   try {
@@ -370,8 +373,9 @@ function nameDegeneracies(facts: Fact[], seed: number, flat: DegeneratePolygon[]
   }
 }
 
-export function replay(facts: Fact[], seed = 0): Derived {
-  const key = `${seed}`;
+export function replay(facts: Fact[], seed: Seed = 0): Derived {
+  seed = focusedSeed(seed); // #2796 (ADR-853): inside a search walking one part, a plain number is that part's
+  const key = seedKey(seed);
   let entry = replayCache.get(facts);
   // The store never mutates a facts array (every action builds a new one), but TESTS and harnesses
   // legitimately `push` into one between replays — so a ref-keyed hit is only valid while the array
@@ -692,6 +696,7 @@ export function clearReplayCaches(): void {
   sampledSourceIds = new WeakMap();
   sampleMemo = null;
   clearNarrowingMemo();
+  solutionCycleMemo.clear(); // #2831 (ADR-824): the show-another cycle is a replay memo like the rest
 }
 /**
  * #2890 ([ADR-830](docs/06-decisions.md#adr-830), ADR-W-210 phase 3) — THE SETTLED VIEW of a figure: everything the
@@ -706,7 +711,7 @@ export function clearReplayCaches(): void {
  */
 export interface SettledView {
   facts: Fact[];
-  seed: number;
+  seed: Seed;
   derived: Derived;
   work: number;
   fold: FoldNode | null;
@@ -714,7 +719,7 @@ export interface SettledView {
   resolved: Construction | null;
   dof: number | null;
 }
-export function settleView(facts: Fact[], seed: number): SettledView {
+export function settleView(facts: Fact[], seed: Seed): SettledView {
   const derived = replay(facts, seed);
   const cell = cellOf.get(derived);
   const usable = viewUsable(derived);
@@ -744,7 +749,7 @@ export function adoptSettled(v: SettledView): void {
     entry = { snapshot: v.facts.slice(), bySeed: new Map() };
     replayCache.set(v.facts, entry);
   }
-  const key = `${v.seed}`;
+  const key = seedKey(v.seed); // #2796 (ADR-853): the memo key of a per-part configuration
   if (!entry.bySeed.has(key)) {
     cellOf.set(v.derived, flatLedger(v.work));
     entry.bySeed.set(key, v.derived);
@@ -762,14 +767,14 @@ export function peekFoldFor(facts: Fact[]): FoldNode | null {
   return foldCache.get(foldKey(resolveBinds(facts))) ?? null;
 }
 /** Whether this heap already holds the replay of `(facts, seed)`: a read of the memo that never solves. */
-export function hasReplay(facts: Fact[], seed: number): boolean {
+export function hasReplay(facts: Fact[], seed: Seed): boolean {
   const entry = replayCache.get(facts);
   if (!entry || entry.snapshot.length !== facts.length || !entry.snapshot.every((f, i) => f === facts[i])) return false;
-  return entry.bySeed.has(`${seed}`);
+  return entry.bySeed.has(seedKey(seed));
 }
 /** The replay of `(facts, seed)` this heap holds, or undefined: never solves. */
-export function peekReplay(facts: Fact[], seed: number): Derived | undefined {
-  return hasReplay(facts, seed) ? replayCache.get(facts)!.bySeed.get(`${seed}`) : undefined;
+export function peekReplay(facts: Fact[], seed: Seed): Derived | undefined {
+  return hasReplay(facts, seed) ? replayCache.get(facts)!.bySeed.get(seedKey(seed)) : undefined;
 }
 export function getFoldFor(facts: Fact[]): FoldNode | null {
   // #2893 (ADR-831): the fold this lane holds (a fold handed across the worker boundary is one the worker has just replayed)
@@ -926,7 +931,7 @@ export function mutedRowHolding(facts: Fact[], all: Fact[], figure: Construction
   return null;
 }
 
-function computeReplay(raw: Fact[], seed = 0): Derived {
+function computeReplay(raw: Fact[], seed: Seed = 0): Derived {
   // #1697 (ADR-588): a naming by use is a FACT of the line that made it — applied here, to the facts before it
   const facts = resolveBinds(raw);
   const key = foldKey(facts);
@@ -958,7 +963,7 @@ function computeReplay(raw: Fact[], seed = 0): Derived {
 /** Per-seed candidate choice: try the HOIST rescue chain first; a rescue whose tail evaluates clean at
  *  THIS seed wins (exactly the old recursive acceptance `rescued.lastError === null && !rescued.pending`),
  *  else fall back to the fold that failed — its honest error stands. */
-function tailChoice(fold: FoldNode, facts: Fact[], seed: number): Derived {
+function tailChoice(fold: FoldNode, facts: Fact[], seed: Seed): Derived {
   if (fold.rescue) {
     const r = tailChoice(fold.rescue, facts, seed);
     if (r.lastError === null && !r.pending) return r;
@@ -2576,21 +2581,25 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
 }
 
 /**
- * The seed-DEPENDENT tail of a replay (ADR-280): reflections + the ADR-018 sample on
- * the fold's finished construction, ONE evaluate, then the per-seed presentation (labels, asserted angle
- * marks, the givens verifier, coincidences). This is all a new seed — a sweep candidate,
- * a "show another configuration" probe, a detection sample — ever pays.
+ * #2744 ([ADR-856](../../docs/06-decisions.md#adr-856)): the listed roots of the fold's determined free points
+ * (`enumerateFreePointRoots`) — seed-independent, so computed once per committed construction and read by every seed's
+ * tail. A listing a work budget cut is not kept.
  */
-function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
-  const { cur, applied, pending } = fold;
-  const status: Record<string, FactStatus> = {};
-  facts.forEach((f, i) => { status[f.id] = fold.statusByIndex[i]; });
-  const rtReorder = new Map(fold.rtReorderByIndex.map(([i, ids]) => [facts[i].id, ids]));
-  const lenByKey = new Map(fold.lens);
-  const angByKey = new Map(fold.angs);
-  const areaByKey = new Map(fold.areas);
-  const arcByKey = new Map<string, MeasureLabels['arcs'][number]>(); // ARC measures (ADR-335) — per-seed constraint values, nothing fold-carried
-  let lastError = fold.buildError;
+const freePointRootsMemo = new WeakMap<Construction, FreePointRoots[]>();
+function freePointRootsOf(cur: Construction): FreePointRoots[] {
+  const hit = freePointRootsMemo.get(cur);
+  if (hit) return hit;
+  const aborts0 = solveBudget.aborts;
+  const listed = enumerateFreePointRoots(cur);
+  if (solveBudget.aborts === aborts0) freePointRootsMemo.set(cur, listed);
+  return listed;
+}
+
+/**
+ * The seed-DEPENDENT sample of one construction (the whole figure, or one independent part of it, #2796): the
+ * reflections and the ADR-018 sample at `seed`, and ONE evaluate, with the ADR-400 basin retry.
+ */
+function tailSample(cur: Construction, seed: number): { figure: Construction; e: EvalResult } {
   // The seed's high bits select a reflection of certain free points (ADR-166); the low bits are the
   // continuous sample. The reflection is split around the sample by the kind of point being flipped:
   //  • APEX points (equidistant / shared-vertex right angle) reflect BEFORE the sample — their mirror is a
@@ -2608,7 +2617,10 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
     const fullMask = reflectMaskOf(seed);
     let preMask = 0, postMask = 0;
     refl.forEach((id, i) => { if (fullMask & (1 << i)) (helpers.has(id) ? (postMask |= 1 << i) : (preMask |= 1 << i)); });
-    return applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
+    const spun = applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
+    // #2744 (ADR-856): a free point its own givens fix up to a discrete choice starts at the root this seed chooses —
+    // seed 0 never (the first drawing is unchanged), the listing once per fold.
+    return baseSeedOf(seed) ? applyRootChoice(spun, freePointRootsOf(cur), baseSeedOf(seed)) : spun;
   });
   let figure = sampled;
   let e = evaluate(figure);
@@ -2632,6 +2644,58 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
         figure = warmed;
       }
     }
+  }
+  return { figure, e };
+}
+
+/**
+ * #2796 (ADR-853): the independent parts of a fold's construction, linked also by the statements — a typed line that
+ * names objects of two parts makes them one figure («שני מעגלים» states their mutual position on the facts alone,
+ * ADR-815). Memoised per construction and statement names, so a part's construction keeps its identity across replays
+ * (the sample and solve memos key on it).
+ */
+const foldPartsMemo = new WeakMap<Construction, { key: string; parts: readonly Part[] }>();
+function foldParts(cur: Construction, facts: Fact[]): readonly Part[] {
+  const links = facts.filter((f) => f.enabled).map((f) => [...namesIn(f.cmd)]);
+  const key = links.map((l) => l.join(',')).join('|');
+  const hit = foldPartsMemo.get(cur);
+  if (hit && hit.key === key) return hit.parts;
+  const parts = partsOf(cur, links);
+  foldPartsMemo.set(cur, { key, parts });
+  return parts;
+}
+
+/**
+ * The seed-DEPENDENT tail of a replay (ADR-280): reflections + the ADR-018 sample on
+ * the fold's finished construction, ONE evaluate, then the per-seed presentation (labels, asserted angle
+ * marks, the givens verifier, coincidences). This is all a new seed — a sweep candidate,
+ * a "show another configuration" probe, a detection sample — ever pays.
+ */
+function runTail(fold: FoldNode, facts: Fact[], seed: Seed): Derived {
+  const { cur, applied, pending } = fold;
+  const status: Record<string, FactStatus> = {};
+  facts.forEach((f, i) => { status[f.id] = fold.statusByIndex[i]; });
+  const rtReorder = new Map(fold.rtReorderByIndex.map(([i, ids]) => [facts[i].id, ids]));
+  const lenByKey = new Map(fold.lens);
+  const angByKey = new Map(fold.angs);
+  const areaByKey = new Map(fold.areas);
+  const arcByKey = new Map<string, MeasureLabels['arcs'][number]>(); // ARC measures (ADR-335) — per-seed constraint values, nothing fold-carried
+  let lastError = fold.buildError;
+  // The sample ({@link tailSample}): reflections + the ADR-018 sample + one evaluate.
+  const parts = foldParts(cur, facts);
+  let figure: Construction;
+  let e: EvalResult;
+  if (parts.length > 1) {
+    // #2796 (ADR-853): each independent part is sampled at its OWN configuration number, about its own centre and at its
+    // own span, with its own reflection mask, and solved on its own — so a part the student did not touch is drawn
+    // exactly as before, whatever is added beside it. The figure is the union of the parts.
+    const each = parts.map((p) => tailSample(p.construction, seedOfPart(seed, p.key)));
+    figure = joinParts(cur, each.map((x) => x.figure));
+    adoptParts(figure, parts.map((p, i) => ({ ...p, construction: each[i].figure })));
+    e = evaluate(figure);
+  } else {
+    ({ figure, e } = tailSample(cur, seedNumber(seed)));
+    adoptParts(figure, [{ ...parts[0], construction: figure }]); // one figure: judged and searched whole
   }
   // A seed can break a figure that BUILT fine — surface that failure so the error reflects what is
   // actually drawn. `lastError` was build-only, so a sample that made `evaluate` fail left it null with
@@ -3037,6 +3101,12 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   // #2797 (ADR-817): the reach member — a rider of a fixed ray or circle stated at a distance it can never reach. The
   // residual moves (the rider's free parameter moves it), which is not whether it can reach zero.
   if (reachImpossibility([...probe.constraints, ...drivenConstraintsOf(probe)]) && !reachImpossibility([...cur.constraints, ...drivenConstraintsOf(cur)])) return false;
+  // #2572 (ADR-859): the bound the METRIC CLOSURE proves — a chord or an inscribed side past the diameter, a side of a
+  // triangle around a circle under it (ADR-837's floor), any length the closure's relations exclude. The residual moves
+  // (the free points move it), which is not whether it can reach zero: ADR-104's bet that a later given pins the figure
+  // holds only within reach, and no given added later widens a range the closure already proved empty. Read on the probe
+  // and not on the figure before it, as the reach member is: a proof already true without the line is not this line's.
+  if (metricClosureImpossibility(probe) && !metricClosureImpossibility(cur)) return false;
   // #1470 (ADR-549): the side twin — a stated side and a statement that structurally puts the point
   // elsewhere. No later given can move a point off the circle it rides.
   if (cmds.some((cmd) => sideImpossibility(probe, cmd))) return false;
@@ -3084,7 +3154,7 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
  * #1668 (ADR-564): and the classifier's verdict is PER FACT — `Derived.concluded` carries it, so a line
  * one of whose members the fold filed as a concluded contradiction never parks on another member's flex.
  */
-export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[], seed = 0, opts: { seatsExhausted?: boolean } = {}): boolean {
+export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[], seed: Seed = 0, opts: { seatsExhausted?: boolean } = {}): boolean {
   if (!hasDeferrableConstraint(commands)) return false;
   const symtab = buildSymTab([...facts.filter((f) => f.enabled).map((f) => f.cmd), ...commands]);
   const lowered = commands.flatMap((c) => lowerOne(c, symtab)) as Command[];
@@ -3348,7 +3418,10 @@ export interface SearchResume {
  * whose givens force a small wedge fails it at every seed, and every caller falls through to today's
  * behaviour, because a valid configuration must stay drawable (ADR-052).
  */
-const spreadOk = (fig: Derived): boolean => fig.lastError === null && wellSpread(fig.construction, fig.positions);
+const spreadOk = (whole: Derived): boolean => {
+  const fig = focusView(whole); // #2796 (ADR-853): inside a part walk, the walked part's legibility
+  return fig.lastError === null && wellSpread(fig.construction, fig.positions);
+};
 
 /**
  * #194 (ADR-474) — how legible this drawing is, as a number: the tightest wedge anywhere in it.
@@ -3360,7 +3433,10 @@ const spreadOk = (fig: Derived): boolean => fig.lastError === null && wellSpread
  * configuration at all, where "best available" is the only improvement available.
  * So the tier is: take the first candidate that clears the bar; failing that, take the BEST one seen.
  */
-const spreadScore = (fig: Derived): number => (fig.lastError === null ? tightestWedge(fig.construction, fig.positions) : -1);
+const spreadScore = (whole: Derived): number => {
+  const fig = focusView(whole); // #2796 (ADR-853)
+  return fig.lastError === null ? tightestWedge(fig.construction, fig.positions) : -1;
+};
 
 /** How many extra candidates a sweep may examine purely to improve spread, once it already holds an
  *  acceptable answer. Bounds the cost the preference can add to a figure that has no legible
@@ -3373,7 +3449,7 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, limit
 function firstSatisfyingSeedUnder(facts: Fact[], from: number, budget: number): number {
   const hasExt = extensionTriples(facts).length > 0;
   const base0 = replay(facts, from);
-  const reflectable = reflectableFreePoints(base0.construction);
+  const reflectable = reflectableFreePoints(focusConstruction(base0.construction)); // #2796: the walked part's
   const hasOnSeg = base0.construction.objects.some((o) => o.kind === 'line-line-intersection' && (o.onSeg || o.onSeg1 || o.onSeg2));
   // The point-free crossing statement (`segments-cross`, issue #241 / ADR-383) is the same discrete
   // requirement as a named `onSeg` meet — it joins every bar and the reflection search below.
@@ -3407,7 +3483,7 @@ function firstSatisfyingSeedUnder(facts: Fact[], from: number, budget: number): 
   // lands cleanly inside). Then the plain seeds (extensions; also an on-seg figure fixable by re-seed alone).
   const seeds: number[] = [];
   if ((hasOnSeg || hasCross) && reflectable.length > 0) {
-    const targeted = reflectMaskForFailing(base0, facts);
+    const targeted = reflectMaskForFailing({ ...base0, construction: focusConstruction(base0.construction) }, facts);
     const subsets = Array.from({ length: (1 << reflectable.length) - 1 }, (_, i) => i + 1);
     const masks = [targeted, ...subsets].filter((m, i, a) => m > 0 && a.indexOf(m) === i);
     for (const m of masks) for (let s = 0; s < 24; s++) seeds.push(withReflectMask(m, s));
@@ -3474,17 +3550,20 @@ export type FailureBar = 'build' | 'statuses';
 export function failsAtEverySeed(facts: Fact[], fig: Derived, bar: FailureBar): boolean {
   const root = foldOfDerived.get(fig);
   if (!root) return false;
-  const nothingToSample = (n: FoldNode): boolean => samplesNothing(n.cur) && reflectableFreePoints(n.cur).length === 0;
+  // #2796 (ADR-853): inside a part walk, what the walked part samples and the walked part's rows
+  const own = (n: FoldNode): Construction =>
+    n === root && partFocus ? (foldParts(n.cur, facts).find((p) => p.key === partFocus!.key)?.construction ?? n.cur) : n.cur;
+  const nothingToSample = (n: FoldNode): boolean => samplesNothing(own(n)) && reflectableFreePoints(own(n)).length === 0;
   for (let n = root.rescue; n; n = n.rescue) if (n.buildError === null && !n.pending && !nothingToSample(n)) return false;
   if (root.buildError !== null) return true;
   if (bar === 'statuses' && root.statusByIndex.length === facts.length) {
     const waiting = factsWaitingForLetter(facts);
-    if (facts.some((f, i) => f.enabled && root.statusByIndex[i] !== 'ok' && !waiting.has(f.id))) return true;
+    if (facts.some((f, i) => f.enabled && root.statusByIndex[i] !== 'ok' && !waiting.has(f.id) && focusOwns(f))) return true;
   }
   return nothingToSample(root);
 }
 /** {@link meetsRequirements} at `seed`, and whether its `false` holds at every seed ({@link failsAtEverySeed}). */
-function meetsAt(facts: Fact[], seed: number): { ok: boolean; everySeed: boolean } {
+function meetsAt(facts: Fact[], seed: Seed): { ok: boolean; everySeed: boolean } {
   const fig = replay(facts, seed);
   const ok = figureMeetsRequirements(facts, fig);
   return { ok, everySeed: !ok && failsAtEverySeed(facts, fig, 'statuses') };
@@ -3548,11 +3627,126 @@ export function factsWaitingForLetter(facts: readonly Fact[]): Set<string> {
  * genuinely under-determined PENDING figure also passes (its unsatisfied constraint is not a violation —
  * it's waiting for more givens, ADR-104 — so there is nothing to search for).
  */
-export function meetsRequirements(facts: Fact[], seed = 0): boolean {
+export function meetsRequirements(facts: Fact[], seed: Seed = 0): boolean {
   return figureMeetsRequirements(facts, replay(facts, seed));
 }
-/** {@link meetsRequirements} of a figure already replayed from `facts`. */
+/**
+ * {@link meetsRequirements} of a figure already replayed from `facts`. #2796 ([ADR-853](docs/06-decisions.md#adr-853)):
+ * a figure of independent parts meets them when its build holds and EVERY PART meets them on its own
+ * ({@link partMeetsRequirements}) — the judge of each part reads that part's statements and points, at that part's own
+ * size; while the configuration search walks one part, only that part is judged.
+ */
 function figureMeetsRequirements(facts: Fact[], fig: Derived): boolean {
+  const parts = partsOf(fig.construction);
+  if (parts.length <= 1) return wholeMeetsRequirements(facts, fig);
+  const fold = foldOfDerived.get(fig);
+  if (fold?.buildError) return false;
+  if (partFocus) {
+    const p = parts.find((x) => x.key === partFocus!.key);
+    return p ? partMeetsRequirements(facts, fig, p, parts) : wholeMeetsRequirements(facts, fig);
+  }
+  return parts.every((p) => partMeetsRequirements(facts, fig, p, parts));
+}
+
+/** Every string anywhere inside `v`. */
+function namesIn(v: unknown, out: Set<string> = new Set()): Set<string> {
+  if (typeof v === 'string') out.add(v);
+  else if (Array.isArray(v)) for (const x of v) namesIn(x, out);
+  else if (v && typeof v === 'object') for (const x of Object.values(v)) namesIn(x, out);
+  return out;
+}
+/** Does a statement belong to the part? It does when it names one of the part's objects — or names no object of the
+ *  figure at all (it then belongs to every part, so a failure it carries is every part's). */
+function inPart(v: unknown, part: Part, all: ReadonlySet<Id>): boolean {
+  const names = [...namesIn(v)].filter((n) => all.has(n));
+  return names.length === 0 || names.some((n) => part.ids.has(n));
+}
+
+/**
+ * #2796 ([ADR-853](docs/06-decisions.md#adr-853)) — DOES ONE PART OF THE FIGURE MEET EVERY REQUIREMENT? The same bar
+ * as the whole ({@link wholeMeetsRequirements}), over the part's own statements, points, records and violations: so its
+ * points are told apart at ITS OWN size (1.5% of the part's span, not of nine shapes side by side). Across parts the
+ * canvas is judged once: no point of the part may sit on a point of another part while another drawing exists (02
+ * FR-ALT-5) — nothing forces two parts that share no unknown onto each other.
+ */
+function partMeetsRequirements(facts: Fact[], fig: Derived, part: Part, parts: readonly Part[]): boolean {
+  const all = new Set<Id>();
+  for (const p of parts) for (const id of p.ids) all.add(id);
+  const e = evaluate(part.construction);
+  if (!e.ok) return false;
+  const pf = facts.filter((f) => inPart(f.cmd, part, all));
+  const keep = <V,>(m: Map<Id, V>): Map<Id, V> => new Map([...m].filter(([k]) => part.ids.has(k)));
+  let violations: GivenViolation[];
+  if (fig.positions.size > 0) violations = fig.violations.filter((v) => inPart(v.ids, part, all));
+  else {
+    // another part failed its sample, so the figure's verifier did not run: this part's givens are checked here
+    const fold = foldOfDerived.get(fig);
+    violations = fold ? checkGivens(fold.applied.filter((c) => inPart(c, part, all)), e.positions, e.circles, part.construction) : [];
+  }
+  const view: Derived = {
+    ...fig,
+    construction: part.construction,
+    positions: keep(e.positions),
+    circles: keep(e.circles),
+    lastError: null,
+    violations,
+    coincidences: (e.coincidences ?? []).filter(([a, b]) => part.ids.has(a) || part.ids.has(b)),
+  };
+  if (!wholeMeetsRequirements(pf, view)) return false;
+  // the canvas: no point of this part on a point of another part
+  const mine = [...view.positions].filter(([id]) => !id.startsWith('~') && isGeoPoint(part.construction.objects.find((o) => o.id === id)!));
+  if (mine.length === 0) return true;
+  const xs = mine.map(([, p]) => p.x), ys = mine.map(([, p]) => p.y);
+  const minSep = 0.015 * Math.max(1, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  for (const other of parts) {
+    if (other === part) continue;
+    const eo = evaluate(other.construction);
+    if (!eo.ok) continue;
+    for (const [id, q] of eo.positions) {
+      if (id.startsWith('~') || !other.ids.has(id)) continue;
+      for (const [, p] of mine) if (Math.hypot(p.x - q.x, p.y - q.y) < minSep) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * #2796 ([ADR-853](docs/06-decisions.md#adr-853)) — THE PART THE CONFIGURATION SEARCH IS WALKING. While it is set, a
+ * plain number handed to {@link replay} names that part's number and every other part stays at its entry in `base`,
+ * and the requirement bar judges that part alone. So every tier of the search (the sweep, the seat, variant, reflection
+ * and branch tiers) walks one part without a line of its own changing, and the parts it does not walk never move.
+ */
+let partFocus: { key: Id; base: Seed; part: Part; all: ReadonlySet<Id> } | null = null;
+function withPartFocus<T>(part: Part, parts: readonly Part[], base: Seed, run: () => T): T {
+  const prev = partFocus;
+  const all = new Set<Id>();
+  for (const p of parts) for (const id of p.ids) all.add(id);
+  partFocus = { key: part.key, base, part, all };
+  try {
+    return run();
+  } finally {
+    partFocus = prev;
+  }
+}
+const focusedSeed = (s: Seed): Seed => (partFocus && typeof s === 'number' ? withPartSeed(partFocus.base, partFocus.key, s) : s);
+/** May the search rewrite this fact? Outside a part walk, every fact; inside one, only the walked part's (a rewrite of
+ *  another part's choice cannot cure this part, and would move a part the walk must leave where it is). */
+const focusOwns = (f: Fact): boolean => !partFocus || inPart(f.cmd, partFocus.part, partFocus.all);
+/** The construction a search tier reads its reflectable points from: the walked part's, inside a part walk. */
+const focusConstruction = (c: Construction): Construction =>
+  partFocus ? (partsOf(c).find((p) => p.key === partFocus!.key)?.construction ?? c) : c;
+/** The figure as a search tier reads it: inside a part walk, the walked part alone (its points, its forced stacks). */
+function focusView(fig: Derived): Derived {
+  if (!partFocus) return fig;
+  const p = partsOf(fig.construction).find((x) => x.key === partFocus!.key);
+  if (!p || p.construction === fig.construction) return fig;
+  const e = evaluate(p.construction);
+  if (!e.ok) return { ...fig, construction: p.construction, positions: new Map(), coincidences: [], lastError: fig.lastError ?? e.error };
+  return { ...fig, construction: p.construction, positions: e.positions, circles: e.circles, coincidences: e.coincidences ?? [], lastError: foldOfDerived.get(fig)?.buildError ?? null };
+}
+
+/** The bar over one figure (or one part's view of it). */
+function wholeMeetsRequirements(facts: Fact[], fig: Derived): boolean {
   const waiting = factsWaitingForLetter(facts);
   return (
     fig.lastError === null &&
@@ -3637,7 +3831,7 @@ export function circleVariantsHold(facts: readonly Fact[], fig: Pick<Derived, 'c
  * תצורה אחרת» put D on B — the corner-seated square, a perfectly valid seating — while presses 5 and 6
  * separate them. Both are legal; only one should be offered first.
  */
-export const separatedView = (fig: Derived): boolean => fig.coincidences.length === 0;
+export const separatedView = (fig: Derived): boolean => focusView(fig).coincidences.length === 0; // #2796: the walked part's, inside a part walk
 
 /**
  * Before drawing, VERIFY the figure meets every requirement and, if not, LOOP over alternative
@@ -3654,7 +3848,7 @@ export const separatedView = (fig: Derived): boolean => fig.coincidences.length 
  *  suite's CPU contention (5 s solo); since #2893 the limit is work, the same in the suite. */
 export let lastConfigTier: 'current' | 'sweep' | 'seat' | 'variant' | 'reflect' | 'branch' | null = null;
 
-export function findValidConfig(facts: Fact[], fromSeed = 0, limit = SEARCH_WORK_LIMIT): { facts: Fact[]; seed: number } | null {
+export function findValidConfig(facts: Fact[], fromSeed: Seed = 0, limit = SEARCH_WORK_LIMIT): { facts: Fact[]; seed: Seed } | null {
   return decidedOrThrow(findValidConfigRound(facts, fromSeed, 0, limit));
 }
 /**
@@ -3662,10 +3856,37 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, limit = SEARCH_WORK
  * found none), or "not decided" (it reached its limit first). «המשיכו לחפש» runs round `round` from the resume it got,
  * whose limit is the rounds' sum (`roundLimit`).
  */
-export function findValidConfigRound(facts: Fact[], fromSeed: number, round = 0, limit = SEARCH_WORK_LIMIT): { facts: Fact[]; seed: number } | null | NotDecided<SearchResume> {
+export function findValidConfigRound(facts: Fact[], fromSeed: Seed, round = 0, limit = SEARCH_WORK_LIMIT): { facts: Fact[]; seed: Seed } | null | NotDecided<SearchResume> {
   lastConfigTier = null;
-  const r = withSearchLimit(roundLimit(limit, round), () => findValidConfigUnder(facts, fromSeed), 'findValidConfig');
+  const r = withSearchLimit(roundLimit(limit, round), () => findValidConfigByPart(facts, fromSeed), 'findValidConfig');
   return r.value === null && r.reached ? notDecided({ round: round + 1 }, r.spent) : r.value;
+}
+
+/**
+ * #2796 ([ADR-853](docs/06-decisions.md#adr-853)) — THE SEARCH WALKS ONLY THE PARTS THAT FAIL. A figure of one part is
+ * searched exactly as before. In a figure of independent parts, each part that fails its requirements at the current
+ * configuration is walked on its own, from its own entry, through every tier ({@link withPartFocus}); the parts that
+ * pass keep their entries, so nothing the student did not touch moves (NFR-ST-1). The answer is judged whole before it
+ * is returned; one that is not (a stack across parts no part walk could see) falls back to the whole search.
+ */
+function findValidConfigByPart(facts: Fact[], from: Seed): { facts: Fact[]; seed: Seed } | null {
+  const fig = replay(facts, from);
+  const parts = partsOf(fig.construction);
+  if (parts.length <= 1 || foldOfDerived.get(fig)?.buildError) {
+    return findValidConfigUnder(facts, parts.length === 1 ? seedOfPart(from, parts[0].key) : seedNumber(from));
+  }
+  const failing = parts.filter((p) => !partMeetsRequirements(facts, fig, p, parts));
+  if (failing.length === 0) return { facts, seed: from };
+  let curFacts = facts;
+  let cur: Seed = from;
+  for (const part of failing) {
+    const found = withPartFocus(part, parts, cur, () => findValidConfigUnder(curFacts, seedOfPart(cur, part.key)));
+    if (!found) return null;
+    curFacts = found.facts;
+    cur = withPartSeed(cur, part.key, found.seed);
+  }
+  if (meetsRequirements(curFacts, cur)) return { facts: curFacts, seed: cur };
+  return limitReached() ? null : findValidConfigUnder(facts, seedNumber(from));
 }
 
 /**
@@ -3789,7 +4010,7 @@ function findValidConfigUnder(facts: Fact[], fromSeed: number): { facts: Fact[];
     // extension/segment bars, not the full requirement set — so nothing was searching this dimension
     // against `meetsRequirements`. General, not convexity-specific: the ADR-166 apex-side family gains
     // the same coverage.
-    const reflectable = at0.everySeed ? 0 : reflectableFreePoints(replay(facts).construction).length;
+    const reflectable = at0.everySeed ? 0 : reflectableFreePoints(focusConstruction(replay(facts).construction)).length; // #2796: the walked part's
     for (let m = 1; m < 1 << Math.min(reflectable, REFLECT_MAX); m++) {
       for (let s = fromSeed; s < fromSeed + 6; s++) {
         if (limitReached()) return null;
@@ -3804,7 +4025,7 @@ function findValidConfigUnder(facts: Fact[], fromSeed: number): { facts: Fact[];
     const base = replay(facts).construction;
     const branchy = facts
       .map((f, i) => ({ f, i }))
-      .filter(({ f }) => f.enabled && BRANCHABLE.has(f.cmd.type) && 'id' in f.cmd)
+      .filter(({ f }) => f.enabled && BRANCHABLE.has(f.cmd.type) && 'id' in f.cmd && focusOwns(f)) // #2796: the walked part's
       .map(({ f, i }) => ({ i, count: Math.max(1, branchCount(base, (f.cmd as { id: Id }).id)) }))
       .filter((x) => x.count > 1)
       .slice(0, 4); // bound the combinatorics — vary the first few branchable points
@@ -3842,14 +4063,14 @@ function findValidConfigUnder(facts: Fact[], fromSeed: number): { facts: Fact[];
  * pathological candidate can't blow through the between-candidate checks. `onProgress` reports the
  * candidate index (the worker forwards it to the UI's "still searching…" cue).
  */
-export function searchResample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void, limit = SEARCH_WORK_LIMIT): number | null {
+export function searchResample(facts: Fact[], seed: Seed, onProgress?: (k: number, n: number) => void, limit = SEARCH_WORK_LIMIT): number | null {
   return withSearchLimit(limit, () => searchResampleUnder(facts, seed, onProgress), 'searchResample').value;
 }
-function searchResampleUnder(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): number | null {
+function searchResampleUnder(facts: Fact[], seed: Seed, onProgress?: (k: number, n: number) => void): number | null {
   const cur = replay(facts, seed);
   if (freeDofs(cur.construction).length === 0) return null; // fully determined — nothing to vary
   const curFp = shapeFingerprint(cur.construction, cur.positions, cur.circles);
-  let s = seed;
+  let s = seedNumber(seed); // #2796 (ADR-853): the press steps the base, a plain number — every part moves
   /** #194: the first requirement-meeting but squashed candidate — the answer when nothing better shows. */
   let squashed = -1;
   for (let k = 0; k < CONFIG_SEEDS && !limitReached(); k++) {
@@ -4063,10 +4284,10 @@ const SEARCH_AXIS_STEPS_MAX = 63;
 
 export function searchAnotherView(
   facts: Fact[],
-  seed: number,
+  seed: Seed,
   onProgress?: (k: number, n: number) => void,
   limit = SEARCH_WORK_LIMIT,
-): { facts: Fact[]; seed: number } | null {
+): { facts: Fact[]; seed: Seed } | null {
   return decidedOrThrow(searchAnotherViewRound(facts, seed, 0, onProgress, limit));
 }
 /**
@@ -4075,15 +4296,15 @@ export function searchAnotherView(
  */
 export function searchAnotherViewRound(
   facts: Fact[],
-  seed: number,
+  seed: Seed,
   round = 0,
   onProgress?: (k: number, n: number) => void,
   limit = SEARCH_WORK_LIMIT,
-): { facts: Fact[]; seed: number } | null | NotDecided<SearchResume> {
+): { facts: Fact[]; seed: Seed } | null | NotDecided<SearchResume> {
   const r = withSearchLimit(roundLimit(limit, round), () => searchAnotherViewUnder(facts, seed, onProgress), 'searchAnotherView');
   return r.value === null && r.reached ? notDecided({ round: round + 1 }, r.spent) : r.value;
 }
-function searchAnotherViewUnder(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): { facts: Fact[]; seed: number } | null {
+function searchAnotherViewUnder(facts: Fact[], seed: Seed, onProgress?: (k: number, n: number) => void): { facts: Fact[]; seed: Seed } | null {
   const cur = replay(facts, seed);
   // #1600 (ADR-593): the discrete space is the PRODUCT of every registered axis — every cyclable branch, the
   // composition side, every variant (#1711, ADR-573) and the seat — walked as ONE odometer from the current
@@ -4095,6 +4316,16 @@ function searchAnotherViewUnder(facts: Fact[], seed: number, onProgress?: (k: nu
   const total = axes.reduce((p, a) => p * a.n, 1);
   const hasDofs = freeDofs(cur.construction).length > 0;
   const steps = Math.min(total - 1, SEARCH_AXIS_STEPS_MAX);
+  /*
+   * #2831 (ADR-824, ADR-W-206 — operator 2026-11-12, *"2831 - A"*): on a figure whose SHAPE is determined, the
+   * press walks the solution cycle — each new solution before another placement of one already shown.
+   */
+  if (total > 1 && freeDofCount(cur.construction) === 0) {
+    // The gathering gets half of the work left (ADR-W-210 invariant 3: counted in work, never seconds), so a press it
+    // cuts still has the odometer's half to answer with.
+    const next = solutionCycleStep(facts, seed, axes, unitsLeft() / 2);
+    if (next) return next;
+  }
   const candidates = Array.from({ length: Math.max(0, steps) }, (_, k) => withAssignment(facts, axes, advanceAssignment(axes, k + 1)));
 
   /**
@@ -4102,13 +4333,15 @@ function searchAnotherViewUnder(facts: Fact[], seed: number, onProgress?: (k: nu
    * rather than returned. It is legal — it may even be the only seating — so it is kept, and returned
    * only if the whole search finds nothing separated.
    */
-  let coincident: { facts: Fact[]; seed: number } | null = null;
+  let coincident: { facts: Fact[]; seed: Seed } | null = null;
   let k = 0;
   const totalWork = candidates.length * (hasDofs ? 4 : 1) + (hasDofs ? CONFIG_SEEDS : 0);
   for (const fc of candidates) {
     if (limitReached()) break;
     // Fresh seeds first (the legacy press resampled AND flipped), the current seed as the in-combo fallback.
-    const seeds = hasDofs ? [seed + 1, seed + 2, seed + 3, seed] : [seed];
+    // #2796 (ADR-853): a fresh seed is a plain number — the press moves every part, each to its own next drawing
+    const n = seedNumber(seed);
+    const seeds: Seed[] = hasDofs ? [n + 1, n + 2, n + 3, seed] : [seed];
     for (let j = 0; j < seeds.length; j++) {
       const s = seeds[j];
       if (limitReached()) break;
@@ -4133,6 +4366,161 @@ function searchAnotherViewUnder(facts: Fact[], seed: number, onProgress?: (k: nu
   // #942 (ADR-486): the coincident view is offered only now, with every separated option exhausted —
   // "only when there is no other config".
   return coincident;
+}
+
+/** The assignment at position `idx` of the odometer counted from the all-default assignment (the first axis fastest). */
+function assignmentAt(axes: readonly { n: number }[], idx: number): number[] {
+  let rest = idx;
+  return axes.map((a) => {
+    const d = rest % a.n;
+    rest = Math.floor(rest / a.n);
+    return d;
+  });
+}
+
+/** Two shape fingerprints within the solver's agreement: one shape, whatever the turn, shift or mirror. */
+const SAME_SHAPE_TOL = 1e-3;
+function sameShape(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((x, i) => Math.abs(x - b[i]) <= SAME_SHAPE_TOL * Math.max(1, Math.abs(x), Math.abs(b[i])));
+}
+
+/**
+ * THE SOLUTION CYCLE OF A DETERMINED SHAPE (#2831, [ADR-824](docs/06-decisions.md#adr-824), the workspace rule
+ * [ADR-W-206](docs/06w-decisions-workspace.md#adr-w-206); operator 2026-11-12, *"2831 - A"*: a mirror image of a drawing is
+ * the SAME solution placed differently, and «הציגו תצורה אחרת» shows new solutions first, Q-2731c (b)).
+ *
+ * The odometer ({@link advanceAssignment}) turns the first axis fastest, and an axis that only PLACES the figure — the
+ * tangent from A touching at either of two mirror points — turns faster than one that changes the answer (which vertex
+ * holds the right angle), so every new solution waited one press per placement axis: measured, «מנקודה A הוציאו משיק
+ * למעגל בנקודה B · … · משולש ישר זווית ABD · BD = 6» showed its three triangles on presses 0, 2 and 4.
+ *
+ * On a figure with no shape freedom left (`freeDofCount` 0; the placement may still be sampled) the axis space is
+ * finite, so it is gathered whole: every assignment, counted from the all-default one, that meets every requirement at
+ * the press's seed (the shape is determined, so the seed only places it; a press keeps its seed). They are grouped by shape ({@link shapeFingerprint}: the same
+ * drawing up to a turn, a shift, a scale or a mirror — one solution), #942's separated drawings first within a group,
+ * and the groups are interleaved round-robin in order of first appearance: g0#0, g1#0, g2#0, …, g0#1, g1#1, …. A press
+ * moves to the successor of the assignment on the screen; one that is not in the cycle starts it. The cycle depends
+ * only on the facts with their axis digits and the seed, so nothing new is stored and undo cannot desync.
+ *
+ * `null` — keep the odometer: the cycle has nothing but the drawing on the screen, or its work limit cut the gathering
+ * (the next press resumes it, so the limit decides only when the cycle takes over, never what it is).
+ */
+function solutionCycleStep(
+  facts: Fact[],
+  seed: Seed,
+  axes: ChoiceAxis[],
+  units: number,
+): { facts: Fact[]; seed: Seed } | null {
+  const here = axes.reduce((idx, a, k) => idx + a.cur * axes.slice(0, k).reduce((p, b) => p * b.n, 1), 0);
+  const zeroed = withAssignment(facts, axes, axes.map(() => 0));
+  const key = JSON.stringify(zeroed.map((f) => [f.enabled, f.cmd]));
+  let entry = solutionCycleMemo.get(key);
+  if (!entry) {
+    entry = { seed, members: [], next: 0, cycle: undefined, cut: 0, cells: [] };
+    if (solutionCycleMemo.size >= SOLUTION_CYCLE_MEMO_SIZE) solutionCycleMemo.delete(solutionCycleMemo.keys().next().value!);
+    solutionCycleMemo.set(key, entry);
+  }
+  if (!gatherSolutionCycle(entry, facts, axes, units)) return null;
+  const cycle = entry.cycle;
+  if (!cycle) return null;
+  const at = cycle.findIndex((m) => m.idx === here);
+  const next = at < 0 ? cycle[0] : cycle[(at + 1) % cycle.length];
+  if (next.idx === here) return null;
+  return { facts: withAssignment(facts, axes, assignmentAt(axes, next.idx)), seed: entry.seed };
+}
+
+/** One drawing of a solution cycle: its odometer position from the all-default assignment, its shape and whether it is separated. */
+interface CycleMember {
+  idx: number;
+  fp: number[];
+  separated: boolean;
+}
+/** A cycle being gathered (`members` so far, `next` the assignment to try) and, once complete, the cycle (`null`: none). */
+interface CycleEntry {
+  /** The seed the cycle is drawn at: the seed of the press that began gathering it (#2796: per part, a `Seed`). */
+  seed: Seed;
+  members: CycleMember[];
+  next: number;
+  cycle: CycleMember[] | null | undefined;
+  /** How many presses the clock cut while solving assignment `next`. */
+  cut: number;
+  /** The work each press's gathering did, as ledger cells: what a later press is charged for the cycle it is served. */
+  cells: WorkCell[];
+}
+/**
+ * The cycle per figure (docs/17 §7): keyed by the facts with every axis digit zeroed, for the last few figures, and
+ * drawn at the seed of the press that began gathering it (the shape is determined, so the seed only places it; every
+ * member and every press then keeps that seed). A press after the first is served the cycle and CHARGED the work its
+ * gathering cost, as every memo hit is (`chargeHit`, ADR-831 / ADR-W-210 invariant 5): a press counts what it would from
+ * empty caches, so a warm heap and a cold one count the same. A gathering its work limit cuts
+ * keeps what it found and the next press resumes it (the odometer answers meanwhile, and may move the seed: the
+ * cycle keeps its own), so on a figure whose solves are slow the clock decides when the cycle takes over.
+ */
+const solutionCycleMemo = new Map<string, CycleEntry>();
+const SOLUTION_CYCLE_MEMO_SIZE = 8;
+
+/**
+ * Gather (or resume gathering) the cycle into `entry` under a work limit of `units` (inside the press's own: whichever
+ * is reached first stops it); `false` when the limit cut it. First the press is charged what earlier presses gathered
+ * (it would have computed that from empty caches: the memo-hit rule, ADR-831), so a press served a whole cycle counts the
+ * cold gathering, and a resumed gathering counts its earlier stretches too; a charge the limit cannot afford is a cut.
+ */
+function gatherSolutionCycle(entry: CycleEntry, facts: Fact[], axes: ChoiceAxis[], units: number): boolean {
+  return withSearchLimit(
+    units,
+    () => {
+      if (entry.cells.length > 0 && !chargeHit({ own: 0, deps: entry.cells, charged: 0 })) return false;
+      if (entry.cycle !== undefined) return true;
+      const { value, cell } = computeWithCell(() => gatherSolutionCycleUnder(entry, facts, axes));
+      entry.cells.push(cell);
+      return value;
+    },
+    'solutionCycle',
+  ).value;
+}
+function gatherSolutionCycleUnder(entry: CycleEntry, facts: Fact[], axes: ChoiceAxis[]): boolean {
+  const seed = entry.seed;
+  const total = Math.min(
+    axes.reduce((p, a) => p * a.n, 1),
+    SEARCH_AXIS_STEPS_MAX + 1,
+  );
+  for (; entry.next < total; entry.next++) {
+    if (limitReached()) return false;
+    const idx = entry.next;
+    // The shape is determined, so the seed only places it: every member is drawn at the cycle's seed. The drawing on
+    // the screen is judged like every other: one that breaks a given is not a member (a press from it starts the cycle).
+    const fc = withAssignment(facts, axes, assignmentAt(axes, idx));
+    const aborts = solveBudget.aborts;
+    const ok = meetsRequirements(fc, seed);
+    if (solveBudget.aborts !== aborts || limitReached()) {
+      // Cut mid-solve: the next press retries this assignment once; cut again, it is read as the odometer reads a
+      // candidate its limit cuts — not offered — so one pathological solve cannot keep the cycle from forming.
+      entry.cut += 1;
+      if (entry.cut < 2) return false;
+      entry.cut = 0;
+      continue;
+    }
+    entry.cut = 0;
+    if (!ok) continue;
+    const r = replay(fc, seed);
+    entry.members.push({ idx, fp: shapeFingerprint(r.construction, r.positions, r.circles), separated: separatedView(r) });
+  }
+  const members = entry.members;
+  if (members.length < 2) {
+    entry.cycle = null;
+    return true;
+  }
+  const groups: CycleMember[][] = [];
+  for (const m of members) {
+    const g = groups.find((x) => sameShape(x[0].fp, m.fp));
+    if (g) g.push(m);
+    else groups.push([m]);
+  }
+  for (const g of groups) g.sort((x, y) => Number(y.separated) - Number(x.separated)); // stable: found order within a tier
+  const cycle: CycleMember[] = [];
+  for (let round = 0; cycle.length < members.length; round++) for (const g of groups) if (round < g.length) cycle.push(g[round]);
+  entry.cycle = cycle;
+  return true;
 }
 
 /** #85 ([ADR-293](docs/06-decisions.md#adr-293)) — is this derived state DRAWABLE? Positions exist and
@@ -4248,7 +4636,7 @@ function choiceSweep(facts: Fact[], stop: () => boolean, skipProven: boolean): {
   // #1987 (ADR-622): the `reflex` axis joins this tier — a convexity default that YIELDED (ADR-613) is an
   // unstated choice exactly as a variant is, so a figure the convex seat cannot draw belongs here, not in a
   // refusal. Zero cost on a figure with no yielding ring ({@link reflexAxes} registers no axis).
-  const axes = configurationAxes(facts, replay(facts).construction).filter((a) => a.kind === 'variant' || a.kind === 'side' || a.kind === 'reflex');
+  const axes = configurationAxes(facts, replay(facts).construction).filter((a) => (a.kind === 'variant' || a.kind === 'side' || a.kind === 'reflex') && focusOwns(facts[a.i])); // #2796: the walked part's
   if (axes.length === 0) return null;
   const total = axes.reduce((p, a) => p * a.n, 1);
   const changed = (a: number[]): number => a.reduce((c, d, k) => c + (d === axes[k].cur ? 0 : 1), 0);
@@ -4296,6 +4684,7 @@ export function seatRescue(facts: Fact[]): { facts: Fact[]; seed: number } | nul
 export function seatRotations(facts: Fact[]): Fact[][] {
   const out: Fact[][] = [];
   for (const { f, i } of unpinnedSeats(facts)) {
+    if (!focusOwns(f)) continue; // #2796 (ADR-853): a part walk turns the walked part's seats only
     const cur = (f.cmd as { rot?: 1 | 2 }).rot ?? 0;
     for (const rot of ([1, 2, 0] as const).filter((r) => r !== cur)) {
       out.push(
@@ -4396,7 +4785,7 @@ export const seatSweepConfig = { cap: SEAT_SWEEP_WORK_CAP };
  * recorded work (`FoldNode.work`), so the sweep's charged count — and its verdict — is the same either way. Empty unless the figure has an
  * unpinned seat AND the step fails at the current one (a step that builds never sweeps).
  */
-export function seatSweepWarmup(facts: Fact[], commands: AnyCommand[], seed = 0): Fact[][] {
+export function seatSweepWarmup(facts: Fact[], commands: AnyCommand[], seed: Seed = 0): Fact[][] {
   const all = trialFacts(facts, commands);
   if (unpinnedSeats(all).length === 0) return [];
   const after = replay(all, seed);
@@ -4442,7 +4831,7 @@ const IMPLIED_MIN_SAMPLES = 3;
  * constraint, so this arm never sees one — which is the shape #1011 needs it to have, and the way the
  * two compose rather than fight (the chokepoint-collision note on #999, 2026-09-15).
  */
-export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0): boolean {
+export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed: Seed = 0): boolean {
   try {
     const before = replay(facts, seed);
     const all = trialFacts(facts, commands);
@@ -4575,7 +4964,7 @@ const FORCED_RING_MIN_SAMPLES = 4;
  *
  * @returns the offending ring's ids, or `null`.
  */
-export function forcedCrossedRing(facts: Fact[], commands: AnyCommand[], seed = 0): Id[] | null {
+export function forcedCrossedRing(facts: Fact[], commands: AnyCommand[], seed: Seed = 0): Id[] | null {
   try {
     const seen = new Set<string>();
     const declared: Id[][] = [];
@@ -4681,7 +5070,7 @@ export interface ExtensionSide {
  *
  * @returns the extension, or `null`.
  */
-export function impossibleExtensionSide(facts: Fact[], commands: AnyCommand[], seed = 0): ExtensionSide | null {
+export function impossibleExtensionSide(facts: Fact[], commands: AnyCommand[], seed: Seed = 0): ExtensionSide | null {
   try {
     const stated = commands.flatMap((c) => (c.type === 'extend-onto-circle' ? [c] : []));
     const standing = facts.flatMap((f) => (f.enabled && f.cmd.type === 'extend-onto-circle' ? [{ c: f.cmd, utterance: f.utterance }] : []));
@@ -4705,14 +5094,14 @@ export function impossibleExtensionSide(facts: Fact[], commands: AnyCommand[], s
     };
     for (const c of stated) {
       const seat = seatOf(c);
-      if (seat && beyond(fig.positions, c, seat) === false && offEverywhere(sharedSamples(facts, { gate: true, atSeed: seed }), c, seat)) return { a: c.a, b: c.b, id: c.id };
+      if (seat && beyond(fig.positions, c, seat) === false && offEverywhere(sharedSamples(facts, { gate: true, atSeed: seedNumber(seed) }), c, seat)) return { a: c.a, b: c.b, id: c.id };
     }
     const before = replay(facts, seed).positions;
     for (const { c, utterance } of standing) {
       const seat = seatOf(c);
       if (!seat || beyond(fig.positions, c, seat) !== false) continue; // the prefilter: on its side on screen ⇒ on it somewhere
       if (beyond(before, c, seat) !== true) continue; // already off it on screen: not this line's doing
-      const pool = gateSamples(trial, seed, (pos) => beyond(pos, c, seat) === true);
+      const pool = gateSamples(trial, seedNumber(seed), (pos) => beyond(pos, c, seat) === true);
       if (pool && offEverywhere(pool, c, seat)) return { a: c.a, b: c.b, id: c.id, standing: utterance ?? `${c.a}${c.b}` };
     }
     return null;
@@ -4721,7 +5110,7 @@ export function impossibleExtensionSide(facts: Fact[], commands: AnyCommand[], s
   }
 }
 
-export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): StepOutcome {
+export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed: Seed = 0): StepOutcome {
   // ALL THREE label kinds (#162): the gate predates ADR-118's `areas`, so a lone symbolic area label
   // («שטח משולש AFO הוא 9b» — correctly no constraint, ADR-031/118) counted as nothing and the
   // student's statement was swallowed as "already drawn". A diff, so an exact re-statement still nets 0.
@@ -5689,7 +6078,7 @@ function definitionKey(o: { kind: string; id?: string }): string | null {
 export function impliedIdentityBinding(
   facts: Fact[],
   commands: AnyCommand[],
-  seed = 0,
+  seed: Seed = 0,
   autos: ReadonlySet<Id> = autoNamedLabels(facts),
 ): { from: Id; to: Id; merge: boolean } | null {
   if (!autos.size || !commands.length) return null;
@@ -6295,10 +6684,10 @@ function shapeDiffers(a: number[], b: number[]): boolean {
  * Returns the SAME array when nothing changed (undo/memo hygiene). Bounded by GATE_WORK_LIMIT units of work (#2294,
  * #2893, ADR-831: it was the seed search's wall clock); at the limit it keeps the best variant seen so far, as before.
  */
-export function settleVariantDefaults(facts: Fact[], isNew: (f: Fact) => boolean, seed: number, limit = GATE_WORK_LIMIT): Fact[] {
+export function settleVariantDefaults(facts: Fact[], isNew: (f: Fact) => boolean, seed: Seed, limit = GATE_WORK_LIMIT): Fact[] {
   return withSearchLimit(limit, () => settleVariantDefaultsUnder(facts, isNew, seed), 'settleVariantDefaults').value;
 }
-function settleVariantDefaultsUnder(facts: Fact[], isNew: (f: Fact) => boolean, seed: number): Fact[] {
+function settleVariantDefaultsUnder(facts: Fact[], isNew: (f: Fact) => boolean, seed: Seed): Fact[] {
   let out = facts;
   for (let idx = 0; idx < out.length; idx++) {
     const f = out[idx];

@@ -64,13 +64,13 @@ import {
   type Fact,
 } from '@/store/geoStore';
 import { geoJobs, geoWork, storeData } from '@/store/geoWork';
-import { freeDofs, freeDofCount, unstatedChoices, type AnyCommand } from '@/engine';
+import { freeDofs, freeDofCount, unstatedChoices, type AnyCommand, type Seed } from '@/engine';
 import { loadFigureText } from '@/store/figureLoad';
 import { serializeFigure } from '@/store/figureFile';
 import { meterAction, type WorkCounts } from '../../../shell/workMeter';
 import { isNotDecided } from '../../../shell/notDecided';
 
-export type Snap = { facts: Fact[]; seed: number };
+export type Snap = { facts: Fact[]; seed: Seed };
 
 /** What the caller says about the heaps that serve the worker's operations. */
 export interface WorkerOps {

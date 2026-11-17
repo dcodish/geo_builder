@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { complexI18n } from '../i18n';
-import { deriveLines, lineEntailed } from '../app/deriveLines';
+import { deriveLines, lineEntailed, lineHeld } from '../app/deriveLines';
 import { activeLines, decideSubmitCx, submitLine } from '../app/submit';
 import { useComplexStore } from '../store/useComplexStore';
 import { HELD_CASES_COMPLEX, HELD_CONTROLS_COMPLEX, HELD_NOTICE } from '../../shell/__tests__/fixtures/held-row-2790';
@@ -34,8 +34,16 @@ describe('#2790 — complex accepts a held line as its own row, with the notice'
       expect(store().lines).toEqual(c.lines);
       expect(store().lastError).toBeNull();
       expect(store().lastNote).toEqual({ key: 'already-held', detail: last });
-      // (iii) nothing moves, at 4 seeds
-      SEEDS.forEach((s, i) => expect(drawn(s), `seed ${s}`).toEqual(before[i]));
+      // (iii) nothing moves, at 4 seeds — exactly for an exact restatement; for a deferred one (#2801, ADR-CX-102) to
+      // the precision of the numeric polish, which is the numeric Jacobian's (~1e-8)
+      SEEDS.forEach((s, i) => {
+        const now = drawn(s);
+        expect([...now.keys()], `seed ${s}`).toEqual([...before[i].keys()]);
+        for (const [name, z] of before[i]) {
+          const w = now.get(name)!;
+          expect(Math.hypot(w.re - z.re, w.im - z.im), `seed ${s}, ${name}`).toBeLessThanOrEqual(1e-7 * Math.max(1, Math.hypot(z.re, z.im)));
+        }
+      });
       // (iv) the earlier row muted, then deleted: the restated row holds its relation alone
       if (c.earlier === undefined) return;
       store().setDisabledIdx([c.earlier]);
@@ -47,7 +55,7 @@ describe('#2790 — complex accepts a held line as its own row, with the notice'
         expect(d.contradiction).toBeNull();
         expect(d.hasConfiguration).toBe(true);
         expect(d.untranslated).toEqual([]);
-        expect(lineEntailed(lines, last), 'the row carries the relation').toBe(true);
+        expect(lineEntailed(lines, last) || lineHeld(lines, last), 'the row carries the relation').toBe(true);
       }
     });
   }

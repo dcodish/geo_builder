@@ -205,7 +205,7 @@ const RULES3: ScopeRule3[] = [
       // a TWO-SIDED numeric bound around a lone lowercase letter: 60<a<90, 60 ≤ a ≤ 90.
       // The RESERVED letters are excluded by name — «60<t<90» is a student bounding the figure
       // PARAMETER, and answering it with "use ∠ABC or α" would be guidance about the wrong thing; it
-      // stays an honest not-understood until a parameter-bound form exists.
+      // reads as the parameter's range (#1524, ADR-3D-477 — `paramBound`'s chain takes exactly these letters).
       /^\s*\d+(?:\.\d+)?\s*[<≤]\s*(?![tkmuvwxyz](?![a-z]))[a-z]\s*[<≤]\s*\d+(?:\.\d+)?\s*$/,
       // Deliberately NOT extended to «זווית a» / «angle a = 60»: the #181 ANCHORED UPLIFT already owns
       // a single letter after an angle noun — it reads as the point label A and «angle b = 60» builds
@@ -294,6 +294,9 @@ export function classifyGuidance3(utterance: string): ScopeMatch3 | null {
 const VOCABULARY_3D = new RegExp(
   // a line or plane NAME (l1, π2) and a parameter are this builder's own symbols, so they are words here
   String.raw`(?<![A-Za-z])[lπ]\d|π|פרמטר|parameter|מצטלב|skew|sphere|cylinder|cone|` +
+    // #1524 (ADR-3D-477): a range's comparison PHRASE («k גדול מ-2», "k is at least 2") — the words of the
+    // `paramBound` grammar, as phrases so a bare «גדול» in junk still reads as junk
+    String.raw`(?:גדול|קטן)ה?\s+(?:מ|או\s+שו?וה)|לפחות|לכל\s+היותר|(?:greater|less|smaller|larger|bigger)\s+than|at\s+(?:least|most)|` +
     '(?:' + NOUN_EN + ')|פירמיד|טטר|ארבעון|קוביי?|תיב|מנסר|גוף|גליל|חרוט|כדור|נקוד|ישר|קטע|מישור|וקטור|זו?וי|מקצוע|פא[הות]|' +
     'אלכסון|גובה|היטל|מעגל|צלע|בסיס|אמצע|מרכז|נפח|שטח|אורך|מרחק|מקביל|מאונך|ניצב|' +
     'point|line|segment|plane|vector|angle|edge|face|diagonal|height|projection|circle|base|midpoint|volume|area|length|distance|parallel|perpendicular',

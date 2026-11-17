@@ -19,7 +19,7 @@ import { answerQuery } from '../engine/queries';
 import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 import type { Vec3 } from '../engine/vec3';
-import { scaleGivenActive, scaleGivenSafe } from '../engine/scaleGiven';
+import { scaleGivenActive, scaleGivenLane3, scaleGivenMagnitude, scaleGivenSafe } from '../engine/scaleGiven';
 import { decideDeterministic3 } from '../app/decideDeterministic3';
 import type { Fact3 } from '../store/store3';
 import type { Seed3 } from '../engine/components3';
@@ -360,17 +360,15 @@ describe('#2746 — the scale given asks the same absolute-frame predicate', () 
     for (const seed of SEEDS) allOk(seed);
   });
 
-  // the controls: an absolute object still detaches the size, as #551 contracts — refused as today
-  // #2789 (ADR-3D-457): «l1:x=t(1,1,1)» passes through the origin, so the rescale keeps it — now accepted (below); the
-  // controls off the origin still refuse, the follow-up #2792's
+  // the former controls: an absolute object off the origin detached the size, as #551 contracted. ADR-W-199 flips them:
+  // #2792 (ADR-3D-521) scales the figure's own content before the placement, so the size holds beside the object
   for (const abs of ['x+y+z=1', 'P(1,2,3)']) {
-    it(`«${abs}» still refuses the size (size-on-solid)`, () => {
+    it(`«${abs}» keeps the size (the content lane, #2792)`, () => {
       for (const l of [CUBE3, 'אורך AB = 4', abs]) submit(l);
       const d = derived(0);
       expect(hasAbsoluteFrameObject(d.construction)).toBe(true);
-      expect(scaleGivenSafe(d.construction)).toBe(false);
-      const sized = state().facts.find((f) => f.utterance === 'אורך AB = 4')!;
-      expect(d.status[sized.id]).toEqual(expect.objectContaining({ code: 'size-on-solid' }));
+      expect(scaleGivenSafe(d.construction)).toBe(true);
+      for (const f of state().facts) expect(d.status[f.id], f.utterance).toBe('ok');
     });
   }
 
@@ -497,10 +495,10 @@ describe('#2789 — an axis point frames the figure, and a size beside an origin
     },
   );
 
-  it.each(['P(2,0,0)', 'x+y+z=1', 'l1:x=(1,0,0)+t(1,1,1)'])('a control off the origin «%s» still refuses the size (#2792)', (line) => {
+  it.each(['P(2,0,0)', 'x+y+z=1', 'l1:x=(1,0,0)+t(1,1,1)'])('off the origin «%s» the size is accepted too (#2792, ADR-3D-521)', (line) => {
     build([CUBE, line]);
     submit(SIZE);
-    expect(state().lastError).toMatchObject({ code: 'size-on-solid' });
+    expect(state().lastError).toBeNull();
   });
 
   it('an axis point is not a stated position: absolutePointCount and the translation axes are untouched', () => {
@@ -751,5 +749,166 @@ describe('#2793 — a solid’s vertex on half an axis, and a sign beside a fixe
     expect(translationSlideSampled3(c(["תיבה ABCDA'B'C'D'", 'X_B=3'])), 'x_B = 3, no sign').toBe(false);
     // FR-SP-4: no absolute object — a free point's coordinates are not the frame (#1499's «SM⊥ABC»)
     expect(translationSlideSampled3(c(['ABC משולש', 'M אמצע BC', 'SM⊥ABC'])), 'no absolute object').toBe(false);
+  });
+});
+
+/**
+ * #2792 (ADR-3D-521) — a size beside a fixed object off the origin is a given, in both orders (ADR-W-199, operator
+ * 2026-11-09: "we would not refuse something that can be built"). The scale given has three lanes (`scaleGivenLane3`):
+ * the origin rescale (#2789), the figure's own content scaled before the placement, and the pivot.
+ */
+describe('#2792 — a size beside a fixed object off the origin holds, in both orders', () => {
+  beforeEach(() => state().clear());
+  const CUBE = "קובייה ABCDA'B'C'D'";
+  const PYR = 'פירמידה ABCDS';
+  const SIZE = 'אורך AB = 4';
+  const VOL = 'נפח הפירמידה ABCDS = 12';
+  const SEEDS8 = [0, 1, 2, 3, 4, 5, 6, 7];
+  const near = (p: Vec3, q: Vec3): number => Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z);
+  const build = (lines: readonly string[]): void => {
+    state().clear();
+    for (const l of lines) {
+      submit(l);
+      expect(state().lastError, l).toBeNull();
+    }
+  };
+  const okAt = (seed: number) => {
+    const d = derive3(state().facts, seed);
+    for (const f of state().facts) expect(d.status[f.id], `${f.utterance} @${seed}`).toBe('ok');
+    return d;
+  };
+  const volumeAt = (seed: number): number => {
+    const d = derive3(state().facts, seed);
+    const cl = d.construction.claims.find((x) => x.type === 'volume-poly')!;
+    return scaleGivenMagnitude(cl, d.construction, d.resolved.positions)!;
+  };
+  const OBJECTS = ['P(1,2,3)', 'P(2,0,0)', 'x+y+z=1', 'l1:x=(1,0,0)+t(1,1,1)', 'המישור π1: z - 3 = 0'];
+
+  for (const obj of OBJECTS) {
+    for (const order of [[CUBE, obj, SIZE], [CUBE, SIZE, obj]]) {
+      it(`cube · ${order.slice(1).join(' · ')}: edge 4, the object unchanged, the placement sampled, clear of it`, () => {
+        build(order);
+        const As = new Set<string>();
+        const plain = (() => {
+          state().clear();
+          build([CUBE, obj]);
+          const r = derive3(state().facts, 0).resolved;
+          return { planes: new Map(r.planes), lines: new Map(r.lines), P: r.positions.get('P') };
+        })();
+        build(order);
+        for (const seed of SEEDS8) {
+          const d = okAt(seed);
+          const pos = d.resolved.positions;
+          expect(near(pos.get('A')!, pos.get('B')!), `|AB| @${seed}`).toBeCloseTo(4, 9);
+          As.add(`${pos.get('A')!.x.toFixed(6)},${pos.get('A')!.y.toFixed(6)}`);
+          if (plain.P) expect(pos.get('P')).toEqual(plain.P);
+          for (const [n, pl] of plain.planes) {
+            const now = d.resolved.planes.get(n)!;
+            const s = Math.hypot(now.n.x, now.n.y, now.n.z) / Math.hypot(pl.n.x, pl.n.y, pl.n.z);
+            expect(Math.abs(now.d / s - pl.d), `plane ${n} unchanged`).toBeLessThan(1e-9);
+          }
+          for (const [n, ln] of plain.lines) expect(near(d.resolved.lines.get(n)!.anchor, ln.anchor), `line ${n} unchanged`).toBeLessThan(1e-9);
+        }
+        expect(As.size, 'the placement is sampled').toBeGreaterThan(1);
+      });
+    }
+    it(`pyramid volume beside «${obj}»: V = 12 in both orders, one uniform factor, the same drawing`, () => {
+      build([PYR, VOL, obj]);
+      const first = SEEDS8.map((s) => new Map(okAt(s).resolved.positions));
+      for (const s of SEEDS8) expect(volumeAt(s)).toBeCloseTo(12, 9);
+      expect(derive3(state().facts, 0).construction.scalarPins).toHaveLength(0);
+      build([PYR, obj, VOL]);
+      for (const s of SEEDS8) {
+        expect(volumeAt(s)).toBeCloseTo(12, 9);
+        const pos = okAt(s).resolved.positions;
+        for (const [id, p] of first[s]) expect(near(pos.get(id)!, p), `${id} @${s}`).toBeLessThan(1e-9);
+      }
+    });
+  }
+
+  it('the router: one representative per lane', () => {
+    const lane = (lines: readonly string[]) => scaleGivenLane3(derive3((build(lines), state().facts), 0).construction)?.lane;
+    expect(lane([CUBE, 'P(1,2,3)'])).toBe('content');
+    expect(lane([CUBE, 'A(1,2,3)'])).toBe('content');
+    expect(lane([CUBE, 'P נמצא על החלק החיובי של ציר ה-x'])).toBe('origin');
+    expect(lane([CUBE, 'A(1,2,3)', 'B(5,2,3)'])).toBe('pivot');
+    expect(lane(['קטע AB'])).toBeUndefined();
+  });
+
+  for (const order of [[CUBE, 'A(1,2,3)', SIZE], [CUBE, SIZE, 'A(1,2,3)']]) {
+    it(`a pinned vertex: ${order.slice(1).join(' · ')} → edge 4 with A where it was stated`, () => {
+      build(order);
+      for (const seed of SEEDS8) {
+        const pos = okAt(seed).resolved.positions;
+        expect(pos.get('A')).toEqual({ x: 1, y: 2, z: 3 });
+        expect(near(pos.get('A')!, pos.get('B')!)).toBeCloseTo(4, 9);
+      }
+    });
+  }
+
+  for (const order of [[PYR, 'A(1,2,3)', VOL], [PYR, VOL, 'A(1,2,3)']]) {
+    it(`a pinned pyramid vertex: ${order.slice(1).join(' · ')} → V = 12 with A where it was stated`, () => {
+      build(order);
+      for (const seed of SEEDS8) {
+        expect(okAt(seed).resolved.positions.get('A')).toEqual({ x: 1, y: 2, z: 3 });
+        expect(volumeAt(seed)).toBeCloseTo(12, 9);
+      }
+    });
+  }
+
+  for (const order of [
+    [CUBE, 'A(1,2,3)', 'B(5,2,3)', SIZE],
+    [CUBE, SIZE, 'A(1,2,3)', 'B(5,2,3)'],
+    [CUBE, 'A(1,2,3)', "C'(5,6,7)", SIZE],
+  ]) {
+    it(`a size the coordinates already make true is accepted: ${order.slice(1).join(' · ')}`, () => {
+      build(order);
+      for (const seed of [0, 3]) {
+        const pos = okAt(seed).resolved.positions;
+        expect(near(pos.get('A')!, pos.get('B')!)).toBeCloseTo(4, 9);
+      }
+    });
+  }
+
+  it('the refusal kept: A · B · «אורך AB = 5» names the coordinates it contradicts', () => {
+    build([CUBE, 'A(1,2,3)', 'B(5,2,3)']);
+    submit('אורך AB = 5');
+    expect(state().lastError).toMatchObject({ code: 'givens-contradict' });
+  });
+
+  it('a wrong value on the sized cube is refuted, not the tool’s limit: P · «אורך AB = 4» · «אורך AC = 10»', () => {
+    build([CUBE, 'P(1,2,3)', SIZE]);
+    submit('אורך AC = 10');
+    expect(state().lastError).toMatchObject({ code: 'claim-refuted' });
+    for (const seed of [0, 3]) expect(near(at(seed, 'A'), at(seed, 'B'))).toBeCloseTo(4, 9);
+  });
+
+  // the wave's parity gate (round #2914): a size already stated (here «AB = 2», demoted to a pin by «AE = 1» on its rider)
+  // makes a later wrong diagonal a VALUE to check, refused claim-refuted on that line alone — never a pivot pin whose
+  // failure names every pin owner («AE = 1» has nothing to do with AC). Both orders, both cube spellings.
+  for (const cube of ['קובייה ABCD', CUBE]) {
+    for (const order of [
+      ['AB = 2', 'E על AB', 'AE = 1'],
+      ['E על AB', 'AE = 1', 'AB = 2'],
+    ]) {
+      it(`${cube} · ${order.join(' · ')} · «AC = 10»: refused as a wrong value, naming no other statement`, () => {
+        build([cube, ...order]);
+        submit('AC = 10');
+        expect(state().lastError).toMatchObject({ code: 'claim-refuted' });
+        expect(state().lastError).not.toHaveProperty('others');
+        for (const seed of [0, 3]) expect(near(at(seed, 'A'), at(seed, 'B'))).toBeCloseTo(2, 9);
+      });
+    }
+  }
+
+  it('«M אמצע AP» beside «P(1,2,3)» with «אורך AB = 4»: M is the midpoint of AP at every seed', () => {
+    build([CUBE, 'P(1,2,3)', 'M אמצע AP', SIZE]);
+    for (const seed of SEEDS8) {
+      const pos = okAt(seed).resolved.positions;
+      const A = pos.get('A')!;
+      const P = pos.get('P')!;
+      expect(near(pos.get('M')!, { x: (A.x + P.x) / 2, y: (A.y + P.y) / 2, z: (A.z + P.z) / 2 })).toBeLessThan(1e-9);
+      expect(near(A, pos.get('B')!)).toBeCloseTo(4, 9);
+    }
   });
 });

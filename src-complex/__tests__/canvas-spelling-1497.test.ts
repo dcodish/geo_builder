@@ -103,3 +103,81 @@ describe('#1497 — what is not typed', () => {
     expect(point(['z = 0.5+1.25i', 'w = 2z'], 'w').canvasCart).toBe('w');
   });
 });
+
+/**
+ * #2002 (ADR-CX-103) — a number typed in POLAR form with a letter in its modulus reads as typed on the canvas, in BOTH
+ * views (W8), in every configuration: never the drawn sample, never a value the tool solved for the letter (ADR-W-047
+ * clause 3). Only a letter the student valued is replaced, while its chip shows the value (clause 2).
+ */
+describe('#2002 — a typed polar form in a letter reads as typed on the canvas', () => {
+  function at(lines: string[], configIndex: number, seed: number, letterLines: ReadonlySet<number> = new Set(), name = 'z') {
+    for (const l of lines) expect(submitLine(l), `the gate refused «${l}»`).toBe(true);
+    const d = deriveLines(store().lines, configIndex, seed, store().queries, letterLines);
+    return { p: d.points.find((p) => p.name === name)!, chips: d.paramChips };
+  }
+  const closedAngle = (): string => {
+    const text = point(['z = 2·cis(π/6)']).canvas;
+    store().resetSession();
+    return text.replace(/^z = 2·cis/, '');
+  };
+
+  it.each([
+    [['z = r·cis(30°)'], 'z = r·cis30°'],
+    [['z = r·cis(30°)', '|z| = 4'], 'z = r·cis30°'],
+    [['|z| = 9r', 'arg(z) = 30°'], 'z = 9r·cis30°'],
+    [['z = 2r·cis(30°)'], 'z = 2r·cis30°'],
+    [['z = (r+1)·cis(30°)'], 'z = (r+1)·cis30°'],
+    [['z = r(cos30° + i sin30°)'], 'z = r·cis30°'],
+    [['|z| = 2r+1', 'arg(z) = 30°'], 'z = (2r+1)·cis30°'],
+    [['z = r cis 30'], 'z = r·cis30°'],
+    [['z = rcis30°'], 'z = r·cis30°'],
+  ])('%j reads «%s» in both views, at every configuration and seed', (lines, text) => {
+    for (const [cfg, seed] of [[0, 0], [1, 0], [0, 7], [1, 7]]) {
+      store().resetSession();
+      const { p } = at(lines, cfg, seed);
+      expect([p.canvas, p.canvasCart]).toEqual([text, text]);
+    }
+  });
+
+  it('«z = r·cis(π/6)» spells its angle as the closed form of the same spelling does', () => {
+    const angle = closedAngle();
+    expect(at(['z = r·cis(π/6)'], 0, 0).p.canvasCart).toBe(`z = r·cis${angle}`);
+  });
+
+  it('a letter the tool solved stays a letter on the canvas; its value is the panel’s', () => {
+    const { p, chips } = at(['z = r·cis(30°)', '|z| = 4'], 0, 0);
+    expect(p.canvas).toBe('z = r·cis30°');
+    expect(p.reading).toBe('z = 4·cis30°');
+    expect(chips).toEqual([]);
+  });
+
+  it('the W7 pair in a letter prints no sample and no «≈»', () => {
+    const { p } = at(['|z1| = 9r', 'arg z1 = 30'], 0, 7, new Set(), 'z1');
+    expect(p.canvasCart).toBe('z₁ = 9r·cis30°');
+    expect(p.canvasCart).not.toMatch(/≈|\d\.\d/);
+  });
+
+  it('a valued letter: the number as before, and the valuing line now offers the chip', () => {
+    const valued = at(['|z| = 9r', 'arg(z) = 30°', 'r = 2'], 0, 0);
+    expect([valued.p.canvas, valued.p.canvasCart]).toEqual(['z = 18·cis30°', 'z = 9√3+9i']);
+    expect(valued.chips).toEqual([{ param: 'r', line: 2, value: '2' }]);
+    const letter = deriveLines(store().lines, 0, 0, store().queries, new Set([2])).points.find((p) => p.name === 'z')!;
+    expect([letter.canvas, letter.canvasCart]).toEqual(['z = 9r·cis30°', 'z = 9r·cis30°']);
+  });
+
+  it('«z = r·cis(30°)» · «r = 3» reads the number, and «r = 3» offers the chip', () => {
+    const { p, chips } = at(['z = r·cis(30°)', 'r = 3'], 0, 0);
+    expect([p.canvas, p.canvasCart]).toEqual(['z = 3·cis30°', 'z = 3√3/2+(3/2)i']);
+    expect(chips).toEqual([{ param: 'r', line: 1, value: '3' }]);
+  });
+
+  it('the control: a closed trig form is unchanged', () => {
+    const { p } = at(['z = 2(cos30° + i sin30°)'], 0, 0);
+    expect([p.canvas, p.canvasCart]).toEqual(['z = 2·cis30°', 'z = √3+i']);
+  });
+
+  it('the control: a polar form on an axis keeps its cartesian definition', () => {
+    const { p } = at(['z = r·cis(90°)'], 0, 0);
+    expect([p.canvas, p.canvasCart]).toEqual(['z = ri', 'z = ri']);
+  });
+});

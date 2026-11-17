@@ -10,10 +10,10 @@
 import { knowledgeSamples3, lineAtParam, planeAtParam, readPinLetters3, type Resolved3 } from './evaluate';
 import { seedNumber3, type Seed3 } from './components3';
 import { CLAIM_REL_TOL, containmentDeviation, coordPlaneRelHolds, DIRECTION_REL_TOL, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
-import { atomVec, evalExpr } from './vecExpr';
+import { atomVec, evalExpr, hasLetters3, solveNormal3, vecEqLetters3, vecEqSystem3 } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { bisectorDir3, cross3, dist3, dot3, ringCollapsed3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
-import { evalAffine, symbolOwnersOf, type Claim3, type Construction3, type RevolutionObj, type SymComp } from './types';
+import { evalAffine, symbolOwnersOf, symbolValueOf, type Claim3, type Construction3, type RevolutionObj, type SymComp } from './types';
 import { freeRelationHolds3 } from './freeVecSystem';
 import { pivotLetterValue3 } from './solve3';
 
@@ -97,31 +97,56 @@ export function letterNumbersAt3(c: Construction3, sym: string, r: Resolved3): (
   const out: (number | undefined)[] = [];
   for (const o of symbolOwnersOf(c, sym)) {
     if (o.kind === 'param') out.push(r.param?.value);
-    else if (o.kind === 'pin-sym') out.push(pinLettersAt3(c, r)[sym]);
+    else if (o.kind === 'pin-sym') out.push(lettersAt3(c, r)[sym]);
     else if (o.kind === 'vec-def') out.push(r.ratioSymbols[sym]);
     else if (o.kind === 'component') out.push(pivotLetterValue3(c, { kind: 'component', target: o.target, axis: o.axis }, at, () => undefined));
     else if (o.kind === 'rider') out.push(pivotLetterValue3(c, { kind: 'rider', id: o.id, fromB: o.fromB }, at, () => undefined));
+    else if (o.kind === 'vec-letter') out.push(lettersAt3(c, r)[sym]); // #1551: the one reader (ADR-3D-472 Am. 1)
   }
   return out;
 }
 
-const pinLettersMemo = new WeakMap<Resolved3, Record<string, number>>();
+const lettersMemo = new WeakMap<Resolved3, Record<string, number>>();
 
 /**
- * #2785 (ADR-3D-488) — THE VALUE OF EVERY LETTER WRITTEN IN A COORDINATE, in one resolved configuration. Where the pivot
+ * #2785 (ADR-3D-488) + #1551 (ADR-3D-472 Am. 1) — THE ONE READER OF A LETTER'S VALUE, in one resolved configuration: a
+ * letter is one unknown wherever it is written, in a coordinate or in a vector equation's coefficient.
+ *
+ * COORDINATES. Where the pivot
  * runs it solved them (`pivot.pinSymbols`). Where it does not (every point fixed by coordinates), nothing moves and
  * the letters are READ from the placed points: each point pin is Σ kᵢ·letterᵢ + c = the point's coordinate, solved
  * jointly over every pin (Gauss–Newton, least squares; a value-pinned letter is its number). A letter whose equations
  * disagree takes the least-squares value, so every claim that writes it fails there: the arbiter, never a second
  * placement path.
+ *
+ * VECTOR EQUATIONS. Every remaining letter of every lettered `vec-eq` is read JOINTLY over all of them (each equation
+ * is linear in its open letters at a drawing, `vecEqSystem3`), with the coordinate letters above as numbers. So a
+ * letter written in two vector relations, or in a vector relation and a coordinate, has one value; where the
+ * equations disagree it takes the least-squares value and every claim that writes it fails there. A letter the
+ * drawing does not determine (dependent directions) is left out, and its claims judge the span residual instead.
  */
-export function pinLettersAt3(c: Construction3, r: Resolved3): Record<string, number> {
-  if (r.pivot?.pinSymbols) return r.pivot.pinSymbols;
-  const hit = pinLettersMemo.get(r);
+export function lettersAt3(c: Construction3, r: Resolved3): Record<string, number> {
+  const hit = lettersMemo.get(r);
   if (hit) return hit;
-  const out = readPinLetters3(c, seedNumber3(r.seed), r.positions).values; // #2563: one reader with the placement
-  pinLettersMemo.set(r, out);
+  // the coordinate letters: the pivot's own, else the one reader with the placement (#2563, `readPinLetters3`)
+  const out: Record<string, number> = r.pivot?.pinSymbols ? { ...r.pivot.pinSymbols } : { ...readPinLetters3(c, seedNumber3(r.seed), r.positions).values };
+  vecLettersInto3(c, r, out);
+  lettersMemo.set(r, out);
   return out;
+}
+
+/** The vector-equation half of {@link lettersAt3}: every open coefficient letter, read jointly, written into `out`. */
+function vecLettersInto3(c: Construction3, r: Resolved3, out: Record<string, number>): void {
+  const eqs = c.claims.filter((k): k is Extract<Claim3, { type: 'vec-eq' }> => k.type === 'vec-eq' && (hasLetters3(k.lhs) || hasLetters3(k.rhs)));
+  if (eqs.length === 0) return;
+  const known = (s: string) => out[s] ?? symbolValueOf(c, s);
+  const systems = eqs.map((k) => vecEqSystem3(k.lhs, k.rhs, (a) => atomVec(a, c, r.positions), known)).filter((s) => s !== null);
+  const syms = [...new Set(systems.flatMap((s) => [...s.D.keys()]))];
+  if (syms.length === 0) return;
+  const zero = v3(0, 0, 0);
+  const cols = syms.map((sym) => systems.map((s) => s.D.get(sym) ?? zero));
+  const x = solveNormal3(cols, systems.map((s) => s.R));
+  if (x) syms.forEach((sym, i) => { out[sym] = x[i]; });
 }
 
 /** Seeds checked for every claim: the display seed plus fixed offsets (deterministic). */
@@ -434,6 +459,15 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
     case 'free-rel': // #2684 (ADR-3D-421): the relation at this drawing and this configuration's free-vector solution
       return freeRelationHolds3(c, claim.m, pos, resolved.freeX);
     case 'vec-eq': {
+      // #1551 (ADR-3D-472): with letters it holds when SOME letters satisfy it at this drawing — the least-squares
+      // residual the pivot drove, judged by the same relative tolerance
+      if (hasLetters3(claim.lhs) || hasLetters3(claim.rhs)) {
+        // #1551 + #2785 (ADR-3D-472 Am. 1): at the letters' ONE value (`lettersAt3`), so a letter written in two
+        // relations cannot hold each at its own number; a letter the drawing leaves open is judged by the span residual
+        const at = lettersAt3(c, resolved);
+        const sol = vecEqLetters3(claim.lhs, claim.rhs, (a) => atomVec(a, c, pos), (sym) => at[sym] ?? symbolValueOf(c, sym));
+        return !!sol && norm3(sol.residual) <= REL_TOL * Math.max(sol.scale, 1);
+      }
       const l = evalExpr(claim.lhs, c, pos);
       const r = evalExpr(claim.rhs, c, pos);
       if (!l || !r) return false;
@@ -479,7 +513,7 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       // present component, scaled by its own magnitude.
       // #2785 (ADR-3D-488): a component written with letters is judged at the letters' resolved values
       if (claim.sym && claim.sym.some((e) => e !== null)) {
-        const at = pinLettersAt3(c, resolved);
+        const at = lettersAt3(c, resolved);
         const val = (e: SymComp | null, v: number | null): number | null => {
           if (!e) return v;
           const n = evalAffine(e, (s) => at[s] ?? NaN);
@@ -644,3 +678,4 @@ export function verifyClaim(claim: Claim3, c: Construction3, seed: Seed3): boole
   // one base seed at a time, so a refuted claim still stops at the first failing seed (docs/17 §7)
   return claimSeeds(seed).every((s) => knowledgeSamples3(c, [s]).every((r) => holdsAt(claim, c, r)));
 }
+

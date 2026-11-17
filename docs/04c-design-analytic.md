@@ -36,6 +36,16 @@ source of givens** ([02c](02c-requirements-analytic.md) P2/P3).
 (`y = mx + 8`), with no symbolic algebra. **`conic.ts` — equation → curve, plus the canonicity gate.** **`curves.ts` —
 curve geometry**: resolution, membership residuals and the renderer's polylines, pure.
 
+**A free conic's direction** ([ADR-AG-467](06c-decisions-analytic.md#adr-ag-467), #2853). A bare «פרבולה» is a curve fact
+with a `turn` (`CurveTurn`: the same parabola opening along the other axis, its own equation and text). M1 keeps the turn
+on the curve object and opens a region `choice` of two `opens-along` selectors (x first). `resolvedAt` reads the
+assignment like every other discrete axis (`discreteAxes.ts`), and `turnedObjects` puts the turn in the curve's place
+when the configuration took `y`, so every consumer of the resolved construction sees ONE curve. The selector holds by
+construction. The sign of the free `p` is the direction along the axis, so four directions are two digits' worth.
+`freshLetters` renames the turn's letters with the curve's. «משוואת ה(אליפסה|פרבולה) היא …» is `contextual` like the circle's and lowers to
+`the-conic`. M1 binds the one conic of that kind, and a `toolLetters` conic takes the stated equation under its id. The
+letters, the turn and the direction choice are then dropped.
+
 **The conic's frame** ([ADR-AG-455](06c-decisions-analytic.md#adr-ag-455), #2664). `classify` completes the square, so a
 parabola or an ellipse with axes parallel to the coordinate axes is read anywhere: `NumCurve` carries `h`, `k` (the
 centre or vertex) and, for a parabola opening along y, `axis: 'y'`. The fields are ABSENT on a curve at the origin
@@ -1681,6 +1691,16 @@ notice after the narrowing notes, per render.
 *Identifiers:* `crossings.apart()` · `a > 0`
 *ADRs:* ADR-486.
 
+**The solution cycle of a determined figure ([ADR-AG-473](06c-decisions-analytic.md#adr-ag-473), #2831).** When the
+drawing on the screen has `carrierDof` 0, `anotherConfiguration` (`app/another.ts`) walks a cycle instead of the next
+differing seed: the configurations `derive(lines, s)` draws for `s < TRIES` (drawn from the one folded construction,
+`drawingConstructionOf`, so the lines fold once), admitted ones only, a picture already gathered (`looksTheSame`)
+dropped; grouped by `sameSolution` (`engine/evaluate.ts`: the points and each curve's characteristic points in the
+figure's own frame, the mirror folded, plus the used letters' values); interleaved round-robin in order of first
+appearance. A press moves to the successor of the drawing on the screen; one outside the cycle starts it. Any admitted
+configuration with freedom left, or a cycle of one, keeps the seed walk. The cycle is memoised per (lines, seed
+names, pins) for the last few figures.
+
 ### A noun's exclusive condition is part of its ring ([ADR-AG-189](06c-decisions-analytic.md#adr-ag-189), #1627)
 
 Ring promises — simple, open, and not-a-parallelogram for the trapezoid family (`ONE_PARALLEL_PAIR_NOUNS`,
@@ -1730,7 +1750,13 @@ unknown no pin fixed, `blockRootsOf` lists the roots of its `carrierSystem` by d
 each candidate polished on the real residuals and judged — domains, free-direction signs, `admissibleAt`; directions
 mod π; at most `OPTION_CAP + 1`), memoised per (construction, assignment), and `steerToBlockRoot` starts configuration
 s ≥ 1 at admitted root ⌊jitter(s + `BLOCK_STREAM`)·n⌋, vertices and parameters both; configuration 0 is never steered,
-and a root past the anchor writes `;b<i>` into `rootKey`. `Figure.rootKey` joins `drawableAt`'s assignment comparison; `resampledInside` frees a
+and a root past the anchor writes `;b<i>` into `rootKey`. A configuration 0 with freedom left lists a DETERMINED PART instead
+([ADR-AG-502](06c-decisions-analytic.md#adr-ag-502), #2744): `subBlockRoots` takes each free vertex whose own rows have rank 2
+over its coordinates (every other unknown held; no pin), lists its roots by the same descent, started first from its
+mirror images through the points its rows name and across the lines through two of them (`images`), admits a root only
+with no ring fault at all (a noun's other ring is no solution) and no two named points on one spot, and stores each
+root in those points' frame (`anchorFrameOf`: the two farthest, plus one off their line, so a mirrored configuration keeps
+the side); `steerSubBlock` places the chosen root in the frame as configuration s ≥ 1 sampled it. `Figure.rootKey` joins `drawableAt`'s assignment comparison; `resampledInside` frees a
 stalled parameter; `admittedToPool(f)` (`selectorsOk`, no `hardRingFaults`) feeds `admittedOf(c, seeds)`, and
 `starved(figs)` (fewer than `MIN_WITNESSES` pictures, `sameConfiguration`, `signatureParts`) withholds a value;
 `derive` refuses failing selectors after the search.
@@ -2131,8 +2157,8 @@ optional envelope field cleaned by `cleanAnnotations`, so an old file loads with
 (re-keyed by `relabelCurveStyle`, now generic over the value). The fold never reads it, so it is never a given or a
 question. A key whose object is gone is kept and ignored. **How the later surfaces plug in:** #1211 adds a `coords`
 facet keyed by a point id and written from the point's click menu; #1121 adds a `line` facet (equation, slope) keyed
-by a line id, drawn BESIDE the name (2026-10-09 answer 4) through the same placement; #1752 adds the focus mark's click
-(naming it), which records a sentence through `decideSubmit` as the centre offer does — the mark itself is this one.
+by a line id, drawn BESIDE the name (2026-10-09 answer 4) through the same placement; #1752's focus click is built
+(#2851, ADR-AG-465, "The focus offer" below) — it records a sentence through `decideSubmit`, so it is no facet.
 Each is a facet, a reader in `cleanAnnotations`, and a projection into `SceneKnowledge`; no store or envelope field.
 
 **The chip.** `app/conicMarks.ts` `conicChips(d, annotations)`: one per STATED parabola or ellipse, on its
@@ -2150,6 +2176,20 @@ nothing at all where a student's point stands at the focus. A hidden curve (#223
 as `SceneKnowledge.roleMarks` and returns `scene.roles`: foci as dots, directrices clipped to the view box by
 `polylines`, their labels as requests in the ONE `placeSceneLabels` call (priority 2, after angles and lengths),
 through `lbl`. The frame takes them in: `markAnchors` feeds `drawnBox`'s extra points (a focus; where a directrix crosses its axis). `Figure.tsx` paints them in `analytic-roles`: dashed 1.25px directrices, blue dots, ink labels.
+
+**The focus offer** ([ADR-AG-465](06c-decisions-analytic.md#adr-ag-465), #2851). A shown focus mark no student point stands on
+carries `offer: { id: 'focus:<k>:<curve>', letter, title }`; `focusSentenceOf(d, id, letter)` composes its sentence
+(«<letter> מוקד הפרבולה», «<letter> מוקד <side> של האליפסה», words from `parser/conicRoleWords.ts`, the side read against
+the ellipse's centre), null when stale or when two curves of that kind make «האליפסה» ambiguous. `buildScene` passes the
+offer through `roles.foci`; `Figure.tsx` draws the `OFFER_RING` (the crossing / centre offer's dashed ring, one constant) around each offered focus (`analytic-focus-offers`,
+`data-noexport`, under the points) when `onFocus` is given. `App.tsx` opens `LetterPopover` with `initialValue` =
+the letter; the decision runs in the analytic worker like the centre's (#2890: the letter op's `focusName` / `focusSwap`
+requests, `opsAn.letter`, applied on the page by `applyCentreName` / `applyCentreSwap`). `decideFocusName` / `decideFocusSwap`
+(`app/centreName.ts`; `focusPopoverOps` is their in-process pair for the locks) run the centre's decision with this composer — `normalizePointName`,
+`nameInUse` + holder, `decideSubmit`, `commitRecord` — and its swap is the centre's (`decideOfferSwap`: record under the
+automatic letter, then `decideSwap`), with `label` = that automatic letter. `rename.ts`'s `tokenRe` matches an indexed
+id in every spelling (`F₁` · `F1` · `F_1` · `F_{1}`) and `keyOf` maps the occurrence back to the id, so a letter typed «F1»
+renames and swaps (found in round #2855).
 
 **The circle case.** `isCircleShaped(c, id)` — `(a − b)/max(1, a, b)` read through `isKnowledge`, zero in every
 configuration. Such an ellipse has no chip and no marks; `SceneKnowledge.circleShaped` gives it a circle's centre cross
@@ -2210,7 +2250,13 @@ envelope and the persist trigger. A curve click resolves through `app/curveDispl
 conic, `solid` / `none` for a circle (a hidden circle also drops its centre cross). A letter change re-keys it by POSITION
 (`relabelCurveStyle(style, before, after)` over the two derivations' drawn curves), because a curve id may carry letters or a hash.
 
-*Identifiers:* `serialize` · `{hidden?, dashed?}` · `shell` · `cleanSegDisplay` · `knows.segStyle` · `SceneSegment` · `key` · `ink` · `solid` · `dashed` · `ghost` · `measurablesOf` · `centreOf` · `onCentre(offerId, screen)` · `onCrossing` · `nameInUse` · `centreSentenceOf(figure, offerId, letter)` · `centreLabelOf` · `label` · `decideSwap(auto, taken)`
+**What a hidden segment takes** ([ADR-AG-474](06c-decisions-analytic.md#adr-ag-474), #2852). `buildScene` reads the scene
+into `shell`'s `hiddenWith`: ghost segments, `stated.lengths`, `stated.rights`, `stated.equalLengths`, and the points every
+other stated mark touches. A ghost carries no label, the stated layer is drawn from what is left, and a lone point (and
+its dashed extension) is not drawn. `app/hideOwnership.ts` decides the lone points (`lonePoints`: minted, used by no other
+line, built into nothing but a segment or polygon) and the rows that show «מוסתר» (`hiddenRowLines`).
+
+*Identifiers:* `serialize` · `{hidden?, dashed?}` · `shell` · `cleanSegDisplay` · `knows.segStyle` · `knows.lonePoints` · `hiddenWith` · `hiddenRowLines` · `SceneSegment` · `key` · `ink` · `solid` · `dashed` · `ghost` · `measurablesOf` · `centreOf` · `onCentre(offerId, screen)` · `onCrossing` · `nameInUse` · `centreSentenceOf(figure, offerId, letter)` · `centreLabelOf` · `label` · `decideSwap(auto, taken)`
 
 ## The app: submit, ask, locus
 

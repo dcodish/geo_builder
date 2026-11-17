@@ -9,7 +9,7 @@ import { applyCommand3 } from '../apply';
 import { verifyClaim } from '../claims';
 import { checkInSpan, evaluate3 } from '../evaluate';
 import { emptyConstruction3, type Claim3, type Command3, type Construction3, type VecExpr } from '../types';
-import { decompose3, evalExpr } from '../vecExpr';
+import { decompose3, evalExpr, solveNormal3, vecEqLetters3, vecEqSystem3 } from '../vecExpr';
 import { dist3, norm3, sub3, v3 } from '../vec3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
@@ -165,5 +165,72 @@ describe('apply validation (V1 commands)', () => {
     );
     const r = applyCommand3(c, { type: 'point-in-span', id: 'P', a: 'A', b: 'C', vecFrom: 'B', span: ['u', 'v'] });
     expect(r).toMatchObject({ ok: false, error: { code: 'need-basis' } });
+  });
+});
+
+/** #1551 (ADR-3D-472): the letters of a vector equation, read off one drawing by least squares. */
+describe('vecEqLetters3 — letters solved per drawing', () => {
+  const V = { EA: v3(-1, 0, -0.5), EC: v3(0, 1, -0.5) };
+  const vecOf = (a: VecExpr[number]['atom']) => (a.kind === 'pair' ? (V as Record<string, ReturnType<typeof v3>>)[`${a.from}${a.to}`] ?? null : null);
+  const lhs = (_x: ReturnType<typeof v3>) => [{ coeff: 1, atom: { kind: 'pair', from: 'E', to: 'M' } }] as VecExpr;
+  const rhs = [
+    { coeff: 0, atom: { kind: 'pair', from: 'E', to: 'A' }, letter: { sym: 'a', p: 1 } },
+    { coeff: 0, atom: { kind: 'pair', from: 'E', to: 'C' }, letter: { sym: 'b', p: 1 } },
+  ] as VecExpr;
+  it('a vector in the span gives its two letters and a zero residual', () => {
+    const EM = v3(2 / 3 * V.EA.x + 1 / 6 * V.EC.x, 2 / 3 * V.EA.y + 1 / 6 * V.EC.y, 2 / 3 * V.EA.z + 1 / 6 * V.EC.z);
+    const sol = vecEqLetters3(lhs(EM), rhs, (a) => (a.kind === 'pair' && a.to === 'M' ? EM : vecOf(a)), () => undefined)!;
+    expect(sol.letters!.get('a')).toBeCloseTo(2 / 3, 12);
+    expect(sol.letters!.get('b')).toBeCloseTo(1 / 6, 12);
+    expect(norm3(sol.residual)).toBeLessThan(1e-12);
+  });
+  it('a vector off the span leaves the residual no letter can absorb', () => {
+    const EM = v3(0, 0, 1);
+    const sol = vecEqLetters3(lhs(EM), rhs, (a) => (a.kind === 'pair' && a.to === 'M' ? EM : vecOf(a)), () => undefined)!;
+    expect(norm3(sol.residual)).toBeGreaterThan(0.1);
+  });
+  it('a letter given a value is a number: the other is solved around it', () => {
+    const EM = v3(1 / 2 * V.EA.x + 1 / 6 * V.EC.x, 1 / 2 * V.EA.y + 1 / 6 * V.EC.y, 1 / 2 * V.EA.z + 1 / 6 * V.EC.z);
+    const sol = vecEqLetters3(lhs(EM), rhs, (a) => (a.kind === 'pair' && a.to === 'M' ? EM : vecOf(a)), (s) => (s === 'a' ? 1 / 2 : undefined))!;
+    expect([...sol.letters!.keys()]).toEqual(['b']);
+    expect(sol.letters!.get('b')).toBeCloseTo(1 / 6, 12);
+  });
+  it('dependent letter directions determine nothing (null letters), never a min-norm guess', () => {
+    const twice = [rhs[0], { ...rhs[1], atom: { kind: 'pair', from: 'E', to: 'A' } }] as VecExpr;
+    const sol = vecEqLetters3(lhs(V.EA), twice, (a) => (a.kind === 'pair' && a.to === 'M' ? V.EA : vecOf(a)), () => undefined)!;
+    expect(sol.letters).toBeNull();
+    expect(norm3(sol.residual)).toBeLessThan(1e-12);
+  });
+});
+
+// #1551 + #2785 (ADR-3D-472 Am. 1): the joint letter reader's two pieces
+describe('vecEqSystem3 / solveNormal3 — one letter, one value over several equations', () => {
+  const X = v3(1, 0, 0), Y = v3(0, 1, 0);
+  const vecs: Record<string, ReturnType<typeof v3>> = { X, Y, R1: v3(2, 3, 0), R2: v3(3, 2, 0) };
+  const at = (a: { kind: string; from?: string; to?: string }) => vecs[(a as { to: string }).to] ?? null;
+  const term = (to: string, sym?: string) => ({ coeff: 0, atom: { kind: 'pair' as const, from: 'O', to }, ...(sym ? { letter: { sym, p: 1 } } : {}) });
+  const lhs = (to: string) => [{ coeff: 1, atom: { kind: 'pair' as const, from: 'O', to } }];
+  it('assembles R = Σ s·Dₛ, a known letter as a number', () => {
+    const s = vecEqSystem3(lhs('R1'), [term('X', 'a'), term('Y', 'b')], at as never, (sym) => (sym === 'b' ? 3 : undefined))!;
+    expect([...s.D.keys()]).toEqual(['a']);
+    expect(norm3(sub3(s.R, v3(2, 0, 0)))).toBeLessThan(1e-12); // R1 − 3·Y
+  });
+  it('two equations that agree give the letter once; two that disagree give the least-squares value', () => {
+    const e1 = vecEqSystem3(lhs('R1'), [term('X', 'a'), term('Y', 'b')], at as never, () => undefined)!;
+    const e2 = vecEqSystem3(lhs('R1'), [term('X', 'a'), { coeff: 3, atom: { kind: 'pair' as const, from: 'O', to: 'Y' } }], at as never, () => undefined)!;
+    const zero = v3(0, 0, 0);
+    const syms = ['a', 'b'];
+    const cols = syms.map((s) => [e1, e2].map((e) => e.D.get(s) ?? zero));
+    const x = solveNormal3(cols, [e1.R, e2.R])!;
+    expect(x[0]).toBeCloseTo(2, 12);
+    expect(x[1]).toBeCloseTo(3, 12);
+    // «R1 = a·X + b·Y» and «R1 = b·X + a·Y» (the swapped relation): a = 2 and a = 3 cannot both hold
+    const e3 = vecEqSystem3(lhs('R1'), [term('X', 'b'), term('Y', 'a')], at as never, () => undefined)!;
+    const y = solveNormal3(syms.map((s) => [e1, e3].map((e) => e.D.get(s) ?? zero)), [e1.R, e3.R])!;
+    expect(y[0]).toBeCloseTo(2.5, 12);
+    expect(vecEqLetters3(lhs('R1'), [term('X', 'a'), term('Y', 'b')], at as never, (s) => (s === 'a' ? y[0] : y[1]))!.residual.x).not.toBeCloseTo(0, 6);
+  });
+  it('dependent directions leave the letters undetermined', () => {
+    expect(solveNormal3([[X], [X]], [v3(1, 0, 0)])).toBeNull();
   });
 });

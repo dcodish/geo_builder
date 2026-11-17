@@ -4027,6 +4027,8 @@ figure) joins the saved-session net.
 ## ADR-CX-065 — The canvas shows what the student typed; computed values go to the panel (#1862)
 
 > **⚠ Superseded in part** 2026-11-05 by [ADR-CX-088](#adr-cx-088): "the panel's readings do not change" no longer holds for a number typed as a decimal, which reads as a decimal in the panel.
+>
+> **Discharged** 2026-11-16 by [ADR-CX-103](#adr-cx-103): the "Not in this ADR" paragraph (#2002) is built — a typed polar form in a letter and a W7 pair holding a letter read as typed on the canvas.
 
 **Status:** accepted, 2026-10-12 · **Issue:** [#1862](https://github.com/dcodish/geo_builder/issues/1862) (feature, P2, `complex`, PR) · round #1998 ·
 supersedes the canvas half of [ADR-CX-015](#adr-cx-015) and the 2026-08-18 ruling that the reading returns to the canvas; partly supersedes [ADR-CX-043](#adr-cx-043) ("substituted", canvas clause) and [ADR-CX-058](#adr-cx-058) (canvas substitution)
@@ -4524,7 +4526,7 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 
 **Decision.** The `known` verdict is deleted. `decideSubmitCx` runs the gate first and, for a typed line `lineEntailed` finds entailed, returns `record` with `note: { key: 'already-held' }`; `submitLine` calls `recordLine(line, seed, note)`, which sets `lastNote` in the same commit, and the App words it `suite.notice.alreadyHeld`. A load replays the rows as saved and asks nothing (`replaying`). `setNote` is removed (no caller). The triage replay counts a held line `built` (`held`).
 
-**Known gap (the note's reach).** A held Re/Im or distance value («z1 = 3+4i» · «Re(z1) = 3») records with no note: the exact core does not carry those relations (02d), so the detector cannot see them. Nothing is dropped; the line records either way.
+**Known gap (the note's reach)** — closed by [ADR-CX-102](#adr-cx-102) (2026-11-16, #2801): such a line now gets the note when it moves nothing drawn. A held Re/Im or distance value («z1 = 3+4i» · «Re(z1) = 3») recorded with no note: the exact core does not carry those relations (02d), so the detector cannot see them. Nothing is dropped; the line records either way.
 
 **Locks.** `src-complex/__tests__/already-drawn-1990.test.ts` drives the shared table (`HELD_CASES_COMPLEX`) through the real `submitLine`: one row, the note, no point moving at 4 seeds, and, with the earlier row muted and then deleted, the row carrying the relation alone; controls. Re-based on ADR-W-200's authority: `entailed-noop-2268`, `triage-replay-cx-2241`, `sibling-phrasings`, `app/__tests__/acceptance-gate`.
 
@@ -4736,3 +4738,96 @@ Each memo was also switched off alone, in the same minutes. Without the fold mem
 
 **What the student will see.**
 - Nothing today: no figure reaches the limit (measured above). [ruled] If one ever does: «עדיין לא נמצא פתרון — החיפוש נעצר אחרי כ-10 שניות.» with «המשיכו לחפש» (operator, 2026-11-14, #2893 question 1: *"«עדיין לא נמצא פתרון…» (Recommended)"*), the button searching the same amount again from where it stopped (question 2: *"Another ~10 s round (Recommended)"*), and the typed line staying in the box, not added (question 3: *"Stays in the box, not added (Recommended)"*). The limit counted in work (*"10s is an ok number"*, 2026-11-13).
+
+## ADR-CX-100 — A given line through the origin is the direction it states: stage 1a″, drive by solvability (#2802, #2801)
+
+**Status:** accepted · 2026-11-16 · bug (P2, `wrong-answer`), fix round #2914, branch `fix/2802-free-modulus-zero` · **amends** [ADR-CX-029](#adr-cx-029) (the claim drive's row is now also a given's) · **LADDER stage:** 1a″ (new, [LADDER-CX](LADDER-CX.md))
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-4 (a free point on a line or circle is drawn at a sampled point of it) · **Design:** [04d](04d-design-complex.md) "A line through the origin is a direction"
+
+**Measured at pickup** (`3f6132c2`, `deriveLines([line], s, s)`, seeds 0–7). A lone «Re(z) = 0», «|z - 1| = |z + 1|», «Im(z) = 0», «|z - i| = |z + i|», «Re(z) = Im(z)», «Re(z) + Im(z) = 0» drew z at |z| ≈ 1e-6 at every seed (0.018i and 0.045i at two seeds), with `configCount` 0: what was drawn was the fold's fallback. «|z - 1| = |z - i|» (the line y = x) drew z at 405+405i. Restated in another spelling, the line moved z by 1.89–2.66 («|z - 1| = |z + 1|» · «Re(z) = 0», both orders), and «z מדומה טהור» · «Re(z) = 0» moved z from 3.01i onto the origin. Exactly the issues' tables.
+
+**Root cause.** A line through 0 reaches the numeric tier as a residual ∝ |z| in the (|z|, θ) basis, so Levenberg–Marquardt shrinks |z| onto its 1e-6 bound instead of turning θ; the solve never reaches tolerance and the fallback is drawn (#2802). And because the deferred «Re(z) = 0» names z, the claim drive's syntactic guard switched «z מדומה טהור» off (H3 of #2801's plan).
+
+**Decision.**
+- **A real-linear form reader** (`realLinearOf`, `solve/claimDrive.ts`): one complex unknown, `a·z + b·z̄ + k`, exact over Gaussian-rational constants (sums, differences, negation, conjugation, a product or quotient by a constant; no CAS, ADR-CX-006). `lineThroughOrigin` reads an `eq` row with k = 0 and |a| = |b| ≠ 0 («Re(z) = 0», «Im(z) = 0», «Re(z) = Im(z)», «z + conj(z) = 0»), and a `mod` row `|p·z + a| = |q·z + b|` with |p| = |q| whose two centres are equidistant from 0 and distinct («|z - 1| = |z + 1|», «|z - 1| = |z - i|»): u = −b/a, or u = −c/c̄ for c the difference of the centres.
+- **Stage 1a″** (`liftDirectionRows`, called from `exactSolve`): each such DEFERRED row is replaced by `arg(z²) = arg(u)`, the row «z מדומה טהור» drives with (ADR-CX-029). Its two branches are the two sides of the origin; |z| stays a free, sampled modulus. A direction that needs a literal atom carries its binding into the sample.
+- **Withdrawn where it leaves the figure unsolvable.** In `exactSolve`, when the lifted tier 1 (or the lifted tier 1 with the claim drive) is inconsistent; in `foldConstraints`, when the lifted fold has a contradiction, an unsatisfied given or no configuration: the figure is then folded with the line as the numeric row it was. So «Re(z) = 0» · «Im(z) = 0» and «z = 0» · «Re(z) = 0» are accepted with z at 0, and «z = 3+4i» · «Re(z) = 0» is refused `incompatible`, as before. The second fold runs only when a lift happened and the first fold failed.
+- **The claim drive's syntactic guard is kept** (deviation from #2801's plan §3.1, which replaced it by the solvability test): it now reads the deferred rows left after the lift, so a lifted line no longer switches a claim off (rows 6–7 of #2801). Replacing it would also change what a claim over a CIRCLE draws and marks («z מדומה טהור» · «|z - 1| = 2»), which no ruling covers.
+
+**Not changed.** A line not through 0, a circle, «Re(z^2) = 0» (two lines; not one-name linear): numeric rows, drawn by ADR-CX-101.
+
+**What the student will see.**
+- [ruled] A lone line through the origin («Re(z) = 0», «|z - 1| = |z + 1|», «Im(z) = 0», «Re(z) = Im(z)», …) draws z on it, away from the origin, at a size that varies with the configuration (ADR-052; 02d FR-CN-4).
+- [judged] Q-2802a (a): «הציגו תצורה אחרת» alternates z between the two sides of the origin, as for «z מדומה טהור».
+- [ruled] Typed again in another spelling, it leaves z where it was, and is its own row with «זה כבר קיים באיור — נוסף כנתון נפרד.» (ADR-W-200; NFR-ST-1).
+
+**Locks.** `src-complex/__tests__/claim-drive-688.test.ts` (the lift and its reader; the not-lifted rows; the withdrawal guards; the direction class matrix, both orders, seeds 0–7); `canvas-defaults-885-886.test.ts` (configCount ≥ 1); `entailed-noop-2268.test.ts`; fixtures `lone-imaginary-axis-2802.complex.json`, `restated-bisector-2801.complex.json`.
+
+## ADR-CX-101 — A continuum is drawn at its point nearest the sampled start; a rank has an absolute floor (#2801, #2802)
+
+**Status:** accepted · 2026-11-16 · bug (P2), fix round #2914, branch `fix/2802-free-modulus-zero` · **LADDER stage:** 3b (rank), 3c (nearest point) ([LADDER-CX](LADDER-CX.md))
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-4, FR-CN-5 · **Design:** [04d](04d-design-complex.md) "The configuration set"
+
+**Measured at pickup.** Where the givens leave a curve of solutions, the drawn member was wherever LM stopped: «|z - 1 - i| = |z|» at −15.7+16.7i (|z| ≈ 23) at seed 0; «Re(z) = 2» · «|z - 1| = |z - 3|» moved z by 0.35–6.31 against «Re(z) = 2» alone; «|z - 1| = 2» typed twice moved z by 3.99 at seed 1 (a jittered restart).
+
+**Root cause.** The code comment at the continuum branch promised "one member per sample — the seed moves along it", but nothing made the member a function of (the set, the seed): an LM endpoint depends on the residuals' Jacobians, so two descriptions of one set end in different places. Two rank defects made it worse: the forward-difference Jacobian in `consumedDimensions` carries an O(h) error, so two parallel rows of one line ranked 2 and a line was censused as isolated points (seven configurations for «Re(z) = 2» · «|z - 1| = |z - 3|»); and a residual that holds identically (rounding noise ~1e-17) was ranked against its own noise (H4 of #2801).
+
+**Decision.**
+- **Stage 3c, `nearestOnSet`** (`solve/tier2.ts`; `solveResiduals` is unchanged): from the sampled start, brought onto the set by the least drawn displacement (and from the solve's own point only when the start cannot be), walk the set to the point nearest the start, every length measured in the drawn plane — a tangent Gauss–Newton step over the null space of the residuals' Jacobian (central differences), its length set by a one-step quadratic fit (a circle's curvature makes the plain step overshoot), then the least drawn displacement back onto the set (a chord Newton on the Jacobians of the point it stepped from), over the residual rows that constrain independently (parallel rows of one set are reduced first), with one step past tolerance so two descriptions of one set polish to one point. Its precision is the numeric Jacobian's, about 1e-8 of the figure's size. Kept only when every residual holds; otherwise the descent's endpoint, as before. `systemFor` applies it to the continuum branch only. An end on a SINGULAR point of the set is refused (its residuals' gradient in the drawn plane under a thousandth of the solve's own point's): at the crossing of «Im(z^2) = 0»'s two axes a whole disc is within `TOL` of the set, and a projection from near the diagonal converges into it. Then the descent's own point is drawn (one seed of eight for «Im(z^2) = 0», z at −0.24i).
+- **Stage 3b, the rank** (`consumedDimensions`): central differences where it decides "isolated or a continuum" (and for the driven-DOF count), and a pivot must also exceed `TOL` absolutely; the census's per-start check of a system already judged isolated keeps the forward difference.
+
+**Cost (docs/17 §7).** The polish runs once per fold, only on a continuum: 6 of the 46 fixtures (2b-capstone, param-sign-modulus-1387, param-sign-quadrant-1387, symbolic-cartesian-ib/-modulus/-quadrant-1365). Measured on the dev PC under the round's parallel load (median of 60 cold folds, seeds 0–3): those six take +0.12 to +0.40 ms a fold (0.11–0.66 ms → 0.29–1.06 ms, ×1.6 to ×2.8); the heaviest fixture (triangle-not-flat-2212, ~1 ms) and the rest are within the run-to-run noise, which at this load is itself ±20–50 % on sub-millisecond figures. The work meter (line reads + exact solves) records 0 rises. This is over the plan's 10 % per-fixture gate on those six; it is reported, not hidden: the cost is the Jacobians a projection needs, and a lone continuum is still drawn in about a millisecond.
+
+**Not changed.** Isolated solves, the census, polynomial certificates; every figure whose numeric system is isolated or empty.
+
+**What the student will see.**
+- [ruled] A lone locus that was drawn far off the canvas («|z - 1 - i| = |z|», at about 23 from the origin) is drawn near the default view, and «הציגו תצורה אחרת» moves z along it (ADR-052, FR-CN-4).
+- [ruled] A condition restated in another spelling or repeated («Re(z) = 2» · «|z - 1| = |z - 3|», «|z - 1| = 2» twice) leaves z where it was (NFR-ST-1).
+- [ruled] Every other lone line or circle not through the origin («Re(z) = 1», «|z - 1| = 2») is drawn at the point of it nearest its sampled start: a different point than before on the same set, as ADR-052 allows for an unstated position.
+
+**Locks.** `src-complex/solve/__tests__/tier2.test.ts` (the polish on a line and a circle, two residuals of one set to one point, the null fallback; a lone locus within |z| ≤ 10 at seeds 0–7; the deferred class matrix, both orders, seeds 0–7; the rank floor).
+
+## ADR-CX-102 — A deferred line that moves nothing drawn gets the already-held notice: the reach of ADR-CX-089 (#2801)
+
+**Status:** accepted · 2026-11-16 · bug (P2), fix round #2914, branch `fix/2802-free-modulus-zero` · **closes** the known gap of [ADR-CX-089](#adr-cx-089) · **amends** [ADR-CX-084](#adr-cx-084) (a notice may be sampled now that it never decides whether a row is recorded) · **LADDER stage:** 0e′ ([LADDER-CX](LADDER-CX.md))
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-5; [02w](02w-requirements-workspace.md) FR-SU-36 and the parity row "Already-there note" · **Design:** [04d](04d-design-complex.md) "A restatement the exact solve already entails"
+
+**Decision.** `exactDelta(before, after)` (`replay/derive2.ts`) answers `entailed` (stage 0e′, unchanged: `entailedBy` is `exactDelta === 'entailed'`), `deferred` (the line adds only rows the exact tier defers, and the exact solve is otherwise unchanged) or `changes`. `lineHeld` (`app/deriveLines.ts`) holds a `deferred` line when, at configurations 0–3 (each at its own seed, as the app folds them), the figure after it has the same configuration count, no unsatisfied given, and every number where it was (≤ 1e-7·scale: the polish's precision, ADR-CX-101). With ADR-CX-101 a row that cuts the set moves the nearest point at a generic start, so "nothing moved at four starts" is the stability property itself. `decideSubmitCx` attaches the notice through `lineAlreadyHeld`: one exact comparison, then the folds only for a `deferred` line. The row is recorded either way (ADR-W-200), so the sampled test decides only a notice — which is why it does not contradict ADR-CX-084's "a float is never identity", which guarded a no-row verdict.
+
+**What the student will see.**
+- [ruled] «Re(z) = 2» · «|z - 1| = |z - 3|», «|z - 1| = 2» twice, «z1 = 3+4i» · «Re(z1) = 3» are each their own row with «זה כבר קיים באיור — נוסף כנתון נפרד.» (ADR-W-200: *"it should be accepted but with a notice that it already exists. this should be on all tools"*), where they recorded with no notice.
+
+**Locks.** `src-complex/__tests__/entailed-noop-2268.test.ts` (the held family; the controls that cut a continuum record silently); the shared table `shell/__tests__/fixtures/held-row-2790.ts` (`HELD_CASES_COMPLEX`, `HELD_CONTROLS_COMPLEX`) through `already-drawn-1990.test.ts`.
+
+## ADR-CX-103 — A typed polar form in a letter reads as typed on the canvas: «z = r·cis30°», «z = 9r·cis30°» (#2002)
+
+**Status:** accepted · 2026-11-16 · bug (complex, `wrong-answer`) · fix round #2914, stream H · branch `fix/2002-polar-letter-form` · **discharges** [ADR-CX-065](#adr-cx-065)'s "Not in this ADR" paragraph · operator ruling of 2026-10-13 on #2002 (option A), on W7, W8 and [ADR-W-047](06w-decisions-workspace.md#adr-w-047) clauses 2–3 as recorded in ADR-CX-065 §3–4 · absorbs #1738 (family merge, operator 2026-11-01)
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-KN-5, FR-CN-10 · **Design:** [04d](04d-design-complex.md) § "The canvas prints its own label" (the polar reader) · **LADDER stage:** 5d (no new stage), [LADDER-CX](LADDER-CX.md)
+
+**Measured before** (`3f6132c2`, through `deriveLines` at configurations 0/1 and seeds 0/7): «z = r·cis(30°)» read «z ≈ r·cis30°» / «z ≈ 0.74+0.42i» (seed 7: «z ≈ 2+1.15i»), a sampled decimal; with «|z| = 4» it read «z = 4·cis30°» / «z = 2√3+2i», a value the tool solved for r; «|z| = 9r» · «arg(z) = 30°» read «z ≈ 9r·cis30°» / «z ≈ 6.63+3.82i» (#1738's line); «z = (r+1)·cis(30°)» and «|z| = 2r+1» · «arg(z) = 30°» read a bare «z»; no letter/value chip was offered for a valued letter in a polar modulus. The plan's `|r|` no longer showed (a polar modulus letter is a size since ADR-CX-070), and the no-dot spellings «z = r cis 30» / «z = rcis30°», out of reach when the plan was written, now declare r as a parameter (ADR-CX-068), so they joined the class.
+
+**Root cause.** The stage-5d canvas composer had one symbolic reader, `definitionOf` (ADR-CX-058), which accepts a definition only when it is Gaussian-affine over ℚ. `r·cis30°` = r·(√3/2 + i/2) is not, and a W7 pair has no definition at all, so the composer fell to the PANEL's string — the carriers' reading, which substitutes a tool-solved letter and prints the drawn sample. **Class:** a number the student typed in polar form, whose modulus holds a letter, printed a computed or sampled value on the canvas instead of the typed form.
+
+**Decision.**
+1. **A polar reader beside the cartesian one** (`polarDefinitionOf`, `model/polarForm.ts`): a typed `name = M·cis θ` (any spelling the parser lowers to the same literal, the trig form included) or the W7 pair `|name| = M` · `arg name = θ`, read off the constraint shapes: M a real ℚ-affine form in parameters, its terms in the order typed; θ an exact angle. Null for a closed modulus or a letter in the argument; a form `definitionOf` also reads (`r·cis90°`) keeps «z = ri», because the canvas asks `definitionOf` first.
+2. **The canvas** (`canvasPoints`, `replay/derive2.ts`): when `definitionOf` is null and the polar reader answers, only the letters whose chip shows the value are substituted (ADR-CX-065 §3). A letter left → «z = M·cisθ» in BOTH views, with `=`, M bracketed when it has more than one term, θ spelled as the closed polar reading spells it. Closed → the path it took before.
+3. **The chip**: a valued letter in M is reported in `paramChips` (ADR-CX-065 §4), so «r = 2» now offers the letter/value chip.
+
+**Unchanged.** The panel (`reading`/`readingCart`), the ask lane, the gate, `statedAs`, every closed typed number, and a Gaussian-affine form.
+
+**Not reached (found, not built).** A letter in the ARGUMENT («z = 4cis(t)») still prints a bare «z»: no ruling covers a symbolic angle.
+
+**Siblings.** 2-D, 3-D and analytic already print the student's letters (ADR-W-047). Not a plane-geometry sentence, so no docs/22 §10 row.
+
+**Locks.** Unit: `src-complex/model/__tests__/polarForm.test.ts` (every spelling, the W7 pair, what it does not read, the substitution). The canvas table: `src-complex/__tests__/canvas-spelling-1497.test.ts` (both views, configurations 0/1, seeds 0/7; the tool-solved letter kept; the chip and letter mode; the control). The class net: `src-complex/__tests__/fixtures.test.ts` (a canvas label holding a letter reads alike in both views, with no «≈», `|letter|` or decimal). Fixtures `polar-letter-2002.complex.json` and `polar-letter-pair-2002.complex.json`.
+
+**What the student will see.**
+- [ruled] «z = r·cis(30°)» reads «z = r·cis30°» on the canvas in both views, in every configuration (ruling 2026-10-13 on #2002).
+- [ruled] «z = r·cis(30°)» then «|z| = 4» still reads «z = r·cis30°»; the value is in the panel (ADR-W-047 clause 3).
+- [ruled] «|z| = 9r» with «arg(z) = 30°» reads «z = 9r·cis30°» in both views, with no sampled decimal (W7).
+- [ruled] Every spelling of the class: «z = 2r·cis30°», «z = (r+1)·cis30°», «z = r·cis30°» for the trig form and the no-dot spellings, «z = (2r+1)·cis30°» (W8).
+- [ruled] After «r = 2» the canvas reads the number as before, and the «r = 2» row offers the letter/value chip (ADR-W-047 clause 2).

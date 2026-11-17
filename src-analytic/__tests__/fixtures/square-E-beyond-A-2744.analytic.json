@@ -1,0 +1,11 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "ריבוע ABCD שצלעו 10",
+    "E על הישר AB",
+    "DE = 12"
+  ],
+  "seed": 0,
+  "name": "#2744 — ריבוע ABCD שצלעו 10, E על הישר AB, DE = 12: E מכל צד של A"
+}

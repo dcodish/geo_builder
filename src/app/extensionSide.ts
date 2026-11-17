@@ -11,6 +11,7 @@
  * A later line that makes a STANDING extension impossible (judge ruling on #2518, option B) is refused here too, naming
  * the extension's line and the statement that broke it. It offers nothing: the line to change is another row.
  */
+import type { Seed } from '@/engine';
 import { impossibleExtensionSide, type ExtensionSide } from '@/replay/core';
 import { dryRunOutcome, type Fact } from '@/store/geoStore';
 import { parse, type ParseContext } from '@/parser';
@@ -31,7 +32,7 @@ function reversedSentence(side: ExtensionSide, text: string): string | null {
 }
 
 /** Does this line read as the reversed extension, and build on this figure? */
-function reversedBuilds(side: ExtensionSide, line: string, ctx: ParseContext, facts: Fact[], seed: number): boolean {
+function reversedBuilds(side: ExtensionSide, line: string, ctx: ParseContext, facts: Fact[], seed: Seed): boolean {
   const r = parse(line, ctx);
   if (!r.ok) return false;
   if (!r.commands.some((c) => c.type === 'extend-onto-circle' && c.a === side.b && c.b === side.a && c.id === side.id)) return false;
@@ -44,7 +45,7 @@ function reversedBuilds(side: ExtensionSide, line: string, ctx: ParseContext, fa
  * @param utterance what the student typed, quoted back
  * @param sentence the sentence the offer is built from: the student's own line, or the LLM's canonical line that lowered it
  */
-export function extensionSideVerdict(utterance: string, sentence: string, commands: readonly AnyCommand[], ctx: ParseContext, facts: Fact[], seed: number): ExtensionSideVerdict | null {
+export function extensionSideVerdict(utterance: string, sentence: string, commands: readonly AnyCommand[], ctx: ParseContext, facts: Fact[], seed: Seed): ExtensionSideVerdict | null {
   const side = impossibleExtensionSide(facts, [...commands], seed);
   if (!side) return null;
   if (side.standing !== undefined) {

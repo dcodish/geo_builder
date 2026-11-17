@@ -12,7 +12,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
-import { looksTheSame } from '../engine/evaluate';
+import { looksTheSame, sameSolution } from '../engine/evaluate';
 import { anotherConfiguration } from '../app/another';
 
 function presses(lines: readonly string[], n: number) {
@@ -55,5 +55,83 @@ describe('sr-30 — the control: a figure with ONE drawing says so, it does not 
     expect(looksTheSame(d, d)).toBe(true);
     const moved = { ...d, points: d.points.map((p, i) => (i === 0 ? { ...p, x: p.x + 1 } : p)) };
     expect(looksTheSame(d, moved)).toBe(false);
+  });
+});
+
+/**
+ * #2831 ([ADR-AG-473](../../docs/06c-decisions-analytic.md#adr-ag-473), [ADR-W-206](../../docs/06w-decisions-workspace.md#adr-w-206))
+ * — ONE SOLUTION, PLACED DIFFERENTLY. The operator, 2026-11-12 (*"2831 - A"*): a mirror image of a drawing is the same
+ * solution placed differently, and «הציגו תצורה אחרת» shows new solutions first. `sameSolution` is the key; the cycle
+ * is the button's walk on a determined figure.
+ */
+describe('#2831 — sameSolution: a mirror is the same solution, another shape or letter value is not', () => {
+  const p215 = [
+    'נתונה אליפסה שציריה הם צירי השיעורים',
+    'F1 ו-F2 מוקדי האליפסה',
+    'נתון ישר l המקביל לציר ה-x',
+    'הישר l חותך את האליפסה בנקודות A ו-B',
+    'AB=8',
+    'AF1=6',
+    'AF2=10',
+  ];
+  const fig = (lines: readonly string[], seed: number) => derive(lines, seed).figure;
+  const point = (f: ReturnType<typeof fig>, id: string) => f.points.find((p) => p.id === id)!;
+
+  it('the x-axis mirror (l: y = 6 against y = −6) is the same solution', () => {
+    const [a, b] = [fig(p215, 0), fig(p215, 6)];
+    expect(point(a, 'A').y).toBeCloseTo(6, 3);
+    expect(point(b, 'A').y).toBeCloseTo(-6, 3);
+    expect(looksTheSame(a, b)).toBe(false);
+    expect(sameSolution(a, b)).toBe(true);
+  });
+
+  it('the y-axis mirror (A at (4, 6) against (−4, 6)) is the same solution', () => {
+    const [a, b] = [fig(p215, 0), fig(p215, 1)];
+    expect(point(a, 'A').x).toBeCloseTo(4, 3);
+    expect(point(b, 'A').x).toBeCloseTo(-4, 3);
+    expect(sameSolution(a, b)).toBe(true);
+  });
+
+  it('another ellipse is another solution', () => {
+    expect(sameSolution(fig(p215, 0), fig(p215, 2))).toBe(false);
+  });
+
+  it('a letter with another value is another solution, even when the drawing is a mirror (M(a,0) · N(13,0) · MN = 9)', () => {
+    const lines = ['M(a,0)', 'N(13,0)', 'MN = 9'];
+    const [a, b] = [fig(lines, 0), derive(lines, anotherConfiguration(lines, 0).seed).figure];
+    expect(new Set([a.env.a, b.env.a].map((v) => Math.round(v)))).toEqual(new Set([4, 22]));
+    expect(sameSolution(a, b)).toBe(false);
+  });
+
+  it('a figure is the same solution as itself', () => {
+    expect(sameSolution(fig(p215, 0), fig(p215, 0))).toBe(true);
+  });
+});
+
+describe('#2831 — the solution cycle of a determined figure', () => {
+  it('a figure whose only alternative is a mirror still reaches it, and comes back (A = (3, ±4) on x² + y² = 25)', () => {
+    const lines = ['נתון מעגל שמשוואתו x^2+y^2=25', 'A על המעגל', 'x_A = 3'];
+    const ys = presses(lines, 4).map((d) => Math.round(d.figure.points.find((p) => p.id === 'A')!.y));
+    expect(ys).toHaveLength(5);
+    expect(new Set(ys)).toEqual(new Set([4, -4]));
+    for (let i = 1; i < ys.length; i += 1) expect(ys[i]).not.toBe(ys[i - 1]);
+  });
+
+  it('two solutions alternate press by press (M(a,0) · N(13,0) · MN = 9: a = 4, 22, 4, 22)', () => {
+    const as = presses(['M(a,0)', 'N(13,0)', 'MN = 9'], 3).map((d) => Math.round(d.figure.env.a));
+    expect(as).toEqual([4, 22, 4, 22]);
+  });
+
+  it('a press from a drawing outside the cycle starts it, and the first drawing is unchanged', () => {
+    const lines = ['M(a,0)', 'N(13,0)', 'MN = 9'];
+    expect(Math.round(derive(lines, 0).figure.env.a)).toBe(4);
+    const r = anotherConfiguration(lines, 97);
+    expect(r.found).toBe(true);
+  });
+
+  it('a figure with freedom left keeps the seed walk: a free triangle draws a new shape every press', () => {
+    const ds = presses(['משולש ABC', 'AB = 5'], 4);
+    expect(ds).toHaveLength(5);
+    for (let i = 1; i < ds.length; i += 1) expect(looksTheSame(ds[i].figure, ds[i - 1].figure)).toBe(false);
   });
 });

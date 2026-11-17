@@ -43,7 +43,7 @@ import { expect } from 'vitest';
 import { replay, useGeoStore, groupKey } from '@/store/geoStore';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { isGeoPoint, freeDofCount, detectRelations, detectShapes, ringSimple, circleRefs, crossingUtterance } from '@/engine';
-import type { AnyCommand, Id, Vec } from '@/engine';
+import type { AnyCommand, Id, Seed, Vec } from '@/engine';
 
 import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
@@ -3668,7 +3668,7 @@ export const SCENARIOS_4: Scenario[] = [
       }
       expect([...apexes].sort(), 'the three apexes each get their own base').toEqual(['A', 'B', 'C']);
       // and the button itself: two presses, every view shown keeps the median on the base
-      let cur = { facts, seed: firstSatisfyingSeed(facts) };
+      let cur: { facts: Fact[]; seed: Seed } = { facts, seed: firstSatisfyingSeed(facts) };
       medianOnBase(replay(cur.facts, cur.seed));
       for (let k = 0; k < 2; k++) {
         const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);
@@ -6169,7 +6169,7 @@ export const SCENARIOS_4: Scenario[] = [
       allStepsOk(fig);
       const facts = factsOf(['מעגל O', 'משולש ABC חוסם את מעגל O', 'ABC משולש שווה צלעות']);
       const before = replay(factsOf(['מעגל O', 'משולש ABC חוסם את מעגל O'])).circles.get('circle-O')!;
-      let cur = { facts, seed: 0 };
+      let cur: { facts: Fact[]; seed: Seed } = { facts, seed: 0 };
       for (let k = 0; k < 4; k++) {
         const f = replay(cur.facts, cur.seed);
         expect(ringEnclosesCircle(f, ['A', 'B', 'C']), `view ${k} (seed ${cur.seed}): O inside ABC, every touch within its side`).toBe(true);
@@ -6631,7 +6631,7 @@ export const SCENARIOS_4: Scenario[] = [
         return cases[((v % 3) + 3) % 3];
       };
       // the student's button, 12 presses: every view is its variant's case, and all three are shown
-      let cur = { facts: factsOf(['שני מעגלים']), seed: 0 };
+      let cur: { facts: Fact[]; seed: Seed } = { facts: factsOf(['שני מעגלים']), seed: 0 };
       const seen = new Set<string>();
       for (let k = 0; k <= 12; k++) {
         if (k > 0) {
@@ -6866,8 +6866,126 @@ export const SCENARIOS_4: Scenario[] = [
       // the control: the diagonal the square forces still commits
       expect(gateVerdict(factsOf(['ריבוע ABCD']), 'AC = 10').kind, 'a square with only its diagonal stated commits').toBe('commit');
     },
+  },  {
+    id: 'square-E-beyond-A-2744',
+    title: '#2744 (ADR-856): a point its givens fix up to a choice — E on line AB with DE = 12 — shows each solution through «הציגו תצורה אחרת», and «BE» lists both values',
+    guards:
+      '#2744 (P2, wrong-answer). Measured at 3f6132c2 through parse -> replay: «ריבוע ABCD שצלעו 10 · E על הישר AB · DE = 12» drew BE = 3.37 at 24 of 24 seeds, «הציגו תצורה אחרת» found nothing, and the values panel and the question box stated BE = 3.37 as known while 16.63 is equally valid; the same with «זווית ADE = 30» and «שטח ADE = 20». Root cause: a free point two scalar givens fix is solved by descent from a start the seed barely moves, so the pool held one root (the class of ADR-AG-451 / ADR-3D-447). Fix (ADR-856): the fold lists the point\'s other roots by deflated descent and mirror-image starts (`engine/blockRoots.ts`), and every seed but 0 starts the point at the root it chooses. The unit matrix is src/engine/__tests__/blockRoots.test.ts.',
+    steps: ['ריבוע ABCD שצלעו 10', 'E על הישר AB', 'DE = 12'],
+    check(fig) {
+      allStepsOk(fig);
+      const be = dist(at(fig, 'B'), at(fig, 'E'));
+      expect(Math.min(Math.abs(be - 3.3668), Math.abs(be - 16.6332)), 'BE is one of the two roots').toBeLessThan(1e-3);
+      expect(Math.abs(dist(at(fig, 'D'), at(fig, 'E')) - 12), 'DE = 12 holds (to the solver tolerance)').toBeLessThan(1e-4);
+      if (checked2744) return; // the pool and press assertions read the whole figure once, not per swept seed
+      checked2744 = true;
+      const roots = (steps: string[], read: (f: ReturnType<typeof replay>) => number) => {
+        const facts = factsOf(steps);
+        const tally = new Map<string, number>();
+        for (let s = 0; s < 24; s++) {
+          const k = read(replay(facts, s)).toFixed(2);
+          tally.set(k, (tally.get(k) ?? 0) + 1);
+        }
+        return tally;
+      };
+      const BE = (f: ReturnType<typeof replay>) => dist(at(f, 'B'), at(f, 'E'));
+      const lines = ['ריבוע ABCD שצלעו 10', 'E על הישר AB', 'DE = 12'];
+      const facts = factsOf(lines);
+      // the first drawing is today's: E between A and B
+      expect(BE(replay(facts, 0)), 'seed 0 is unchanged').toBeCloseTo(3.3668, 3);
+      // both roots over seeds 0–23, each at least 6 times
+      const pool = roots(lines, BE);
+      expect([...pool.keys()].sort(), 'the pool holds both roots').toEqual(['16.63', '3.37']);
+      for (const [k, n] of pool) expect(n, `root BE = ${k} at least 6 of 24 seeds`).toBeGreaterThanOrEqual(6);
+      // one press from the first drawing reaches E beyond A
+      const next = searchAnotherView(facts, 0, undefined, Number.POSITIVE_INFINITY);
+      expect(next, '«הציגו תצורה אחרת» finds another configuration').not.toBeNull();
+      expect(BE(replay(next!.facts, next!.seed)), 'the press shows E beyond A').toBeCloseTo(16.6332, 3);
+      // «BE» lists both values (ADR-634), in the panel and in the question box
+      const v = computeValues(facts, [{ text: 'BE', q: parseValueQuery('BE') }]);
+      const row = v.rows.find((r) => r.kind === 'length' && [...r.ids].sort().join('') === 'BE');
+      expect(row?.value, 'the panel row: 3.37 …').toBeCloseTo(3.3668, 3);
+      expect(row?.or?.value, '… או 16.63').toBeCloseTo(16.6332, 3);
+      expect(v.queryRows[0].value).toBeCloseTo(3.3668, 3);
+      expect(v.queryRows[0].or?.value, 'the question box: both values').toBeCloseTo(16.6332, 3);
+      // the siblings of the class reach both roots
+      expect([...roots(['ריבוע ABCD שצלעו 10', 'E על הישר AB', 'זווית ADE = 30'], BE).keys()].sort(), 'an angle').toEqual(['15.77', '4.23']);
+      expect([...roots(['ריבוע ABCD שצלעו 10', 'E על הישר AB', 'שטח ADE = 20'], BE).keys()].sort(), 'an area').toEqual(['14.00', '6.00']);
+      // controls: a bound that selects the far root still draws it first; the segment form keeps its one root
+      expect(BE(replay(factsOf([...lines, 'BE > 10']), 0)), 'BE > 10 draws the far root').toBeCloseTo(16.6332, 3);
+      const seg = factsOf(['ריבוע ABCD שצלעו 10', 'E על AB', 'DE = 12']);
+      expect(searchAnotherView(seg, 0, undefined, Number.POSITIVE_INFINITY), 'the segment admits one root: no other configuration').toBeNull();
+      // the SSA control keeps both triangles
+      const ssa = roots(['משולש ABC', 'AB = 5', 'AC = 4', 'זווית ABC = 40'], (f) => dist(at(f, 'B'), at(f, 'C')));
+      expect([...ssa.keys()].sort(), 'SSA: both triangles').toEqual(['1.45', '6.21']);
+    },
+  },
+  {
+    id: 'unreachable-length-refused-2572',
+    title: '#2572 (ADR-859): a length the figure can never reach — a chord or an inscribed side past the diameter, a side of a triangle around a circle under it — is refused naming the line that bounds it, never parked as waiting for givens',
+    guards:
+      'Operator ruling "2572 - A" (2026-10-28): «Refuse it, naming the circle\'s line. The same refusal the diameter already gets.» Measured at main 3f6132c2 through decideDeterministic2D (model mocked): «AB = 6» on a radius-2 chord, «AB = 8» inscribed in radius 3, «AB = 4» around radius 3 (#2538\'s X1) and «AB = 10» for two points on radius 3 (#2272) all committed as deferred («waiting for givens»), though the metric closure already proved each impossible (the fold\'s own status carried its reason). Root cause: ADR-104\'s deferral gate (`constraintIsPending`) asked whether the residual MOVES, never whether the closure proves it cannot reach zero. Fix (ADR-859): the gate consults `metricClosureImpossibility` on the trial (a proof the figure before the line already had is not this line\'s). The gate unit test is src/store/__tests__/deferral-gate.test.ts § #2572.',
+    // The refused line never becomes a fact, so each line is driven through the submit gate in `check`.
+    steps: ['מעגל O ברדיוס 2'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const bare = (s: string) => s.replace(/[⁦-⁩]/g, '');
+      const cases: [string[], string, string][] = [
+        [['מעגל O ברדיוס 2', 'AB מיתר במעגל'], 'AB = 6', 'הנתונים סותרים זה את זה — «AB = 6» לא מתקיים יחד עם «מעגל O ברדיוס 2», «AB מיתר במעגל»: יחד הם קובעים |AB| = 6 ו-|AO| + |BO| = 4, אבל לפי אי־שוויון המשולש ABO תמיד |AB| ≤ |AO| + |BO|. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מעגל O ברדיוס 3', 'משולש ABC חסום במעגל O'], 'AB = 8', 'הנתונים סותרים זה את זה — «AB = 8» לא מתקיים יחד עם «מעגל O ברדיוס 3», «משולש ABC חסום במעגל O»: יחד הם קובעים |AB| = 8 ו-|AO| + |BO| = 6, אבל לפי אי־שוויון המשולש ABO תמיד |AB| ≤ |AO| + |BO|. בדקו איזה מהאורכים האלה לא נכון.'],
+        [['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O'], 'AB = 4', 'לא ניתן: «AB = 4» סותר את «משולש ABC חוסם את מעגל O» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 4.'],
+        [['מעגל O ברדיוס 3', 'A, B על מעגל O'], 'AB = 10', 'הנתונים סותרים זה את זה — «AB = 10» לא מתקיים יחד עם «מעגל O ברדיוס 3», «A, B על מעגל O»: יחד הם קובעים |AB| = 10 ו-|AO| + |BO| = 6, אבל לפי אי־שוויון המשולש ABO תמיד |AB| ≤ |AO| + |BO|. בדקו איזה מהאורכים האלה לא נכון.'],
+      ];
+      for (const [prior, line, words] of cases) {
+        const facts = factsOf(prior);
+        const v = gateVerdict(facts, line);
+        expect(v.kind === 'refused' && v.reason, `«${line}» after «${prior.join(' · ')}» is refused before it becomes a fact, never parked`).toBe('error');
+        const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+        expect(bare(humanizeError(detail, he, line, otherUtteranceForError(facts, detail))), `«${line}»: names the line that bounds it`).toBe(words);
+      }
+      // the controls: a length the same figure can reach still commits
+      expect(gateVerdict(factsOf(['מעגל O ברדיוס 2', 'AB מיתר במעגל']), 'AB = 3').kind, 'a chord of 3 in a radius-2 circle').toBe('commit');
+      expect(gateVerdict(factsOf(['מעגל O ברדיוס 2', 'AB מיתר במעגל']), 'AB = 4').kind, 'a chord equal to the diameter').toBe('commit');
+      expect(gateVerdict(factsOf(['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O']), 'AB = 8').kind, 'a side of 8 around a radius-3 circle (X2)').toBe('commit');
+    },
+  },
+  {
+    id: 'new-solutions-first-tangent-right-triangle-2831',
+    title:
+      '#2831 (ADR-824, ADR-W-206): «מעגל O · משיק מ-A בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6» — the three triangles (the right angle at A, B or D) are the first drawing and presses 1 and 2; the mirror images come after',
+    guards:
+      "Operator ruling 2026-11-12 on #2831 («2831 - A»): a mirror image of a drawing is the SAME solution placed differently, and «הציגו תצורה אחרת» shows new solutions first (Q-2731c (b)). Measured on c82d767c through searchAnotherView: the axes are branch2 (which tangent point B, a mirror) × side2 (which side of AB D sits, a mirror) × seat3 (which vertex holds the right angle, the solution), and the odometer turns the mirror axes first, so the three triangles came on presses 0, 2 and 4, each after a mirror of the one before. The determined-shape arm now walks the solution cycle: the assignments grouped by shape fingerprint, interleaved round-robin from the all-default one.",
+    steps: ['נתון מעגל O שרדיוסו 5', 'מנקודה A הוציאו משיק למעגל בנקודה B', 'OA = 13', 'משולש ישר זווית ABD', 'BD = 6'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['נתון מעגל O שרדיוסו 5', 'מנקודה A הוציאו משיק למעגל בנקודה B', 'OA = 13', 'משולש ישר זווית ABD', 'BD = 6']);
+      const sig = (f: ReturnType<typeof replay>) => {
+        const ids = [...f.positions.keys()].filter((id) => /^[A-Z]$/.test(id)).sort();
+        const ds: number[] = [];
+        for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) ds.push(dist(f.positions.get(ids[i])!, f.positions.get(ids[j])!));
+        const m = Math.max(...ds);
+        return ds.map((x) => (x / m).toFixed(3)).join(',');
+      };
+      // From the drawing the commit shows (the store settles each line through the config search), six presses.
+      let cur = findValidConfig(facts) ?? { facts, seed: 0 };
+      const shapes = [sig(replay(cur.facts, cur.seed))];
+      for (let k = 0; k < 6; k++) {
+        const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);
+        expect(next, `press ${k + 1} finds another configuration`).not.toBeNull();
+        expect(meetsRequirements(next!.facts, next!.seed), `press ${k + 1} meets every given`).toBe(true);
+        cur = next!;
+        shapes.push(sig(replay(cur.facts, cur.seed)));
+      }
+      expect(shapes, 'seven drawings: the first and six presses').toHaveLength(7);
+      expect(new Set(shapes.slice(0, 3)).size, 'the three triangles are presses 0, 1 and 2').toBe(3);
+      expect(new Set(shapes).size, 'there are three solutions, no fourth').toBe(3);
+      expect(shapes.slice(3, 6), 'presses 3–5 are the same three solutions placed differently').toEqual(shapes.slice(0, 3));
+    },
   },
 ];
+/** #2744: the scenario's pool and press assertions run once, not at every swept seed. */
+let checked2744 = false;
 /** #2370 / #2444 (ADR-828): the vertex of ABC that carries a right angle ('' = none, two letters never happen in a triangle). */
 function rightAngleSeat(f: ReturnType<typeof replay>): string {
   const ids = ['A', 'B', 'C'] as const;
@@ -6992,7 +7110,7 @@ function configsShown(facts: Fact[]): number {
 }
 /** #1600: the default view plus `presses` presses of «הציגו תצורה אחרת» — every view shown meets the givens. */
 function pressAll(facts: Fact[], presses: number) {
-  let cur = { facts, seed: firstSatisfyingSeed(facts) };
+  let cur: { facts: Fact[]; seed: Seed } = { facts, seed: firstSatisfyingSeed(facts) };
   const out = [replay(cur.facts, cur.seed)];
   for (let k = 0; k < presses; k++) {
     const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);

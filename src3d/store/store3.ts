@@ -20,6 +20,7 @@
  *    by object identity, so adding a fact never moves existing points.
  */
 
+import { boundHolds3, signBound3, type Bound3 } from '../engine/bound3';
 import { create } from 'zustand';
 import type { PlaneDisplayMode3Map } from './figureFile3';
 import { buildNotices3, shapeWarnings3, type BuildNotice3, type ShapeWarning3 } from '../engine/notices';
@@ -48,13 +49,13 @@ import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engi
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../../shell/lexicon/marks3';
-import { checkInSpan, clearEngineCaches3, componentValue, crossingOnInk3, declaredRingCrossed3, evaluate3, searchSeed3, type SeedResume3, type SeedSearch3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, clearEngineCaches3, statedLetterValue3, crossingOnInk3, declaredRingCrossed3, evaluate3, searchSeed3, type SeedResume3, type SeedSearch3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
 import { coincidences3, namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
-import { claimPointIds, defaultPlaneDisplay3, scalarPinOrigin3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type ScalarPin, type SegmentEquationReading3, type SolidCommand } from '../engine/types';
+import { claimPointIds, defaultPlaneDisplay3, scalarPinOrigin3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type ScalarPin, type SegmentEquationReading3, type SolidCommand, figureSymbolsOf } from '../engine/types';
 import { partsOf3, sameSeed3, seedKey3, seedNumber3, type Seed3 } from '../engine/components3';
 import { ContentTable } from '../engine/content3';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
@@ -2068,7 +2069,7 @@ function deriveCore3(
           status[newest?.factId ?? owner.factId] =
             claim.type === 'polygon-open'
               ? boundPolygonCollapsed(owner.factId, claim.ids)
-              : (sampledCarrierVerdict(claim, c, resolved) ?? membershipCollapse(owner.factId, claim) ?? { code: 'claim-refuted' });
+              : (sampledCarrierVerdict(claim, c, resolved) ?? membershipCollapse(owner.factId, claim) ?? lettersCannotHold3(claim, facts.find((g) => g.id === owner.factId)?.utterance ?? '') ?? { code: 'claim-refuted' });
           break;
         }
       }
@@ -2421,7 +2422,7 @@ function deriveCore3(
             break;
           }
         }
-      } else if (cmd.type === 'param-sign') {
+      } else if (cmd.type === 'param-sign' || cmd.type === 'param-bound') {
         // ADR-3D-032: the chosen parameter value must honour the stated sign.
         // #325 (ADR-3D-079): the sign may name a PIN symbol (`B(2t,t,k)` → t) — read the
         // pivot's solved value for it instead of the coord-sym parameter.
@@ -2434,16 +2435,13 @@ function deriveCore3(
         // reported `sign-unsatisfiable` against a figure that honours it. Measured: that is exactly what
         // happened the moment apply started accepting the sign. `ratioSymbols` is published by the code
         // that picks the root, so the two can never disagree about which value was used.
-        const bound = c.partialNames.find((b) => b.sym === cmd.sym);
-        const v =
-          resolved.param?.name === cmd.sym
-            ? resolved.param.value
-            : (resolved.pivot?.pinSymbols?.[cmd.sym] ??
-               resolved.ratioSymbols?.[cmd.sym] ??
-               resolved.freeSyms.get(cmd.sym) ?? // #2684 (ADR-3D-421): a free-vector system's letter
-               (bound ? componentValue(c, bound.target, bound.axis, (id) => positions.get(id), resolved.freeVectors) : undefined)); // #1188: a free vector's component
-        if (v === undefined || !Number.isFinite(v) || (cmd.positive ? v <= 1e-9 : v >= -1e-9)) {
-          status[f.id] = { code: 'sign-unsatisfiable', id: cmd.sym };
+        // #2684 (ADR-3D-421): a free-vector system's letter; #1188: a free vector's component. #2916 (ADR-3D-533): one
+        // reader, shared with the knowledge admission
+        const v = statedLetterValue3(c, resolved, cmd.sym);
+        // #1524 (ADR-3D-477): a RANGE is checked the same way, against its own interval, and refused in its own words.
+        const stated: Bound3 = cmd.type === 'param-sign' ? signBound3(cmd.positive) : { lo: cmd.lo, hi: cmd.hi, loStrict: cmd.loStrict, hiStrict: cmd.hiStrict };
+        if (v === undefined || !boundHolds3(stated, v)) {
+          status[f.id] = { code: cmd.type === 'param-sign' ? 'sign-unsatisfiable' : 'param-bound-unsatisfiable', id: cmd.sym };
           break;
         }
       } else if (cmd.type === 'vec-rel' || cmd.type === 'seg-plane-rel' || cmd.type === 'length-rel') {
@@ -3395,6 +3393,10 @@ function impliedByPrior3(facts: readonly Fact3[], seed: Seed3, fact: Fact3, deri
   const prior = derive3(facts as Fact3[], seed);
   const was = prior.construction;
   const now = derived.construction;
+  // #1551 (ADR-3D-472): a line that NAMES a new letter («EM = a·EA + b·EC» over placed points) states something the
+  // figure did not hold — what a and b are — even where the relation itself held already
+  const had = new Set(figureSymbolsOf(was));
+  if (figureSymbolsOf(now).some((l) => !had.has(l))) return null;
   const size = (v: unknown): number | null => (v instanceof Map || v instanceof Set ? v.size : Array.isArray(v) ? v.length : null);
   let stated = false;
   for (const key of Object.keys(now) as (keyof Construction3)[]) {
@@ -3750,3 +3752,13 @@ export const useGeo3 = create<Geo3State>()(
 
 export const undo3 = () => useGeo3.temporal.getState().undo();
 export const redo3 = () => useGeo3.temporal.getState().redo();
+
+/**
+ * #1551 ([ADR-3D-472](../../docs/06b-decisions-3d.md#adr-3d-472)) — a vector equation with LETTERS («EB' = a·EA + b·EC»)
+ * states that some numbers make it hold. Its pin drove the figure's free shape toward it, so a verification that still
+ * fails means no shape and no letters satisfy it with the other givens: the contradiction register naming the
+ * sentence (operator ruling 2026-10-13), never «בדקו את החישוב» — there is no student calculation to check.
+ */
+function lettersCannotHold3(claim: Claim3, utterance: string): FactStatus3 | null {
+  return claim.type === 'vec-eq' && [...claim.lhs, ...claim.rhs].some((t) => t.letter) ? { code: 'givens-contradict', stated: utterance, others: [] } : null;
+}

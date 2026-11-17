@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-16T21:03:21.769Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה ABCDS",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid4gr",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "נפח הפירמידה ABCDS = 12",
+      "cmds": [
+        {
+          "type": "claim",
+          "claim": {
+            "type": "volume-poly",
+            "noun": "pyramid",
+            "ids": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "S"
+            ],
+            "value": 12
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "x+y+z=1",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π",
+          "plane": {
+            "cx": {
+              "k": 1,
+              "p": 0
+            },
+            "cy": {
+              "k": 1,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -1,
+              "p": 0
+            },
+            "src": "x+y+z=1"
+          }
+        }
+      ]
+    }
+  ]
+}

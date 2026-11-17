@@ -48,7 +48,8 @@ const HEBREW_LETTER = /[א-ת]/;
 // #1545 (ADR-3D-300): the prime glyphs are the ONE set the grammar folds (`lexicon/marks3`), not a local
 // `'′` — a run ending in a geresh «A׳» left its last prime outside the isolate, and an RTL paragraph put
 // it at the far end of the label.
-const CORE = new RegExp(`[A-Za-z0-9'${PRIME_GLYPHS3}·<½¾²³ℓ\\u20D7→Α-ω|∠∡∢⊥∥△▲√⌢°]`);
+// #1524 (ADR-3D-478): `>`, `≤`, `≥` join `<` — the palette offers them now that a letter's range reads (the #482 lock).
+const CORE = new RegExp(`[A-Za-z0-9'${PRIME_GLYPHS3}·<>≤≥½¾²³ℓ\\u20D7→Α-ω|∠∡∢⊥∥△▲√⌢°]`);
 
 /**
  * Delimiters that HUG a run and belong inside the isolate with it — `(1, 2, -3)` is the 3-D case that

@@ -13,7 +13,7 @@
 import { curveInLetters, readInLetters, type Monomial, type SymbolicCurve } from './locusFit';
 import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, isRadiusSymbol, labelRows, narrowedDomain, noFreedomReaches, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
 import { curveParentsOf, parentsOf } from './derived';
-import { enumerateBlockRoots, pinReach, statedScale, walkPins, type Pin } from './pinRoots';
+import { anchorFrameOf, enumerateBlockRoots, fromFrame, pinReach, statedScale, toFrame, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, parabolaFocus, type Box } from './curves';
 import { toWorld } from './conicFrame';
@@ -1874,6 +1874,8 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      * WHICH AXIS IS THE ELLIPSE'S MAJOR ONE (#2616/#2619, ADR-AG-353/354) — the RESOLVED semi-axes, never the signed
      * letters: x holds when a > b, y when b > a, strictly at the figure's resolution (a circle, a = b, has no major axis).
      */
+    // A free parabola's axis (#2853, ADR-AG-467) is a definition the resolution already applied: it holds on its curve.
+    if (s.kind === 'opens-along') return true;
     if (s.kind === 'major-axis') {
       const atFn = (id: Id) => at.get(id) ?? null;
       const k = curveAtOf(c, env, atFn)(s.curve);
@@ -2654,8 +2656,21 @@ export function resolvedAt(raw: Construction, seed: number, choiceSeed = seed): 
     selectors,
     // #2018 (ADR-AG-298): an object bound to a role («תיכון לבסיס»'s foot and segment) is lettered by the option this
     // configuration took — resolved here with the constraints, so nothing downstream reads another option's letters.
-    objects: followObjects(raw.objects, constraints),
+    objects: turnedObjects(followObjects(raw.objects, constraints), selectors),
   };
+}
+
+/**
+ * A FREE PARABOLA DRAWN ALONG THE AXIS ITS CONFIGURATION TOOK (#2853, [ADR-AG-467](../../docs/06c-decisions-analytic.md#adr-ag-467)):
+ * an `opens-along y` selector puts the curve's `turn` in its place, equation and text, so every reader of the resolved
+ * construction — the residuals, the focus, the frame, the panel — sees one curve. Along x the object is as stated.
+ */
+export function turnedObjects(objects: readonly GeoObject[], selectors: readonly Selector[]): GeoObject[] {
+  const turned = new Set(selectors.flatMap((s) => (s.kind === 'opens-along' && s.axis === 'y' ? [s.curve] : [])));
+  if (turned.size === 0) return objects as GeoObject[];
+  return objects.map((o) =>
+    o.kind === 'curve' && o.turn && turned.has(o.id) ? { ...o, curve: o.turn.curve, label: { ...o.label, eqSrc: o.turn.eqSrc } } : o,
+  );
 }
 
 /** Do the (resolved) selectors of `c` all hold at these positions? The one reading of a region given. */
@@ -3778,7 +3793,22 @@ interface BlockList {
   syms: string[];
   /** The admitted roots, each with its index in the listing (0 is configuration 0's own root). */
   roots: Array<{ x: number[]; index: number }>;
+  /**
+   * #2744 ([ADR-AG-502](../../docs/06c-decisions-analytic.md#adr-ag-502)): a figure with freedom left lists, instead of
+   * the whole block, each free vertex its OWN rows fix (every other unknown held) — its admitted roots in the frame of
+   * the two most separated points those rows name, since the seed moves the rest of the figure. `roots` is then empty.
+   */
+  points?: SubBlockPoint[];
 }
+interface SubBlockPoint {
+  id: Id;
+  /** [a0, a1] or [a0, a1, a2] (`anchorFrameOf`): three anchors keep the root on its side of them when a seed mirrors the figure. */
+  frame: Id[];
+  /** The roots as coordinates in the frame (`toFrame`); index 0 is configuration 0's own root. */
+  roots: Array<{ u: number; v: number }>;
+}
+/** At most this many vertices are listed on their own (2-D's `REFLECT_MAX`). */
+const SUB_BLOCK_MAX = 4;
 const blockMemo = new ContentCache<Map<string, BlockList | null>>('blockMemo');
 function blockRootsOf(raw: Construction, choiceSeed: number): BlockList | null {
   const akey = assignmentAt(raw, choiceSeed).key;
@@ -3804,7 +3834,7 @@ function listBlockRoots(raw: Construction, choiceSeed: number, akey: string): Bl
     evaluateStats.uncached += 1;
     f = evaluateUncached(raw, 0, choiceSeed, 1, false);
   }
-  if (f.unsatisfied.length > 0 || f.carrierDof !== 0 || f.vacant.length > 0) return null;
+  if (f.unsatisfied.length > 0 || f.vacant.length > 0) return null;
   const c = resolvedAt(raw, 0, anchorSeed);
   const sys = carrierSystem(c, f.env);
   if (sys.ids.length + sys.syms.length === 0 || c.constraints.length === 0) return null;
@@ -3845,6 +3875,12 @@ function listBlockRoots(raw: Construction, choiceSeed: number, akey: string): Bl
     return admissibleAt(c, placeOrderFree(c, e, pos, 0) ?? pos, e);
   };
   blockRootStats.listings += 1;
+  // #2744 (ADR-AG-502): freedom left, so the whole block has no discrete root set — its determined vertices may.
+  if (f.carrierDof !== 0) {
+    if (pinIdx.size > 0) return null; // a pin's other roots are ADR-AG-303's axis; this listing holds none
+    const points = subBlockRoots(c, sys, anchor, at, span, admit);
+    return points.length > 0 ? { pinned, ids: sys.ids, syms: sys.syms, roots: [], points } : null;
+  }
   const listed = enumerateBlockRoots({
     anchor,
     residuals: (x) => sys.residualsAt(held(x)),
@@ -3868,12 +3904,15 @@ function listBlockRoots(raw: Construction, choiceSeed: number, akey: string): Bl
  * Configuration `seed`'s start at a listed root (`blockRootsOf`): the vertices and parameters written in, and the root's
  * index for `rootKey`. Configuration 0, an unlisted block, or pins that took another root: `null`, nothing moves.
  */
-function steerToBlockRoot(raw: Construction, seed: number, choiceSeed: number, env: Env, seeded: Map<Id, Pt>): { env: Env; index: number } | null {
+function steerToBlockRoot(raw: Construction, c: Construction, seed: number, choiceSeed: number, env: Env, seeded: Map<Id, Pt>, wide: boolean): { env: Env; index: number } | null {
   if (seed === 0) return null;
   const list = blockRootsOf(raw, choiceSeed);
   if (!list) return null;
   for (const [sym, v] of list.pinned) if (!(Math.abs((env[sym] ?? Number.NaN) - v) <= SOLVE_RESOLUTION * Math.max(1, Math.abs(v)))) return null;
   if (!list.ids.every((id) => seeded.has(id))) return null;
+  // #2744 (ADR-AG-502): the first drawing's walk (`wide` false: a prettier drawing of configuration 0's own choices,
+  // ADR-AG-227) is never steered, so the drawing a student opens on is the one it always was.
+  if (list.points) return wide ? steerSubBlock(c, list.points, seed, env, seeded) : null;
   const root = list.roots[Math.min(list.roots.length - 1, Math.floor(jitter(seed + BLOCK_STREAM, 1) * list.roots.length))];
   list.ids.forEach((id, i) => seeded.set(id, { x: root.x[2 * i], y: root.x[2 * i + 1] }));
   const out: Record<string, number> = { ...env };
@@ -3881,6 +3920,159 @@ function steerToBlockRoot(raw: Construction, seed: number, choiceSeed: number, e
     out[sym] = root.x[2 * list.ids.length + j];
   });
   return { env: out, index: root.index };
+}
+
+/**
+ * THE VERTICES THE GIVENS FIX, IN A FIGURE WITH FREEDOM LEFT (#2744, [ADR-AG-502](../../docs/06c-decisions-analytic.md#adr-ag-502),
+ * amending ADR-AG-451's predicate from the whole figure to a determined part of it).
+ *
+ * «ריבוע ABCD שצלעו 10 · E על הישר AB · DE = 12»: the square's pose is free (`carrierDof` 3), so ADR-AG-451 never ran,
+ * yet E is fixed up to a choice — 6.63 from A on either side. Each free vertex P whose OWN rows fix it (the residuals
+ * over its two coordinates, every other unknown held at configuration 0's root, have rank 2) has its roots listed by
+ * the same deflated descent (`enumerateBlockRoots`), started first from P's mirror images through the points its rows
+ * name and across the lines through two of them: a ridge between the roots (an area's |·| where the triangle
+ * flattens) holds a descent from a near start. A root counts when the solve's judge admits the whole figure there.
+ * Each root is stored in the frame of the two most separated points P's rows name that do not move with P, since the
+ * seed places the rest of the figure elsewhere. At most `SUB_BLOCK_MAX` vertices.
+ */
+function subBlockRoots(
+  c: Construction,
+  sys: CarrierSystem,
+  anchor: number[],
+  at: ReadonlyMap<Id, Pt>,
+  span: number,
+  admit: (x: number[]) => boolean,
+): SubBlockPoint[] {
+  const out: SubBlockPoint[] = [];
+  const named = (k: Constraint): Id[] => {
+    const ids = new Set<Id>();
+    const walk = (v: unknown): void => {
+      if (typeof v === 'string') {
+        const o = objectById(c, v);
+        if (o && isPositional(o)) ids.add(o.id);
+        return;
+      }
+      if (!v || typeof v !== 'object') return;
+      if (Array.isArray(v)) v.forEach(walk);
+      else Object.values(v as Record<string, unknown>).forEach(walk);
+    };
+    walk(k);
+    return [...ids];
+  };
+  const base = sys.positionsAt(anchor);
+  const namedIds = c.objects.filter((o) => isPositional(o) && !(o.kind === 'derived' && o.helper)).map((o) => o.id);
+  const h = span * 1e-4;
+  for (let i = 0; i < sys.ids.length && out.length < SUB_BLOCK_MAX; i += 1) {
+    const id = sys.ids[i];
+    const root = [anchor[2 * i], anchor[2 * i + 1]];
+    const withP = (p: readonly number[]) => {
+      const x = [...anchor];
+      x[2 * i] = p[0];
+      x[2 * i + 1] = p[1];
+      return x;
+    };
+    // what moves with P (P and what is built from it), read by a nudge
+    const moved = new Set<Id>([id]);
+    for (const d of [
+      [h, 0],
+      [0, h],
+    ]) {
+      const q = sys.positionsAt(withP([root[0] + d[0], root[1] + d[1]]));
+      for (const [k, v] of q) {
+        const w = base.get(k);
+        if (w && Math.hypot(v.x - w.x, v.y - w.y) > span * 1e-9) moved.add(k);
+      }
+    }
+    const rows = c.constraints.filter((k) => named(k).some((r) => moved.has(r)));
+    if (rows.length === 0) continue;
+    const anchors = [...new Set(rows.flatMap(named))].filter((r) => !moved.has(r) && at.has(r));
+    const frame = anchorFrameOf(anchors, (r) => at.get(r)!, span);
+    if (!frame) continue;
+    const residuals = (p: number[]) => sys.residualsAt(withP(p));
+    // rank 2: P's rows fix it
+    const col = (dx: number, dy: number) => {
+      const plus = residuals([root[0] + dx, root[1] + dy]);
+      const minus = residuals([root[0] - dx, root[1] - dy]);
+      return plus.map((v, k) => ((v - minus[k]) / 2) * (span / h));
+    };
+    const jx = col(h, 0);
+    const jy = col(0, h);
+    if ([...jx, ...jy].some((v) => !Number.isFinite(v))) continue;
+    let sxx = 0;
+    let syy = 0;
+    let sxy = 0;
+    for (let k = 0; k < jx.length; k += 1) {
+      sxx += jx[k] * jx[k];
+      syy += jy[k] * jy[k];
+      sxy += jx[k] * jy[k];
+    }
+    const tr = sxx + syy;
+    const disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - (sxx * syy - sxy * sxy)));
+    const big = tr / 2 + disc;
+    const small = tr / 2 - disc;
+    if (!(big > 0) || !(small > 0) || Math.sqrt(small / big) < 1e-4) continue;
+    const pts = anchors.map((r) => at.get(r)!);
+    const images: number[][] = pts.map((q) => [2 * q.x - root[0], 2 * q.y - root[1]]);
+    for (let a = 0; a < pts.length; a += 1)
+      for (let b = a + 1; b < pts.length; b += 1) {
+        const dx = pts[b].x - pts[a].x;
+        const dy = pts[b].y - pts[a].y;
+        const L = dx * dx + dy * dy;
+        if (L < span * span * 1e-12) continue;
+        const t = ((root[0] - pts[a].x) * dx + (root[1] - pts[a].y) * dy) / L;
+        images.push([2 * (pts[a].x + t * dx) - root[0], 2 * (pts[a].y + t * dy) - root[1]]);
+      }
+    const listed = enumerateBlockRoots({
+      anchor: root,
+      residuals,
+      solve: (x0, fn) => {
+        const r = solveLM(x0, fn, 120);
+        return { values: r.values, ok: r.ok };
+      },
+      // a part's other root must keep every ring its noun promises — a soft fault too (a trapezoid drawn as a
+      // parallelogram is the noun's other root, never a solution the student's figure has)
+      admit: (p) => {
+        const x = withP(p);
+        if (!admit(x)) return false;
+        const pos = sys.positionsAt(x);
+        if (ringFaultsOf(c, (id) => pos.get(id)).length > 0) return false;
+        // …and no two named points on one spot (2-D's rule): a root that stacks them is the givens' degenerate case
+        const pts = namedIds.map((id) => pos.get(id)).filter((q): q is Pt => !!q);
+        for (let a = 0; a < pts.length; a += 1)
+          for (let b = a + 1; b < pts.length; b += 1) if (Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y) <= span * 1e-6) return false;
+        return true;
+      },
+      delta: (a, b, k) => (a[k] - b[k]) / span,
+      same: SOLVE_RESOLUTION,
+      cap: OPTION_CAP + 1,
+      images: images.slice(0, 10),
+    });
+    blockRootStats.solves += listed.solves;
+    if (!listed.admitted[0]) continue;
+    const kept = listed.roots.filter((_, k) => listed.admitted[k]);
+    if (kept.length < 2) continue;
+    const F = frame.map((r) => at.get(r)!);
+    const coords = kept.map(([x, y]) => toFrame({ x, y }, F));
+    if (coords.some((r) => r === null)) continue;
+    out.push({ id, frame, roots: coords as Array<{ u: number; v: number }> });
+  }
+  return out;
+}
+
+/** Configuration `seed`'s starts at its chosen root of each listed vertex, placed in the anchors as the seed placed them. */
+function steerSubBlock(c: Construction, points: readonly SubBlockPoint[], seed: number, env: Env, seeded: Map<Id, Pt>): { env: Env; index: number } | null {
+  const pos = place(c, env, seeded);
+  let index = 0;
+  let steered = false;
+  points.forEach((p, k) => {
+    const F = p.frame.map((id) => pos.get(id));
+    if (F.some((v) => !v) || !toFrame(F[0]!, F as Pt[])) return;
+    const pick = Math.min(p.roots.length - 1, Math.floor(jitter(seed + BLOCK_STREAM, k + 1) * p.roots.length));
+    seeded.set(p.id, fromFrame(p.roots[pick], F as Pt[]));
+    index = index * (OPTION_CAP + 1) + pick;
+    steered = true;
+  });
+  return steered ? { env, index } : null;
 }
 
 /**
@@ -4572,7 +4764,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const named = labelsFromFigure(c, env, seeded);
   env = named.env;
   // #2731 (ADR-AG-451): a determined block's configuration s ≥ 1 starts AT one of its listed roots — the seed chooses.
-  const block = steerToBlockRoot(raw, seed, choiceSeed, env, seeded);
+  const block = steerToBlockRoot(raw, c, seed, choiceSeed, env, seeded, wide);
   if (block) env = block.env;
 
   const unsatisfied: Constraint[] = [];
@@ -6297,6 +6489,103 @@ export function looksTheSame(a: Figure, b: Figure): boolean {
     }
   }
   return true;
+}
+
+/**
+ * ARE THESE TWO CONFIGURATIONS ONE SOLUTION, PLACED DIFFERENTLY? (#2831, [ADR-AG-473](../../docs/06c-decisions-analytic.md#adr-ag-473),
+ * [ADR-W-206](../../docs/06w-decisions-workspace.md#adr-w-206); operator 2026-11-12, *"2831 - A"*: a mirror image of a drawing
+ * is the SAME solution placed differently).
+ *
+ * {@link looksTheSame} asks whether two drawings are one PICTURE; this asks whether they are one ANSWER. Two configurations
+ * are one solution when the drawing is the same up to a rigid motion of the plane (a turn, a shift or a mirror), every
+ * letter the figure uses has the same value, and every curve has the same shape — 3-D's ADR-3D-461 key, in the plane.
+ *
+ * The drawing is read in the figure's OWN frame: the origin at its first named point, the first axis toward the first
+ * named point apart from it, and the second axis signed so the first point off that line lies on its positive side (that
+ * sign is what folds a mirror). The coordinate axes are not part of the frame, so the x-axis mirror of the book's p2-15
+ * ellipse is the ellipse already shown. A curve contributes its characteristic points in that frame (a circle its centre
+ * and radius, a parabola its vertex and focus, an ellipse its four vertices as a set, a line its foot from the origin
+ * and its direction); a figure with fewer than two apart points has no frame and is one solution only with itself
+ * ({@link sameConfiguration}). Only «הציגו תצורה אחרת»'s ordering reads it (`app/another.ts`).
+ */
+export function sameSolution(a: Figure, b: Figure): boolean {
+  const ka = solutionParts(a);
+  const kb = solutionParts(b);
+  if (!ka || !kb) return sameConfiguration(a, b);
+  if (ka.length !== kb.length) return false;
+  const tol = 1e-3 * Math.max(1, ka.scale, kb.scale);
+  for (let i = 0; i < ka.length; i += 1) {
+    const x = ka.parts[i];
+    const y = kb.parts[i];
+    if (x.label !== y.label || x.pts.length !== y.pts.length || x.nums.length !== y.nums.length) return false;
+    for (let j = 0; j < x.nums.length; j += 1) if (!(Math.abs(x.nums[j] - y.nums[j]) <= SAME_VALUE_EPS * 10 * Math.max(1, Math.abs(x.nums[j]), Math.abs(y.nums[j])))) return false;
+    // A curve's points are a SET (an ellipse's ±a vertices swap under a mirror): every point of one meets one of the other.
+    const used = new Set<number>();
+    for (const p of x.pts) {
+      const k = y.pts.findIndex((q, n) => !used.has(n) && Math.hypot(p[0] - q[0], p[1] - q[1]) <= tol);
+      if (k < 0) return false;
+      used.add(k);
+    }
+  }
+  return true;
+}
+
+/** The figure in its own frame (see {@link sameSolution}): labelled point sets and plain numbers, plus the frame's scale. */
+function solutionParts(f: Figure): { parts: Array<{ label: string; pts: Array<[number, number]>; nums: number[] }>; length: number; scale: number } | null {
+  const pts = f.points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  if (pts.length < 2) return null;
+  const o = pts[0];
+  const far = Math.max(...pts.map((p) => Math.hypot(p.x - o.x, p.y - o.y)));
+  const apart = 1e-6 * Math.max(1, far);
+  const p1 = pts.find((p) => Math.hypot(p.x - o.x, p.y - o.y) > apart);
+  if (!p1) return null;
+  const len = Math.hypot(p1.x - o.x, p1.y - o.y);
+  const u: [number, number] = [(p1.x - o.x) / len, (p1.y - o.y) / len];
+  const v0 = (x: number, y: number) => -(x - o.x) * u[1] + (y - o.y) * u[0];
+  const off = pts.find((p) => Math.abs(v0(p.x, p.y)) > 1e-4 * Math.max(1, far));
+  const sign = off && v0(off.x, off.y) < 0 ? -1 : 1;
+  const frame = (x: number, y: number): [number, number] => [(x - o.x) * u[0] + (y - o.y) * u[1], sign * v0(x, y)];
+  const parts: Array<{ label: string; pts: Array<[number, number]>; nums: number[] }> = [];
+  for (const p of pts) parts.push({ label: `${p.id}:`, pts: [frame(p.x, p.y)], nums: [] });
+  for (const c of f.curves) {
+    const q = c.curve;
+    switch (q.kind) {
+      case 'circle':
+        parts.push({ label: `${c.id}:circle`, pts: [frame(q.cx, q.cy)], nums: [q.r] });
+        break;
+      case 'parabola': {
+        const h = q.h ?? 0;
+        const k = q.k ?? 0;
+        const focus: [number, number] = q.axis === 'y' ? [h, k + q.p / 2] : [h + q.p / 2, k];
+        parts.push({ label: `${c.id}:parabola`, pts: [frame(h, k)], nums: [] }, { label: `${c.id}:focus`, pts: [frame(...focus)], nums: [] });
+        break;
+      }
+      case 'ellipse': {
+        const h = q.h ?? 0;
+        const k = q.k ?? 0;
+        parts.push({ label: `${c.id}:ellipse`, pts: [frame(h - q.a, k), frame(h + q.a, k), frame(h, k - q.b), frame(h, k + q.b)], nums: [] });
+        break;
+      }
+      case 'line': {
+        const n = normalizedLine(q.a, q.b, q.c);
+        if (!n) break;
+        // The foot of the frame origin on the line, and the line's direction in the frame, folded to [0, π).
+        const d = n.a * o.x + n.b * o.y + n.c;
+        const foot = frame(o.x - d * n.a, o.y - d * n.b);
+        const dir = frame(o.x - n.b, o.y + n.a);
+        let ang = Math.atan2(dir[1], dir[0]);
+        if (ang < 0) ang += Math.PI;
+        if (ang >= Math.PI - 1e-9) ang -= Math.PI;
+        parts.push({ label: `${c.id}:line`, pts: [foot], nums: [Math.min(ang, Math.PI - ang) < 1e-6 ? 0 : ang] });
+        break;
+      }
+    }
+  }
+  for (const sym of f.usedSymbols) {
+    if (isDirectionSymbol(sym) || !Number.isFinite(f.env[sym])) continue;
+    parts.push({ label: `${sym}=`, pts: [], nums: [f.env[sym]] });
+  }
+  return { parts, length: parts.length, scale: far };
 }
 
 /** How many different pictures these configurations are. */

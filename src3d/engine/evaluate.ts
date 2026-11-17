@@ -45,7 +45,7 @@ import {
 } from './operands';
 import { configurationOrder3, samePointConfig3 } from './configs3';
 import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3, type CanonicalEval3 } from './solve3';
-import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
+import { scaleGivenActive, scaleGivenLane3, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
 import { absolutePointCount, claimPointIds, evalAffine, scalarPinOrigin3, type ScalarPin, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, orientationStated3, pinSymAnchor3, pinSymsOf, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol, type SymComp } from './types';
@@ -61,7 +61,7 @@ import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, r
   triangleIncircle3,
   bisectorDir3,
   lineCrossing3,
-  ringSelfCrossing3} from './vec3';
+  ringSelfCrossing3, linePlaneCrossingT3} from './vec3';
 import { seedKey3, canonicalSeed3, partsOf3, seedNumber3, seedOfPart3, type Part3, type Seed3 } from './components3';
 import { baseRingOf, boundSolidDimCount3, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
@@ -1165,7 +1165,8 @@ import { memberHolds3, onLineHolds3 } from './operands';
 // #814's `componentValue` / `componentSignsHold` live in operands.ts (#818: the pivot's sign-axis
 // continuation reads them too, and solve3 must never import evaluate) — re-exported for the store.
 export { componentValue, componentSignsHold } from './operands';
-import { componentSignsHold, positionalComponentSigns3 } from './operands';
+import { boundHolds3, boundWindow3, symBound3 } from './bound3';
+import { componentSignsHold, componentValue, positionalComponentSigns3 } from './operands';
 
 
 /**
@@ -1192,7 +1193,10 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number, param
   // difference structural. Sign givens are applied HERE for the first time: they were honoured on the
   // paramGivens path (`pinParam`) but silently ignored on this one, so `k הוא פרמטר חיובי` plus a ⟂
   // given could draw the negative root — a figure contradicting a stated given.
-  const signed = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+  // #1524 (ADR-3D-477): the parameter's OWN stated range (a sign or a range), folded — a range stated on another
+  // letter never filters this one's roots.
+  const own = symBound3(c, c.param);
+  const signed = own ? roots.filter((t) => boundHolds3(own, t)) : roots;
   const pool = signed.length > 0 ? signed : roots; // an unsatisfiable sign is refused downstream, not here
   const pick = (branches: number[], value: number) => ({ value, roots, branches });
 
@@ -1223,8 +1227,8 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number, param
 /** The half-line an UNPINNED parameter is sampled on — a stated sign narrows it (ADR-3D-032). `reach` (#1986,
  *  ADR-3D-418, analytic's ADR-AG-256) widens the window's OPEN side(s) only; 1 is the default window, bit-identical. */
 function openParamRange3(c: Construction3, reach = 1): [number, number] {
-  const sign = c.paramSigns.find(() => true);
-  return sign ? (sign.positive ? [0.3, 3 * reach] : [-3 * reach, -0.3]) : [-3 * reach, 3 * reach];
+  // #1524 (ADR-3D-477): a stated range narrows the window the way a sign did — a sign gives the same half-windows
+  return boundWindow3(symBound3(c, c.param), -3 * reach, 3 * reach, 0.3);
 }
 
 /**
@@ -1488,7 +1492,7 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
 type VecDef = Construction3['vecDefs'][number];
 
 /** Solve the relation for its unknown point at a fixed symbol value; null when degenerate. */
-function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>): Vec3 | null {
+function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>, letterVal?: (sym: string) => number): Vec3 | null {
   const evalR = (P: Vec3): Vec3 | null => {
     const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
     const from = get(vd.from);
@@ -1511,7 +1515,8 @@ function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: numb
         vvec = a && b ? sub3(b, a) : null;
       }
       if (!vvec) return null;
-      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * kValue));
+      // #1551 (ADR-3D-472): a term naming its own letter (a definition with several) reads that letter's number
+      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * (t.sym !== undefined && letterVal ? letterVal(t.sym) : kValue)));
     }
     return acc;
   };
@@ -1638,8 +1643,8 @@ function firstNonDegenerateRoot(
   // Filtered by `sym` deliberately. The other sign consumers in this file apply `paramSigns.every`
   // to every root regardless of which symbol each sign names — sound while a figure has one symbol,
   // and not something to copy: here a second vec-def's sign must not constrain this one's branch.
-  const signs = c.paramSigns.filter((g) => g.sym === vd.symbol);
-  const eligible = signs.length ? roots.filter((k) => signs.every((g) => (g.positive ? k > 1e-9 : k < -1e-9))) : roots;
+  const own = symBound3(c, vd.symbol); // #1524: a sign or a range, folded
+  const eligible = own ? roots.filter((k) => boundHolds3(own, k)) : roots;
   for (const k of eligible) if (pinDrivenSegLen(c, pin, vd, pos, k) > tol) return k;
   // No root honours the sign: return nothing, so the point stays UNPLACED and the store's existing
   // vec-rel check refuses honestly. A sign that cannot be satisfied must never fall back to a root
@@ -2970,7 +2975,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       // snapped first, so the value the verifier's own predicate judges is the value drawn (ADR-3D-286 §3)
       roots = snapAndDedupe(candidates).filter(holdsAll);
     }
-    const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+    const ownBound = symBound3(c, c.param); // #1524 (ADR-3D-477): the parameter's own sign or range
+    const pool0 = ownBound ? roots.filter((t) => boundHolds3(ownBound, t)) : roots;
     const pool = pool0.length > 0 ? pool0 : roots;
     if (pool.length > 0) {
       const value = opts.paramValue !== undefined ? nearestBranch(pool, opts.paramValue) : pool[seed % pool.length]; // #1474
@@ -3145,7 +3151,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         // among pivot solutions, exactly like a coordinate sign given
         const symsOk = c.paramSigns.every((s) => {
           const v = sol.pinSymbols?.[s.sym];
-          return v === undefined ? true : s.positive ? v > 1e-9 : v < -1e-9;
+          const b = symBound3(c, s.sym); // #1524: the letter's folded sign or range
+          return v === undefined || !b ? true : boundHolds3(b, v);
         });
         if (!symsOk) return false;
         // #814: the same selection for a letter that NAMES a free component («p חיובי» after
@@ -3756,6 +3763,41 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     }
   }
 
+  // ---- #2792 (ADR-3D-521): the scale given's CONTENT lane. The figure's only ties to the absolute world are point pins on
+  // one point C (or none), so the stated size is reached by the similarity p ↦ C + k(p − C) on the figure's OWN points —
+  // never on a stated point, an equation plane or a typed line, which stay exactly where the student put them — and it
+  // runs BEFORE the placement funnel, so the funnel's extent, translation range and clearance all read the true size.
+  // C is fixed by the map, so a pin on it still holds. A mixed point (a midpoint of a vertex and a stated point) is
+  // re-derived from its own definition afterwards, as after every rigid motion (ADR-3D-456).
+  {
+    const lane = scaleGivenActive(c) ? scaleGivenLane3(c) : null;
+    if (lane?.lane === 'content') {
+      const g = c.scaleGivens[0];
+      const m0 = scaleGivenMagnitude(g, c, pos);
+      const power = scaleGivenPower(g);
+      const stated = scaleGivenValue(g);
+      if (m0 !== null && m0 > 1e-9 && power !== null && stated !== null) {
+        const k = Math.pow(stated / m0, 1 / power);
+        const C = lane.centre;
+        const map = (p: Vec3): Vec3 => v3(C.x + k * (p.x - C.x), C.y + k * (p.y - C.y), C.z + k * (p.z - C.z));
+        const lanes = figureLanes3(c);
+        for (const [id, p] of pos) if (lanes.get(id) === 'figure') pos.set(id, map(p));
+        // a plane or line already resolved from the figure (not a stated equation or a typed line) rides the same map
+        for (const [name, pl] of planes) {
+          const def = c.planes.get(name);
+          if (def && !def.free) continue; // an equation plane: absolute
+          planes.set(name, { n: pl.n, d: k * pl.d + (k - 1) * dot3(pl.n, C) });
+        }
+        for (const [name, ln] of lines) {
+          if (c.lines.get(name)?.kind === 'parametric') continue; // a typed line: absolute
+          lines.set(name, { ...ln, anchor: map(ln.anchor) });
+        }
+        if (freePlaneOffsetPinned3(c)) reresolveFreeObjects3(c, seed, pos, planes, lines, freePlaneDofs, freeLineDofs);
+        if (mixedPointIds3(c).length > 0) reseatMixed3(c, seed, pos, planes, lines, pivot?.riderTs ? new Map(Object.entries(pivot.riderTs)) : undefined);
+      }
+    }
+  }
+
   // ---- #367: nothing pinned the placement, but the figure DOES carry an absolute-frame object.
   // The canonical placement is then an unstated choice, not a gauge — sample it, so the solid sits
   // somewhere different against the line/plane in every configuration instead of asserting the
@@ -4159,11 +4201,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     const line = lines.get(def.line);
     const pl = planes.get(def.plane);
     if (!line || !pl) continue;
-    const denom = dot3(pl.n, line.dir);
-    if (Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(line.dir), 1e-12)) {
-      const t = -(dot3(pl.n, line.anchor) + pl.d) / denom;
-      pos.set(id, add3(line.anchor, scale3(line.dir, t)));
-    }
+    const t = linePlaneCrossingT3(pl.n, pl.d, line.anchor, line.dir);
+    if (t !== null) pos.set(id, add3(line.anchor, scale3(line.dir, t)));
   }
 
   const revolutions = c.revolutions.map((rev, i) => {
@@ -4184,7 +4223,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   for (const [id, def] of c.points) {
     if (def.kind !== 'on-circle3' || pos.has(id)) continue;
     const g = circles3.find((k) => k.id === def.circle);
-    if (g) seatOnCircleRider3(seed, pos, g, id);
+    if (g) seatOnCircleRider3(c, seed, pos, g, id);
   }
 
   // ---- a FINAL fill for foot-line points whose named line only resolved late (a through-line
@@ -4202,7 +4241,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   // the shape DOFs it did not touch keep varying with the seed. Everything still resolved at this
   // point is position-derived (`scaleGivenSafe` admits no absolute object), so the derived plane
   // offsets scale with the same factor and every incidence survives verbatim.
-  if (scaleGivenActive(c)) {
+  if (scaleGivenActive(c) && scaleGivenLane3(c)?.lane === 'origin') {
     const g = c.scaleGivens[0];
     const m0 = scaleGivenMagnitude(g, c, pos);
     const power = scaleGivenPower(g);
@@ -4527,24 +4566,58 @@ export function paramConfigValues3(c: Construction3, seed: number, r: Resolved3 
 const RAW: Resolve3Opts = { solvedFrame: true };
 
 export function knowledgeSamples3(c: Construction3, baseSeeds: readonly number[], opts: { readback?: boolean } = {}): Resolved3[] {
-  return baseSeeds.flatMap((s) => {
-    const r0 = resolve3(c, s, RAW);
-    const vals = paramConfigValues3(c, s, r0);
-    const confs: { r: Resolved3; paramValue?: number }[] =
-      vals.length <= 1 ? [{ r: r0 }] : vals.map((v) => (v === r0.param!.value ? { r: r0 } : { r: resolve3(c, s, { ...RAW, paramValue: v }), paramValue: v }));
-    if (!opts.readback) return confs.map((k) => k.r);
-    // #2368 (ADR-3D-375): READ-BACK adds, per configuration whose placement keeps a measured leftover rigid
-    // freedom, its exact IMAGE along it — agreement can only see what is varied, and the multi-start never
-    // varies that freedom. The image's one-entry pool keeps the «או» rows and `branchAgrees` honest (a
-    // moved point is not a second configuration). Claims and narrowing stay on the plain samples.
-    // #2907 (ADR-3D-498): READ-BACK also stands on every OTHER admissible configuration of the configuration's pool — the
-    // seeds sample the gauge and `pool[seed % n]` reaches the rest only by arithmetic (the #1474 lesson, one lane over),
-    // so a value that differs on a configuration no seed draws read as fact
-    return confs.flatMap(({ r, paramValue }) => {
-      const at = paramValue !== undefined ? { paramValue } : {};
-      const others = Array.from({ length: r.pivot?.others ?? 0 }, (_, k) => resolve3(c, s, { ...RAW, ...at, configuration: k + 1 }));
-      return (placementFreedom3(r)?.dim ?? 0) > 0 ? [r, resolve3(c, s, { ...RAW, ...at, placementImage: true }), ...others] : [r, ...others];
-    });
+  const all = (s: number): Resolved3[] => samplesAtSeed3(c, s, opts);
+  if (!hasStatedSelectors3(c)) return baseSeeds.flatMap(all);
+  /**
+   * #2916 ([ADR-3D-533](../../docs/06b-decisions-3d.md#adr-3d-533)) — ONLY ADMITTED CONFIGURATIONS ARE EVIDENCE. A sample that
+   * breaks a stated selector ({@link admittedConfiguration3}) is dropped; a base seed left with none is replaced by the
+   * next seed of its reserve walk (s + k·{@link RESERVE_STEP3}), at most one reserve seed per base seed in all, so the
+   * gauge keeps as many witnesses as it was given (one picture always agrees with itself — analytic's #1642) and the work
+   * stays bounded. Nothing admitted anywhere: the figure itself breaks a given, and its own line already says so (the
+   * store's verifier) — the plain samples stand, as before, rather than an empty set that every gate would read as agreement.
+   */
+  const out: Resolved3[] = [];
+  let spare = baseSeeds.length;
+  for (const s of baseSeeds) {
+    let got = all(s).filter((r) => admittedConfiguration3(c, r));
+    for (let k = 1; got.length === 0 && spare > 0; k++, spare--) got = all(s + k * RESERVE_STEP3).filter((r) => admittedConfiguration3(c, r));
+    out.push(...got);
+  }
+  return out.length > 0 ? out : baseSeeds.flatMap(all);
+}
+
+/** #2916: the reserve walk's stride — clear of every lane's base offsets (1013, 2027, 3041, 4057). */
+const RESERVE_STEP3 = 6089;
+
+/** #2916: does the figure state anything {@link admittedConfiguration3} judges? None: every sample is admitted, at no cost. */
+function hasStatedSelectors3(c: Construction3): boolean {
+  return (
+    c.signGivens.length > 0 ||
+    c.componentSigns.length > 0 ||
+    c.paramSigns.length > 0 ||
+    c.memberships.some((m) => m.side !== undefined) ||
+    c.requirements.some((req) => req.kind !== 'quad-general')
+  );
+}
+
+/** One base seed's knowledge samples: every configuration of the parameter, and with `readback` the image and the fanned roots. */
+function samplesAtSeed3(c: Construction3, s: number, opts: { readback?: boolean }): Resolved3[] {
+  const r0 = resolve3(c, s, RAW);
+  const vals = paramConfigValues3(c, s, r0);
+  const confs: { r: Resolved3; paramValue?: number }[] =
+    vals.length <= 1 ? [{ r: r0 }] : vals.map((v) => (v === r0.param!.value ? { r: r0 } : { r: resolve3(c, s, { ...RAW, paramValue: v }), paramValue: v }));
+  if (!opts.readback) return confs.map((k) => k.r);
+  // #2368 (ADR-3D-375): READ-BACK adds, per configuration whose placement keeps a measured leftover rigid
+  // freedom, its exact IMAGE along it — agreement can only see what is varied, and the multi-start never
+  // varies that freedom. The image's one-entry pool keeps the «או» rows and `branchAgrees` honest (a
+  // moved point is not a second configuration). Claims and narrowing stay on the plain samples.
+  // #2907 (ADR-3D-498): READ-BACK also stands on every OTHER admissible configuration of the configuration's pool — the
+  // seeds sample the gauge and `pool[seed % n]` reaches the rest only by arithmetic (the #1474 lesson, one lane over),
+  // so a value that differs on a configuration no seed draws read as fact
+  return confs.flatMap(({ r, paramValue }) => {
+    const at = paramValue !== undefined ? { paramValue } : {};
+    const others = Array.from({ length: r.pivot?.others ?? 0 }, (_, k) => resolve3(c, s, { ...RAW, ...at, configuration: k + 1 }));
+    return (placementFreedom3(r)?.dim ?? 0) > 0 ? [r, resolve3(c, s, { ...RAW, ...at, placementImage: true }), ...others] : [r, ...others];
   });
 }
 
@@ -4736,7 +4809,7 @@ function evaluateSolidsAndPoints(
       // plane resolves only later the rider is seated after the circle pass instead
       const k = c.circles3.find((x) => x.id === def.circle);
       const g = k && circleGeom3(c, k, seed, pos, planes, lines);
-      if (g) seatOnCircleRider3(seed, pos, g, id, riderTOverride);
+      if (g) seatOnCircleRider3(c, seed, pos, g, id, riderTOverride);
     } else if (def.kind === 'plane-cut') {
       // V8-b (G2): the point where a plane crosses segment a–b (the plane may be an
       // equation, a point-run, or a ⊥/∥ rel-plane — resolved from current positions)
@@ -4745,9 +4818,8 @@ function evaluateSolidsAndPoints(
       const B = pos.get(def.b);
       if (!pl || !A || !B) continue;
       const dir = sub3(B, A);
-      const denom = dot3(pl.n, dir);
-      if (Math.abs(denom) < 1e-12) continue; // segment ∥ plane — no crossing
-      const t = -(dot3(pl.n, A) + pl.d) / denom;
+      const t = linePlaneCrossingT3(pl.n, pl.d, A, dir);
+      if (t === null) continue; // segment ∥ plane — no crossing (#2834: scale-free)
       pos.set(id, add3(A, scale3(dir, t)));
     } else if (def.kind === 'centroid') {
       const ps = def.of.map((p) => pos.get(p));
@@ -4827,22 +4899,38 @@ function evaluateSolidsAndPoints(
           // and «k שלילי» falsely `sign-unsatisfiable`: the figure can perfectly well put N beyond S on
           // the SC line, the sampler just never looked there. A default that survives a contradicting
           // statement is asserting a given the student never gave (ADR-052), so the range follows the sign.
-          const neg = c.paramSigns.some((g) => g.sym === vd.symbol && !g.positive);
+          // #1524 (ADR-3D-477): ...and a stated RANGE is the student choosing which part of it; a sign gives the
+          // same windows as before ((0.2, 0.8) / (−0.8, −0.2)).
           // #1829 (ADR-3D-471): ONE LETTER, ONE NUMBER — the draw is keyed by the letter's FIRST definition, so
           // «DF = t·DC» and «BE = t·BC» place F and E at the same t (keyed per point, they drew two different t's).
           // A letter with one definition keeps its key, so its drawing is unchanged.
           const keyPt = c.vecDefs.find((d) => d.symbol === vd.symbol)?.unknown ?? vd.unknown;
-          k = neg
-            ? sample(seed, `sym-${vd.symbol}-${keyPt}`, -0.8, -0.2)
-            : sample(seed, `sym-${vd.symbol}-${keyPt}`, 0.2, 0.8);
+          const [k0, k1] = boundWindow3(symBound3(c, vd.symbol), 0.2, 0.8, 0.2);
+          k = sample(seed, `sym-${vd.symbol}-${keyPt}`, k0, k1);
         }
       }
       // #930 (ADR-3D-236): record the value ACTUALLY used, on every path — the pinned root pick above
       // and the sampled free DOF alike. Recording per-branch missed the sampled case, and the sign
       // verifier then reported `sign-unsatisfiable` on a figure whose k was a perfectly positive sample.
       if (vd.symbol) ratioSymbols?.set(vd.symbol, k);
+      /**
+       * #1551 (ADR-3D-472): a definition with SEVERAL letters («EN = a·EA + b·EC») — each letter a free number, given its
+       * stated value or sampled like a one-letter ratio (one letter, one number: keyed by its first definition, the sign
+       * given choosing the side). No relation drives these letters; a point placed by them has one free DOF per letter.
+       */
+      const letterVals = new Map<string, number>();
+      for (const sym of vd.symbols ?? []) {
+        const given = symbolValueOf(c, sym);
+        const keyPt = c.vecDefs.find((d) => d.symbols?.includes(sym) || d.symbol === sym)?.unknown ?? vd.unknown;
+        // #1524 (ADR-3D-477): the letter's stated sign or range, as the one-letter ratio above reads it (a sign gives the
+        // half-windows [0.2, 0.8] / [−0.8, −0.2] bit for bit)
+        const [w0, w1] = boundWindow3(symBound3(c, sym), 0.2, 0.8, 0.2);
+        const v = given ?? sample(seed, `sym-${sym}-${keyPt}`, w0, w1);
+        letterVals.set(sym, v);
+        ratioSymbols?.set(sym, v);
+      }
       // #1188 step 2: a definition over a free vector reads its pure value (apply admits only pure, symbol-free ones)
-      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined);
+      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined, (sym) => letterVals.get(sym) ?? 0);
       if (P) pos.set(id, P);
     } else if (def.kind === 'vec-pair') {
       // the cevian intersection: each relation traces an affine line in its own symbol
@@ -4997,11 +5085,8 @@ function evaluateSolidsAndPoints(
         // would have gone live silently the moment an isosceles-trapezoid or right-kite base existed.
         const centre = ringCircumcentre3(bp);
         const nb = cross3(sub3(bp[1], bp[0]), sub3(bp[2], bp[0]));
-        const denom = dot3(pl.n, nb);
-        if (centre && Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(nb), 1e-12)) {
-          const s = -(dot3(pl.n, centre) + pl.d) / denom;
-          pos.set(id, add3(centre, scale3(nb, s)));
-        }
+        const s = centre ? linePlaneCrossingT3(pl.n, pl.d, centre, nb) : null;
+        if (centre && s !== null) pos.set(id, add3(centre, scale3(nb, s)));
       }
     } else if (def.kind === 'foot-face') {
       // V8-e (G5): the height's foot — ⟂ from `from` onto the plane through the face pts
@@ -5015,11 +5100,8 @@ function evaluateSolidsAndPoints(
       const line = lines.get(def.line);
       const pl = planes.get(def.plane);
       if (line && pl) {
-        const denom = dot3(pl.n, line.dir);
-        if (Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(line.dir), 1e-12)) {
-          const t = -(dot3(pl.n, line.anchor) + pl.d) / denom;
-          pos.set(id, add3(line.anchor, scale3(line.dir, t)));
-        }
+        const t = linePlaneCrossingT3(pl.n, pl.d, line.anchor, line.dir);
+        if (t !== null) pos.set(id, add3(line.anchor, scale3(line.dir, t)));
         // parallel ⇒ no position — derive3 flags `line-misses-plane` honestly
       }
     }
@@ -5188,13 +5270,51 @@ function circleGeom3(
 }
 
 /**
+ * #2829 ([ADR-3D-525](../../docs/06b-decisions-3d.md#adr-3d-525)) — THE RING TEST A FREE CORNER IS SEATED BY: the declared
+ * rings (`declaredRings3`, the store's one enumeration) that hold `id`, as a test of a candidate position for it with
+ * `ringSelfCrossing3`, the store's own predicate. A ring corner not seated yet (not placed, or in `unseated`) is LEFT
+ * OUT of the ring, so several riders of one ring are seated in point order, each judged against the corners before it;
+ * a ring with fewer than four judged corners cannot cross and is not judged. `null` when no ring is judged: the seat
+ * is then the plain general-position seat, untouched. Never a veto: a seat with no simple candidate keeps its old pick
+ * and the store's ring pass keeps its verdict.
+ */
+function ringSimpleWith3(c: Construction3, pos: Positions3, id: Id, unseated: ReadonlySet<Id>): { rings: Id[][]; simple: (q: Vec3) => boolean } | null {
+  const rings = declaredRings3(c)
+    .filter((ring) => ring.includes(id))
+    .map((ring) => ring.filter((q) => q === id || (pos.has(q) && !unseated.has(q))))
+    .filter((ring) => ring.length >= 4);
+  if (!rings.length) return null;
+  const simple = (p: Vec3): boolean => rings.every((ring) => !ringSelfCrossing3(ring.map((q) => (q === id ? p : (pos.get(q) as Vec3)))));
+  return { rings, simple };
+}
+
+/** The riders of one circle that come after `id` in point order: not seated yet when `id` is (#2829). */
+function laterRidersOf3(c: Construction3, id: Id, circle: string): Set<Id> {
+  const out = new Set<Id>();
+  let after = false;
+  for (const [q, def] of c.points) {
+    if (q === id) after = true;
+    else if (after && def.kind === 'on-circle3' && def.circle === circle) out.add(q);
+  }
+  return out;
+}
+
+/**
  * #2611 ([ADR-3D-410](../../docs/06b-decisions-3d.md#adr-3d-410)) — a point riding a circle, the on-line rider's circle
  * twin: ONE sampled DOF, the angle in the circle's own frame (ADR-052 — resampled by «הציגו תצורה אחרת»), read from the
  * circle as resolved, so it follows the circle whatever defines it. A sampled angle that parks the rider next to an
  * existing point steps deterministically to a clear spot (ADR-3D-080's general-position rule; k = 0 keeps the first key).
  * A DRIVEN rider (the carrier table's entry) turns from its sampled seat by the solved offset; 0 is the seat itself.
+ *
+ * #2829 ([ADR-3D-525](../../docs/06b-decisions-3d.md#adr-3d-525)): a rider that closes a DECLARED ring is seated where the
+ * ring is simple (a ring order is a given, general position a preference — ADR-3D-327, 02b FR-RD-7). The draws are the
+ * same keys in the same order (k = 0 first, so a ring already simple and clear there is byte-identical), up to 23 of
+ * them, and a simple draw beats a clearer crossed one. When no draw lands simple and every other judged corner lies on
+ * the rider's circle, the first key's angle is mapped into the admissible arc ({@link ringArcSeat3}), so the seat never
+ * misses.
  */
 function seatOnCircleRider3(
+  c: Construction3,
   seed: number,
   pos: Positions3,
   k: Resolved3['circles3'][number],
@@ -5207,17 +5327,88 @@ function seatOnCircleRider3(
   const angle = (n: number): number => sample(seed, n === 0 ? `oncircle-th-${id}` : `oncircle-th-${id}-${n}`, 0, 2 * Math.PI);
   const sepOf = (q: Vec3): number => placed.reduce((m, r) => Math.min(m, dist3(q, r)), Infinity);
   const minSep = 0.35 * k.radius;
+  const ring = ringSimpleWith3(c, pos, id, laterRidersOf3(c, id, k.id));
   let th = angle(0);
   let best = sepOf(at(th));
-  for (let n = 1; n <= 11 && best < minSep; n++) {
-    const t = angle(n);
-    const s = sepOf(at(t));
-    if (s > best) {
-      th = t;
-      best = s;
+  if (!ring) {
+    for (let n = 1; n <= 11 && best < minSep; n++) {
+      const t = angle(n);
+      const s = sepOf(at(t));
+      if (s > best) {
+        th = t;
+        best = s;
+      }
+    }
+  } else {
+    // the same walk with the ring first: the clearest SIMPLE draw, stopping at the first simple one that is clear
+    let simpleTh: number | null = null;
+    let simpleBest = -Infinity;
+    for (let n = 0; n <= 23; n++) {
+      const t = n === 0 ? th : angle(n);
+      const p = at(t);
+      const s = sepOf(p);
+      if (ring.simple(p) && s > simpleBest) {
+        simpleTh = t;
+        simpleBest = s;
+        if (s >= minSep) break;
+      }
+    }
+    if (simpleTh !== null) th = simpleTh;
+    else {
+      const arcTh = ringArcSeat3(pos, k, ring.rings[0], id, th);
+      if (arcTh !== null && ring.simple(at(arcTh))) th = arcTh;
+      else {
+        // no simple seat on this circle: the plain general-position walk, as before (the store's ring pass judges it)
+        for (let n = 1; n <= 11 && best < minSep; n++) {
+          const t = angle(n);
+          const s = sepOf(at(t));
+          if (s > best) {
+            th = t;
+            best = s;
+          }
+        }
+      }
     }
   }
   pos.set(id, at(th + (riderTOverride?.get(id) ?? 0)));
+}
+
+/**
+ * #2829 ([ADR-3D-525](../../docs/06b-decisions-3d.md#adr-3d-525)) — the seat a ring-closing circle rider takes when no
+ * draw lands simple: the open arc between its two ring neighbours that holds no other corner of the ring. Read only
+ * when every other corner of the (judged) ring lies on the rider's circle, where the ring is simple exactly when its
+ * order is the circle's order. The first key's angle, as a fraction of the turn, is mapped into the arc's middle
+ * 80 %, so the seat still varies with the seed (ADR-052) and stays clear of both neighbours. `null` when a corner is
+ * off the circle or no such arc exists (the other corners are already out of the circle's order).
+ */
+function ringArcSeat3(pos: Positions3, k: Resolved3['circles3'][number], ring: readonly Id[], id: Id, th0: number): number | null {
+  const TAU = 2 * Math.PI;
+  const tol = 1e-6 * k.radius;
+  const phi = (q: Id): number | null => {
+    const p = pos.get(q);
+    if (!p) return null;
+    const d = sub3(p, k.center);
+    if (Math.abs(dot3(d, k.normal)) > tol || Math.abs(norm3(d) - k.radius) > tol) return null;
+    const a = Math.atan2(dot3(d, k.e2), dot3(d, k.e1));
+    return a < 0 ? a + TAU : a;
+  };
+  const ccw = (from: number, to: number): number => (((to - from) % TAU) + TAU) % TAU;
+  const i = ring.indexOf(id);
+  const n = ring.length;
+  const prev = phi(ring[(i - 1 + n) % n]);
+  const next = phi(ring[(i + 1) % n]);
+  const rest = ring.filter((_, j) => j !== i && j !== (i - 1 + n) % n && j !== (i + 1) % n).map(phi);
+  if (prev === null || next === null || rest.some((a) => a === null)) return null;
+  const clear = (from: number, width: number): boolean =>
+    width > 1e-9 && (rest as number[]).every((a) => {
+      const u = ccw(from, a);
+      return u <= 1e-9 || u >= width - 1e-9;
+    });
+  const fwd = ccw(prev, next);
+  const back = ccw(next, prev);
+  const [from, width] = clear(prev, fwd) ? [prev, fwd] : clear(next, back) ? [next, back] : [NaN, NaN];
+  if (Number.isNaN(from)) return null;
+  return from + width * (0.1 + 0.8 * (th0 / TAU));
 }
 
 /** A free point riding a named line (ADR-3D-031, the on-plane rider's line edition): sampled t along
@@ -5367,7 +5558,7 @@ function reresolveFreeObjects3(
         (((k.def.kind === 'center-plane-radius' || k.def.kind === 'free') && k.def.plane !== undefined && freePlane(k.def.plane)) ||
           (k.def.kind === 'tangent-line' && isFreeLine3(c, k.def.line)));
       const g = free ? circleGeom3(c, k, seed, pos, planes, lines) : null;
-      if (g) seatOnCircleRider3(seed, pos, g, id);
+      if (g) seatOnCircleRider3(c, seed, pos, g, id);
     } else if (def.kind === 'foot-plane' && freePlane(def.plane)) {
       const from = pos.get(def.from);
       const pl = planes.get(def.plane);
@@ -5553,7 +5744,11 @@ export function meetsRequirements3(c: Construction3, seed: Seed3): boolean {
 
 /** {@link meetsRequirements3}'s judgement of one seed (the figure resolved there). */
 function requirementsMetAt3(c: Construction3, seed: Seed3, hard: readonly Exclude<Requirement3, { kind: 'quad-general' }>[]): boolean {
-  const r = resolve3(c, seed);
+  return requirementsHoldOn3(c, resolve3(c, seed), hard);
+}
+
+/** The stated requirements judged on one resolved configuration — the seed search's predicate and the knowledge admission's. */
+function requirementsHoldOn3(c: Construction3, r: Resolved3, hard: readonly Exclude<Requirement3, { kind: 'quad-general' }>[]): boolean {
   return hard.every((req) => {
     if (req.kind === 'mutual') {
       // S4 (#378): the drawn configuration must actually SHOW the stated position. For `skew` this
@@ -5574,6 +5769,59 @@ function requirementsMetAt3(c: Construction3, seed: Seed3, hard: readonly Exclud
     const deg = (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2) / (n1 * n2)))) * 180) / Math.PI;
     return (req.min === undefined || deg > req.min) && (req.max === undefined || deg < req.max);
   });
+}
+
+/**
+ * THE VALUE A STATED LETTER TAKES IN ONE CONFIGURATION — the one reader of «k חיובי»'s k (#2916 moved it here from the store's
+ * verifier, so the knowledge admission and the verifier cannot read a letter two ways). A letter is the figure parameter, a
+ * pivot pin symbol (#325), a vec-def ratio symbol (#930), a free-vector system's letter (#2684) or the NAME of a free
+ * component (#814, #1188). `undefined` when the letter names nothing in this configuration.
+ */
+export function statedLetterValue3(c: Construction3, r: Resolved3, sym: string): number | undefined {
+  if (r.param?.name === sym) return r.param.value;
+  const bound = c.partialNames.find((b) => b.sym === sym);
+  return (
+    r.pivot?.pinSymbols?.[sym] ??
+    r.ratioSymbols?.[sym] ??
+    r.freeSyms.get(sym) ??
+    (bound ? componentValue(c, bound.target, bound.axis, (id) => r.positions.get(id), r.freeVectors) : undefined)
+  );
+}
+
+/**
+ * #2916 ([ADR-3D-533](../../docs/06b-decisions-3d.md#adr-3d-533)) — IS THIS CONFIGURATION ADMITTED AS KNOWLEDGE? Every stated
+ * selector holds on it: each coordinate sign («שיעור ה-y של A שלילי»), each named component's sign (#814), each letter's
+ * sign («k חיובי»), each side of a plane («מעל המישור»), and each stated requirement (an angle bound, a mutual position).
+ *
+ * The selectors determine nothing — the sampler resolves a configuration and the pivot's sign walk usually lands on the
+ * honouring root, but nothing guaranteed it (seed + 3041 on the ADR-3D-032 exam box put A at y > 0). A configuration that
+ * breaks a given is not one the givens allow, so a value read off it is no evidence either way: 2-D's and analytic's rule
+ * (every printed value is witnessed by an ADMITTED configuration). The predicates are the verifier's own, at its tolerances.
+ */
+export function admittedConfiguration3(c: Construction3, r: Resolved3): boolean {
+  const at = (id: Id): Vec3 | undefined => r.positions.get(id);
+  for (const g of c.signGivens) {
+    const v = at(g.id)?.[g.axis];
+    if (!(v !== undefined && (g.positive ? v > 1e-9 : v < -1e-9))) return false;
+  }
+  if (!componentSignsHold(c, at)) return false;
+  for (const g of c.paramSigns) {
+    const v = statedLetterValue3(c, r, g.sym);
+    // #1524 (ADR-3D-477): a stated sign is a range — the verifier's own test (`boundHolds3`), so a stated range admits too
+    if (v !== undefined && Number.isFinite(v) && !boundHolds3(g.bound, v)) return false;
+  }
+  for (const m of c.memberships) {
+    if (!m.side || m.plane === 'any') continue;
+    const p = at(m.id);
+    const pl = r.planes.get(m.plane);
+    if (!p || !pl) continue; // unresolvable: the verifier's own refusal, never this gate's
+    const nz = pl.n.z / norm3(pl.n);
+    if (Math.abs(nz) <= 1e-9) continue;
+    const signed = ((dot3(pl.n, p) + pl.d) / norm3(pl.n)) * (nz < 0 ? -1 : 1);
+    if (signed * (m.side === 'above' ? 1 : -1) <= 1e-9) return false;
+  }
+  const hard = c.requirements.filter((req): req is Exclude<Requirement3, { kind: 'quad-general' }> => req.kind !== 'quad-general');
+  return hard.length === 0 || requirementsHoldOn3(c, r, hard);
 }
 
 /**

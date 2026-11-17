@@ -74,7 +74,16 @@ never as a contradiction or a refutation.
   whether they are all of them. A polynomial read structurally off the AST in the one complex unknown
   (or its conjugate) is a completeness certificate. A deterministic multi-start is only a floor. The
   list has a seed-free canonical order, so the configuration index walks every drawing, and
-  `configCount` feeds `canCycle`.
+  `configCount` feeds `canCycle`. **A continuum** (a system the rank test, `consumedDimensions`, finds not isolated —
+  central differences, a pivot above `TOL` absolutely) contributes ONE member: the point of its set nearest the sampled
+  start in the drawn plane (`nearestOnSet`, `solve/tier2.ts`, stage 3c), so the member is a function of the set and the
+  seed, never of the rows that describe the set ([ADR-CX-101](06d-decisions-complex.md#adr-cx-101)).
+- **A line through the origin is a direction** (stage 1a″, `liftDirectionRows` in `solve/claimDrive.ts`, called by
+  `exactSolve`). A deferred one-name row that `realLinearOf` reads as `a·z + b·z̄ = 0` with |a| = |b|, or as
+  `|z − a′| = |z − b′|` with |a′| = |b′|, is replaced by `arg(z²) = arg(u)`, the claim drive's own row: two branches, the
+  two sides of the origin, and a free sampled modulus. The lift is withdrawn when it makes tier 1 inconsistent, and
+  `foldConstraints` folds again without it when the lifted fold is unsatisfied or contradicted, so the origin and a
+  deferred given that pins z are answered as before ([ADR-CX-100](06d-decisions-complex.md#adr-cx-100)).
 
 ## Shape
 
@@ -208,7 +217,9 @@ never as a contradiction or a refutation.
   enumerated branches (`sameDirection`) as before. Tier 1 is linear over ℚ, so such a row lies in the span of
   the earlier ones. Seed-free; a sampled agreement never counts. The store carries the answer as `lastNote`
   (a notice banner, outside undo), never as a refusal. `hydrateSession` replays with `replaying` set, so a
-  saved restatement stays a row.
+  saved restatement stays a row. **A deferred restatement** (`exactDelta` answers `deferred`: only deferred rows, the exact
+  solve unchanged) gets the same note through `lineHeld` (`app/deriveLines.ts`) when the folds at configurations 0–3, each
+  at its own seed, keep their configuration count and every drawn number ([ADR-CX-102](06d-decisions-complex.md#adr-cx-102)).
 - **A DETERMINED number with no exact form reads ≈ decimals** (stage 5d, `determinedReadings` in
   `replay/derive2.ts`; [ADR-CX-080](06d-decisions-complex.md#adr-cx-080)). After the exact carriers and a
   closed definition, a number defined by no parameter (`definitionOf` null) is asked through the ask
@@ -229,6 +240,14 @@ never as a contradiction or a refutation.
   that appears in a typed form; `deriveLines` takes the letter-mode lines (`letterLines`), mapped by
   the App from the store's `display` map (keyed by store line index, shifted on removal, in the undo
   slice and the save file).
+  **A typed POLAR form whose modulus holds a letter** (`z = r·cis(30°)`, `z = (r+1)·cis30°`, the trig
+  form, or the W7 pair `|z| = 9r` · `arg z = 30°`) has no Gaussian-affine definition, so the polar
+  reader beside it answers (`polarDefinitionOf`, `model/polarForm.ts`;
+  [ADR-CX-103](06d-decisions-complex.md#adr-cx-103)): the modulus as a ℚ-affine form in parameters,
+  its terms in the order typed, and the argument as an exact angle, read off the constraint shapes. The
+  same substitution applies (only the letters whose chip shows the value); a letter left → «z = r·cis30°»
+  in BOTH views, `=` and never a sample, the angle spelled as the closed polar reading spells it;
+  closed → the reading, as before. A valued letter in the modulus is reported in `paramChips`.
 - **A radical is a token, and a radical LITERAL is a value** ([ADR-CX-056](06d-decisions-complex.md#adr-cx-056)).
   «√» / «∛» / «∜» / «ⁿ√» / «sqrt(» lex as one root token; a root of a rational literal becomes an exact
   value on the modulus exponent vector (so «√2cis45» stays a tier-1 literal), and any other radicand is

@@ -134,7 +134,9 @@ export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
     products: ['analytic', '3d'],
     mustRefuse: ['2d'],
     topic: true,
-    patterns: [/פרמטר/, /^\s*[a-z]\s*[<>]/, /^\s*[a-z]\s*=\s*[\d/]+\s*$/, /^\s*\d+\s*<\s*[a-z]\s*</],
+    // #1524 (ADR-3D-477): a ONE-sided bound in its other spellings — «t ≥ 0», «k ≤ 3», «t גדול מ-2», «k לפחות 2» — is
+    // the sign's sibling, so it joins the sign's family; a two-sided one stays a parity row (letter-bound-closed-1524)
+    patterns: [/פרמטר/, /^\s*[a-z]\s*[<>≤≥]/, /^\s*[a-z]\s+(?:גדול|קטן|לפחות|לכל היותר)/, /^\s*[a-z]\s*=\s*[\d/]+\s*$/, /^\s*\d+\s*<\s*[a-z]\s*</],
   },
   X6: {
     title: 'coordinate components and distance notation',
@@ -868,6 +870,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'lengths-forced-rect-diag-2894', family: 'lengths', steps: ['מלבן ABCD', 'AB = 3', 'BC = 4', 'AC = 7'], expect: 'refused', note: 'the right angle at B forces |AC| = 5' },
   { id: 'lengths-forced-equilateral-2894', family: 'lengths', steps: ['משולש שווה צלעות ABC', 'AB = 3', 'BC = 5'], expect: 'refused', note: 'the equal sides force |BC| = 3' },
   { id: 'lengths-triangle-plain-2894', family: 'lengths', steps: ['משולש ABC', 'AB = 3', 'BC = 4', 'AC = 10'], expect: 'refused', note: 'the triangle inequality: |AB| + |BC| = 7 < 10 — the same sentence in every builder (ADR-835 Am. 1)' },
+  // ── #2572 (ADR-859, operator ruling "2572 - A" 2026-10-28): a length the figure can never reach is refused naming the
+  // circle's line, never parked as waiting for givens. Analytic refused all four before 2-D did (measured on #2572, 2026-10-28).
+  { id: 'unreachable-chord-2572', family: 'chords-arcs', steps: ['מעגל O ברדיוס 2', 'AB מיתר במעגל', 'AB = 6'], expect: 'refused', exception: 'X8', note: 'a chord longer than the diameter' },
+  { id: 'unreachable-chord-control-2572', family: 'chords-arcs', steps: ['מעגל O ברדיוס 2', 'AB מיתר במעגל', 'AB = 3'], expect: 'builds', exception: 'X8' },
+  { id: 'unreachable-inscribed-side-2572', family: 'inscribed', steps: ['מעגל O ברדיוס 3', 'משולש ABC חסום במעגל O', 'AB = 8'], expect: 'refused', exception: 'X8', note: 'an inscribed side longer than the diameter' },
+  { id: 'unreachable-circumscribed-side-2572', family: 'inscribed', steps: ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O', 'AB = 4'], expect: 'refused', exception: 'X8', note: 'every side of a triangle around a circle is longer than its diameter (ADR-837)' },
+  { id: 'unreachable-circumscribed-side-control-2572', family: 'inscribed', steps: ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O', 'AB = 8'], expect: 'builds', exception: 'X8' },
+  { id: 'unreachable-points-on-circle-2272', family: 'chords-arcs', steps: ['מעגל O ברדיוס 3', 'A, B על מעגל O', 'AB = 10'], expect: 'refused', exception: 'X8', note: '#2272: two points on a circle further apart than its diameter' },
   { id: 'flat-polygon-1849-coincide', family: 'polygons', steps: ['מרובע ABCD', 'AB מתלכד עם CD'], expect: 'refused', exception: 'X7', note: 'two sides of one quadrilateral on one line (T31); «מתלכד» is 3-D vocabulary (X7)' },
   { id: 'flat-polygon-1849-thin-control', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9'], expect: 'builds', note: 'thin but a real triangle — the control' },
   // #2292 / #2344 (ADR-W-146; 3-D ADR-3D-372) — givens that hold only in the LIMIT where a declared polygon collapses
@@ -893,6 +903,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'proof-target-show-1666', family: 'frame', steps: ['משולש ABC', 'הראו כי AB = AC'], expect: 'refused' },
   // #1658 / ADR-562 — a bound on a letter is recorded as waiting in 2-D, as analytic records it
   { id: 'letter-bound-1658', family: 'lengths', steps: ['משולש ABC', '0 < k < 6'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  // #1524 (ADR-3D-477): 3-D's catalog now advertises the closed two-sided bound; on a figure with no such letter 3-D
+  // still refuses it as an unknown letter, the same gap as the open bound above
+  { id: 'letter-bound-closed-1524', family: 'lengths', steps: ['משולש ABC', '2 ≤ t ≤ 5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
 
   // ── 3-D's plane sentences on a solid's letters: 2-D and analytic type the letters free, 3-D types its pyramid ──
   { id: 'pyr-equal-lengths', family: 'lengths', steps: ['מרובע ABCD', 'נקודה S', 'אורך AS שווה לאורך AB'], contextFor: { '3d': ['פירמידה SABCD שבסיסה ריבוע'] }, expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }] },

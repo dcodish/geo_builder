@@ -90,10 +90,21 @@ describe('#2268 — controls: what adds information is recorded, what is false i
   it('a new name is a definition, never a restatement', () => expectRecorded(['z1 = 1+i'], 'z2 = 2z1'));
   it('a claim is the student\'s answer: recorded and marked, never "already known"', () =>
     expectRecorded(['z1 = 1+i'], 'z1 ממשי'));
-  it('Re/Im rows are the numeric tier\'s: recorded as today (a float is never identity)', () => {
-    expectRecorded(['z1 = 3+4i'], 'Re(z1) = 3');
+  it('a Re/Im row the exact core defers is never "entailed" exactly (a float is never identity)…', () => {
+    expect(lineEntailed(['z1 = 3+4i'], 'Re(z1) = 3')).toBe(false);
+    expect(lineEntailed(['z1 = 3+4i'], 'Im(z1) = 4')).toBe(false);
+  });
+  it('…but #2801 (ADR-CX-102): it moves nothing drawn, so it is its own row WITH the notice — recorded either way', () => {
+    expectAlreadyKnown(['z1 = 3+4i'], 'Re(z1) = 3');
     store().resetSession();
-    expectRecorded(['z1 = 3+4i'], 'Im(z1) = 4');
+    expectAlreadyKnown(['z1 = 3+4i'], 'Im(z1) = 4');
+  });
+  it('a value that CUTS a continuum records with no notice', () => {
+    expectRecorded(['Re(z) = 1'], '|z - 1| = 2');
+    store().resetSession();
+    expectRecorded(['Re(z) = 0'], '|z| = 2');
+    store().resetSession();
+    expectRecorded(['|z - 1| = 2'], 'Re(z) = 1');
   });
   it('«|z1| = 14» after «z1 = 15cis(π/7)» is still refused', () => {
     expect(submitLine('z1 = 15cis(π/7)')).toBe(true);
@@ -105,6 +116,38 @@ describe('#2268 — controls: what adds information is recorded, what is false i
   it('an argument that cuts an enumerated set is a new given, not a restatement', () => {
     expect(lineEntailed(['|z1| = 2', 'z1^2 = -4'], 'arg z1 = 90')).toBe(false);
     expect(lineEntailed(['|z1| = 2', 'z1^2 = -4'], '|z1| = 2')).toBe(true);
+  });
+});
+
+/**
+ * #2801 (ADR-CX-100…102) — the restated condition: a line through the origin is an exact direction, so its restatement
+ * is ENTAILED (stage 0e′); a deferred one is decided on the drawing. Both are their own row with the notice.
+ */
+describe('#2801 — a condition restated in another spelling is already held', () => {
+  it.each([
+    [['|z - 1| = |z + 1|'], 'Re(z) = 0'],
+    [['Re(z) = 0'], '|z - 1| = |z + 1|'],
+    [['Im(z) = 0'], '|z - i| = |z + i|'],
+    [['|z - i| = |z + i|'], 'Im(z) = 0'],
+    [['arg(z) = 90'], 'Re(z) = 0'],
+  ])('%j → «%s» is entailed exactly', (givens, line) => {
+    expect(lineEntailed(givens, line)).toBe(true);
+    expectAlreadyKnown(givens, line);
+  });
+  it.each([
+    [['Re(z) = 2'], '|z - 1| = |z - 3|'],
+    [['|z - 1| = |z - 3|'], 'Re(z) = 2'],
+    [['|z - 1| = 2'], '|z - 1| = 2'],
+    [['|z - 1| = 2'], '|1 - z| = 2'],
+  ])('%j → «%s» is held on the drawing', (givens, line) => expectAlreadyKnown(givens, line));
+  it('unticking the earlier line keeps z on the stated set', () => {
+    play('|z - 1| = |z + 1|', 'Re(z) = 0');
+    store().setDisabledIdx([0]);
+    for (const s of [0, 1, 2, 3]) {
+      const z = deriveLines(activeLines(), s, s).points.find((p) => p.name === 'z')!.z;
+      expect(Math.abs(z.re)).toBeLessThan(1e-9);
+      expect(Math.abs(z.im)).toBeGreaterThan(0.5);
+    }
   });
 });
 

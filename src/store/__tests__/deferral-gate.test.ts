@@ -82,3 +82,29 @@ describe('deferralWorthwhile (#207, ADR-385)', () => {
     expect(Math.hypot(P('O').x - P('C').x, P('O').y - P('C').y)).toBeCloseTo(6, 1);
   });
 });
+
+/**
+ * #2572 ([ADR-859](../../../docs/06-decisions.md#adr-859)) — a length the figure can never reach is not «waiting for
+ * givens». The flex probe asks whether the residual MOVES; the metric closure proves whether it can reach zero. A chord
+ * or an inscribed side past the diameter, a side of a triangle around a circle under it (ADR-837's floor): concluded.
+ * The reachable twin of each still defers or builds, and ADR-104's own bet (an early ⟂ before its pinning givens) stays.
+ */
+describe('deferralWorthwhile — a length the metric closure proves out of reach (#2572, ADR-859)', () => {
+  const concluded: Array<[string, string[], string]> = [
+    ['a chord past the diameter', ['מעגל O ברדיוס 2', 'AB מיתר במעגל'], 'AB = 6'],
+    ['an inscribed side past the diameter', ['מעגל O ברדיוס 3', 'משולש ABC חסום במעגל O'], 'AB = 8'],
+    ['a side of a triangle around a circle under the diameter', ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O'], 'AB = 4'],
+    ['two points on a circle further apart than the diameter (#2272)', ['מעגל O ברדיוס 3', 'A, B על מעגל O'], 'AB = 10'],
+  ];
+  it.each(concluded)('%s is NOT deferral-worthy', (_name, prefix, line) => {
+    const facts = factsOf(prefix);
+    expect(deferralWorthwhile(facts, lastCmds(facts, line))).toBe(false);
+  }, 60_000);
+  it('a length the same figure can reach is not refused by the proof (the chord at 3, the side around the circle at 8)', () => {
+    for (const [prefix, line] of [[['מעגל O ברדיוס 2', 'AB מיתר במעגל'], 'AB = 3'], [['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O'], 'AB = 8']] as const) {
+      const facts = factsOf([...prefix]);
+      const r = replay([...facts, ...factsOf([...prefix, line]).slice(facts.length)]);
+      expect(r.lastError, `«${line}»`).toBeNull();
+    }
+  }, 60_000);
+});

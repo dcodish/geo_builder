@@ -5,7 +5,7 @@
  * (`exam-2021-special-q1-parabola-2731`, `exam-2023b-q1-four-circles-2731`) and `issue-2731-determined-roots.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
-import { BLOCK_ROUNDS, BLOCK_STARTS, enumerateBlockRoots, type BlockRootSearch } from '../engine/pinRoots';
+import { BLOCK_ROUNDS, BLOCK_STARTS, enumerateBlockRoots, anchorFrameOf, fromFrame, toFrame, type BlockRootSearch } from '../engine/pinRoots';
 import { solveLM } from '../engine/solve';
 
 const solve: BlockRootSearch['solve'] = (x0, f) => {
@@ -92,5 +92,28 @@ describe('#2731 — enumerateBlockRoots', () => {
     const a = enumerateBlockRoots(search({ anchor: [5, 5, 5], residuals: fourCircles }));
     const b = enumerateBlockRoots(search({ anchor: [5, 5, 5], residuals: fourCircles }));
     expect(b).toEqual(a);
+  });
+});
+
+describe('#2744 (ADR-AG-502) — a mirror-image start crosses a ridge, and a root rides the frame of its anchors', () => {
+  /** E on the x-axis with area(ADE) = 20, A = (0,0), D = (0,10): 5|x| = 20, so x = ±4 with a kink at x = 0 between. */
+  const area = (x: number[]) => [(5 * Math.abs(x[0]) - 20) / 20, x[1] / 10];
+  it('the image through A reaches the far root (x = −4), listed after the anchor', () => {
+    const out = enumerateBlockRoots(search({ anchor: [4, 0], residuals: area, images: [[-4, 0.3]] }));
+    expect(rounded(out.roots.filter((_, i) => out.admitted[i]))).toEqual([[4, 0], [-4, 0]]);
+  });
+  it('a frame of three anchors keeps a root on its side of them when the figure is mirrored', () => {
+    const F = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 10 }];
+    const r = toFrame({ x: -6.63, y: 0 }, F)!;
+    const mirrored = F.map((p) => ({ x: p.x * 2 + 1, y: -p.y * 2 + 3 })); // scaled, moved and flipped
+    const back = fromFrame(r, mirrored);
+    expect(back.x).toBeCloseTo(-6.63 * 2 + 1, 9);
+    expect(back.y).toBeCloseTo(3, 9);
+  });
+  it('anchorFrameOf: the two farthest anchors, and a third only when it is off their line', () => {
+    const at = (id: string) => ({ A: { x: 0, y: 0 }, B: { x: 10, y: 0 }, D: { x: 0, y: 10 }, M: { x: 5, y: 0 } })[id]!;
+    expect(anchorFrameOf(['A', 'B', 'D'], at, 14)).toEqual(['B', 'D', 'A']);
+    expect(anchorFrameOf(['A', 'B', 'M'], at, 14)).toEqual(['A', 'B']);
+    expect(anchorFrameOf(['A'], at, 14)).toBeNull();
   });
 });

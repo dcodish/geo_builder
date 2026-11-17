@@ -11,6 +11,7 @@
  * In the page's own heap (node, the suites, a browser with no `Worker`) the operation acted on the page's store
  * directly and answers `applied`: nothing is adopted or set.
  */
+import type { Seed } from '@/engine';
 import { adoptSettled, hasReplay, peekReplay } from '@/replay/core';
 import { useGeoStore, type Fact } from '@/store/geoStore';
 import { geoJobs, storeData, type Acted, type ViewArg } from '@/store/geoWork';
@@ -21,7 +22,7 @@ import type { EditDeps } from './editPipeline';
 /** The figure an action starts on: what its result may be applied to. */
 export interface Basis {
   facts: Fact[];
-  seed: number;
+  seed: Seed;
 }
 export const basisNow = (): Basis => {
   const s = useGeoStore.getState();

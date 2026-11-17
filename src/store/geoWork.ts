@@ -16,6 +16,7 @@
  * exactly as before. Which executor does that is injectable ({@link useGeoWorkExecutor}): the work-meter gate hands
  * one that serves each lane from its own module instance, as a browser's two worker heaps are.
  */
+import type { Seed } from '@/engine';
 import type { QueryInput, ValuesPanelResult } from '@/engine/valuesPanel';
 import { adoptSettled, peekFoldFor, type DetectAllResult, type Fact, type FoldNode, type SearchResume, type SettledView } from '@/replay/core';
 import { isNotDecided, type NotDecided } from '../../shell/notDecided';
@@ -124,12 +125,12 @@ export const isCancelled = (err: unknown): boolean => client.isCancelled(err);
  */
 export interface ViewBasis {
   facts: Fact[];
-  seed: number;
+  seed: Seed;
 }
 
 /** True when the store no longer holds the figure `basis` was searched for — any undo, redo, clear,
  *  edit, toggle, load or new line in between replaces the `facts` reference or the seed. */
-export function isStaleBasis(basis: ViewBasis, now: { facts: Fact[]; seed: number }): boolean {
+export function isStaleBasis(basis: ViewBasis, now: { facts: Fact[]; seed: Seed }): boolean {
   return now.facts !== basis.facts || now.seed !== basis.seed;
 }
 
@@ -159,7 +160,7 @@ async function searchOn<T>(basis: ViewBasis, run: () => Promise<T>): Promise<T> 
  * another figure is superseded: it can never be applied (`applyView` checks the basis) and nothing
  * waits on it, so its lane is freed at once. Returns true when it superseded anything.
  */
-export function supersedeStaleSearches(now: { facts: Fact[]; seed: number }): boolean {
+export function supersedeStaleSearches(now: { facts: Fact[]; seed: Seed }): boolean {
   onScreen = now.facts; // first: a worker respawned below is handed THIS figure's fold
   let any = false;
   for (const token of searchesInFlight) {
@@ -178,10 +179,10 @@ export const geoWork = {
    *  limit first), whose `resume.round` is what «המשיכו לחפש» passes as `round`. */
   async resample(
     facts: Fact[],
-    seed: number,
+    seed: Seed,
     onProgress?: (k: number, n: number) => void,
     round = 0,
-  ): Promise<{ facts: Fact[]; seed: number; basis: ViewBasis } | null | NotDecided<SearchResume>> {
+  ): Promise<{ facts: Fact[]; seed: Seed; basis: ViewBasis } | null | NotDecided<SearchResume>> {
     const basis = { facts, seed };
     const found = await searchOn(basis, () => client.run(LANE_OF.resample, 'resample', { facts, seed, round }, { onProgress }));
     if (found === null || isNotDecided(found)) return found;
@@ -192,9 +193,9 @@ export const geoWork = {
    *  "not decided" = it reached its work limit first (`resume.round` continues it). */
   async autoResolve(
     facts: Fact[],
-    seed: number,
+    seed: Seed,
     round = 0,
-  ): Promise<'ok' | { facts: Fact[]; seed: number; fold: FoldNode | null; basis: ViewBasis } | null | NotDecided<SearchResume>> {
+  ): Promise<'ok' | { facts: Fact[]; seed: Seed; fold: FoldNode | null; basis: ViewBasis } | null | NotDecided<SearchResume>> {
     const basis = { facts, seed };
     const found = await searchOn(basis, () => client.run(LANE_OF.autoResolve, 'autoResolve', { facts, seed, round }));
     if (found === 'ok' || found === null || isNotDecided(found)) return found;
@@ -202,7 +203,7 @@ export const geoWork = {
     return { facts: found.facts, seed: found.seed, fold: found.fold, basis };
   },
   /** Warm the fold for a fact-list's content off-thread; returns the node for `primeFoldFor`. */
-  async prefold(facts: Fact[], seed: number): Promise<FoldNode | null> {
+  async prefold(facts: Fact[], seed: Seed): Promise<FoldNode | null> {
     return await client.run(LANE_OF.prefold, 'prefold', { facts, seed });
   },
   /**
@@ -238,7 +239,7 @@ let detectInFlight: { facts: Fact[]; promise: Promise<DetectAllResult> } | null 
  * page's store directly and answers `applied`.
  */
 export const geoJobs = {
-  settle: (facts: Fact[], seed: number): Promise<SettledView | null> => client.run('interactive', 'settle', { facts, seed }),
+  settle: (facts: Fact[], seed: Seed): Promise<SettledView | null> => client.run('interactive', 'settle', { facts, seed }),
   act: (state: import('./geoOps').StoreData, name: string, args: unknown[]) => client.run('interactive', 'act', { state, name, args }),
   decide: (args: Parameters<GeoOps['decide']>[0]) => client.run('interactive', 'decide', args),
   judge: (args: Parameters<GeoOps['judge']>[0]) => client.run('interactive', 'judge', args),
@@ -246,7 +247,7 @@ export const geoJobs = {
   load: (text: string, prefold: boolean) => client.run('interactive', 'load', { text, prefold }),
   /** #2893 (ADR-831): `from` continues an audit that reached its work limit (its `resumeAt`). */
   audit: (facts: Fact[], from = 0) => client.run('interactive', 'audit', { facts, from }),
-  dryRun: (facts: Fact[], seed: number, cmds: import('@/engine').AnyCommand[]) => client.run('interactive', 'dryRun', { facts, seed, cmds }),
+  dryRun: (facts: Fact[], seed: Seed, cmds: import('@/engine').AnyCommand[]) => client.run('interactive', 'dryRun', { facts, seed, cmds }),
 };
 
 /** #217: the values-panel rows, off-thread on user request; shares the detect lane + pool memo.

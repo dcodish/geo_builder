@@ -30,7 +30,8 @@ import { typedCartesian, typedDecimalReadings, typedPolar } from './typedSpellin
 import { valueOptionsOf, type ValueOptions } from '../../shell/valueOptions';
 import type { Cx } from '../value/value';
 import { cArgDeg, cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
-import { closedParts, definitionOf, statedAs, substituteKnown, symbolicParts, typedLineOf, valuedParamOf } from '../model/cartesianForm';
+import { type StatedAs, closedParts, definitionOf, statedAs, substituteKnown, symbolicParts, typedLineOf, valuedParamOf } from '../model/cartesianForm';
+import { type PolarDefinition, polarDefinitionOf, polarFormText, polarHoldsLetter, substitutePolar } from '../model/polarForm';
 import { type Rat, rat, toNumber, add as ratAdd, sub as ratSub, mul as ratMul, div as ratDiv, neg as ratNeg, isZero as ratIsZero, sqrtExact } from '../value/rational';
 import { composeCartesian, gaussianRationalParts, numericPart, ratPart, readableCartesianParts } from '../value/cartesian';
 import { type ExpVec, eq as modEq, evaluate as evalMod, format as fmtMod, fromRational as modFromRational, pow as modPow, isOne as modIsOne, isParametric } from '../value/modulus';
@@ -65,7 +66,7 @@ import { prettyName } from '../model/naming';
 import { substitute } from '../model/solutionSet';
 import type { SequenceKind, SequenceStatement } from '../model/sequence';
 import { type SurfacedFormula, surfacedFormulas } from '../formulas/table';
-import { type Bound, solveResiduals } from '../solve/tier2';
+import { type Bound, TOL, nearestOnSet, solveResiduals } from '../solve/tier2';
 import { type PolyContext, allRoots, censusStarts, degreeOf, polyOf } from '../solve/census';
 import {
   type Env,
@@ -76,7 +77,7 @@ import {
   measureResidual,
 } from '../solve/residuals';
 import { verifyClaims } from '../solve/claims';
-import { claimDriveRows } from '../solve/claimDrive';
+import { claimDriveRows, liftDirectionRows } from '../solve/claimDrive';
 import { filterBranches } from '../solve/filter';
 import { type AffineArg, projectWindow, statedWindow, violatesDeg } from '../solve/window';
 import type { BranchFilter, Constraint, Selection as SolutionSelection } from '../model/constraint';
@@ -463,13 +464,16 @@ interface ExactSolve {
   readonly literalSample: ReadonlyMap<string, number>;
   readonly t1Base: Tier1Result;
   readonly t1: Tier1Result;
+  /** how many deferred lines through the origin were lifted to their exact direction (stage 1a″) */
+  readonly lifted: number;
 }
 
 /**
  * The fold's EXACT solve, the one definition `foldConstraints` and {@link entailedBy} share — pure over
- * the lowered statements, independent of the seed and of the configuration index.
+ * the lowered statements, independent of the seed and of the configuration index. `lift: false` is the
+ * fold {@link foldConstraints} falls back to when the lifted directions leave the figure unsolvable.
  */
-function exactSolve(input: Omit<FoldInput, 'configIndex' | 'seed'>): ExactSolve {
+function exactSolve(input: Omit<FoldInput, 'configIndex' | 'seed'>, lift = true): ExactSolve {
   // #2873 (ADR-W-210): one exact solve is one unit of work — every `foldConstraints` makes exactly one, and
   // `entailedBy` two, so a fold and the entailment gate are counted in the same unit. The other unit is one executed
   // line read (`parseLineV2`, #2888, ADR-CX-090).
@@ -484,12 +488,38 @@ function exactSolve(input: Omit<FoldInput, 'configIndex' | 'seed'>): ExactSolve 
   const { signed } = paramSigns({ constraints: given, objects, measures });
   // #1481 — the literal atoms' degrees are fixed constants: tier 1 decides an opaque atom with them.
   // #1818 — and a definition its known parameters close is solved as the literal it is (stage 1b)
-  const { constraints, atoms: literalSample, t1: t1Base } = closeKnownDefinitions(given, signed, givenAtoms);
+  const closed = closeKnownDefinitions(given, signed, givenAtoms);
+  let { constraints, atoms: literalSample, t1: t1Base } = closed;
+  /**
+   * #2802/#2801 (ADR-CX-100, stage 1a″) — a deferred LINE THROUGH THE ORIGIN is solved as the exact
+   * direction it is (`solve/claimDrive.ts`, `liftDirectionRows`). Withdrawn when the directions it adds
+   * contradict the exact solve: the one point of such a line a direction cannot carry is 0, and
+   * «Re(z) = 0» · «Im(z) = 0» states exactly that point — it stays the numeric tier's, as before.
+   */
+  let lifted = 0;
+  if (lift) {
+    const l = liftDirectionRows(constraints, t1Base.deferred);
+    if (l.lifted > 0) {
+      const atoms = new Map(literalSample);
+      for (const b of l.atoms) atoms.set(b.atom, b.degrees);
+      const t1L = solveTier1(l.rows, signed, atoms);
+      if (!t1L.inconsistent || t1Base.inconsistent) {
+        ({ constraints, literalSample, t1Base, lifted } = { constraints: l.rows, literalSample: atoms, t1Base: t1L, lifted: l.lifted });
+      }
+    }
+  }
   // #1894 — a claim about a real-parameter letter is checked by its type, never driven: driving it
   // would make the letter a complex unknown, the phantom point this lane exists to prevent
   const driveRows = claimDriveRows(assertions.filter((a) => !('name' in a) || !realLetters.has(a.name)), t1Base);
-  const t1 = driveRows.length ? solveTier1([...constraints, ...driveRows], signed, literalSample) : t1Base;
-  return { signed, constraints, literalSample, t1Base, t1 };
+  let t1 = driveRows.length ? solveTier1([...constraints, ...driveRows], signed, literalSample) : t1Base;
+  if (lifted > 0 && t1.inconsistent) {
+    // the lifted directions and a claim's drive disagree: the figure is decided without the lift
+    ({ constraints, atoms: literalSample, t1: t1Base } = closed);
+    lifted = 0;
+    const rows = claimDriveRows(assertions.filter((a) => !('name' in a) || !realLetters.has(a.name)), t1Base);
+    t1 = rows.length ? solveTier1([...constraints, ...rows], signed, literalSample) : t1Base;
+  }
+  return { signed, constraints, literalSample, t1Base, t1, lifted };
 }
 
 /**
@@ -511,28 +541,45 @@ export function entailedBy(
   before: Omit<FoldInput, 'configIndex' | 'seed'>,
   after: Omit<FoldInput, 'configIndex' | 'seed'>,
 ): boolean {
+  return exactDelta(before, after) === 'entailed';
+}
+
+/**
+ * #2801 (ADR-CX-102) — what one line does to the EXACT solve: `entailed` (stage 0e′, above), `deferred`
+ * when it adds only rows the exact tier defers to the numeric residue and leaves the exact solve exactly
+ * as it was (a Re/Im/distance relation not through the origin, a circle), or `changes`. A `deferred`
+ * line is the one whose restatement only the drawn figure can show (`app/deriveLines.ts`, `lineHeld`).
+ */
+export function exactDelta(
+  before: Omit<FoldInput, 'configIndex' | 'seed'>,
+  after: Omit<FoldInput, 'configIndex' | 'seed'>,
+): 'entailed' | 'deferred' | 'changes' {
+  const added = after.constraints.length - before.constraints.length;
   const len = (xs: { readonly length: number } | { readonly size: number } | undefined): number =>
     xs === undefined ? 0 : 'size' in xs ? xs.size : xs.length;
   // the line contributes ROWS and nothing else
-  if (after.constraints.length <= before.constraints.length) return false;
+  if (added <= 0) return 'changes';
   const others = (f: typeof before): number[] =>
     [f.filters, f.assertions, f.objects, f.measures, f.sequences, f.selections, f.solutionSets, f.realTyped, f.untranslated, f.aliases].map(len);
   const [was, now] = [others(before), others(after)];
-  if (was.some((n, i) => n !== now[i])) return false;
+  if (was.some((n, i) => n !== now[i])) return 'changes';
   const a = exactSolve(before);
   const b = exactSolve(after);
   const [s, t] = [a.t1, b.t1];
-  if (s.inconsistent || t.inconsistent || a.t1Base.inconsistent || b.t1Base.inconsistent) return false;
+  if (s.inconsistent || t.inconsistent || a.t1Base.inconsistent || b.t1Base.inconsistent) return 'changes';
   // a name the line brought into existence is a definition, never a restatement
   const known = new Set([...s.names, ...before.declared]);
-  if (t.names.some((n) => !known.has(n)) || after.declared.some((n) => !known.has(n))) return false;
-  if (t.impossible.length !== s.impossible.length || t.undecided.length !== s.undecided.length) return false;
-  if (t.deferred.length !== s.deferred.length || b.t1Base.deferred.length !== a.t1Base.deferred.length) return false;
-  if (!sameSet(a.signed, b.signed) || !sameList(s.signedParams, t.signedParams)) return false;
-  if (!sameList([...s.freeDof].sort(), [...t.freeDof].sort())) return false;
-  if (!sameList([...s.params.free].sort(), [...t.params.free].sort())) return false;
-  if (!sameExpMap(s.knownModulus, t.knownModulus) || !sameExpMap(s.paramValues, t.paramValues)) return false;
-  return sameBranches(s, t);
+  if (t.names.some((n) => !known.has(n)) || after.declared.some((n) => !known.has(n))) return 'changes';
+  if (t.impossible.length !== s.impossible.length || t.undecided.length !== s.undecided.length) return 'changes';
+  // every row the line added is deferred, or none is
+  const grew = t.deferred.length - s.deferred.length;
+  if (grew !== b.t1Base.deferred.length - a.t1Base.deferred.length || (grew !== 0 && grew !== added)) return 'changes';
+  if (!sameSet(a.signed, b.signed) || !sameList(s.signedParams, t.signedParams)) return 'changes';
+  if (!sameList([...s.freeDof].sort(), [...t.freeDof].sort())) return 'changes';
+  if (!sameList([...s.params.free].sort(), [...t.params.free].sort())) return 'changes';
+  if (!sameExpMap(s.knownModulus, t.knownModulus) || !sameExpMap(s.paramValues, t.paramValues)) return 'changes';
+  if (!sameBranches(s, t)) return 'changes';
+  return grew === 0 ? 'entailed' : 'deferred';
 }
 
 const sameList = (x: readonly string[], y: readonly string[]): boolean => x.length === y.length && x.every((v, i) => v === y[i]);
@@ -681,6 +728,19 @@ export interface ResolvedSelection extends SolutionSelection {
  * in how they PRODUCE constraints; what happens to them afterwards is identical.
  */
 export function foldConstraints(input: FoldInput): Derived2 {
+  /**
+   * #2802/#2801 (ADR-CX-100) — DRIVE WHERE IT LEAVES THE FIGURE SOLVABLE. A given line through the origin
+   * is folded as its exact direction (stage 1a″); when that fold cannot satisfy the givens — the line
+   * meets another given only at 0, or a given the exact tier defers pins the number off the line — the
+   * figure is folded with the line as the numeric row it was, so a refusal names what it named before.
+   */
+  const probe = { lifted: 0 };
+  const first = foldOnce(input, true, probe);
+  if (probe.lifted === 0 || (first.contradiction === null && first.unsatisfied.length === 0 && first.hasConfiguration)) return first;
+  return foldOnce(input, false, probe);
+}
+
+function foldOnce(input: FoldInput, lift: boolean, probe: { lifted: number }): Derived2 {
   const {
     constraints: given,
     filters: filterList,
@@ -716,7 +776,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * the same wall with `rootsMode`, so fixing the seam once serves both. See `solve/claimDrive.ts`.
    * The solve itself is `exactSolve`, shared with `entailedBy` (#2268).
    */
-  const { signed, constraints, literalSample, t1 } = exactSolve(input);
+  const { signed, constraints, literalSample, t1, lifted } = exactSolve(input, lift);
+  probe.lifted = lifted;
 
   const baseSample = new Map(literalSample);
   // the parameters the student's own rows mention, a closed definition's included (#1818)
@@ -1267,6 +1328,25 @@ export function foldConstraints(input: FoldInput): Derived2 {
       return out;
     };
 
+    /**
+     * #2801/#2802 (ADR-CX-101, stage 3c) — the member of a CONTINUUM that is drawn: the point of the
+     * solution set nearest the sampled start, measured in the drawn plane (`nearestOnSet`). The descent's
+     * own endpoint depends on the rows that describe the set; the nearest point depends only on the set and
+     * the seed, so a restated condition leaves the figure still and «הציגו תצורה אחרת» moves along the set.
+     * Kept only when every live residual still holds; otherwise the descent's endpoint, as before.
+     */
+    const nearestMember = (x: readonly number[]): State => {
+      const drawnVec = (y: readonly number[]): number[] => {
+        const pos = positionsOf(decode(y));
+        return drawnNames.flatMap((name) => {
+          const z = pos.get(name);
+          return z ? [z.re, z.im] : [0, 0];
+        });
+      };
+      const polished = nearestOnSet(evaluateAt, drawnVec, x, encode(initial), bounds);
+      return polished ? decode(polished) : decode(x);
+    };
+
     /** The n-D FLOOR: deterministic multi-start, kept only where the solve is isolated. */
     const multiStartCensus = (): State[] => {
       const out: State[] = solved && solved.solved ? [lmState] : [];
@@ -1277,7 +1357,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
       ];
       for (const x0 of censusStarts(kinds, bounds, censusStartCount)) {
         const r = solveResiduals(evaluateAt, x0, { bounds, restarts: 0, alternatives: false });
-        if (!r.solved || consumedDimensions(evaluateAt, r.x) !== n) continue;
+        if (!r.solved || consumedDimensions(evaluateAt, r.x, false) !== n) continue;
         const st = decode(r.x);
         if (!out.some((o) => sameDrawing(o, st, FLOOR_TOL))) out.push(st);
       }
@@ -1316,7 +1396,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
         completeness = 'floor';
         const isolated = solved !== null && solved.solved && consumedDimensions(evaluateAt, solved.x) === n;
         // a continuum is one member per sample — the seed moves along it; an isolated solve is censused
-        states = !solved || !solved.solved ? [] : isolated ? ordered(multiStartCensus()) : [lmState];
+        states = !solved || !solved.solved ? [] : isolated ? ordered(multiStartCensus()) : [nearestMember(solved.x)];
       }
     }
     return {
@@ -2151,6 +2231,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
    *   student valued («a = 3») replaced, and only while the chip shows values. Closed → the number in
    *   the view's own form; still holding a letter → the typed form in BOTH views (W8: its polar form
    *   depends on the letter's sign, which nothing states). A letter the TOOL solved stays a letter.
+   * - typed in POLAR form with a letter in the modulus («z = r·cis30°», «z = (r+1)·cis30°», or the W7 pair
+   *   «|z| = 9r» · «arg z = 30°»; #2002, ADR-CX-103) → the same rule through the polar reader
+   *   (`model/polarForm.ts`): a letter left → the typed polar form in BOTH views; closed → as before.
    */
   const studentValued = new Set(valuedBy ? valuedBy.keys() : given.map(valuedParamOf).filter((p): p is string => p !== null));
   const shownValues = new Map([...rationalParams].filter(([p]) => studentValued.has(p) && !letterParams.has(p)));
@@ -2158,11 +2241,25 @@ export function foldConstraints(input: FoldInput): Derived2 {
   const statedList = stated ?? given;
   const aliasOf = new Map<string, string>([...aliases, ...selectionAliases]);
   const competing = new Set<string>();
+  /** #2002 — the first polar definition among a number's names, for a number stated as typed or as its W7 pair */
+  const polarDefinitionIn = (names: readonly string[], how: readonly StatedAs[]): PolarDefinition | null =>
+    how.some((h) => h !== 'computed') ? (names.map((n) => polarDefinitionOf(n, statedList)).find((d) => d !== null) ?? null) : null;
   const canvasPoints: DerivedPoint[] = shownPoints.map((p) => {
     const names = [p.name, ...(aliasOf.has(p.name) ? [aliasOf.get(p.name)!] : [])];
     const how = names.map((n) => statedAs(n, statedList, setMembers));
     if (how.every((h) => h === 'computed')) return { ...p, canvas: p.display, canvasCart: p.display };
     const def = how.includes('typed') ? names.map((n) => definitionOf(n, statedList)).find((d) => d !== null) ?? null : null;
+    // #2002 (ADR-CX-103): a typed polar form — or the W7 pair — whose modulus holds a letter («z = r·cis30°»,
+    // «|z| = 9r» · «arg z = 30°») reads as typed in BOTH views while a letter is left (W8); closed, it falls through
+    const polar = def ? null : polarDefinitionIn(names, how);
+    if (polar) {
+      for (const k of polar.mod.terms.keys()) if (studentValued.has(k) && rationalParams.has(k)) competing.add(k);
+      const shown = substitutePolar(polar, shownValues);
+      if (polarHoldsLetter(shown)) {
+        const typed = `${p.display} = ${polarFormText(shown)}`;
+        return { ...p, canvas: typed, canvasCart: typed };
+      }
+    }
     if (!def) {
       // #1497 (ADR-W-179): a number typed with no parameter, as typed, in the view it was typed in (D1)
       const line = how.includes('typed') ? names.map((n) => typedLineOf(n, statedList)).find((c) => c !== null) ?? null : null;
@@ -2276,18 +2373,31 @@ export function foldConstraints(input: FoldInput): Derived2 {
  * own given has just pinned. Rank is the honest correction, and it is computed rather than tracked so
  * it cannot drift from what the residuals really did.
  */
-function consumedDimensions(f: (x: readonly number[]) => number[], x: readonly number[]): number {
+function consumedDimensions(f: (x: readonly number[]) => number[], x: readonly number[], central = true): number {
   const n = x.length;
   if (n === 0) return 0;
   const r0 = f(x);
   if (r0.length === 0) return 0;
   const J: number[][] = r0.map(() => new Array<number>(n).fill(0));
+  // #2801 (ADR-CX-101): CENTRAL differences. A forward difference carries a truncation error of order
+  // h·f″ (~1e-7 here), and two different residuals of ONE line («Re(z) = 2», «|z − 1| = |z − 3|») then
+  // differ by more than the relative threshold below: the parallel pair ranked 2, and a line read as
+  // isolated points. The central error is of order h² — under the threshold for every curved residual.
+  // The census, which asks only "is this start's root isolated?" of a system already judged isolated, keeps
+  // the forward difference (`central = false`): a full rank is robust to it.
   for (let j = 0; j < n; j++) {
-    const h = 1e-6 * Math.max(1, Math.abs(x[j]));
+    const h = (central ? 1e-5 : 1e-6) * Math.max(1, Math.abs(x[j]));
     const xp = [...x];
     xp[j] += h;
     const rp = f(xp);
-    for (let i = 0; i < r0.length; i++) J[i][j] = (rp[i] - r0[i]) / h;
+    if (!central) {
+      for (let i = 0; i < r0.length; i++) J[i][j] = (rp[i] - r0[i]) / h;
+      continue;
+    }
+    const xm = [...x];
+    xm[j] -= h;
+    const rm = f(xm);
+    for (let i = 0; i < r0.length; i++) J[i][j] = (rp[i] - rm[i]) / (2 * h);
   }
   // row-echelon over the rows, counting pivots; the scale is set by the largest entry so the
   // threshold means "this direction does not move the residual", not "this number is small"
@@ -2299,7 +2409,10 @@ function consumedDimensions(f: (x: readonly number[]) => number[], x: readonly n
     for (let i = rank; i < M.length; i++) {
       if (pivot < 0 || Math.abs(M[i][col]) > Math.abs(M[pivot][col])) pivot = i;
     }
-    if (pivot < 0 || Math.abs(M[pivot][col]) < 1e-8 * scale) continue;
+    // #2801 (ADR-CX-101, stage 3b): and an ABSOLUTE floor — the solver's own TOL per unit step. A residual
+    // that holds identically on the set («Re(z) = 0» once arg z = 90° is exact) has a Jacobian of rounding
+    // noise, and ranked against itself that noise read as a pinned direction: a continuum taken for isolated.
+    if (pivot < 0 || Math.abs(M[pivot][col]) < 1e-8 * scale || Math.abs(M[pivot][col]) <= TOL) continue;
     [M[rank], M[pivot]] = [M[pivot], M[rank]];
     for (let i = rank + 1; i < M.length; i++) {
       const factor = M[i][col] / M[rank][col];

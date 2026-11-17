@@ -4,15 +4,19 @@
  * not move existing points).
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { applyCommand3, coordLetterExprs3, freeDims, freeSolidRun3, renameIds3, resolveUnletteredSolid3, unstatedPyramidReading3 } from '../apply';
-import { claimResidual3, pinLettersAt3, residualHolds3, verifyClaim } from '../claims';
-import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, type QuadPreference3 } from '../evaluate';
+import { claimResidual3, lettersAt3, residualHolds3, verifyClaim } from '../claims';
+import { admittedConfiguration3, evaluate3, firstSatisfyingSeed3, freeDofCount3, knowledgeSamples3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, statedLetterValue3, type QuadPreference3 } from '../evaluate';
 import { commandStatesCircle3, concaveSeatVertices3, quadDrawnDegenerate, statedConcyclic3 } from '../baseShapes';
 import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
 import { cross3, dist3, dot3, lerp3, norm3, ringSelfCrossing3, sub3, v3 } from '../vec3';
 import { configurationOrder3, congruentShapes3, intrinsicShape3, sameConfiguration3, type PoolConfig3 } from '../configs3';
+import { deserializeFigure3 } from '../../store/figureFile3';
+import { derive3, useGeo3 } from '../../store/store3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
 const PRISM_IDS = ['A', 'B', 'C', "A'", "B'", "C'"];
@@ -674,6 +678,70 @@ describe('#2810 — letters a stated circle passes through have one simple order
     expect(statedConcyclic3(c, ['A', 'B', 'C', 'E'])).toBe(false);
   });
 
+  describe('#2829 (ADR-3D-525): a circle rider that closes a declared ring is seated where the ring is simple', () => {
+    const SEEDS = Array.from({ length: 24 }, (_, s) => s);
+    const tri = (): Command3[] => [
+      { type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] },
+      { type: 'circle3', id: 'circle-ABC', def: { kind: 'circum', ring: ['A', 'B', 'C'] } },
+    ];
+    const rider = (p: string): Command3 => ({ type: 'point-on-circle3', point: p, circle: 'circle-ABC' });
+    const ring = (ids: string[]): Command3 => ({ type: 'solid', kind: ids.length === 4 ? 'polygon4' : 'polygon5', ids } as Command3);
+    const crossed = (pos: Map<string, ReturnType<typeof v3>>, ids: string[]) => ringSelfCrossing3(ids.map((q) => pos.get(q)!));
+    const onCircle = (pos: Map<string, ReturnType<typeof v3>>, p: string) => {
+      const [A, B, C, P] = ['A', 'B', 'C', p].map((q) => pos.get(q)!);
+      // P is concyclic with A, B, C: the circumcentre is equidistant (coplanarity and radius, scale-free)
+      const n = cross3(sub3(B, A), sub3(C, A));
+      return Math.abs(dot3(sub3(P, A), n)) / norm3(n) < 1e-9;
+    };
+
+    it('the quadrilateral ABCD after «D על המעגל» is simple at every seed; A, B, C never move; D still varies', () => {
+      const bare = build(...tri(), rider('D'));
+      const quad4 = build(...tri(), rider('D'), ring(['A', 'B', 'C', 'D']));
+      const ds = new Set<string>();
+      let crossedBefore = 0;
+      for (const s of SEEDS) {
+        const p0 = evaluate3(bare, s);
+        const p1 = evaluate3(quad4, s);
+        if (crossed(p0, ['A', 'B', 'C', 'D'])) crossedBefore++;
+        expect(crossed(p1, ['A', 'B', 'C', 'D']), `seed ${s}`).toBe(false);
+        for (const q of ['A', 'B', 'C']) expect(p1.get(q)).toEqual(p0.get(q)); // only the free corner moves (#1935)
+        expect(onCircle(p1, 'D')).toBe(true);
+        // a ring already simple at the first draw keeps it: byte-identical
+        if (!crossed(p0, ['A', 'B', 'C', 'D'])) expect(p1.get('D')).toEqual(p0.get('D'));
+        ds.add(JSON.stringify(p1.get('D')));
+      }
+      expect(crossedBefore).toBeGreaterThan(0); // the seat without the ring does cross: the test is not vacuous
+      expect(ds.size).toBeGreaterThan(12); // ADR-052: the angle is still a free DOF
+    });
+
+    it('two riders of one pentagon are seated in point order, each against the corners before it: simple at every seed', () => {
+      const c = build(...tri(), rider('D'), rider('E'), ring(['A', 'B', 'C', 'D', 'E']));
+      for (const s of SEEDS) {
+        const p = evaluate3(c, s);
+        expect(crossed(p, ['A', 'B', 'C', 'D', 'E']), `seed ${s}`).toBe(false);
+        expect(onCircle(p, 'D') && onCircle(p, 'E')).toBe(true);
+      }
+    });
+
+    it('any order the circle can draw is honoured: ABDC and ACBD are simple at every seed', () => {
+      for (const ids of [['A', 'B', 'D', 'C'], ['A', 'C', 'B', 'D']]) {
+        const c = build(...tri(), rider('D'), ring(ids));
+        for (const s of SEEDS) expect(crossed(evaluate3(c, s), ids), `${ids.join('')} seed ${s}`).toBe(false);
+      }
+    });
+
+    it('a rider in no declared ring, and one whose two rings no seat can satisfy, keep the general-position seat', () => {
+      const bare = build(...tri(), rider('D'));
+      const triOnly = build(...tri(), rider('D'), { type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'D'] });
+      const both = build(...tri(), rider('D'), ring(['A', 'B', 'C', 'D']), ring(['A', 'B', 'D', 'C']));
+      for (const s of SEEDS) {
+        const p0 = evaluate3(bare, s);
+        expect(evaluate3(triOnly, s).get('D')).toEqual(p0.get('D'));
+        expect(evaluate3(both, s).get('D')).toEqual(p0.get('D')); // never a veto: the store's ring pass keeps its verdict
+      }
+    });
+  });
+
   it('concaveSeatVertices3 yields to a stated circle (flat ring and kite alike); no circle keeps the seat', () => {
     expect(concaveSeatVertices3(two(), ['A', 'B', 'D', 'C'])).not.toBeNull(); // C1: no circle, the seat stays
     expect(concaveSeatVertices3(two({ type: 'circle3', id: 'circle-ABCD', def: { kind: 'circum', ring: ['A', 'B', 'C', 'D'] } }), ['A', 'B', 'D', 'C'])).toBeNull();
@@ -904,7 +972,7 @@ describe('#2785 (ADR-3D-488) — a coordinate letter written twice is one pin sy
     expect(claims.every((cl) => cl.type === 'coords-eq' && cl.sym?.[0]?.terms[0].sym === 'k')).toBe(true);
     // k = 2 (off B) and k = 4 (off C) cannot both hold: the least-squares k fails both claims
     const res = resolve3(r.next, 0);
-    expect(pinLettersAt3(r.next, res).k).toBeCloseTo(3, 9);
+    expect(lettersAt3(r.next, res).k).toBeCloseTo(3, 9);
     expect(verifyClaim(claims[claims.length - 1], r.next, 0)).toBe(false);
   });
 
@@ -914,8 +982,97 @@ describe('#2785 (ADR-3D-488) — a coordinate letter written twice is one pin sy
       { type: 'point3', id: 'B', x: null, y: null, z: null, syms: ['t', 't', 'k'], symExprs: [{ terms: [{ sym: 't', k: 2 }], c: 0 }, { terms: [{ sym: 't', k: 1 }], c: 0 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }] },
     );
     const res = resolve3(c, 0);
-    expect(pinLettersAt3(c, res).t).toBeCloseTo(1, 9);
-    expect(pinLettersAt3(c, res).k).toBeCloseTo(-8, 9);
+    expect(lettersAt3(c, res).t).toBeCloseTo(1, 9);
+    expect(lettersAt3(c, res).k).toBeCloseTo(-8, 9);
     expect(c.claims.filter((cl) => cl.type === 'coords-eq').every((cl) => verifyClaim(cl, c, 0))).toBe(true);
+  });
+});
+
+/**
+ * #2831 — «הציגו תצורה אחרת» shows every NEW solution before another placement of one already shown. Operator ruling
+ * 2026-11-12 "2831 - A": a mirror image (another placement of the drawing) is the SAME solution; new solutions first
+ * (ADR-W-206). 3-D needed no code change: measured at c82d767c, every fixture whose pool has more than one
+ * `configurationOrder3` group (or whose parameter has more than one branch) already reaches every group within G−1
+ * presses of the real `resample`, from its saved seed and from seed 0. This block locks that walk.
+ */
+describe('#2831 — new solutions first: a press reaches every configurationOrder3 group within G−1 presses', () => {
+  const FIXTURES = join(__dirname, '..', '..', '..', 'fixtures3');
+  const sameKey = (a: number[], b: number[]): boolean =>
+    a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 1e-3 * Math.max(1, Math.abs(v), Math.abs(b[i])));
+  /** The drawn configuration's group, by `configurationOrder3`'s own key: the intrinsic shape plus the letters' values. */
+  const drawnKey = (): number[] => {
+    const { facts, seed } = useGeo3.getState();
+    const d = derive3(facts, seed);
+    const symbols: Record<string, number> = { ...(d.resolved.pivot?.pinSymbols ?? {}), ...d.resolved.ratioSymbols };
+    if (d.resolved.param) symbols[`param:${d.resolved.param.name}`] = d.resolved.param.value;
+    return intrinsicShape3({ pos: d.positions, pinSymbols: symbols });
+  };
+  /** Load the fixture through the real path, press `resample` `presses` times; the group index of each drawing, by first appearance. */
+  const groupWalk = (file: string, presses: number): number[] => {
+    const r = deserializeFigure3(readFileSync(join(FIXTURES, file), 'utf8'));
+    if (!r.ok) throw new Error(`${file} did not load`);
+    useGeo3.getState().loadFigure(r.facts, r.seed);
+    const keys: number[][] = [];
+    const groupOf = (): number => {
+      const k = drawnKey();
+      const i = keys.findIndex((x) => sameKey(x, k));
+      if (i >= 0) return i;
+      keys.push(k);
+      return keys.length - 1;
+    };
+    const out = [groupOf()];
+    for (let p = 0; p < presses; p++) {
+      useGeo3.getState().resample();
+      out.push(groupOf());
+    }
+    return out;
+  };
+
+  it('SSA\'s two triangles (G = 2, each in two mirror placements): the presses alternate the two triangles', () => {
+    expect(groupWalk('ssa-two-triangles-2714.geo3.json', 4)).toEqual([0, 1, 0, 1, 0]);
+  });
+
+  it('a parameter with three branches (G = 3, outside the pivot pool): presses 0–2 are three solutions, press 3 returns to the first', () => {
+    expect(groupWalk('param-three-branches-1474.geo3.json', 3)).toEqual([0, 1, 2, 0]);
+  });
+});
+
+/**
+ * #2916 (ADR-3D-533) — ONLY ADMITTED CONFIGURATIONS ARE KNOWLEDGE. The ADR-3D-032 exam box states «A.y < 0»; on `main` the
+ * read-back sample at seed + 3041 put A at y > 0, and the ask lane's plane row lost its A′ anchor. The commands are the
+ * fixture's own (`fixtures3/exam-box-sign-2916.geo3.json`), applied by the reducer.
+ */
+describe('#2916 — the knowledge samples admit only configurations that keep every stated given', () => {
+  const file = JSON.parse(readFileSync(join(__dirname, '..', '..', '..', 'fixtures3', 'exam-box-sign-2916.geo3.json'), 'utf8')) as { facts: { cmds: Command3[] }[] };
+  const c = build(...file.facts.flatMap((f) => f.cmds));
+  const RB = { readback: true } as const;
+  const seedsOf = (s: number) => [s, s + 1013, s + 2027, s + 3041]; // the ask lane's
+
+  it('the predicate refuses a configuration whose stated sign is broken, and admits the one that keeps it', () => {
+    const r = resolve3(c, 0, { solvedFrame: true });
+    expect(r.positions.get('A')!.y).toBeLessThan(0);
+    expect(admittedConfiguration3(c, r)).toBe(true);
+    const flipped = new Map(r.positions);
+    const a = r.positions.get('A')!;
+    flipped.set('A', v3(a.x, -a.y, a.z));
+    expect(admittedConfiguration3(c, { ...r, positions: flipped })).toBe(false);
+    // ...and the letter sign «k חיובי» is read by the verifier's own reader
+    expect(statedLetterValue3(c, r, 'k')).toBeGreaterThan(0);
+  });
+
+  it('every read-back sample keeps «A.y < 0» and «k > 0», and the gauge keeps its witnesses (seeds 0 and 23: where main broke)', () => {
+    for (const s of [0, 23]) {
+      const samples = knowledgeSamples3(c, seedsOf(s), RB);
+      expect(samples.length, `seed ${s}`).toBeGreaterThanOrEqual(4);
+      for (const r of samples) {
+        expect(r.positions.get('A')!.y, `seed ${s}`).toBeLessThan(0);
+        expect(admittedConfiguration3(c, r), `seed ${s}`).toBe(true);
+      }
+    }
+  }, 120_000);
+
+  it('a figure that states no selector is sampled exactly as before (no admission, no reserve seed)', () => {
+    const cube = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
+    expect(knowledgeSamples3(cube, [0, 1013])).toHaveLength(2);
   });
 });

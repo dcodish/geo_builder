@@ -13,6 +13,7 @@
  * figure (#157's trapezoid-midsegment) builds clean at seed 0 on every step — measured; no resolve fires
  * and nothing freezes — so it is not a lock here.
  */
+import { seedNumber } from '@/engine';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useGeoStore, meetsRequirements, findValidConfig, replay } from '@/store/geoStore';
 import { runViewResolve } from '@/app/resolveView';
@@ -83,7 +84,7 @@ describe('#364 — the commit is the facts alone; the resolve is a separate, off
     const { facts, seed } = state();
     expect(meetsRequirements(facts, seed), 'resolved to a valid configuration').toBe(true);
     expect(seed, 'swept upward from the current seed, never from 0').toBeGreaterThanOrEqual(BROKEN_SEED);
-    for (let s = BROKEN_SEED; s < seed; s++) expect(meetsRequirements(facts, s), `seed ${s} was skipped although valid`).toBe(false);
+    for (let s = BROKEN_SEED; s < seedNumber(seed); s++) expect(meetsRequirements(facts, s), `seed ${s} was skipped although valid`).toBe(false);
   }, 300_000);
 
   it('the resolve merges into the commit’s history entry: one undo removes the fact AND restores the seed', async () => {

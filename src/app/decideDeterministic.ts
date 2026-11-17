@@ -25,6 +25,7 @@
  * instant part (store operations and the pre-parse format guards), `decideFromParse` the part that parses
  * and dry-runs. `decideDeterministic2D` is both, for a caller that has no spinner.
  */
+import type { Seed } from '@/engine';
 import {
   buildParseCtx,
   classifyOutOfScope,
@@ -111,7 +112,7 @@ export interface DecideView {
 
 export interface DecideState {
   readonly facts: readonly Fact[];
-  readonly seed: number;
+  readonly seed: Seed;
   readonly view: DecideView;
   /**
    * #2362 ([ADR-748](../../docs/06-decisions.md#adr-748), operator ruling 2026-10-20 Q2): «הציגו מרכזי מעגלים» was ON when
@@ -244,7 +245,7 @@ export interface DecideHooks {
    * Warm the fold of a trial fact list (the #41 / ADR-290 worker prefold). An optimisation only: it
    * primes a memo, it never changes a result, so a caller without a worker omits it.
    */
-  prefold?(trial: Fact[], seed: number): Promise<void>;
+  prefold?(trial: Fact[], seed: Seed): Promise<void>;
 }
 
 /**

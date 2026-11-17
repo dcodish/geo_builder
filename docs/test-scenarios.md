@@ -2368,3 +2368,15 @@ over all four (ADR-041).
 ### `lengths-clearer-reason-2894` — a length the figure already forces, stated otherwise, is refused with 3-D's reason, naming the statement it contradicts (#2894, ADR-835)
 
 **Guards against:** the 2-D refusal of a length conflict the metric closure decides drifting from 3-D's sentence (ADR-3D-495) or losing the earlier statement it names: «ריבוע ABCD · AB = 3 · AC = 10», a rectangle's diagonal, an equilateral side, a diameter longer than 2r, «ABCD ריבוע» over two unequal sides — each driven through the submit gate and read word for word; the control (a square with only its diagonal) commits.
+
+### `unreachable-length-refused-2572` — a chord or an inscribed side past the diameter, a side of a triangle around a circle under it: refused naming the line that bounds it (#2572, ADR-859)
+
+**Guards against:** a length the figure can never reach parked as «waiting for givens» (ADR-104's deferral) though the metric closure proves it impossible: «AB = 6» on a radius-2 chord, «AB = 8» inscribed in radius 3, «AB = 4» around radius 3 (#2538's X1), «AB = 10» for two points on radius 3 (#2272). **Asserts** each is refused by the submit gate before it becomes a fact, in the closure's words naming the circle's line; the controls (a chord of 3 and of 4 in radius 2, a side of 8 around radius 3) commit.
+
+### `new-solutions-first-tangent-right-triangle-2831` — «משיק מ-A בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6»: the three triangles come on presses 0, 1 and 2 (#2831, ADR-824)
+
+**Guards against:** «הציגו תצורה אחרת» showing a mirror image of the drawing on the screen before a solution not yet shown (the odometer turned the tangent-point and side axes, both mirrors, faster than the right-angle seat: the triangles came on presses 0, 2 and 4). **Asserts** presses 0–2 are three different shapes, there is no fourth, and presses 3–5 repeat them in order, as other placements.
+
+### `square-E-beyond-A-2744` — a point its givens fix up to a choice shows each solution, and «BE» lists both values (#2744, ADR-856)
+
+**Guards against:** «ריבוע ABCD שצלעו 10 · E על הישר AB · DE = 12» drawing E between A and B at every seed, «הציגו תצורה אחרת» finding nothing, and the panel stating BE = 3.37 as known. **Asserts** seed 0 at BE 3.37, both roots over seeds 0–23 (each at least 6), a press reaching 16.63, «BE» answering both values in the panel and the question box, the angle and area siblings reaching both roots; controls: «BE > 10» draws 16.63 at seed 0, the segment form has no other configuration, the SSA triangle keeps both shapes.

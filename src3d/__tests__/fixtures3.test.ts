@@ -29,6 +29,12 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2916 (ADR-3D-533) — the ADR-3D-032 exam box, the issue's sequence: «A.y < 0» is stated, and a knowledge sample at seed + 3041
+  // broke it. The admission is asserted in engine/__tests__/engine3.test.ts; the ask/panel agreement by the #2367 sweep over this corpus.
+  'exam-box-sign-2916.geo3.json': [
+    'תיבה', "מישור A'B'C'D' הוא x+4y-8z-142=0", 'B(0,7,6)', 'משוואת הישר AB היא x = (0,7,6) + t(0,2,1)', 'אורך המקצוע AB הוא 5√5',
+    'שיעור ה-y של הקודקוד A שלילי', 'נתונה נקודה M(k,1,3), k חיובי', 'גודל הזווית שבין הישר AB ובין הישר AM הוא 60',
+  ],
   // #2563 (ADR-3D-489) — the operator's sequence: a NEW point with letter coordinates, k shared with B and p a new letter.
   // The class is asserted in letter-coords-new-point-2563.test.ts; this is the build + drift + load net.
   'letter-coords-new-point-2563.geo3.json': ['פירמידה SABCD', 'B(2t, t, k)', 'N(k,p,3)'],
@@ -634,9 +640,40 @@ const SEEDED: SeededCorpus = {
   // point). Saved with `seedParts`, so the corpus also loads the new file field. The per-line work, the stability and the
   // round trips are asserted in issue-2764-independent-parts.test.ts; this is the build + drift + load net.
   'nine-separate-shapes-2764.geo3.json': ['מרובע', 'טרפז', 'טרפז שווה שוקיים', 'טרפז ישר זווית', 'מקבילית', 'מלבן', 'מעוין', 'ריבוע', 'דלתון'],
+  // #1524 (ADR-3D-477): a parameter's RANGE — «k ≥ 0» (the sign that allows zero) selects the root of the 60° angle, the
+  // appositive and the standalone spelling both; «2 ≤ k ≤ 9» checks it. The refusals and the sampled windows are asserted in
+  // adr-3d-032.test.ts; this is the build + drift + load net.
+  'param-range-1524.geo3.json': [
+    'תיבה', "מישור A'B'C'D' הוא x+4y-8z-142=0", 'B(0,7,6)', 'משוואת הישר AB היא x = (0,7,6) + t(0,2,1)', 'אורך המקצוע AB הוא 5√5',
+    'שיעור ה-y של הקודקוד A שלילי', 'נתונה נקודה M(k,1,3), k ≥ 0', 'גודל הזווית שבין הישר AB ובין הישר AM הוא 60', '2 ≤ k ≤ 9',
+  ],
   // #1829 (ADR-3D-471): the operator's rectangle, saved with his «AE» ask (before: «AE⃗ — לא נקבע על ידי הנתונים»; now
   // «u + t·v»). The answers, the shared t and the panel parity are asserted in queries.test.ts; this is the build + drift net.
   'vector-answer-in-parameter-1829.geo3.json': ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'AB=1', '|AD|=√7', 'DF→ = t*DC→', 'BE→ = t*BC→'],
+  // #1551 (ADR-3D-472): bagrut 2026 summer 03572 Q2 as typed in prod (before: «EM = a·EA + b·EC» not understood). The
+  // letters (a = 2/3, b = 1/6), M in plane AEC and the 2/1/4 box are asserted in issue-1551-two-letter-vec-rel.test.ts.
+  'bagrut-03572-q2-1551.geo3.json': ["תיבה ABCDA'B'C'D'", "נסמן: AA' = w, AB = v, AD = u", "E אמצע BB'", 'EA', 'EC', 'BM=u/6-2v/3+w/12', 'EM = a·EA + b·EC', 'מישור AEC', '|w| = 4', 'BM ⊥ AEC'],
+  // #2829 (ADR-3D-525): the issue's four lines — the circle rider closes the quadrilateral declared after it (before: ABCD
+  // drawn crossed at 14 of 24 seeds). Simple at every seed, A, B, C unmoved and the pentagon twin are asserted in
+  // engine3.test.ts; this is the build + drift + load net.
+  'ring-circle-rider-simple-2829.geo3.json': ['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD'],
+  // #2792 (ADR-3D-521): a size beside a fixed object off the origin, in the order that turned it red (before: «אורך AB = 4»
+  // size-on-solid, the cube at edge 1; the volume red, V = 0.38). The lanes, both orders and the kept refusals are asserted
+  // in placement-gauge.test.ts; these are the build + drift net.
+  'cube-size-beside-point-2792.geo3.json': ["קובייה ABCDA'B'C'D'", 'אורך AB = 4', 'P(1,2,3)'],
+  'pyramid-volume-beside-plane-2792.geo3.json': ['פירמידה ABCDS', 'נפח הפירמידה ABCDS = 12', 'x+y+z=1'],
+  // #2834 (ADR-3D-520): the exam box fixed by the plane A'B'C'D', B and the line AB (before: the nine labels on one pixel,
+  // the patch grown to a parallel line's "crossing" at t ≈ 1e12). The framing is asserted in line-perp-plane-mark.test.ts;
+  // this is the build + drift net.
+  'exam-box-plane-line-2834.geo3.json': [
+    'תיבה',
+    "מישור A'B'C'D' הוא x+4y-8z-142=0",
+    'B(0,7,6)',
+    'משוואת הישר AB היא x = (0,7,6) + t(0,2,1)',
+    'אורך המקצוע AB הוא 5√5',
+    'שיעור ה-y של הקודקוד A שלילי',
+    'נתונה נקודה M(k,1,3)',
+  ],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

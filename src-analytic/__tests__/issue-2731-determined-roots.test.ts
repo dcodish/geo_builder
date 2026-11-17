@@ -12,11 +12,12 @@ import { decideSubmit } from '../app/submit';
 import { ask } from '../app/ask';
 import { anotherConfiguration } from '../app/another';
 import { derive } from '../engine/derive';
-import { evaluate } from '../engine/evaluate';
+import { evaluate, looksTheSame } from '../engine/evaluate';
 import { fmtAnalytic } from '../format';
 import parabola from './fixtures/exam-2021-special-q1-parabola-2731.analytic.json';
 import circles from './fixtures/exam-2023b-q1-four-circles-2731.analytic.json';
 import p215 from './fixtures/ellipse-book-p2-15-2621.analytic.json';
+import square2744 from './fixtures/square-E-beyond-A-2744.analytic.json';
 
 const PARABOLA = parabola.lines;
 const CIRCLES = circles.lines;
@@ -145,16 +146,29 @@ describe('#2731 — three solutions: the book\'s p2-15 ellipse', () => {
     expect(ellipseAt(0)).toBe('8.00,6.93');
   });
 
-  it('«הציגו תצורה אחרת», pressed again and again, reaches all three ellipses', () => {
-    const seen = new Set<string>([ellipseAt(0)]);
-    let seed: Seed = 0;
-    for (let press = 0; press < 20 && seen.size < 3; press += 1) {
-      const next = anotherConfiguration(lines, seed);
+  /**
+   * #2831 ([ADR-AG-473](../../docs/06c-decisions-analytic.md#adr-ag-473), operator 2026-11-12 *"2831 - A"*): a mirror
+   * image is the same solution placed differently, and new solutions come first. The three ellipses are the first
+   * drawing and presses 1 and 2 (the third came on press 13 before); the presses after that are the mirror images,
+   * and a whole round of the cycle comes back to the first drawing.
+   */
+  it('«הציגו תצורה אחרת» shows the three ellipses on presses 0, 1 and 2, then their mirror images', () => {
+    const shown: Seed[] = [0];
+    for (let press = 1; press <= 8; press += 1) {
+      const next = anotherConfiguration(lines, shown.at(-1)!);
       expect(next.found).toBe(true);
-      seed = next.seed;
-      seen.add(ellipseAt(seed));
+      shown.push(next.seed);
     }
-    expect([...seen].sort()).toEqual(['4.18,8.00', '7.65,8.00', '8.00,6.93']);
+    const ellipses = shown.map(ellipseAt);
+    expect(ellipses[0]).toBe('8.00,6.93');
+    expect(new Set(ellipses.slice(1, 3))).toEqual(new Set(['4.18,8.00', '7.65,8.00']));
+    // Press 3 is a placement of a solution already shown: one of the three ellipses again, never a fourth.
+    for (const e of ellipses.slice(3)) expect(['4.18,8.00', '7.65,8.00', '8.00,6.93']).toContain(e);
+    // …and every press is another drawing than the one before it.
+    const at = (s: Seed) => derive(lines, s).figure;
+    for (let i = 1; i < shown.length; i += 1) expect(looksTheSame(at(shown[i]), at(shown[i - 1]))).toBe(false);
+    // The first drawing's own mirror images are reached: A at (−4, 6) is the y-axis mirror of the book's (4, 6).
+    expect(shown.some((s, i) => i > 0 && ellipseAt(s) === '8.00,6.93')).toBe(true);
   });
 });
 
@@ -172,6 +186,43 @@ describe('#2731 — controls: a pin already listed its roots, a free figure is u
     const c = derive(tri, 0).construction;
     const xs = new Set(Array.from({ length: 6 }, (_, s) => evaluate(c, s).points.find((p) => p.id === 'C')!.x.toFixed(3)));
     expect(xs.size).toBeGreaterThan(1);
+    expect(evaluate(c, 1).rootKey).toBeUndefined();
+  });
+});
+
+describe('#2744 (ADR-AG-502) — a free square, E on line AB, DE = 12: E is fixed up to a side of A', () => {
+  const lines = recorded(square2744.lines);
+  const BE = (f: ReturnType<typeof evaluate>) => {
+    const b = f.points.find((p) => p.id === 'B')!;
+    const e = f.points.find((p) => p.id === 'E')!;
+    return Math.hypot(b.x - e.x, b.y - e.y).toFixed(2);
+  };
+  it('the first drawing is unchanged (E between A and B), and «BE» answers both values', () => {
+    expect(BE(derive(lines, 0).figure)).toBe('3.37');
+    expect(answer(lines, 'BE')).toBe('3.37 או 16.63');
+  });
+  it('both roots over configurations 0–23, each at least 6 times', () => {
+    const c = derive(lines, 0).construction;
+    const tally = new Map<string, number>();
+    // the pool's own reading: configurations whose givens and selectors hold (`poolOf` above)
+    for (let s = 0; s < 24; s += 1) {
+      const f = evaluate(c, s);
+      if (f.unsatisfied.length === 0 && f.selectorsOk) tally.set(BE(f), (tally.get(BE(f)) ?? 0) + 1);
+    }
+    expect([...tally.keys()].sort()).toEqual(['16.63', '3.37']);
+    for (const n of tally.values()) expect(n).toBeGreaterThanOrEqual(6);
+  });
+  it('«הציגו תצורה אחרת» reaches E beyond A', () => {
+    const next = anotherConfiguration(lines, 0);
+    expect(next.found).toBe(true);
+    expect(BE(derive(lines, next.seed).figure)).toBe('16.63');
+  });
+  it('the angle and the area siblings answer both values', () => {
+    expect(answer(recorded(['ריבוע ABCD שצלעו 10', 'E על הישר AB', 'זווית ADE = 30']), 'BE')).toBe('4.23 או 15.77');
+    expect(answer(recorded(['ריבוע ABCD שצלעו 10', 'E על הישר AB', 'שטח ADE = 20']), 'BE')).toBe('6 או 14');
+  });
+  it('a free square alone, with nothing fixing a vertex, is not listed: no root key', () => {
+    const c = derive(recorded(['ריבוע ABCD שצלעו 10']), 0).construction;
     expect(evaluate(c, 1).rootKey).toBeUndefined();
   });
 });

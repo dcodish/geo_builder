@@ -1265,6 +1265,11 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
   Am. 1) — and even then it is refused when the dry run's seat sweep finished and cured nothing (`StepOutcome.seatsExhausted`,
   [ADR-584](06-decisions.md#adr-584), #1671). `seatSweep` is bounded by `SEAT_SWEEP_WORK_CAP` charged units; the
   worker warms the rotated folds first (`seatSweepWarmup`; a transplanted fold carries `FoldNode.work`).
+- **Pending is within reach** ([ADR-859](06-decisions.md#adr-859), #2572): `constraintIsPending` — the one predicate both
+  the gate and the classifier ask — returns NOT pending when the metric closure (`metricClosureImpossibility`, ADR-833/837)
+  proves the trial's lengths hold in no configuration and proves nothing of the figure before the line. The flex probe
+  asks whether a residual moves; the closure, whether it can reach zero. A chord or inscribed side past the diameter and a
+  side of a circumscribed triangle under it are concluded, so the gate refuses them in the dry run's words.
 - **The gate's budgets are work, never the clock** ([ADR-709](06-decisions.md#adr-709), #1857). After the seat
   sweep, the dry run's unstated-choice rescue (`choiceRescue(all, { workCap: choiceRescueConfig.cap })`) decides
   whether another variant / side / reflex assignment cures an erroring step; it runs under
@@ -1586,7 +1591,8 @@ is never re-read.
   (`main-thread-sweeps.test.ts` records `firstSatisfyingSeed` at 0).
 - **The resolve** is `resolveAfterCommit` (App) → `runViewResolve` (`app/resolveView.ts`) → `geoWork.autoResolve`
   (the worker): `meetsRequirements` decides whether anything is wrong, and `findValidConfig(facts, seed)` sweeps
-  from the current seed (M2). The found view merges into the commit's history entry, so one undo removes both.
+  from the current seed (M2). In a figure of independent parts it walks only the parts that fail (ADR-853), so a
+  separate shape the new line did not touch keeps its configuration entry. The found view merges into the commit's history entry, so one undo removes both.
 - **The search basis** ([ADR-812](06-decisions.md#adr-812), #2757). Every worker search result carries the `(facts, seed)`
   it ran on (`ViewBasis`, `store/geoWork.ts`), and `applyView` is a compare-and-set on it: a view that lands after
   an undo, redo, clear, edit or new line is dropped. A store subscription supersedes such a search on the change
@@ -1620,6 +1626,30 @@ reports `factsAfter[k]`; `figureAtStep` re-derives the figure with the `(facts, 
 reads `replaySession`. `main.tsx` mounts it under `import.meta.env.DEV`, which production folds to `false`.
 
 ## Fold and replay
+
+### A figure of independent parts is solved, sampled and judged part by part (#2796, [ADR-853](06-decisions.md#adr-853))
+
+`partsOf(c)` (`engine/components.ts`) is a union–find over the construction's objects: two objects are one part when
+either names the other (any string inside an object — parents, `solve`, `avoid`, `between` — that is an object id),
+and every constraint, stated side (`requirements`) and `sideChoices` record joins the objects it names; the replay
+tail also links the objects each enabled fact names (`foldParts`), so one typed line is one figure even where only the
+facts carry the relation («שני מעגלים»: the pair's unstated mutual position, ADR-815). A generic walk,
+never a per-kind list; a record naming no object keeps the figure whole. A part with no drawn object (polygon, segment,
+line, circle, arc) rides with the first part that has one. **One part ⇒ the construction itself**, so every connected
+figure takes its old path bit for bit. The part's key is its first object id in construction order.
+
+- **Solve.** `resolveDriven` and `evaluate` split a multi-part construction: each part's sub-construction is resolved
+  and evaluated on its own (memoised by identity), and the results are joined (`joinParts`, `joinEvals`). A forced
+  coincidence is recorded inside a part only; a stack across parts is a default the search separates (FR-ALT-5).
+- **Sample.** `runTail` → `tailSample` per part, at the part's own number (`seedOfPart`): the spin about the part's own
+  centroid, the jitter from its own span, the reflection mask over its own `reflectableFreePoints` (so `REFLECT_MAX`
+  applies per part), and the ADR-400 warm retry per part. The joined figure adopts its parts (`adoptParts`), so its
+  `evaluate` re-solves only a part whose sample changed. The fold is unchanged (the ladder already works on the new
+  statement's component, `jointFirst`).
+- **Judge.** `figureMeetsRequirements` of a multi-part figure is the build plus `partMeetsRequirements` of every part:
+  the same bar over the part's own facts (a fact belongs to the parts whose objects it names, or to every part when it
+  names none), positions, violations and coincidences — `pointsDistinct` at the part's own span — and the canvas once:
+  no point of the part within 1.5 % of its span of another part's point.
 
 ### The within-segment gate and its structural exemption (#944, [ADR-489](06-decisions.md#adr-489))
 
@@ -1976,6 +2006,28 @@ The relations layer's definite values, the values panel and the forced crossing 
 
 ## The configuration registry and searches
 
+### The per-part configuration (`Seed`) and the part walk (#2796, [ADR-853](06-decisions.md#adr-853))
+
+The configuration is `Seed = number | { seed, parts }` (`engine/components.ts`): a plain number is every part at it;
+`parts[key]` is the full number (base and reflection mask) of the part keyed `key`, and a part with no entry sits at
+`seed`. Helpers: `seedNumber`, `seedOfPart`, `withPartSeed`, `canonicalSeed` (no entry equal to the base; none ⇒ the
+number), `seedKey` (the replay memo key; a number spells as before), `sameSeed` (zundo's equality), `cleanSeed`,
+`seedPartsOf`. When parts join, the joined part takes the earliest key's entry (it keeps that key); a part with no
+entry samples at the base. Branch, variant and seat choices were already per fact.
+
+`findValidConfig` (`findValidConfigByPart`) searches a one-part figure exactly as before. In a figure of parts it runs
+every tier **for each failing part only**, from that part's entry, under `withPartFocus`: while a part is walked, a
+plain number handed to `replay` names that part's number (every other part at its entry), the bar judges that part
+alone, the reflection count and `reflectMaskForFailing` read the part's construction, `spreadOk`/`separatedView` read
+the part's view, and the seat, variant/side and branch tiers rewrite only the part's facts (`focusOwns`) — the branch
+tier takes the part's branchable facts, not the first four of the whole. Parts that pass keep their entries (NFR-ST-1).
+The answer is judged whole; one that is not falls back to the whole search. «הציגו תצורה אחרת» (`searchAnotherView`,
+`searchResample`) stays a plain-number press that moves every part; the press's fingerprint compares the whole
+drawing. The gate's readers (`dryRunOutcome`, `forcedCrossedRing`, `settleVariantDefaults`, `seatSweepWarmup`, …)
+take the `Seed` through, so a new line is read at its own part's number; knowledge pools stay plain numbers around
+the base. On disk `seed` stays the base number and the entries ride in a sibling `seedParts` (file, share link,
+session), so an older build ignores them; a malformed entry is dropped (`cleanSeed`).
+
 ### One registry of unstated discrete choices ([ADR-593](06-decisions.md#adr-593))
 
 An unstated discrete choice is reachable by «הציגו תצורה אחרת», counted by the status line and judged by the values
@@ -1994,6 +2046,18 @@ press); `admissibleRewrites` enumerates every axis but `variant` (sampled by `va
 `ADMISSIBLE_REWRITE_CAP`; `choiceRescue` (`findValidConfig`'s tier after the seat, and `dryRunOutcome`'s curable
 test) tries the `variant` and `side` axes, fewest changes first; `App.tsx` enables the button when any axis or free
 DOF exists.
+
+**The solution cycle ([ADR-824](06-decisions.md#adr-824), #2831).** On a figure with no shape freedom left
+(`freeDofCount` 0; its placement may still be sampled), `searchAnotherView` first calls `solutionCycleStep`: it gathers
+every axis assignment (counted from the all-default one, at most 64) that meets every requirement at the seed of the press that began
+gathering (the shape is determined, so the seed only places it; the cycle keeps that seed), groups them by `shapeFingerprint` within `SAME_SHAPE_TOL` (one solution up to a turn, shift, scale or mirror),
+puts #942's separated drawings first within a group, and interleaves the groups round-robin in order of first
+appearance. The press returns the successor of the assignment on the screen. A cycle with nothing but the drawing on
+the screen, or one the deadline cut, falls through to the odometer below, unchanged; so does every figure with shape
+freedom. The cycle is memoised per facts with every axis digit zeroed, the last 8 figures, so only the first press pays
+for the gathering. The gathering gets half the press's remaining budget; one the deadline cuts keeps what it found and
+the next press resumes it while the odometer answers, and an assignment whose solve the clock cuts twice is not
+offered, as the odometer treats a candidate its deadline cuts.
 
 The seat is **pinned** by the student's own right angle, read from one set, `explicitRightAngleVerts` (ADR-445), that the ADR-163 reseat pre-scan, `cyclableSeat` and `unpinnedSeats` all consult: a 90° `set-angle`, and since [ADR-658](06-decisions.md#adr-658) (#2082) a `set-perpendicular` whose two segments meet at one vertex V of an enabled right triangle with their other ends its other two vertices (every ⟂ spelling and every height that lowers to one; structure only, never positions). The set is in fact order, so of two right angles stated on one right triangle the earlier keeps the seat, and the later line meets the angle-sum prover's `no-room` verdict (LADDER stage 0f) and is refused at the door, naming the earlier statement through the fold's drop-one search ([ADR-508](06-decisions.md#adr-508)). A noun's default seat (`seat: true` ⟂ or perp-offset knee) is never read as a stated angle by that prover.
 
@@ -2041,6 +2105,23 @@ keeps its vertex order; chords stated to meet within a segment (`line-line-inter
 their ends; otherwise, or when unsatisfiable, the default stays. It runs before the jitter, adds no evaluate, and is
 reached by every view search's seed sweep (ADR-106) — the counterpart of the stated-side seat (ADR-594).
 
+### A determined free point's other roots are listed once per fold, and the seed chooses one ([ADR-856](06-decisions.md#adr-856))
+
+A free point two scalar givens fix («E על הישר AB» · «DE = 12») is solved by descent from the sampled start, which
+`applySeed` barely moves, so every seed reached the same root. `engine/blockRoots.ts` `enumerateFreePointRoots(cur)` lists,
+for each non-pinned free point that ADR-166's reflection does not own (`reflectableFreePoints`) and whose own rows fix it
+(every constraint reading it or a point that moves with it, every other point held: a rank-2 Jacobian over its two
+coordinates), its roots: polished descents from its mirror images through the points its rows name and across the lines
+through two of them, then deflated LM (`r·Π(1 + 1/‖x − root‖²)`) from `ROOT_STARTS` fixed nudges at a quarter and a whole
+span, for at most `ROOT_ROUNDS`, at most `ROOT_CAP` roots, inside `ROOT_REACH` spans. A root counts when every constraint
+holds there, no polygon is defective and no two named points meet. Each is stored in the frame of those points
+(`frameOf`: the two farthest, and one off their line). `replay/core.ts` memoises the list per committed construction
+(`freePointRootsOf`); `runTail` calls `applyRootChoice` on the sampled construction for every base seed but 0, which
+starts each listed point at root `rootChoice(seed, id, n)` placed in its anchors as the seed sampled them (one
+`evaluateCore` without a solve). A start, never a verdict: `evaluate` converges from it and ADR-400's warm retry still
+runs. Nothing else reads it: the seed resample of `searchAnotherView` and the knowledge pool see the other root because
+the seeds now reach it.
+
 ### A free point's admissible region rides on the point (#556, [ADR-511](06-decisions.md#adr-511))
 
 A construction needing a free operand on one side of a circle (a tangent's or secant's apex, «M מחוץ למעגל») emits
@@ -2078,6 +2159,17 @@ The engine leaves an unstated choice free (ADR-052) and cyclable (ADR-138); this
 - **Render:** on the fact's row, plus one cue beside «הציגו תצורה אחרת» (ADR-502 Am. 1, #996).
 
 ## Render and marks
+
+### A hidden segment takes what exists only for it ([ADR-825](06-decisions.md#adr-825), [ADR-W-207](06w-decisions-workspace.md#adr-w-207), #2852)
+
+`Figure.tsx` reads its scene into the shared decision `hiddenWith` (`shell/frame/segmentDisplay.ts`) before it builds
+the scene: the segments split by `segStyle`, the length labels, the right-angle marks, the declared equal classes,
+and the points every other mark touches. The scene is built from what it leaves — `buildScene`'s `suppress` drops the
+lone points, so their extensions go too. Which points may go is the facts' question, answered in
+`src/app/hideOwnership.ts` (`lonePoints`: never typed, at most one row names it, nothing but a segment or polygon built
+from it) and handed in as the `lonePoints` prop; `hiddenRowGroups` gives the rows that show «מוסתר».
+
+*Identifiers:* `hiddenWith` · `lonePoints` · `hiddenRowGroups` · `suppress` · `FactRow.hidden`
 
 ### An off-ink construction point's dashed extension ([ADR-612](06-decisions.md#adr-612), [ADR-W-124](06w-decisions-workspace.md#adr-w-124), #1971, #1937)
 

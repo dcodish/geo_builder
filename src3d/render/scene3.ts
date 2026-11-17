@@ -19,7 +19,7 @@ import { hasAbsoluteFrameObject, intersectPlanes, type Resolved3, type ResolvedL
 import { FLAT_SOLID_KINDS } from '../engine/solve3';
 import { DIRECTION_REL_TOL, distanceWitness, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
 import { defaultPlaneDisplay3, lengthMarkText, type Construction3, type Id, type Operand3, type Positions3, type SolidObj } from '../engine/types';
-import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
+import { add3, centroid3, cross3, dist3, dot3, lerp3, linePlaneCrossingT3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
 import { dihedralConstruction, dihedralGeometry, linePlaneConstruction, solidBaseRings } from './dihedral';
@@ -711,9 +711,9 @@ export function buildScene3(
     // and a rectangle that never meet — the same visual contradiction as an on-plane point drawn
     // outside the patch (the rule this sweep already states), one member short.
     for (const ln of resolved.lines.values()) {
-      const denom = dot3(pl.n, ln.dir);
-      if (Math.abs(denom) < 1e-9) continue; // parallel to the plane — no crossing
-      grow(add3(ln.anchor, scale3(ln.dir, -(dot3(pl.n, ln.anchor) + pl.d) / denom)));
+      const t = linePlaneCrossingT3(pl.n, pl.d, ln.anchor, ln.dir);
+      if (t === null) continue; // parallel to the plane — no crossing (#2834: scale-free, the engine's test)
+      grow(add3(ln.anchor, scale3(ln.dir, t)));
     }
     patchExtent.set(name, ext);
     const at = (u: number, v: number) => add3(fr.center, add3(scale3(fr.e1, u), scale3(fr.e2, v)));

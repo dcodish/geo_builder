@@ -35,6 +35,7 @@
  * («a circle with center O»), and the honesty battery has already accounted every token of the line. Only a
  * clause the tool can read on its own, and then cannot find in the line's lowering, refuses the line.
  */
+import type { Seed } from '@/engine';
 import { augmentParseCtx, parse } from '@/parser';
 import type { ParseContext, ScopeMatch } from '@/parser';
 import type { AnyCommand } from '@/engine';
@@ -243,7 +244,7 @@ export function droppedClause(
  * this one function with the facts the line is applied after; the entailment test is the dry run of the clause after
  * the whole line's own commands (`empty` / `implied`, ADR-156 / ADR-542). Before it, the ✎ seam had no clause gate.
  */
-export function clauseCoverageVerdict(utterance: string, commands: readonly AnyCommand[], ctx: ParseContext, facts: Fact[], seed: number): ScopeMatch | null {
+export function clauseCoverageVerdict(utterance: string, commands: readonly AnyCommand[], ctx: ParseContext, facts: Fact[], seed: Seed): ScopeMatch | null {
   return droppedClause(utterance, commands, ctx, (clause) => {
     const whole = trialFacts(facts, [...commands]).map((f) => (f.group === '~try' ? { ...f, id: f.id.replace('~try', '~line'), group: '~line' } : f));
     const o = dryRunOutcome(whole, clause, seed);

@@ -61,3 +61,22 @@ describe('#886 — the default canvas draws points, not radius arrows', () => {
     expect(s.radii.length).toBe(6);
   });
 });
+
+/**
+ * #2802 (ADR-CX-100, ADR-CX-101) — a lone locus is never drawn from a FAILED solve. «Re(z) = 0» had
+ * configCount 0: the descent stalled at the modulus bound and the canvas drew the fold's fallback, z on the
+ * origin. Every lone line or circle now reaches tolerance and draws a member of its set.
+ */
+describe('#2802 — the default drawing of a lone locus is a solved member of it', () => {
+  it.each([
+    'Re(z) = 0', '|z - 1| = |z + 1|', 'Im(z) = 0', '|z - i| = |z + i|', 'Re(z) = Im(z)', 'Re(z) + Im(z) = 0',
+    '|z - 1 - i| = |z + 1 + i|', '|z - 1| = |z - i|', '|z - 1 - i| = |z|', 'Re(z^2) = 0', 'Im(z^2) = 0',
+  ])('«%s»: configCount ≥ 1 and z off the origin', (line) => {
+    for (const s of [0, 1, 2, 3]) {
+      const d = deriveLines([line], s, s);
+      expect(d.configCount, `${line} @ ${s}`).toBeGreaterThanOrEqual(1);
+      const z = d.points.find((p) => p.name === 'z')!.z;
+      expect(Math.hypot(z.re, z.im), `${line} @ ${s}`).toBeGreaterThan(0.1);
+    }
+  });
+});

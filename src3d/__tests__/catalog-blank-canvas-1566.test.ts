@@ -27,7 +27,8 @@ const STILL_FAILS: Record<string, string> = {
   // a mutual or plane–plane relation's pin does not move created points to a solution (the pivot finds none, or the
   // segments' meeting is the requirement's gate, never solved)
   'AC ו-BD נחתכים': '#2609',
-  'AB מתלכד עם CD': '#2609',
+  // #2916 (ADR-3D-533) healed «AB מתלכד עם CD» in the 2026-11-16 batch: it builds on a blank page, the four points on
+  // one line — row removed.
   "המישור ABC מקביל למישור A'B'C'": '#2609',
   // a crossing placed off the segment, and the right-pyramid point's own no-solution: not a drive decision
   "הישר A'C חותך את המישור BC'D בנקודה K": '#2609',

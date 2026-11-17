@@ -31,7 +31,7 @@
  * `round`. "Not decided" is never written to the store: it is answered before anything is applied.
  */
 import type { QueryInput, ValuesPanelResult } from '@/engine/valuesPanel';
-import type { AnyCommand } from '@/engine';
+import type { AnyCommand, Seed } from '@/engine';
 import {
   searchAnotherViewRound,
   findValidConfigRound,
@@ -68,7 +68,7 @@ export interface GeoOpsOptions {
 
 export interface Figure {
   facts: Fact[];
-  seed: number;
+  seed: Seed;
 }
 /** A view the post-commit search found, with its fold, and settled when it crosses a heap. */
 export type FoundView = Figure & { fold: FoldNode | null; settled?: SettledView | null };
@@ -228,7 +228,7 @@ export function geoOps(options: GeoOpsOptions) {
     /** The honesty audit of loaded rows (ADR-242). */
     /** #2893 (ADR-831): from step `from` on, when «המשיכו לחפש» continues an audit that reached its limit. */
     audit: ({ facts, from = 0 }: { facts: Fact[]; from?: number }): LoadAudit => auditLoadedFigure(facts, LOAD_WORK_LIMIT, from),
-    dryRun: ({ facts, seed, cmds }: { facts: Fact[]; seed: number; cmds: AnyCommand[] }): { produced: boolean } => ({ produced: dryRunOutcome(facts, cmds, seed).produced }),
+    dryRun: ({ facts, seed, cmds }: { facts: Fact[]; seed: Seed; cmds: AnyCommand[] }): { produced: boolean } => ({ produced: dryRunOutcome(facts, cmds, seed).produced }),
   };
 }
 export type GeoOps = ReturnType<typeof geoOps>;

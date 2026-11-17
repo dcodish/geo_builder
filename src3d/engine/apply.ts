@@ -11,7 +11,7 @@ import { freePlaneDef } from './freePlane';
 import { heldRadius3, radiusLengthCircle3 } from './freeCircle';
 import { definiteCircle3 } from './definiteCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
-import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
+import { handScaleGivenToPivot3, isScaleGivenClaim, magnitudeScalarPin3, magnitudeSizeStated3, scaleGivenLane3, scaleGivenReadsFigure3, scaleGivenSafe } from './scaleGiven';
 import { nounAdmits, nounOfKind, resolveSolidSubject } from './solidSubject';
 import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, cyclicFixCommands, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_BASES, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
@@ -20,7 +20,8 @@ import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3,
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { builtFrom3, carrierParams3, determinationReach3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, FreeVecMetric3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecExpr, VecRelCommand } from './types';
-import { freeMetricOperands3, scalarPinOrigin3, spellingOf, symbolValueOf } from './types';
+import { freeMetricOperands3, scalarPinOrigin3, spellingOf, symbolValueOf, exprLetters3, termLetter3 } from './types';
+import { signBound3, type Bound3 } from './bound3';
 import { FLAT_SOLID_KINDS } from './solve3';
 import { hasClaimResidual3, verifyClaim } from './claims';
 
@@ -1255,7 +1256,11 @@ function statedComps(
  * (the exam gates ADR-3D-175 measured). The second place it is written makes it one unknown in every place.
  */
 export function coordLetterShared3(c: Construction3, sym: string): boolean {
-  return pinSymsOf(c).includes(sym) || c.param === sym || c.partialNames.some((b) => b.sym === sym && b.target.kind === 'point');
+  return (
+    pinSymsOf(c).includes(sym) || c.param === sym || c.partialNames.some((b) => b.sym === sym && b.target.kind === 'point') ||
+    // #1551 (ADR-3D-472 Am. 1): a letter a vector equation's coefficient already carries is the same unknown
+    symbolOwnersOf(c, sym).some((o) => o.kind === 'vec-letter')
+  );
 }
 
 /**
@@ -2367,6 +2372,10 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     if (r.ok && APPLY_DEPTH === 1) r = settleLetters3(c, r.next);
     // #1188 step 2 (ADR-3D-390): and what it did to the free-vector system, the same way
     if (r.ok && APPLY_DEPTH === 1) r = settleFreeVectors3(c, r.next);
+    // #2792 (ADR-3D-521): a line that leaves a recorded scale given on a figure whose ties now fix or couple its size
+    // («אורך AB = 4» then «A(1,2,3)» and «B(5,2,3)») hands it to the pivot at this event, as ADR-3D-393 did only for a
+    // later magnitude — so it acts as a pin (reached, or refused naming the statements), never silently dropped
+    if (r.ok && APPLY_DEPTH === 1 && r.next !== c && r.next.scaleGivens.length > 0 && scaleGivenLane3(r.next)?.lane === 'pivot') handScaleGivenToPivot3(r.next);
   } finally {
     APPLY_DEPTH -= 1;
   }
@@ -3267,9 +3276,22 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // The claim recorded below stays the arbiter.
       if (cmd.claim.type === 'length-eq' && determinationReach3(c, [cmd.claim.a, cmd.claim.b]).length > 0)
         next.determinations.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
+      // #2792 (ADR-3D-521): minted where the router gives a rescale lane (origin or content), and only for a size read
+      // off the figure's own points; where the figure's ties fix or couple its size (the 'pivot' lane) it enters the
+      // pivot below as its own pin, never the claim lane that refused it «size-on-solid». Only the FIRST size, as for the
+      // scale given (ADR-3D-171): once a magnitude already states the size (`magnitudeSizeStated3`: the scale given, or a
+      // demoted one, ADR-3D-393), a later magnitude is a value to CHECK — «אורך AC = 10» on a cube sized by «AB = 2» is
+      // claim-refuted, never a pin whose failure would blame every pin owner («AE = 1» included).
+      const sizeToPivot =
+        isScaleGivenClaim(cmd.claim) &&
+        c.scaleGivens.length === 0 &&
+        !magnitudeSizeStated3(c) &&
+        scaleGivenLane3(c)?.lane === 'pivot' &&
+        scaleGivenReadsFigure3(c, cmd.claim);
       if (
         isScaleGivenClaim(cmd.claim) &&
         scaleGivenSafe(c) &&
+        scaleGivenReadsFigure3(c, cmd.claim) &&
         c.scaleGivens.length === 0 &&
         ((cmd.claim.type !== 'length-eq' && cmd.claim.type !== 'length-sum') || freeDims(c) === 0)
       ) {
@@ -3303,7 +3325,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // demotion below takes them together.
       const scaleReaches = c.scaleGivens.some((g) => statementReachesFreeDof3(c, g));
       const reaches = statementReachesFreeDof3(c, cmd.claim) || (isScaleGivenClaim(cmd.claim) && scaleReaches);
-      if (reaches || claimPointIds(c, cmd.claim).some((id) => c.points.get(id)?.kind === 'free3')) {
+      if (reaches || sizeToPivot || claimPointIds(c, cmd.claim).some((id) => c.points.get(id)?.kind === 'free3')) {
         // #316 (ADR-3D-075): the COORDS twin — «D=(8,10,-12)» on an under-determined figure is the
         // same statement as «D(8,10,-12)» (one statement, one semantics, docs/17 §2.3; the `=` sign
         // must not turn a GIVEN into a refused claim). It lowers to the pivot pin exactly like
@@ -3341,16 +3363,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
          * (the final verification stays the arbiter, the ADR-3D-030 pattern); a length keeps its
          * historical no-claim pin shape byte-identical.
          */
-        const magnitudeScalarPin = (cl: Claim3): ScalarPin | null =>
-          cl.type === 'length-eq'
-            ? { kind: 'length', a: cl.a, b: cl.b, value: cl.value }
-            : cl.type === 'length-sum' // #1680 (ADR-3D-392): drives like `length`, by its own signed residual
-              ? { kind: 'length-sum', terms: cl.terms, value: cl.value }
-            : cl.type === 'area-eq'
-              ? { kind: 'area3', ids: cl.ids, value: cl.value }
-              : cl.type === 'volume-poly'
-                ? { kind: 'volume3', noun: cl.noun, ids: cl.ids, value: cl.value }
-                : null;
+        const magnitudeScalarPin = magnitudeScalarPin3;
         // …never over a SYMBOL-defined point (SN=k·SC): the pivot does not position it (ADR-3D-030,
         // the same entry rule as the coords arm above), so its residual could never close and a true
         // magnitude would read refuted. Such a statement stays with the claim arbiter below.
@@ -3358,20 +3371,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const mag = symbolDefined ? null : magnitudeScalarPin(cmd.claim);
         // #1782 (ADR-3D-393): free dims, or a free carrier in reach — #2609 (ADR-3D-408): on any figure the pivot runs
         // on, a solid-free one of created points included (the `free3` clause keeps its own length arm below)
-        if (mag && reaches) {
-          if (c.scaleGivens.length > 0) {
-            next.scaleGivens = [];
-            for (const g of c.scaleGivens) {
-              const gp = magnitudeScalarPin(g);
-              if (!gp) continue;
-              next.scalarPins.push(gp);
-              // #1782 (ADR-3D-393): its claim is already recorded; a demoted LENGTH becomes the pin's arbiter
-              // (`given: true`, the #1567 seam), so it is judged as the given it now is — never as an answer
-              // the size-on-solid guard would refuse on a figure the pivot sized. Same slot, so its owner holds.
-              const at = next.claims.indexOf(g);
-              if (g.type === 'length-eq' && at >= 0) next.claims[at] = { ...g, given: true };
-            }
-          }
+        if (mag && (reaches || sizeToPivot)) {
+          // #1782 (ADR-3D-393): a scale given in force is demoted with it (#2792: the one demotion, shared)
+          if (c.scaleGivens.length > 0) handScaleGivenToPivot3(next);
           // #1567 (ADR-3D-285): the length pin records its arbiter; a volume or an area keeps its plain claim
           const lengthPin = cmd.claim.type === 'length-eq' || cmd.claim.type === 'length-sum';
           recordClaim3(next, c, cmd.claim, { pin: () => next.scalarPins.push(mag), record: lengthPin ? 'arbiter' : 'claim' });
@@ -3813,7 +3815,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next: c };
     }
 
-    case 'param-sign': {
+    case 'param-sign':
+    case 'param-bound': {
       // #325: the sign given also applies to a PIN symbol (`t פרמטר חיובי` after `B(2t,t,k)`) —
       // it selects among pivot solutions the way it selects among root branches for c.param.
       // #814 (ADR-3D-175): the THIRD thing a letter can be. Beside the figure parameter and a pin
@@ -3839,17 +3842,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // claiming the figure never defined k); this makes it selectable, so the given is honoured rather
       // than honestly declined. The sign rides the SAME `paramSigns` list every other lane uses —
       // {@link firstNonDegenerateRoot} reads it, filtered to this symbol.
+      // #1524 (ADR-3D-477): a RANGE («k ≥ 2», «t ≥ 0») is the sign's sibling — the same owners, the same lists, as an
+      // interval. A strict end at 0 alone IS the sign, so both lower to one shape here and every reader reads one thing.
+      const bound: Bound3 = cmd.type === 'param-sign' ? signBound3(cmd.positive) : { lo: cmd.lo, hi: cmd.hi, loStrict: cmd.loStrict, hiStrict: cmd.hiStrict };
       const owners = symbolOwnersOf(c, cmd.sym);
       // #1188 step 2 (ADR-3D-390): a free vector's letter — its sampled half-range follows the sign
       const solverOwned = owners.some((o) => o.kind === 'pin-sym' || o.kind === 'param' || o.kind === 'vec-def' || o.kind === 'free-sym');
       const components = owners.filter((o): o is Extract<SymbolOwner, { kind: 'component' }> => o.kind === 'component');
       if (!solverOwned && components.length === 0) {
-        const code = owners.length ? ('sign-not-selectable' as const) : ('unknown-symbol' as const);
+        const code = !owners.length ? ('unknown-symbol' as const) : cmd.type === 'param-sign' ? ('sign-not-selectable' as const) : ('param-bound-not-selectable' as const);
         return { ok: false, error: { code, id: cmd.sym } };
       }
       const next = clone(c);
-      if (solverOwned) next.paramSigns.push(cmd);
-      for (const b of components) next.componentSigns.push({ target: b.target, axis: b.axis, positive: cmd.positive });
+      if (solverOwned) next.paramSigns.push({ sym: cmd.sym, bound });
+      for (const b of components) next.componentSigns.push({ target: b.target, axis: b.axis, bound });
       return { ok: true, next };
     }
 
@@ -4198,6 +4204,48 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (namedErr) return { ok: false, error: namedErr };
       const unknowns = [...new Set(relPointIds(c, cmd.from, cmd.to, cmd.terms).filter((id) => !c.points.has(id)))];
       if (unknowns.length === 0) {
+        /**
+         * #1551 ([ADR-3D-472](../../docs/06b-decisions-3d.md#adr-3d-472)) — LETTERS OVER PLACED POINTS ARE UNKNOWNS OF A
+         * GIVEN. «EM = a·EA + b·EC» with every point placed states that SOME a and b make it hold: it lowers to the
+         * same `vec-eq` given its numeric twin «EM = 2/3EA + 1/6EC» lowers to (pin + claim, #1183), its lettered
+         * coefficients solved per drawing by least squares (`vecEqLetters3`). Holds for every shape: the letters are
+         * seed-stable and the panel prints them; for some shapes: the pin moves the free shape; for none: refused.
+         * The cevian pair below keeps its one-letter reading first; a letter another lane already owns (a ratio, a
+         * coordinate) keeps the old path — one letter, one number.
+         */
+        const letters = exprLetters3(cmd);
+        // #1551 + #2785 (ADR-3D-472 Am. 1): a letter is one unknown wherever it is written — one a coordinate already
+        // carries (a pin symbol, or a point component an earlier coordinate named, promoted below) is the same letter
+        const shareable = (o: SymbolOwner) => o.kind === 'vec-letter' || o.kind === 'pin-sym' || (o.kind === 'component' && o.target.kind === 'point');
+        const fresh = letters.length > 0 && letters.every((l) => symbolOwnersOf(c, l).every(shareable));
+        const cevian = cmd.symbol !== undefined && relPointIds(c, cmd.from, cmd.to, cmd.terms).some((id) => {
+          const d = c.points.get(id);
+          if (d?.kind !== 'vec-defined') return false;
+          const sym = c.vecDefs[d.def].symbol;
+          return sym !== undefined && !c.symbolPins.some((p) => p.sym === sym);
+        });
+        if (fresh && !cevian) {
+          // a point component the letter names becomes the pool's unknown, as a second coordinate use promotes it (#2785)
+          const named = letters.filter((l) => symbolOwnersOf(c, l).some((o) => o.kind === 'component'));
+          const base = named.length > 0 ? clone(c) : c;
+          if (named.length > 0) promoteNamedComponents3(base, named);
+          const asClaim = applyCommand3(base, {
+            type: 'claim',
+            claim: {
+              type: 'vec-eq',
+              lhs: [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }],
+              rhs: cmd.terms.map((t) => {
+                const sym = termLetter3(t, cmd.symbol);
+                return { coeff: t.coeff.k, ...(t.src ? { src: t.src } : {}), atom: t.atom, ...(t.coeff.p !== 0 && sym ? { letter: { sym, p: t.coeff.p } } : {}) };
+              }),
+            },
+          });
+          if (!asClaim.ok) return asClaim;
+          if (hasSegment(asClaim.next, cmd.from, cmd.to)) return asClaim;
+          const withSeg = clone(asClaim.next);
+          withSeg.segments.push([cmd.from, cmd.to]);
+          return { ok: true, next: withSeg };
+        }
         // the CEVIAN pair: a second symbol-relation naming an already vec-defined point
         if (cmd.symbol) {
           const target = relPointIds(c, cmd.from, cmd.to, cmd.terms).find((id) => {
@@ -4269,7 +4317,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const unknown = unknowns[0];
       const next = clone(c);
       const defIndex = next.vecDefs.length;
-      next.vecDefs.push({ from: cmd.from, to: cmd.to, terms: cmd.terms, unknown, symbol: cmd.symbol });
+      // #1551 (ADR-3D-472): several letters define a point with one free number per letter («EN = a·EA + b·EC»: N free in
+      // the plane EAC), each sampled and moved by «הציגו תצורה אחרת» like a one-letter ratio
+      next.vecDefs.push({ from: cmd.from, to: cmd.to, terms: cmd.terms, unknown, symbol: cmd.symbol, ...(cmd.symbols ? { symbols: cmd.symbols } : {}) });
       next.points.set(unknown, { kind: 'vec-defined', def: defIndex });
       if (!hasSegment(next, cmd.from, cmd.to)) next.segments.push([cmd.from, cmd.to]); // the stated vector is drawn
       return { ok: true, next };
@@ -4451,7 +4501,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // parameter's one admissible root. It replaces any prior pin on the symbol (the student
       // substituting the value the earlier relation produced).
       // #1188 step 2 (ADR-3D-390): a free vector's letter reads the same record — the free-vector system substitutes it
-      if (owners.some((o) => o.kind === 'vec-def' || o.kind === 'pin-sym' || o.kind === 'param' || o.kind === 'free-sym')) {
+      if (owners.some((o) => o.kind === 'vec-def' || o.kind === 'pin-sym' || o.kind === 'param' || o.kind === 'free-sym' || o.kind === 'vec-letter')) {
         const next = clone(c);
         next.symbolPins = next.symbolPins.filter((p) => p.sym !== cmd.symbol);
         next.symbolPins.push({ rel: 'value', value: cmd.value, sym: cmd.symbol });

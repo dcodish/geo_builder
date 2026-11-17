@@ -24,6 +24,12 @@ export const SYMBOL_PALETTE_3: readonly Symbol3[] = [
   ['δ', 'δ', 0],
   ['θ', 'θ', 0],
   ['<', '<', 0], // a bound / ordering between measures
+  // #1524 (ADR-3D-478): the rest of the comparisons, now that 3-D reads a letter's RANGE («k ≥ 2», «2 ≤ k ≤ 5»). ADR-W-095
+  // withheld `≥`/`≤` because 3-D's grammar had no comparison for them to type; each face is its own payload and builds
+  // (the bidi3 palette lock parses a template per button).
+  ['>', '>', 0],
+  ['≤', '≤', 0],
+  ['≥', '≥', 0],
   // #1185: the VECTOR arrow. Deliberately `→` (U+2192) and NOT the combining U+20D7 this button
   // used to carry: a combining mark is DEFINED to render over the preceding base character, so with
   // no base it is renderer-dependent — a dotted circle, a stray mark, or tofu, which is what the

@@ -31,6 +31,7 @@ import { sideRecordsOf, sideShortfall, statedTangency, type SideRecord } from '.
 import { solveLM } from './solveLM';
 import { budgetExceeded, chargeHit, computeWithCell, countWork, exactKey, measuredRun, registerLedger, servedRuns, serveRun, servingRepeats, solveBudget, type WorkCell } from './solveBudget';
 import { GLUED_NAME_WHOLE } from '../../shell/lexicon/indexedName';
+import { joinParts, partsOf } from './components';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
 export interface ResolvedLine {
@@ -171,6 +172,10 @@ function allSidesHold(c: Construction, placed: Construction): boolean {
 // written, directives cleared) so a failing constraint can be re-solved over a minimal sub-system while
 // every already-satisfied subsystem stays frozen at its solved position.
 export function resolveDriven(c: Construction): Construction {
+  // #2796 (ADR-853): a figure of independent parts solves each part on its own — the kite's carriers no longer join the
+  // trapezoids' in one joint solve that reshapes them. One part is the construction itself (the path below, unchanged).
+  const parts = partsOf(c);
+  if (parts.length > 1) return joinParts(c, parts.map((p) => resolveDrivenMemo(p.construction)));
   // COUPLED solved-on-segment points: a closed-form `on-segment-solved` whose constraint references
   // ANOTHER solved-on-segment deadlocks the topological evaluator (each needs the other's position —
   // e.g. "AL=LK=KC" makes L solved by AL=LK and K by LK=KC, so L needs K and K needs L). Promote the
@@ -1632,9 +1637,31 @@ export function evaluate(c: Construction): EvalResult {
   // #1605 (ADR-582): a hit is charged the work it saved; one a work budget cannot afford is recomputed
   if (hit && chargeHit(hit.cell)) return hit.r;
   const aborts0 = solveBudget.aborts;
-  const { value: r, cell } = computeWithCell(() => evaluateUncached(c));
+  const parts = partsOf(c);
+  const { value: r, cell } = computeWithCell(() => (parts.length > 1 ? joinEvals(parts.map((p) => evaluate(p.construction))) : evaluateUncached(c)));
   if (solveBudget.aborts === aborts0) evalMemo.set(c, { r, cell }); // a budget-cut solve is not THE result
   return r;
+}
+
+/**
+ * #2796 ([ADR-853](docs/06-decisions.md#adr-853)): the evaluation of a figure of independent parts is the union of its
+ * parts' evaluations, each memoised on its own construction — so a configuration that moves one part re-solves that
+ * part alone. The first part that fails is the figure's failure. A forced coincidence is recorded within a part only:
+ * two parts share no unknown, so nothing FORCES a point of one onto a point of another — such a stack is a default
+ * the configuration search separates (02 FR-ALT-5), never a notice.
+ */
+function joinEvals(rs: EvalResult[]): EvalResult {
+  const bad = rs.find((r) => !r.ok);
+  if (bad) return bad;
+  const positions = new Map<Id, Vec>();
+  const circles = new Map<Id, ResolvedCircle>();
+  const coincidences: [Id, Id][] = [];
+  for (const r of rs as EvalOk[]) {
+    for (const [k, v] of r.positions) positions.set(k, v);
+    for (const [k, v] of r.circles) circles.set(k, v);
+    if (r.coincidences) coincidences.push(...r.coincidences);
+  }
+  return { ok: true, positions, circles, ...(coincidences.length ? { coincidences } : {}) };
 }
 
 /**

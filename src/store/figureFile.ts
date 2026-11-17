@@ -26,7 +26,8 @@ import { ingestTypedText } from '../../shell/bidi';
 import { displayModeToIndexed } from '../../shell/displayMode';
 import { figureTooLarge } from '../../shell/save';
 import { cleanHost } from '../../shell/cevianHost';
-import type { AnyCommand, Id } from '@/engine';
+import type { AnyCommand, Id, Seed } from '@/engine';
+import { cleanSeed, seedNumber, seedPartsOf } from '@/engine/components';
 import { typedLabels } from '@/parser';
 import type { Fact, GeoState } from './geoStore';
 
@@ -64,7 +65,17 @@ export interface FigureFile {
   /** The figure's name at save time (issue #42) — PROVENANCE only: on load the FILENAME wins
    *  (operator ruling), so this field is never read back into the session. */
   name?: string;
-  seed: number;
+  /**
+   * The configuration. On disk it is the base NUMBER, and the parts that landed elsewhere ride in {@link seedParts}
+   * (#2796, [ADR-853](../../docs/06-decisions.md#adr-853)); a loaded file holds the whole configuration here.
+   */
+  seed: Seed;
+  /**
+   * #2796 — on disk only: where each independent part of the figure landed, by part key, written only when some part
+   * is not at `seed`. A sibling field, never an object in `seed`: an older build reads a non-number `seed` as 0, so it
+   * would open a new file at configuration 0; it ignores this field and draws every part at `seed` instead.
+   */
+  seedParts?: Record<string, number>;
   facts: Fact[];
   display?: FigureFileDisplay;
   /** #477: the student's value QUERIES, verbatim. Questions, not facts — they are stored so a saved
@@ -87,7 +98,7 @@ export function figureStateOf(
     GeoState,
     'facts' | 'seed' | 'hidden' | 'segStyle' | 'hiddenCircles' | 'showMeasures' | 'showCenters' | 'displayMode' | 'queries'
   >,
-): { facts: Fact[]; seed: number; display: FigureFileDisplay; queries: string[] } {
+): { facts: Fact[]; seed: Seed; display: FigureFileDisplay; queries: string[] } {
   return {
     facts: st.facts,
     seed: st.seed,
@@ -106,7 +117,7 @@ export function figureStateOf(
 
 /** Serialize the session to pretty-printed JSON (human-diffable — the point of a text format). */
 export function serializeFigure(
-  state: { facts: Fact[]; seed: number; display?: FigureFileDisplay; queries?: string[] },
+  state: { facts: Fact[]; seed: Seed; display?: FigureFileDisplay; queries?: string[] },
   meta: { locale?: string; savedAt?: string; name?: string } = {},
 ): string {
   const file: FigureFile = {
@@ -115,7 +126,7 @@ export function serializeFigure(
     ...(meta.locale ? { locale: meta.locale } : {}),
     ...(meta.savedAt ? { savedAt: meta.savedAt } : {}),
     ...(meta.name ? { name: meta.name } : {}),
-    seed: state.seed,
+    ...seedOnDisk(state.seed),
     facts: state.facts.map(sanitizeFactOut),
     ...(state.display ? { display: state.display } : {}),
     ...(state.queries?.length ? { queries: state.queries } : {}),
@@ -143,14 +154,14 @@ export function serializeFigure(
  * the file format rather than a second schema to maintain.
  */
 export function serializeFigureForLink(
-  state: { facts: Fact[]; seed: number; display?: FigureFileDisplay; queries?: string[] },
+  state: { facts: Fact[]; seed: Seed; display?: FigureFileDisplay; queries?: string[] },
   meta: { name?: string } = {},
 ): string {
   const file: FigureFile = {
     app: APP_MARKER,
     schemaVersion: FIGURE_FILE_VERSION,
     ...(meta.name ? { name: meta.name } : {}),
-    seed: state.seed,
+    ...seedOnDisk(state.seed),
     facts: state.facts.map((f) => {
       const { id: _dropped, ...rest } = sanitizeFactOut(f);
       return rest as Fact;
@@ -277,7 +288,8 @@ export function deserializeFigure(text: string): FigureLoadResult {
       ...(typeof raw.locale === 'string' ? { locale: raw.locale } : {}),
       ...(typeof raw.savedAt === 'string' ? { savedAt: raw.savedAt } : {}),
       ...(typeof raw.name === 'string' ? { name: raw.name } : {}),
-      seed: typeof raw.seed === 'number' && Number.isFinite(raw.seed) ? raw.seed : 0,
+      // #2796 (ADR-853): the base must be a number; a malformed `seedParts` entry is dropped (that part sits at the base)
+      seed: cleanSeed(typeof raw.seed === 'number' && Number.isFinite(raw.seed) ? raw.seed : 0, raw.seedParts),
       facts,
       display,
       // #1645: the questions were WRITTEN (#477) but never read back, so `loadFigure`'s
@@ -288,6 +300,12 @@ export function deserializeFigure(text: string): FigureLoadResult {
         : {}),
     },
   };
+}
+
+/** #2796 (ADR-853): a configuration as the file writes it — the base number, and `seedParts` only when a part is elsewhere. */
+function seedOnDisk(seed: Seed): { seed: number; seedParts?: Record<string, number> } {
+  const parts = seedPartsOf(seed);
+  return { seed: seedNumber(seed), ...(parts ? { seedParts: { ...parts } } : {}) };
 }
 
 /** Suggested download name, date-stamped so successive saves don't silently overwrite. */

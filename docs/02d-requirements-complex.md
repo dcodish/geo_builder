@@ -105,26 +105,35 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   enumerates a real solution set, and "show another configuration" walks that set — so a question asking
   for *all* possibilities can be seen, not just described. **A numeric equation's roots are
   configurations too**: `z1² − 4z1 + 13 = 0` (one NUMBER z₁ that is a root) is two drawings, and the
-  button walks both. The fresh-letter `z² − 4z + 13 = 0` is a solution set instead (FR-CN-6).
+  button walks both. The fresh-letter `z² − 4z + 13 = 0` is a solution set instead (FR-CN-6). Each press shows a
+  solution not yet shown before repeating one ([ADR-W-206](06w-decisions-workspace.md#adr-w-206), operator 2026-11-12):
+  every configuration is its own value set, and a conjugate is a different value, not a placement.
   - Sources: [ADR-CX-049](06d-decisions-complex.md#adr-cx-049), [ADR-CX-050](06d-decisions-complex.md#adr-cx-050)
 - **FR-CN-4 (Must)** — **A default is a starting value, never a fixed one.** An unstated magnitude is a
   free degree of freedom: it must move on "another configuration" or when a later given forces it. Free
   DOF has **one** definition — the nullspace dimension — read by the cue, the knowledge gates and the
-  sampler alike, so the three can never disagree. A sign-free parameter's SIGN is part of its freedom
+  sampler alike, so the three can never disagree. **A free point on a line or circle is drawn at a sampled point
+  of it, never at a degenerate default**: on a line through the origin («Re(z) = 0», «|z - 1| = |z + 1|») z is off
+  the origin, at a sampled size, and «another configuration» alternates the two sides; on any other line or circle
+  z is the point nearest its sampled start, so it is near the view and moves along the set (#2802). A sign-free parameter's SIGN is part of its freedom
   (FR-CN-7): it is sampled, never assumed positive. A free polygon's starting drawing reads as the shape
   it names: «משולש ABC» is never a sliver and «מרובע ABCD» is convex, while every vertex stays free.
   - Sources: [ADR-052](06-decisions.md#adr-052) (this is its complex form),
-    [ADR-CX-045](06d-decisions-complex.md#adr-cx-045), [ADR-CX-052](06d-decisions-complex.md#adr-cx-052), #1424
+    [ADR-CX-045](06d-decisions-complex.md#adr-cx-045), [ADR-CX-052](06d-decisions-complex.md#adr-cx-052), #1424,
+    [ADR-CX-100](06d-decisions-complex.md#adr-cx-100), [ADR-CX-101](06d-decisions-complex.md#adr-cx-101)
 - **FR-CN-5 (Must)** — **A second mention of a name is a GIVEN, not a redefinition.** Re-stating `z1`
   adds information about the existing number; it never silently replaces it.
   - **A restatement is accepted as its own row, and said** (operator 2026-11-09, ADR-W-200). A statement the
     earlier ones already force exactly («|z1| = 15» after «z1 = 15cis(π/7)», «z2 = 3z1» after «z1 = 5cis(π/7)» ·
     «z2 = 15cis(π/7)», the same given typed twice) is recorded as its own row with the suite sentence
     «זה כבר קיים באיור — נוסף כנתון נפרד.»; muting or deleting the row that implied it leaves the relation in force. "Force" is exact,
-    never sampled: a value that only holds in the drawing (over a free number) is a new given and is recorded with no
-    note; a relation the exact core does not carry (Re/Im, a distance) is recorded with no note (a known gap of the
-    note's reach, #2790). A loaded session keeps its saved rows and says nothing.
-  - Sources: [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md), [ADR-CX-084](06d-decisions-complex.md#adr-cx-084), [ADR-CX-089](06d-decisions-complex.md#adr-cx-089)
+    never sampled, for a relation the exact core carries: a value that only holds in the drawing (over a free number) is a
+    new given and is recorded with no note. A line through the origin is exact (a direction), so «Re(z) = 0» after
+    «|z - 1| = |z + 1|» is held. A relation the exact core defers (Re/Im not through the origin, a distance, a circle) is
+    held when it changes nothing drawn at the first four configurations («Re(z) = 2» · «|z - 1| = |z - 3|», a circle
+    typed twice, «Re(z1) = 3» after «z1 = 3+4i»); one that cuts what was free is a new given (#2801). Either way the
+    restated condition moves nothing. A loaded session keeps its saved rows and says nothing.
+  - Sources: [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md), [ADR-CX-084](06d-decisions-complex.md#adr-cx-084), [ADR-CX-089](06d-decisions-complex.md#adr-cx-089), [ADR-CX-102](06d-decisions-complex.md#adr-cx-102)
 - **FR-CN-6 (Must)** — **The solutions of an equation on a bare letter ARE its indexed names.** `z³ = 8`
   plots z₁, z₂, z₃ (in argument order from the principal solution), every one a name the student can
   write in the next sentence. **The spelling does not matter**: `z³ − 8 = 0`, `z³ + 8 = 0`, `2z³ = 16`
@@ -205,8 +214,11 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   claim about it is decided, as for the literal. The data
   panel's «נקודות» substitutes every letter whose value the givens force. A glued
   `i` whose other letter is a complex number («zi») is ambiguous and is refused with the explicit
-  product offered («z*i»); `pi` is never read as p·i.
-  - Sources: [ADR-CX-058](06d-decisions-complex.md#adr-cx-058), #1365 (operator ruling), #1410, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W8, #1862), [ADR-CX-082](06d-decisions-complex.md#adr-cx-082) (#1818)
+  product offered («z*i»); `pi` is never read as p·i. The same canvas rule holds for a number typed in
+  POLAR form with a letter in its modulus («z = r·cis(30°)», «z = r(cos30° + i sin30°)»,
+  «|z| = 9r» · «arg z = 30°»): «z = r·cis30°» / «z = 9r·cis30°» in both views while the letter is left;
+  after «r = 2» the canvas reads the number and the «r = 2» row carries the letter/value chip.
+  - Sources: [ADR-CX-058](06d-decisions-complex.md#adr-cx-058), #1365 (operator ruling), #1410, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W8, #1862), [ADR-CX-082](06d-decisions-complex.md#adr-cx-082) (#1818), [ADR-CX-103](06d-decisions-complex.md#adr-cx-103) (#2002)
 - **FR-CN-11 (Must)** — **The trigonometric form is the same number as cis.** «z1 = 2(cos45 + i sin45)»,
   «z1 = √2(cos45 + i·sin45)», «z1 = cos45 + i sin45» (r omitted is 1), with `i·sin`, `i*sin`,
   `sin45·i`, the `°` or without it, a signed or parenthesised angle, and a symbolic one
@@ -286,8 +298,12 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   in the view's own form (D1), including one fixed by its own stated modulus and argument («|z| = 2» ·
   «arg z = 30°» reads «z = 2·cis30°» / «z = √3+i», W7). That is its own spelling, not a re-spelling of its value:
   «z = 0.5+1.25i» reads «z = 0.5+1.25i», «z = √8cis45» reads «z = √8·cis45°», and a decimal reads at most two
-  decimals (FR-SU-30). An accepted given never leaves nothing on screen.
-  - Sources: [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389, #1390, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W7, #1862), [ADR-W-179](06w-decisions-workspace.md#adr-w-179) (#1497)
+  decimals (FR-SU-30). An accepted given never leaves nothing on screen. A number typed in polar form
+  with a letter in its modulus reads as typed in both views while the letter is left: «z = r·cis(30°)»
+  reads «z = r·cis30°», «z = (r+1)·cis(30°)» reads «z = (r+1)·cis30°», «|z| = 9r» · «arg z = 30°» reads
+  «z = 9r·cis30°» — never the drawn sample, and never a value the tool solved for the letter (after
+  «|z| = 4» it still reads «z = r·cis30°»; the value is in the panel).
+  - Sources: [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389, #1390, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W7, #1862), [ADR-W-179](06w-decisions-workspace.md#adr-w-179) (#1497), [ADR-CX-103](06d-decisions-complex.md#adr-cx-103) (#2002)
 - **FR-KN-6 (Should)** — **The exported question prints the givens, never the claims.** «הורידו שאלה»
   (02w FR-EX-2) lists every active line as typed, in entry order, and leaves out a line that only states a
   claim (✓/✗) — a claim is the student's answer, and a question sheet does not print its answers. A line

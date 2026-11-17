@@ -176,8 +176,12 @@ every pin family that can land elsewhere records its claim: `coords-eq` for the 
 letter written for the first time names a free component (ADR-3D-175); written a second time (`coordLetterShared3`: a pin
 symbol, the figure parameter, or a named point component) it is lowered to 1·k (`coordLetterExprs3`) and the earlier
 statement's named component is promoted to the same pin symbol (`promoteNamedComponents3`). The `coords-eq` claim carries
-the symbolic components (`sym`), read at `pinLettersAt3`: the pivot's `pinSymbols`, or, where the pivot does not run, a
-least-squares read of the letters off the placed points over every point pin (`readPinLetters3`, `evaluate.ts`).
+the symbolic components (`sym`), read at `lettersAt3` — the ONE letter reader ([ADR-3D-472](06b-decisions-3d.md#adr-3d-472) Am. 1): the pivot's
+`pinSymbols`, or, where the pivot does not run, a least-squares read of the letters off the placed points over every
+point pin (`readPinLetters3`, `evaluate.ts`); then every remaining vector-coefficient letter, read jointly over every lettered `vec-eq` (`vecEqSystem3`,
+`solveNormal3`) with the coordinate letters as numbers. A letter a coordinate and a vector relation both carry is one
+pin symbol: `coordLetterShared3` counts a `vec-letter` owner, the vector relation's lowering promotes a named point
+component (`promoteNamedComponents3`), and the `vec-eq` pin reads it at the pivot's `symAt`.
 A NEW point written with letters (#2563, [ADR-3D-489](06b-decisions-3d.md#adr-3d-489)) is a `sym-coord` point unless it is
 ADR-3D-032's one-letter coord-sym: components over the same pool, absolute, own DOF 0, placed from the pivot's pin symbols
 (the override `solvePivot`/`resolve3` thread to `evaluateSolidsAndPoints`) or, where the pivot does not run, from
@@ -574,6 +578,28 @@ over the unflagged pool (the drawing, `solutions`, «הציגו תצורה אח�
 `{ readback: true }`, `knowledgeSamples3` adds `resolve3(c, s, { configuration: k })` for each, which replays the plain
 pools (`pivotStageMemo3`) and stands the pick on the k-th reached root. Claims, narrowing and the drawing keep the plain
 samples.
+
+### A letter's range is one interval (#1524, [ADR-3D-477](06b-decisions-3d.md#adr-3d-477))
+
+A sign («k חיובי», `t > 0`) and a range (`t ≥ 0`, `2 ≤ k ≤ 5`, «k לפחות 2») are one statement: an interval on a letter
+(`engine/bound3.ts`, `Bound3`). `param-sign` lowers to (0, ∞) / (−∞, 0) at apply and `param-bound` to its own ends; both
+land in `paramSigns` (or `componentSigns`, for a letter naming a free component) through the sign's owner gate. Every
+reader asks `bound3`: `boundHolds3` for the root filters, the pivot's pin-symbol filter, the free-vector check, the
+component check and the store's verifier; `boundWindow3` for a free value's sampled window (the coordinate parameter,
+the vec-def ratio, the free-vector sampler); `boundAnchor3` for an open letter's seed anchor (through the one sampler `pinSymAnchor3`, #2563: the pivot's soft anchor and the no-pivot `sym-coord` placement); `boundReflect3` for the sign
+walk. A letter's statements fold in the order stated (`foldBounds3`), skipping one that would empty the range, so the
+verifier refuses the newer statement. A root filter reads only its own letter's range (`symBound3`). A new reader of a
+stated sign reads the interval, never a boolean.
+
+**Only admitted configurations are knowledge** (#2916, [ADR-3D-533](06b-decisions-3d.md#adr-3d-533)). `knowledgeSamples3`
+keeps a sample only when `admittedConfiguration3` holds on it: every coordinate sign (`signGivens`), named-component sign
+(`componentSignsHold`), letter sign (`paramSigns`, read by `statedLetterValue3`, the store verifier's own reader), plane side
+(`memberships[].side`) and hard requirement (`requirementsHoldOn3`, the seed search's own judgement), at the verifier's
+tolerances. A base seed left with no admitted sample is replaced by its reserve walk (s + k·6089), at most one reserve seed
+per base seed in all, so the gauge keeps its witnesses and the work is bounded. A figure that states no selector
+(`hasStatedSelectors3`) is sampled as before at no cost; one with no admitted sample anywhere breaks a given at its own
+drawing (its row is red), and its plain samples stand. Every lane reads the admitted set: ask, panel, claims, narrowing,
+preferences.
 
 ### Who may introduce a point (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253); #1310, [ADR-3D-397](06b-decisions-3d.md#adr-3d-397))
 
@@ -1144,7 +1170,7 @@ object is never one: a free plane (`PlaneDef.free`) and a free line have their o
 by their resolvers, so sampling the figure's six as well would sample one relative pose twice. Declaring or pinning
 one leaves the figure where it was. A free plane given an equation stops being free and counts.
 
-**One absolute-frame predicate (#2746, [ADR-3D-453](06b-decisions-3d.md#adr-3d-453)).** The scale given (#754) asks the
+**One absolute-frame predicate (#2746, [ADR-3D-453](06b-decisions-3d.md#adr-3d-453); its refusal replaced by lanes, ADR-3D-521).** The scale given (#754) asks the
 same question, "would a uniform rescale detach an absolute object?", so `scaleGivenSafe` calls `hasAbsoluteFrameObject`
 and keeps no list of its own; only a rescale's own exclusions stay there (no solid, a revolution or a `circles3`,
 `scaleFixingPins3`). The predicate lives in `types.ts` beside `absolutePointCount`,
@@ -1170,6 +1196,20 @@ figure lane; the funnel's extent and clearance read only it. After each candidat
 re-derived (`reseatMixed3`), and a candidate where one no longer exists (a stated crossing carried off its edge: the #780
 `crossingOnInk3` bound the status pass reads) ranks below every candidate that keeps them all; when none does, the
 solved placement is kept.
+
+**The scale given has three lanes (#2792, [ADR-3D-521](06b-decisions-3d.md#adr-3d-521)).** `scaleGivenLane3`
+(`scaleGiven.ts`) decides once how a stated size acts, and `scaleGivenSafe` is "the lane is a rescale". **origin**: every
+absolute object is invariant and no pin fixes the size (the #2789 rescale about the origin after placement, unchanged).
+**content**: the figure's only ties to the absolute world are point pins on ONE figure point C with every component
+stated, or none, read off `pivotFamilies3` (only `pins` and similarity-invariant `scalarPins` that read the figure lane may
+be present) and no coordinate-plane or axis relation, and no stated sign beside a pin. The resolver applies
+p ↦ C + k(p − C) to the figure-lane points (`figureLanes3`) and to the planes and lines resolved from the figure, never to an
+equation plane, a typed line or a stated point, BEFORE the placement funnel, then re-seats the mixed points; the funnel
+then samples and clears the placement at the true size. **pivot**: anything else (two pinned points, a vector, pair or
+plane pin, a membership, a frame relation, a size-fixing pin). The given is minted only on a rescale lane and only when it
+reads figure-lane points (`scaleGivenReadsFigure3`: «אורך AP = 4» to a stated P is not a size). Only the first size takes the pivot lane: once a magnitude states the size (`magnitudeSizeStated3`), a later one is checked. On the pivot lane it enters
+the pivot as its own pin with its arbiter, and a recorded given whose figure turns to the pivot lane is handed over at the
+outermost apply (`handScaleGivenToPivot3`), so the pivot reaches the size or the pin-owner guard names the statements.
 
 **A stated sign is aimed at (#2793, [ADR-3D-465](06b-decisions-3d.md#adr-3d-465)).** The funnel ranks a candidate first by how
 many stated signs it keeps, in statement order to the first that breaks (an impossible set keeps the earlier statements, so
@@ -1306,7 +1346,8 @@ admissibility (`settleFlatRings`) runs on a solid-free figure too, and #2503's d
 relation's PLANE operands beside its pairs (`pinOperandPlanes3`): a solution where a ⟂ / ∥ / angle-to-plane holds only
 because the plane's points fell on one line is not a configuration, so «AB∥ACD» · «AB ⊥ ACD» is a contradiction. On a rigid figure the FIRST magnitude is still the #754 scale given; a later magnitude
 that reads a free carrier, or arrives while the scale given does, **demotes** it to a pin recorded as its own
-arbiter (`given: true`), and its fact joins the pin owners so a later contradiction names it. A later magnitude
+arbiter (`given: true`), and its fact joins the pin owners so a later contradiction names it. The same demotion
+(`handScaleGivenToPivot3`) runs when a later object or pin turns the scale given's lane to the pivot (#2792, ADR-3D-521). A later magnitude
 that reads no free carrier is then checked exactly (`magnitudeSizeStated3`, `scaleGiven.ts`).
 `lengthClaim` lowers a marked «וקטור AB = 5» to the one-word form's arrow. A candidate the anchors left just
 above `ACCEPT` is polished on the primary residuals alone and kept only if that closes it without collapsing
@@ -1378,7 +1419,11 @@ not-drivable rows: a side-point's height and riders of free planes/lines (#557).
 
 **The circle rider** (`on-circle3`, #2611, [ADR-3D-410](06b-decisions-3d.md#adr-3d-410)). The on-line rider's circle
 twin: one sampled angle in the circle's own frame (`seatOnCircleRider3`, key `oncircle-th-<id>`, stepped clear of
-placed points as the plane rider is). The point pass resolves the circle on the spot (`circleGeom3`, the one circle
+placed points as the plane rider is). A rider that closes a declared ring is seated where the ring is simple
+([ADR-3D-525](06b-decisions-3d.md#adr-3d-525), #2829): `ringSimpleWith3` tests each draw against the declared rings that hold
+it (corners not seated yet left out, so several riders of one ring go in point order), the clearest simple draw of up
+to 24 wins, and when none is simple and the ring's other corners are on the circle, `ringArcSeat3` maps the first
+key's angle into the arc between the rider's ring neighbours. A ring no seat can make simple keeps the old seat. The point pass resolves the circle on the spot (`circleGeom3`, the one circle
 resolver the post-pivot circle pass also calls); a circle whose carrier resolves only after the pass seats its rider
 after the circle pass. A POLYGON's circle (`circum` / `incircle`, `ringCircle3`) makes its rider a gauge-frame point
 and a drivable row of the carrier table; a tangent-line circle's rider still counts but is not driven. The
@@ -1550,6 +1595,21 @@ ring with exactly ONE placeholder corner first yields it to ARM 2 (the family's 
 parallelogram family and the kite, a plane rider otherwise), keeping the point's original slot in the order
 (`keepPointSlot3`) so its dependents still follow it.
 
+### Letters in a vector equation over placed points (#1551, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472))
+
+A `vec-eq` given may carry lettered coefficients (`VecTerm.letter`: coefficient = `coeff + p·sym`). Its letters are
+never pivot unknowns. At any drawing the equation is `R = Σₛ s·Dₛ` with numbers R and Dₛ, so `vecEqLetters3`
+(`vecExpr.ts`) solves the letters by linear least squares and returns the residual no letter can absorb. That residual
+is the pin's three rows in the pivot (the free shape moves until the relation can hold; scale-covariant like the
+numeric `vec-eq`, so the `invariantOnly` lane and the rank probe need no change, and the probe charges the box only
+for the residual's rank), the drive's measure. The verifier, the panel's `vec-letter` owner and the claims' number reader read the letters
+through `lettersAt3` (ADR-3D-472 Am. 1): jointly over every lettered equation, so one letter has one value in every
+relation that writes it; the `vec-eq` claim is judged at those values (the span residual for a letter the drawing
+leaves open). A value given to a letter («a = 1/2») substitutes; dependent letter
+directions leave the letters undetermined (`a = ?`). A definition with several letters (`vecDefs[].symbols`, each term
+naming its letter in `SymTerm.sym`) samples each letter as a one-letter ratio is sampled, and `vecDefLetterAt3` reads
+the letters back through the same least squares.
+
 ### Claims
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape inside a
@@ -1714,6 +1774,12 @@ the shared [`shell/math.tsx`](04w-design-shell.md). **Every annotation is sized 
 (`evaluate.ts`, exported as `intersectPlanes`) answers "no crossing" when `|n₁ × n₂| ≤ MUTUAL_VERIFY_TOL · |n₁| |n₂|`, the
 bar a stated ∥ is verified at. Every reader of a fold line takes it from there: the scene's fold-centred patches, a
 `plane-plane` line, the second line pass. A pair the solver holds parallel therefore never gets a far-away fold line.
+
+**A line meets a plane by one scale-free test ([ADR-3D-520](06b-decisions-3d.md#adr-3d-520), #2834).** `linePlaneCrossingT3`
+(`engine/vec3.ts`) returns where `anchor + t·dir` meets `n·p + d = 0`, or `null` when `|n·dir| ≤ 1e-10·|n|·|dir|`. A
+point-run plane's normal is not unit, so an absolute bar on raw vectors read a solver's parallel residue as a crossing at
+t ≈ 1e12. The patch sweep, the line ⟂ plane knees, `segMeetsPlane` and the engine's `line-plane`, `plane-cut` and
+apex-line points all read this one predicate; a pair the engine calls parallel is never given a far-away crossing to draw.
 
 **A name is its own display text ([ADR-3D-412](06b-decisions-3d.md#adr-3d-412), #2610).** A plane's, a line's and a
 vector's construction key is what the canvas label, the planes list, the data panel and a refusal print; there is no

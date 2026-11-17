@@ -25,6 +25,21 @@ export const cross3 = (a: Vec3, b: Vec3): Vec3 =>
 export const norm3 = (a: Vec3): number => Math.sqrt(dot3(a, a));
 export const dist3 = (a: Vec3, b: Vec3): number => norm3(sub3(a, b));
 
+/**
+ * #2834 (ADR-3D-520) — THE ONE line ↔ plane crossing parameter. Where the line `anchor + t·dir` meets the
+ * plane `n·p + d = 0`, or `null` when the two are parallel. "Parallel" is SCALE-FREE:
+ * `|n·dir| ≤ 1e-10·|n|·|dir|` — the engine's line-plane tolerance since ADR-3D-097, now read by every
+ * caller. A point-run plane carries an unnormalised normal (|n| ≈ 166 on the exam box), so an ABSOLUTE
+ * `|n·dir| < 1e-9` read a solver-settled parallel pair (n·dir = 2.9e-9) as a crossing at t ≈ 1e12, and the
+ * renderer grew the plane patch to it and shrank the figure to one pixel.
+ */
+export function linePlaneCrossingT3(n: Vec3, d: number, anchor: Vec3, dir: Vec3): number | null {
+  const denom = n.x * dir.x + n.y * dir.y + n.z * dir.z;
+  const scale = Math.sqrt(n.x * n.x + n.y * n.y + n.z * n.z) * Math.sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+  if (!(Math.abs(denom) > 1e-10 * Math.max(scale, 1e-12))) return null;
+  return -(n.x * anchor.x + n.y * anchor.y + n.z * anchor.z + d) / denom;
+}
+
 export function normalize3(a: Vec3): Vec3 {
   const n = norm3(a);
   if (n < 1e-12) throw new Error('normalize3: zero vector');

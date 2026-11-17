@@ -7,6 +7,7 @@
  * the #566 play figure, saved pre-fix) through `deserializeFigure` + the real search, mirroring
  * what the App's load path now does.
  */
+import { seedNumber, type Seed } from '@/engine';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { runViewResolve, type ResolveViewDeps, type ViewResolveFound } from '../resolveView';
 import { deserializeFigure } from '@/store/figureFile';
@@ -17,7 +18,7 @@ import { geoWork, isCancelled } from '@/store/geoWork';
 import { buildParseCtx, parse } from '@/parser';
 import raw from '../../__tests__/fixtures/issue-572-load-collapse.geo.json?raw';
 
-function fakeDeps(overrides: Partial<ResolveViewDeps> & { facts?: Fact[]; seed?: number }): {
+function fakeDeps(overrides: Partial<ResolveViewDeps> & { facts?: Fact[]; seed?: Seed }): {
   deps: ResolveViewDeps;
   calls: { pending: boolean[]; applied: ViewResolveFound[]; exhausted: number };
 } {
@@ -144,7 +145,7 @@ describe('#2757 — a configuration search that finishes late applies nothing', 
       autoResolve: async (facts, seed) => {
         await gate; // ...for as long as the worker takes (up to 12 s in the browser)
         // what the worker answers: the searched figure at another seed (the reviewer's probe)
-        return { facts, seed: seed + 3, fold: null, basis: { facts, seed } };
+        return { facts, seed: seedNumber(seed) + 3, fold: null, basis: { facts, seed } };
       },
       applyView: (found) => {
         const temporal = useGeoStore.temporal.getState();
@@ -208,7 +209,7 @@ describe('#2757 — a configuration search that finishes late applies nothing', 
     const seed0 = st().seed;
     const search = lateSearch();
     await search.finish();
-    expect(st().seed).toBe(seed0 + 3);
+    expect(st().seed).toBe(seedNumber(seed0) + 3);
     expect(useGeoStore.temporal.getState().pastStates.length).toBe(before);
   });
 
@@ -217,7 +218,7 @@ describe('#2757 — a configuration search that finishes late applies nothing', 
     const search = lateSearch();
     st().toggleHidden('A');
     await search.finish();
-    expect(st().seed).toBe(seed0 + 3);
+    expect(st().seed).toBe(seedNumber(seed0) + 3);
   });
 
   it('"show another configuration" (the resample search) is superseded by an undo mid-search', async () => {

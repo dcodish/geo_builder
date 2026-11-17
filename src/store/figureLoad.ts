@@ -28,6 +28,7 @@
  * is the load.
  */
 
+import type { Seed } from '@/engine';
 import type { FigureFile, FigureLoadFailure } from './figureFile';
 import type { Fact } from './geoStore';
 import { adoptSettled, useGeoStore } from './geoStore';
@@ -52,7 +53,7 @@ export interface FigureLoadOpts {
    * it and the load folds on this thread during the smoke replay — correct, just slower, which is
    * what a test wants.
    */
-  prefold?: (facts: Fact[], seed: number) => Promise<unknown>;
+  prefold?: (facts: Fact[], seed: Seed) => Promise<unknown>;
   /**
    * Wipe the undo history after committing. A figure that arrives WITHOUT a session behind it — a
    * restored offer (#1238), a shared link (#1189) — has nothing for undo to go back to: a restore

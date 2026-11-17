@@ -101,13 +101,33 @@ export type LetterMap = Readonly<Record<string, string>>;
  *
  * Keys passed {@link normalizePointName}, so they carry no regex metacharacter. Longest first, so a
  * map naming both `A` and `A1` reads `A1` whole.
+ *
+ * #2851 (found in round #2855): an INDEXED key (`F₁`, the glyph id) is matched in EVERY spelling the grammar reads as
+ * that one name — `F₁`, `F1`, `F_1`, `F_{1}` (#2075, ADR-AG-398) — and an occurrence is keyed back to the id by
+ * {@link keyOf}. It matched the glyph alone, so a letter the student TYPED as «F1» could never be renamed or swapped:
+ * the rewrite found no occurrence and the faithfulness proof refused the line («swap-unsafe»).
  */
+const SUBSCRIPT_DIGITS = '₀₁₂₃₄₅₆₇₈₉';
+const keyPattern = (k: string): string => {
+  const m = /^([^₀-₉]*)([₀-₉]+)(.*)$/.exec(k);
+  if (!m) return k;
+  const digits = [...m[2]].map((ch) => String(SUBSCRIPT_DIGITS.indexOf(ch))).join('');
+  return `${m[1]}(?:${m[2]}|${digits}|_${digits}|_\\{${digits}\\})${m[3]}`;
+};
 const tokenRe = (map: LetterMap) =>
-  new RegExp(`(?<![a-z'])(?:${Object.keys(map).sort((a, b) => b.length - a.length).join('|')})(?![a-z0-9₀-₉'])`, 'g');
+  new RegExp(
+    `(?<![a-z'])(?:${Object.keys(map)
+      .sort((a, b) => b.length - a.length)
+      .map(keyPattern)
+      .join('|')})(?![a-z0-9₀-₉'_])`,
+    'g',
+  );
+/** The map key a matched token spells — itself, or the glyph id of an indexed name typed another way. */
+const keyOf = (tok: string, map: LetterMap): string => (tok in map ? tok : foldIndexedName(tok.replace(/_\{(\d+)\}/, '_$1'), 'glyph'));
 
 /** Rewrite every whole-token occurrence of every key, SIMULTANEOUSLY — the rule for ask rows and display sentences. */
 export const relabelMap = (s: string, map: LetterMap): string =>
-  Object.keys(map).length === 0 ? s : s.replace(tokenRe(map), (m) => map[m] ?? m);
+  Object.keys(map).length === 0 ? s : s.replace(tokenRe(map), (m) => map[keyOf(m, map)] ?? m);
 
 /** One letter. */
 export const relabelText = (s: string, from: string, to: string): string => relabelMap(s, { [from]: to });
@@ -182,14 +202,15 @@ function factsMention(facts: readonly Fact[], id: string): boolean {
 }
 
 /** Where a key of `map` occurs as a token in `line`, and which key. */
-function occurrences(line: string, map: LetterMap): Array<{ at: number; tok: string }> {
-  return [...line.matchAll(tokenRe(map))].map((m) => ({ at: m.index ?? 0, tok: m[0] }));
+function occurrences(line: string, map: LetterMap): Array<{ at: number; tok: string; len: number }> {
+  // `tok` is the map KEY the occurrence spells (#2851: «F1» is the key `F₁`), `len` its length in the line
+  return [...line.matchAll(tokenRe(map))].map((m) => ({ at: m.index ?? 0, tok: keyOf(m[0], map), len: m[0].length }));
 }
 
 /** Substitute only the chosen occurrences. */
-function substituteAt(line: string, at: ReadonlyArray<{ at: number; tok: string }>, map: LetterMap): string {
+function substituteAt(line: string, at: ReadonlyArray<{ at: number; tok: string; len: number }>, map: LetterMap): string {
   let out = line;
-  for (const o of [...at].sort((a, b) => b.at - a.at)) out = out.slice(0, o.at) + map[o.tok] + out.slice(o.at + o.tok.length);
+  for (const o of [...at].sort((a, b) => b.at - a.at)) out = out.slice(0, o.at) + map[o.tok] + out.slice(o.at + o.len);
   return out;
 }
 
@@ -215,7 +236,7 @@ export function rewriteLineMap(line: string, map: LetterMap): { line: string; co
   const before = parseLine(line);
   if (!before.ok) return { line: substituteAt(line, at, map), counts: countOf(at) };
   const want = upToAnonymous(JSON.stringify(renameIds(before.facts, map)));
-  const faithful = (sub: ReadonlyArray<{ at: number; tok: string }>) => {
+  const faithful = (sub: ReadonlyArray<{ at: number; tok: string; len: number }>) => {
     const next = substituteAt(line, sub, map);
     const p = parseLine(next);
     return p.ok && upToAnonymous(shapeOf(p.facts)) === want ? next : null;
