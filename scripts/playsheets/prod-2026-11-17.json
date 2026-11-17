@@ -1,0 +1,257 @@
+{
+ "name": "prod-2026-11-17",
+ "title": "prod smoke 2026-11-17 — round #2914 wave 1 + the 2026-11-16 PR batch",
+ "cases": [
+  {
+   "id": "P1",
+   "title": "3-D: נקודה על המעגל סוגרת מרובע לא מוצלב",
+   "class": "look",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "משולש ABC",
+    "מעגל חוסם את ABC",
+    "D על המעגל",
+    "מרובע ABCD"
+   ],
+   "cycles": 2,
+   "lookFor": "המרובע ABCD מצויר בלי צלעות חוצות (D על הקשת בין C ל-A), בכל התצורות; כל השורות ירוקות",
+   "before": "מוצלב ב-14 מתוך 24 תצורות, והשורות ירוקות",
+   "expectAbsent": [
+    "לא ניתן"
+   ]
+  },
+  {
+   "id": "P2",
+   "title": "מרוכבים: מספר קוטבי עם אות מוצג כפי שנכתב",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z = r·cis(30°)"
+   ],
+   "lookFor": "על הקנבס «z = r·cis30°», בלי «≈» ובלי מספר עשרוני (הלוח מימין לא משתנה)",
+   "before": "«z ≈ r·cis30°» / «z ≈ 0.74+0.42i»",
+   "expectFigure": [
+    "r·cis30°"
+   ]
+  },
+  {
+   "id": "P3",
+   "title": "מרוכבים: מודול וארגומנט בנפרד, ואז ערך לאות",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "|z| = 9r",
+    "arg(z) = 30°",
+    "r = 2"
+   ],
+   "lookFor": "על הקנבס «z = 9√3+9i» (בתצוגה הקוטבית «z = 18·cis30°»); בשורה «r = 2» יש מתג אות/ערך",
+   "before": "מספר עשרוני דגום, ואין מתג",
+   "expectFigure": [
+    "9√3+9i"
+   ]
+  },
+  {
+   "id": "P4",
+   "title": "מרוכבים: Re(z) = 0 לבד — z על הציר המדומה, לא בראשית",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "Re(z) = 0"
+   ],
+   "cycles": 2,
+   "lookFor": "z על הציר המדומה, רחוק מהראשית (בערך 3i); «הציגו תצורה אחרת» מעבירה אותו לצד השני",
+   "before": "z בראשית, והכפתור לא משנה דבר",
+   "expectConfigsDiffer": true
+  },
+  {
+   "id": "P5",
+   "title": "מרוכבים: תנאי שחוזר על עצמו לא מזיז את z ומקבל הודעה",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "|z - 1| = |z + 1|",
+    "Re(z) = 0"
+   ],
+   "lookFor": "השורה השנייה נרשמת עם «זה כבר קיים באיור — נוסף כנתון נפרד.», ו-z לא זז",
+   "before": "z קפץ בכ-1.9 והשורה נרשמה בלי הודעה",
+   "expect": [
+    "זה כבר קיים באיור"
+   ]
+  },
+  {
+   "id": "P6",
+   "title": "2-D: מיתר ארוך מהקוטר נדחה",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מעגל O ברדיוס 2",
+    "AB מיתר במעגל",
+    "AB = 6"
+   ],
+   "lookFor": "«AB = 6» נדחית: «הנתונים סותרים זה את זה — «AB = 6» לא מתקיים יחד עם «מעגל O ברדיוס 2», «AB מיתר במעגל»…»",
+   "before": "השורה נרשמה בכתום, «ממתינה לנתונים»",
+   "expectRefusal": "הנתונים סותרים"
+  },
+  {
+   "id": "P7",
+   "title": "2-D: צלע של משולש החוסם מעגל, קצרה מהקוטר, נדחית מיד",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "משולש ABC חוסם את מעגל O",
+    "AB = 4"
+   ],
+   "lookFor": "«AB = 4» נדחית, וההודעה מציינת את «משולש ABC חוסם את מעגל O»",
+   "before": "נרשמה עם ✗ «לא נמצאה תצורה…»",
+   "expectRefusal": "סותר את"
+  },
+  {
+   "id": "P8",
+   "title": "2-D: מיתר אפשרי עדיין נבנה (בקרה)",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מעגל O ברדיוס 2",
+    "AB מיתר במעגל",
+    "AB = 3"
+   ],
+   "lookFor": "שלוש השורות ירוקות, AB מסומן 3",
+   "before": "unchanged",
+   "expectAbsent": [
+    "הנתונים סותרים",
+    "לא ניתן",
+    "לא נמצאה תצורה"
+   ]
+  },
+  {
+   "id": "P9",
+   "title": "2-D: שתי נקודות על מעגל רחוקות מהקוטר נדחות (#2272)",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "A, B על מעגל O",
+    "AB = 10"
+   ],
+   "lookFor": "«AB = 10» נדחית, וההודעה מציינת את «A, B על מעגל O»",
+   "before": "נרשמה כממתינה",
+   "expectRefusal": "הנתונים סותרים"
+  },
+  {
+   "id": "P10",
+   "title": "3-D: תיבת הבגרות — השאלה והלוח כותבים את המישור אותו דבר (#2916)",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "תיבה",
+    "מישור A'B'C'D' הוא x+4y-8z-142=0",
+    "B(0,7,6)",
+    "משוואת הישר AB היא x = (0,7,6) + t(0,2,1)",
+    "אורך המקצוע AB הוא 5√5",
+    "שיעור ה-y של הקודקוד A שלילי",
+    "נתונה נקודה M(k,1,3), k חיובי",
+    "גודל הזווית שבין הישר AB ובין הישר AM הוא 60"
+   ],
+   "asks": [
+    "מישור A'B'C'D'"
+   ],
+   "lookFor": "תשובת השאלה כותבת את הצורה הפרמטרית מ-A′: «π = (2, 5, -15) + t·(0, 2, 1) + s·(4, -1, 0)», כמו הלוח",
+   "before": "השאלה כתבה «π = (142, 0, 0) + …»",
+   "expect": [
+    "(2, 5, -15)"
+   ],
+   "expectAbsent": [
+    "(142, 0, 0)"
+   ]
+  },
+  {
+   "id": "P11",
+   "title": "load: 2d",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "משולש ABC"
+   ],
+   "lookFor": "A triangle.",
+   "before": "unchanged",
+   "expectAbsent": [
+    "לא ניתן",
+    "לא הבנתי"
+   ]
+  },
+  {
+   "id": "P12",
+   "title": "load: 3d",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה ABCD"
+   ],
+   "lookFor": "A cube.",
+   "before": "unchanged",
+   "expectAbsent": [
+    "לא ניתן",
+    "לא הבנתי"
+   ]
+  },
+  {
+   "id": "P13",
+   "title": "load: complex",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z1 = 3+4i"
+   ],
+   "lookFor": "The point z₁ is drawn.",
+   "before": "unchanged",
+   "expectAbsent": [
+    "לא ניתן",
+    "לא הבנתי"
+   ]
+  },
+  {
+   "id": "P14",
+   "title": "load: analytic",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "x^2+y^2=25"
+   ],
+   "lookFor": "The circle is drawn.",
+   "before": "unchanged",
+   "expectAbsent": [
+    "לא ניתן",
+    "לא הבנתי"
+   ]
+  }
+ ]
+}
