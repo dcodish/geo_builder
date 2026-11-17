@@ -112,13 +112,22 @@ export const HELD_CASES_COMPLEX: readonly HeldCase[] = [
   { lines: ['z1 = 3+4i', 'z2 = 1-i', 'z1 = 3+4i'], earlier: 0, why: 'an exact repeat after another line' },
   { lines: ['|z| = 2', '|z| = 2'], earlier: 0, why: 'the same given twice, over a free direction' },
   { lines: ['z1 = 15cis(π/7)', '|z1| = 15'], earlier: 0, why: "the operator's T85 (#2268)" },
+  // #2801 (ADR-CX-100, ADR-CX-102): a line through the origin is an exact direction; the rest is decided on the drawing
+  { lines: ['|z - 1| = |z + 1|', 'Re(z) = 0'], earlier: 0, why: "the reported pair (#2801): one line through 0, two spellings" },
+  { lines: ['Re(z) = 0', '|z - 1| = |z + 1|'], earlier: 0, why: 'the reported pair, the other order' },
+  { lines: ['Im(z) = 0', '|z - i| = |z + i|'], earlier: 0, why: 'the real axis in two spellings' },
+  { lines: ['Re(z) = 2', '|z - 1| = |z - 3|'], earlier: 0, why: 'a line not through 0, two spellings — decided on the drawing' },
+  { lines: ['|z - 1| = 2', '|z - 1| = 2'], earlier: 0, why: 'a circle stated twice — decided on the drawing' },
+  { lines: ['z1 = 3+4i', 'Re(z1) = 3'], earlier: 0, why: 'a Re value the definition decides — decided on the drawing' },
 ];
 
-/** Complex's controls: a contradiction is refused; a new given, and a Re/Im value the exact core does not carry (02d), record silently. */
+/** Complex's controls: a contradiction is refused; a new given records silently, a circle cutting a line included (#2801). */
 export const HELD_CONTROLS_COMPLEX = {
   refused: [['z1 = 3+4i', '|z1| = 6']],
   silent: [
     ['|z1| = 15', 'arg z1 = 30'],
-    ['z1 = 3+4i', 'Re(z1) = 3'],
+    ['Re(z) = 0', '|z| = 2'],
+    ['Re(z) = 0', '|z - 1| = 2'],
+    ['Re(z) = 1', '|z - 1| = 2'],
   ],
 } as const;

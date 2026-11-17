@@ -110,21 +110,28 @@ behind it; their history is in [06d](06d-decisions-complex.md).
 - **FR-CN-4 (Must)** — **A default is a starting value, never a fixed one.** An unstated magnitude is a
   free degree of freedom: it must move on "another configuration" or when a later given forces it. Free
   DOF has **one** definition — the nullspace dimension — read by the cue, the knowledge gates and the
-  sampler alike, so the three can never disagree. A sign-free parameter's SIGN is part of its freedom
+  sampler alike, so the three can never disagree. **A free point on a line or circle is drawn at a sampled point
+  of it, never at a degenerate default**: on a line through the origin («Re(z) = 0», «|z - 1| = |z + 1|») z is off
+  the origin, at a sampled size, and «another configuration» alternates the two sides; on any other line or circle
+  z is the point nearest its sampled start, so it is near the view and moves along the set (#2802). A sign-free parameter's SIGN is part of its freedom
   (FR-CN-7): it is sampled, never assumed positive. A free polygon's starting drawing reads as the shape
   it names: «משולש ABC» is never a sliver and «מרובע ABCD» is convex, while every vertex stays free.
   - Sources: [ADR-052](06-decisions.md#adr-052) (this is its complex form),
-    [ADR-CX-045](06d-decisions-complex.md#adr-cx-045), [ADR-CX-052](06d-decisions-complex.md#adr-cx-052), #1424
+    [ADR-CX-045](06d-decisions-complex.md#adr-cx-045), [ADR-CX-052](06d-decisions-complex.md#adr-cx-052), #1424,
+    [ADR-CX-100](06d-decisions-complex.md#adr-cx-100), [ADR-CX-101](06d-decisions-complex.md#adr-cx-101)
 - **FR-CN-5 (Must)** — **A second mention of a name is a GIVEN, not a redefinition.** Re-stating `z1`
   adds information about the existing number; it never silently replaces it.
   - **A restatement is accepted as its own row, and said** (operator 2026-11-09, ADR-W-200). A statement the
     earlier ones already force exactly («|z1| = 15» after «z1 = 15cis(π/7)», «z2 = 3z1» after «z1 = 5cis(π/7)» ·
     «z2 = 15cis(π/7)», the same given typed twice) is recorded as its own row with the suite sentence
     «זה כבר קיים באיור — נוסף כנתון נפרד.»; muting or deleting the row that implied it leaves the relation in force. "Force" is exact,
-    never sampled: a value that only holds in the drawing (over a free number) is a new given and is recorded with no
-    note; a relation the exact core does not carry (Re/Im, a distance) is recorded with no note (a known gap of the
-    note's reach, #2790). A loaded session keeps its saved rows and says nothing.
-  - Sources: [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md), [ADR-CX-084](06d-decisions-complex.md#adr-cx-084), [ADR-CX-089](06d-decisions-complex.md#adr-cx-089)
+    never sampled, for a relation the exact core carries: a value that only holds in the drawing (over a free number) is a
+    new given and is recorded with no note. A line through the origin is exact (a direction), so «Re(z) = 0» after
+    «|z - 1| = |z + 1|» is held. A relation the exact core defers (Re/Im not through the origin, a distance, a circle) is
+    held when it changes nothing drawn at the first four configurations («Re(z) = 2» · «|z - 1| = |z - 3|», a circle
+    typed twice, «Re(z1) = 3» after «z1 = 3+4i»); one that cuts what was free is a new given (#2801). Either way the
+    restated condition moves nothing. A loaded session keeps its saved rows and says nothing.
+  - Sources: [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md), [ADR-CX-084](06d-decisions-complex.md#adr-cx-084), [ADR-CX-089](06d-decisions-complex.md#adr-cx-089), [ADR-CX-102](06d-decisions-complex.md#adr-cx-102)
 - **FR-CN-6 (Must)** — **The solutions of an equation on a bare letter ARE its indexed names.** `z³ = 8`
   plots z₁, z₂, z₃ (in argument order from the principal solution), every one a name the student can
   write in the next sentence. **The spelling does not matter**: `z³ − 8 = 0`, `z³ + 8 = 0`, `2z³ = 16`

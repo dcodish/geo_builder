@@ -42,7 +42,7 @@ import { linearize } from '../solve/logpolar';
 import { type ExpVec, eq as modEq, mul as modMul, pow as modPow } from '../value/modulus';
 import { type Angle, add as angAdd, scale as angScale, sub as angSub } from '../value/angle';
 import { isInt, rat } from '../value/rational';
-import { type Derived2, type FoldInput, type ResolvedSelection, type Untranslated, entailedBy, foldConstraints } from '../replay/derive2';
+import { type Derived2, type FoldInput, type ResolvedSelection, type Untranslated, entailedBy, exactDelta, foldConstraints } from '../replay/derive2';
 import { clearContentMemos, contentMemo } from '../value/contentMemo';
 
 /**
@@ -60,6 +60,50 @@ export const clearComplexCaches = (): void => clearContentMemos();
  */
 export const lineEntailed = (lines: readonly string[], raw: string): boolean =>
   entailedBy(lowerLines(lines), lowerLines([...lines, raw]));
+
+/** the configurations `lineHeld` compares: the first four, each at its own seed, as the app folds them */
+const HELD_SEEDS = [0, 1, 2, 3];
+
+/**
+ * #2801 ([ADR-CX-102](../../docs/06d-decisions-complex.md#adr-cx-102), ADR-W-200) — a line whose rows the
+ * exact solve DEFERS (a Re/Im/distance relation not through the origin, a circle), and which changes
+ * nothing that is drawn: the already-held notice for what {@link lineEntailed} cannot decide exactly.
+ *
+ * It holds when the exact solve is unchanged and every row the line adds is deferred (`exactDelta`), and
+ * at each of the first four configurations the figure after it has the same number of configurations and
+ * every number drawn where it was before
+ * (to 1e-7 of its size: the precision of the stage-3c polish, which is the numeric Jacobian's, ~1e-8). Since a continuum is drawn at the point nearest the sampled
+ * start (stage 3c, ADR-CX-101), a row that cuts the set moves that point at a generic start, so "nothing
+ * moved at four starts" is the stability property itself.
+ *
+ * This decides a NOTICE, never whether the row is recorded: under ADR-W-200 the line is its own row
+ * either way, so a sampled answer is safe here where it was not for ADR-CX-084's no-row verdict.
+ */
+export function lineHeld(lines: readonly string[], raw: string): boolean {
+  return exactDelta(lowerLines(lines), lowerLines([...lines, raw])) === 'deferred' && foldsUnmoved(lines, raw);
+}
+
+/**
+ * The already-held question the submit path asks, with ONE exact comparison: {@link lineEntailed} or {@link lineHeld}.
+ */
+export function lineAlreadyHeld(lines: readonly string[], raw: string): boolean {
+  const delta = exactDelta(lowerLines(lines), lowerLines([...lines, raw]));
+  return delta === 'entailed' || (delta === 'deferred' && foldsUnmoved(lines, raw));
+}
+
+function foldsUnmoved(lines: readonly string[], raw: string): boolean {
+  const after = [...lines, raw];
+  return HELD_SEEDS.every((s) => {
+    const d0 = deriveLines(lines, s, s);
+    const d1 = deriveLines(after, s, s);
+    if (d1.configCount !== d0.configCount || d1.unsatisfied.length > 0 || d1.contradiction !== null) return false;
+    const at = new Map(d1.points.map((p) => [p.name, p.z]));
+    return d0.points.every((p) => {
+      const w = at.get(p.name);
+      return w !== undefined && Math.hypot(w.re - p.z.re, w.im - p.z.im) <= 1e-7 * Math.max(1, Math.hypot(p.z.re, p.z.im));
+    });
+  });
+}
 
 /**
  * Fold the student's LINES through the v2 parser and the exact solver.
