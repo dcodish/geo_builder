@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — a plain .mjs tool script; there are no types to import and none are wanted.
-import { codeTable, findMessage, formatResult, INLINE_BASELINE, REPO_ROOT } from '../lib/find-message-core.mjs';
+import { codeTable, findMessage, formatResult, INLINE_BASELINE, loadTsTable, REPO_ROOT } from '../lib/find-message-core.mjs';
 
 /**
  * #2201 phase 4 — `npm run find-message`: one command finds any message, wherever it lives. Each lock is a place a
@@ -12,7 +13,8 @@ type Row = { file: string; key: string; value: string };
 type Result = { rows: Row[]; codes: { code: string; keys: string[] }[] };
 const find = (q: string) => findMessage(q) as Promise<Result>;
 
-// Each call scans every locale and source file, which outlasts vitest's 5 s default under a full suite's load.
+// The first call scans every locale and source file (≈ 0.3 s since #2917 read the TS tables without esbuild); the
+// limit is headroom for a loaded machine, not the scan's cost.
 describe('#2201 phase 4 — find-message', { timeout: 30_000 }, () => {
   it('a suite.* value is found once, in shell/ — never again under a product that merges it', async () => {
     const he = JSON.parse(readFileSync(join(REPO_ROOT, 'shell/locales/he.json'), 'utf8'));
@@ -60,6 +62,29 @@ describe('#2201 phase 4 — find-message', { timeout: 30_000 }, () => {
     expect((await find('errors.sameSpot')).codes.map((c) => c.code)).toContain('same-spot');
     // a code with no ruled sentence says so
     expect(formatResult(await find('lines-parallel'))).toContain('code lines-parallel → (the floor: no ruled sentence)');
+  });
+
+  it('a TS table is READ, never run: strings, concatenation, arrays and nested objects (#2917)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'geo-fm-'));
+    try {
+      writeFileSync(
+        join(dir, 'table.ts'),
+        [
+          "import { x } from './nowhere';",
+          "const he = { a: 'א' + 'ב', b: ['p', 'q'], c: { 'd.e': `f` } } as const;",
+          "const en: typeof he = { a: 'ab', b: [], c: {} };",
+          'export const i = x({ he, en });',
+        ].join('\n'),
+      );
+      // an unresolvable import is harmless: nothing is bundled or executed
+      expect(loadTsTable('table.ts', dir)).toEqual({ he: { a: 'אב', b: ['p', 'q'], c: { 'd.e': 'f' } }, en: { a: 'ab', b: [], c: {} } });
+
+      // a computed value is refused by its line, never guessed at
+      writeFileSync(join(dir, 'computed.ts'), ['const he = {', "  a: 'x',", '  b: make(),', '};', "const en = { a: 'x' };"].join('\n'));
+      expect(() => loadTsTable('computed.ts', dir)).toThrow(/computed\.ts:3 is not a plain table value/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('the code table is total: every EngineError variant has a row', () => {
