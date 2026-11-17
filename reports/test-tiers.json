@@ -97,7 +97,6 @@
     "src3d/__tests__/issue-827.test.ts",
     "src3d/__tests__/issue-863-sample-hoist.test.ts",
     "src3d/__tests__/issue-936-degenerate.test.ts",
-    "src3d/__tests__/letter-coords-new-point-2563.test.ts",
     "src3d/__tests__/member-drive.test.ts",
     "src3d/__tests__/plane-two-forms-2367.test.ts",
     "src3d/__tests__/rename-keeps-drawing-2894.test.ts",
