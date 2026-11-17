@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-10T14:04:46.444Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "תיבה",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "box",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מישור A'B'C'D' הוא x+4y-8z-142=0",
+      "cmds": [
+        {
+          "type": "claim",
+          "claim": {
+            "type": "plane-eq",
+            "ids": [
+              "A'",
+              "B'",
+              "C'",
+              "D'"
+            ],
+            "cx": 1,
+            "cy": 4,
+            "cz": -8,
+            "d": -142
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "B(0,7,6)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": 0,
+          "y": 7,
+          "z": 6
+        }
+      ]
+    },
+    {
+      "utterance": "משוואת הישר AB היא x = (0,7,6) + t(0,2,1)",
+      "cmds": [
+        {
+          "type": "line3",
+          "name": "AB",
+          "anchor": [
+            {
+              "k": 0,
+              "p": 0
+            },
+            {
+              "k": 7,
+              "p": 0
+            },
+            {
+              "k": 6,
+              "p": 0
+            }
+          ],
+          "dir": [
+            {
+              "k": 0,
+              "p": 0
+            },
+            {
+              "k": 2,
+              "p": 0
+            },
+            {
+              "k": 1,
+              "p": 0
+            }
+          ],
+          "src": "x = (0,7,6) + t·(0,2,1)"
+        },
+        {
+          "type": "on-line",
+          "id": "A",
+          "line": "AB"
+        },
+        {
+          "type": "on-line",
+          "id": "B",
+          "line": "AB"
+        }
+      ]
+    },
+    {
+      "utterance": "אורך המקצוע AB הוא 5√5",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 11.180339887498949,
+            "src": "5√5"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "שיעור ה-y של הקודקוד A שלילי",
+      "cmds": [
+        {
+          "type": "sign-given",
+          "id": "A",
+          "axis": "y",
+          "positive": false
+        }
+      ]
+    },
+    {
+      "utterance": "נתונה נקודה M(k,1,3), k ≥ 0",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "M",
+          "x": null,
+          "y": 1,
+          "z": 3,
+          "syms": [
+            "k",
+            null,
+            null
+          ],
+          "srcs": [
+            "k",
+            "1",
+            "3"
+          ]
+        },
+        {
+          "type": "param-bound",
+          "sym": "k",
+          "lo": 0,
+          "hi": null,
+          "loStrict": false,
+          "hiStrict": false
+        }
+      ]
+    },
+    {
+      "utterance": "גודל הזווית שבין הישר AB ובין הישר AM הוא 60",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "M"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "angle-seg-eq",
+            "a1": "A",
+            "b1": "B",
+            "a2": "A",
+            "b2": "M",
+            "deg": 60
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "2 ≤ k ≤ 9",
+      "cmds": [
+        {
+          "type": "param-bound",
+          "sym": "k",
+          "lo": 2,
+          "hi": 9,
+          "loStrict": false,
+          "hiStrict": false
+        }
+      ]
+    }
+  ]
+}

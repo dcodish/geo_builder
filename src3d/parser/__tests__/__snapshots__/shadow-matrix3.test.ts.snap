@@ -705,6 +705,36 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "t ≥ 0",
+    "winner": "paramBound",
+  },
+  {
+    "lang": "he",
+    "text": "t ≥ 0",
+    "winner": "paramBound",
+  },
+  {
+    "lang": "en",
+    "text": "2 ≤ t ≤ 5",
+    "winner": "paramBound",
+  },
+  {
+    "lang": "he",
+    "text": "2 ≤ t ≤ 5",
+    "winner": "paramBound",
+  },
+  {
+    "lang": "en",
+    "text": "t is greater than 2",
+    "winner": "paramBound",
+  },
+  {
+    "lang": "he",
+    "text": "t גדול מ-2",
+    "winner": "paramBound",
+  },
+  {
+    "lang": "en",
     "text": "base ABCD lies on a plane parallel to the xy-plane",
     "winner": "coordPlaneRel",
   },
