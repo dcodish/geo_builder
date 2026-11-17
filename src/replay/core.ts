@@ -692,6 +692,7 @@ export function clearReplayCaches(): void {
   sampledSourceIds = new WeakMap();
   sampleMemo = null;
   clearNarrowingMemo();
+  solutionCycleMemo.clear(); // #2831 (ADR-824): the show-another cycle is a replay memo like the rest
 }
 /**
  * #2890 ([ADR-830](docs/06-decisions.md#adr-830), ADR-W-210 phase 3) — THE SETTLED VIEW of a figure: everything the
@@ -4193,11 +4194,11 @@ function solutionCycleStep(
   const key = JSON.stringify(zeroed.map((f) => [f.enabled, f.cmd]));
   let entry = solutionCycleMemo.get(key);
   if (!entry) {
-    entry = { seed, members: [], next: 0, cycle: undefined, cut: 0 };
+    entry = { seed, members: [], next: 0, cycle: undefined, cut: 0, cells: [] };
     if (solutionCycleMemo.size >= SOLUTION_CYCLE_MEMO_SIZE) solutionCycleMemo.delete(solutionCycleMemo.keys().next().value!);
     solutionCycleMemo.set(key, entry);
   }
-  if (entry.cycle === undefined && !gatherSolutionCycle(entry, facts, axes, units)) return null;
+  if (!gatherSolutionCycle(entry, facts, axes, units)) return null;
   const cycle = entry.cycle;
   if (!cycle) return null;
   const at = cycle.findIndex((m) => m.idx === here);
@@ -4221,11 +4222,15 @@ interface CycleEntry {
   cycle: CycleMember[] | null | undefined;
   /** How many presses the clock cut while solving assignment `next`. */
   cut: number;
+  /** The work each press's gathering did, as ledger cells: what a later press is charged for the cycle it is served. */
+  cells: WorkCell[];
 }
 /**
  * The cycle per figure (docs/17 §7): keyed by the facts with every axis digit zeroed, for the last few figures, and
  * drawn at the seed of the press that began gathering it (the shape is determined, so the seed only places it; every
- * member and every press then keeps that seed). A press after the first pays nothing. A gathering its work limit cuts
+ * member and every press then keeps that seed). A press after the first is served the cycle and CHARGED the work its
+ * gathering cost, as every memo hit is (`chargeHit`, ADR-831 / ADR-W-210 invariant 5): a press counts what it would from
+ * empty caches, so a warm heap and a cold one count the same. A gathering its work limit cuts
  * keeps what it found and the next press resumes it (the odometer answers meanwhile, and may move the seed: the
  * cycle keeps its own), so on a figure whose solves are slow the clock decides when the cycle takes over.
  */
@@ -4234,10 +4239,22 @@ const SOLUTION_CYCLE_MEMO_SIZE = 8;
 
 /**
  * Gather (or resume gathering) the cycle into `entry` under a work limit of `units` (inside the press's own: whichever
- * is reached first stops it); `false` when the limit cut it.
+ * is reached first stops it); `false` when the limit cut it. First the press is charged what earlier presses gathered
+ * (it would have computed that from empty caches: the memo-hit rule, ADR-831), so a press served a whole cycle counts the
+ * cold gathering, and a resumed gathering counts its earlier stretches too; a charge the limit cannot afford is a cut.
  */
 function gatherSolutionCycle(entry: CycleEntry, facts: Fact[], axes: ChoiceAxis[], units: number): boolean {
-  return withSearchLimit(units, () => gatherSolutionCycleUnder(entry, facts, axes), 'solutionCycle').value;
+  return withSearchLimit(
+    units,
+    () => {
+      if (entry.cells.length > 0 && !chargeHit({ own: 0, deps: entry.cells, charged: 0 })) return false;
+      if (entry.cycle !== undefined) return true;
+      const { value, cell } = computeWithCell(() => gatherSolutionCycleUnder(entry, facts, axes));
+      entry.cells.push(cell);
+      return value;
+    },
+    'solutionCycle',
+  ).value;
 }
 function gatherSolutionCycleUnder(entry: CycleEntry, facts: Fact[], axes: ChoiceAxis[]): boolean {
   const seed = entry.seed;

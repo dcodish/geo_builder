@@ -685,7 +685,7 @@
 {"k":"corpus471.json#3/5|toggle#1","total":23518,"page":0,"prePaint":2445}
 {"k":"corpus471.json#3/5|toggle#2","total":0,"page":0,"prePaint":0}
 {"k":"corpus471.json#3/5|undo","total":0,"page":0,"prePaint":0}
-{"k":"corpus471.json#4/4|another#1","total":960,"page":0,"prePaint":960}
+{"k":"corpus471.json#4/4|another#1","total":1148,"page":0,"prePaint":1148}
 {"k":"corpus471.json#4/4|ask","total":0,"page":0,"prePaint":0}
 {"k":"corpus471.json#4/4|delete","total":871,"page":0,"prePaint":89}
 {"k":"corpus471.json#4/4|edit","total":6695,"page":0,"prePaint":1629}
@@ -3019,7 +3019,7 @@
 {"k":"minted-name-referred-2848.analytic.json|toggle#1","total":0,"page":0,"prePaint":0}
 {"k":"minted-name-referred-2848.analytic.json|toggle#2","total":0,"page":0,"prePaint":0}
 {"k":"minted-name-referred-2848.analytic.json|undo","total":0,"page":0,"prePaint":0}
-{"k":"operator-letters-on-side-2691.analytic.json|another#1","total":6255,"page":0,"prePaint":102}
+{"k":"operator-letters-on-side-2691.analytic.json|another#1","total":6998,"page":0,"prePaint":4771}
 {"k":"operator-letters-on-side-2691.analytic.json|ask","total":0,"page":0,"prePaint":0}
 {"k":"operator-letters-on-side-2691.analytic.json|delete","total":5004,"page":0,"prePaint":433}
 {"k":"operator-letters-on-side-2691.analytic.json|edit","total":49007,"page":0,"prePaint":10150}

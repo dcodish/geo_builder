@@ -19,6 +19,7 @@
  * pressing the button on it should not quietly redraw the same picture for ever.
  */
 import { derive, drawingConstructionOf } from '../engine/derive';
+import { BoundedStore } from '../engine/content';
 import { admittedToPool, canonicalSeed, drawableAt, drawnConfiguration, drawnSampleOf, looksTheSame, sameSolution, seedNumber, type Figure, type Seed } from '../engine/evaluate';
 
 /** How far to look. The same budget the drawable search uses, for the same reason. */
@@ -129,8 +130,9 @@ interface CycleMember {
  * The cycle per figure, so repeated presses gather it once (docs/17 §7): keyed by what `derive` reads, the last few
  * figures only. The cycle depends on nothing a press changes, which is what keeps it stable from press to press.
  */
-const cycleMemo = new Map<string, CycleMember[] | null>();
-const CYCLE_MEMO_SIZE = 8;
+// A `BoundedStore`: registered with `clearContentCaches`, so a new session (and the work meter's walk) starts it empty
+// like every other memo that outlives an action — a count never depends on a cycle an earlier session gathered.
+const cycleMemo = new BoundedStore<CycleMember[] | null>(8);
 function solutionCycle(
   lines: readonly string[],
   tries: number,
@@ -138,9 +140,9 @@ function solutionCycle(
   pins: Readonly<Record<number, readonly string[]>>,
 ): CycleMember[] | null {
   const key = JSON.stringify([lines, tries, seedNames, pins]);
-  if (cycleMemo.has(key)) return cycleMemo.get(key)!;
+  const hit = cycleMemo.get(key);
+  if (hit !== undefined) return hit;
   const cycle = gatherCycle(lines, tries, seedNames, pins);
-  if (cycleMemo.size >= CYCLE_MEMO_SIZE) cycleMemo.delete(cycleMemo.keys().next().value!);
   cycleMemo.set(key, cycle);
   return cycle;
 }
