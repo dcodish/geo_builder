@@ -1181,7 +1181,7 @@ p ↦ C + k(p − C) to the figure-lane points (`figureLanes3`) and to the plane
 equation plane, a typed line or a stated point, BEFORE the placement funnel, then re-seats the mixed points; the funnel
 then samples and clears the placement at the true size. **pivot**: anything else (two pinned points, a vector, pair or
 plane pin, a membership, a frame relation, a size-fixing pin). The given is minted only on a rescale lane and only when it
-reads figure-lane points (`scaleGivenReadsFigure3`: «אורך AP = 4» to a stated P is not a size). On the pivot lane it enters
+reads figure-lane points (`scaleGivenReadsFigure3`: «אורך AP = 4» to a stated P is not a size). Only the first size takes the pivot lane: once a magnitude states the size (`magnitudeSizeStated3`), a later one is checked. On the pivot lane it enters
 the pivot as its own pin with its arbiter, and a recorded given whose figure turns to the pivot lane is handed over at the
 outermost apply (`handScaleGivenToPivot3`), so the pivot reaches the size or the pin-owner guard names the statements.
 

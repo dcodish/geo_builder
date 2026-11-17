@@ -883,6 +883,24 @@ describe('#2792 — a size beside a fixed object off the origin holds, in both o
     for (const seed of [0, 3]) expect(near(at(seed, 'A'), at(seed, 'B'))).toBeCloseTo(4, 9);
   });
 
+  // the wave's parity gate (round #2914): a size already stated (here «AB = 2», demoted to a pin by «AE = 1» on its rider)
+  // makes a later wrong diagonal a VALUE to check, refused claim-refuted on that line alone — never a pivot pin whose
+  // failure names every pin owner («AE = 1» has nothing to do with AC). Both orders, both cube spellings.
+  for (const cube of ['קובייה ABCD', CUBE]) {
+    for (const order of [
+      ['AB = 2', 'E על AB', 'AE = 1'],
+      ['E על AB', 'AE = 1', 'AB = 2'],
+    ]) {
+      it(`${cube} · ${order.join(' · ')} · «AC = 10»: refused as a wrong value, naming no other statement`, () => {
+        build([cube, ...order]);
+        submit('AC = 10');
+        expect(state().lastError).toMatchObject({ code: 'claim-refuted' });
+        expect(state().lastError).not.toHaveProperty('others');
+        for (const seed of [0, 3]) expect(near(at(seed, 'A'), at(seed, 'B'))).toBeCloseTo(2, 9);
+      });
+    }
+  }
+
   it('«M אמצע AP» beside «P(1,2,3)» with «אורך AB = 4»: M is the midpoint of AP at every seed', () => {
     build([CUBE, 'P(1,2,3)', 'M אמצע AP', SIZE]);
     for (const seed of SEEDS8) {

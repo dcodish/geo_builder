@@ -11,7 +11,7 @@ import { freePlaneDef } from './freePlane';
 import { heldRadius3, radiusLengthCircle3 } from './freeCircle';
 import { definiteCircle3 } from './definiteCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
-import { handScaleGivenToPivot3, isScaleGivenClaim, magnitudeScalarPin3, scaleGivenLane3, scaleGivenReadsFigure3, scaleGivenSafe } from './scaleGiven';
+import { handScaleGivenToPivot3, isScaleGivenClaim, magnitudeScalarPin3, magnitudeSizeStated3, scaleGivenLane3, scaleGivenReadsFigure3, scaleGivenSafe } from './scaleGiven';
 import { nounAdmits, nounOfKind, resolveSolidSubject } from './solidSubject';
 import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, cyclicFixCommands, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_BASES, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
@@ -3273,9 +3273,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         next.determinations.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
       // #2792 (ADR-3D-521): minted where the router gives a rescale lane (origin or content), and only for a size read
       // off the figure's own points; where the figure's ties fix or couple its size (the 'pivot' lane) it enters the
-      // pivot below as its own pin, never the claim lane that refused it «size-on-solid»
+      // pivot below as its own pin, never the claim lane that refused it «size-on-solid». Only the FIRST size, as for the
+      // scale given (ADR-3D-171): once a magnitude already states the size (`magnitudeSizeStated3`: the scale given, or a
+      // demoted one, ADR-3D-393), a later magnitude is a value to CHECK — «אורך AC = 10» on a cube sized by «AB = 2» is
+      // claim-refuted, never a pin whose failure would blame every pin owner («AE = 1» included).
       const sizeToPivot =
-        isScaleGivenClaim(cmd.claim) && c.scaleGivens.length === 0 && scaleGivenLane3(c)?.lane === 'pivot' && scaleGivenReadsFigure3(c, cmd.claim);
+        isScaleGivenClaim(cmd.claim) &&
+        c.scaleGivens.length === 0 &&
+        !magnitudeSizeStated3(c) &&
+        scaleGivenLane3(c)?.lane === 'pivot' &&
+        scaleGivenReadsFigure3(c, cmd.claim);
       if (
         isScaleGivenClaim(cmd.claim) &&
         scaleGivenSafe(c) &&
