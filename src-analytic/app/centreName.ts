@@ -12,6 +12,12 @@
  * A TAKEN letter is answered in the popover like any other: its holder, quoted, and the swap offer. The
  * swap gives the centre the asked-for letter and the old holder the letter the centre would otherwise
  * have got — one commit, so one «בטל» undoes it.
+ *
+ * #2851 (ADR-AG-465) — THE SAME FLOW ON A SHOWN FOCUS. Operator, 2026-11-12: *"make the focus points clickable so he
+ * can nail them on the diagram"*. A focus mark that carries the book's letter is an offer; its popover opens on that
+ * letter, and the letter confirmed records `focusSentenceOf`'s sentence («F1 מוקד ימני של האליפסה», «F מוקד הפרבולה»)
+ * through the same gate. A taken letter quotes its holder and offers the swap, as the centre's does (operator ruling
+ * 2026-11-12 on PR #2856, after his 2026-09-18 «always allow switching names of nodes»): the same `decideOfferSwap`.
  */
 import { decideSubmit, type SubmitVerdict } from './submit';
 import { activeOf, activePins } from './active';
@@ -20,6 +26,7 @@ import { centreSentenceOf, freeLetter } from '../engine/crossings';
 import { derive, type Derivation } from '../engine/derive';
 import type { InputError } from '../store/useAnalyticStore';
 import type { LetterRenameResult, LetterSwapResult } from '../../shell/frame/letterOffer';
+import { focusSentenceOf } from './conicMarks';
 
 export type CentreNameVerdict =
   | { kind: 'record'; verdict: Extract<SubmitVerdict, { kind: 'record' }> }
@@ -29,9 +36,17 @@ export type CentreNameVerdict =
 const currentOf = (state: RenameState): Derivation =>
   derive(activeOf(state.lines, state.disabled), state.seed, state.seedNames ?? {}, activePins(state.hosts ?? {}, state.lines.length, state.disabled));
 
-/** The sentence the gate accepted, or why not — the one path both the name and the swap go through. */
-function recordable(offerId: string, letter: string, state: RenameState, current: Derivation): CentreNameVerdict {
-  const sentence = centreSentenceOf(current.figure, offerId, letter, current.construction);
+/** An offer's own composer: the sentence a click on it records under `letter`, or null when the offer went stale. */
+type SentenceOf = (letter: string, current: Derivation) => string | null;
+
+const centreSentence =
+  (offerId: string): SentenceOf =>
+  (letter, current) =>
+    centreSentenceOf(current.figure, offerId, letter, current.construction);
+
+/** The sentence the gate accepted, or why not — the one path the name and the swap, centre and focus, go through. */
+function recordable(sentenceOf: SentenceOf, letter: string, state: RenameState, current: Derivation): CentreNameVerdict {
+  const sentence = sentenceOf(letter, current);
   // the offer went stale under the popover (the centre was named meanwhile) — say so, never guess a circle
   if (!sentence) return { kind: 'refused', error: { key: 'already-named', detail: letter } };
   const v = decideSubmit(sentence, activeOf(state.lines, state.disabled), state.seed, current);
@@ -45,13 +60,22 @@ function recordable(offerId: string, letter: string, state: RenameState, current
  * (a bad letter; a taken one, WITH its holder, so the popover can quote it and offer the swap).
  */
 export function decideCentreName(offerId: string, toRaw: string, state: RenameState, current: Derivation = currentOf(state)): CentreNameVerdict {
+  return decideOfferName(centreSentence(offerId), toRaw, state, current);
+}
+
+/** #2851 — the letter `toRaw` for the focus offer `offerId` (`ConicMark.offer.id`): the same decision, the focus's sentence. */
+export function decideFocusName(offerId: string, toRaw: string, state: RenameState, current: Derivation = currentOf(state)): CentreNameVerdict {
+  return decideOfferName((letter, cur) => focusSentenceOf(cur, offerId, letter), toRaw, state, current);
+}
+
+function decideOfferName(sentenceOf: SentenceOf, toRaw: string, state: RenameState, current: Derivation): CentreNameVerdict {
   const to = normalizePointName(toRaw);
   if (!to) return { kind: 'refused', error: { key: 'rename-bad-name', detail: toRaw.trim() } };
   if (nameInUse(state, current, to)) {
     const holder = letterHolder(state, to, current);
     return { kind: 'refused', error: { key: 'rename-taken', detail: to, ...(holder ? { holder: holder.text } : {}) }, ...(holder ? { holder } : {}) };
   }
-  return recordable(offerId, to, state, current);
+  return recordable(sentenceOf, to, state, current);
 }
 
 /** The letter the centre is offered under before the student types one — the automatic letter (the
@@ -69,15 +93,50 @@ export function decideCentreSwap(
   state: RenameState,
   current: Derivation = currentOf(state),
 ): { kind: 'apply'; commit: RelabelCommit } | { kind: 'refused'; error: InputError } {
+  return decideOfferSwap(centreSentence(offerId), taken, state, current);
+}
+
+/** #2851 — THE SWAP on a focus offer: the focus takes `taken`, its holder the automatic letter. The centre's swap. */
+export function decideFocusSwap(
+  offerId: string,
+  taken: string,
+  state: RenameState,
+  current: Derivation = currentOf(state),
+): { kind: 'apply'; commit: RelabelCommit } | { kind: 'refused'; error: InputError } {
+  return decideOfferSwap((letter, cur) => focusSentenceOf(cur, offerId, letter), taken, state, current);
+}
+
+function decideOfferSwap(
+  sentenceOf: SentenceOf,
+  taken: string,
+  state: RenameState,
+  current: Derivation,
+): { kind: 'apply'; commit: RelabelCommit } | { kind: 'refused'; error: InputError } {
   const auto = centreLabelOf(current);
   if (nameInUse(state, current, auto)) return { kind: 'refused', error: { key: 'rename-taken', detail: auto } };
-  const first = recordable(offerId, auto, state, current);
+  const first = recordable(sentenceOf, auto, state, current);
   if (first.kind !== 'record') return { kind: 'refused', error: first.error };
   const named: RenameState = { ...state, lines: [...state.lines, first.verdict.line] };
   const sv = decideSwap(auto, taken, named);
   if (sv.kind === 'refused') return sv;
   const { lines, queries, spokenFor, seedNames, segStyle, curveStyle, annotations } = sv;
   return { kind: 'apply', commit: { lines, queries, spokenFor, seedNames, segStyle, curveStyle, ...(annotations ? { annotations } : {}) } };
+}
+
+/**
+ * #2851 (ADR-AG-465) — the popover's callbacks for one focus offer: the centre's two, with the focus's sentence. A taken
+ * letter quotes its holder and offers the swap (operator ruling 2026-11-12 on PR #2856).
+ */
+export function focusPopoverOps(
+  offerId: string,
+  state: RenameState,
+  actions: CentreActions,
+  current: Derivation = currentOf(state),
+): { onRename: (from: string, to: string) => LetterRenameResult; onSwap: (a: string, b: string) => LetterSwapResult } {
+  return {
+    onRename: (_from, to) => applyCentreName(decideFocusName(offerId, to, state, current), actions),
+    onSwap: (_a, b) => applyCentreSwap(decideFocusSwap(offerId, b, state, current), actions),
+  };
 }
 
 /** The store actions the dispatch writes through — the real ones, so the locks drive what App drives. */
@@ -96,7 +155,7 @@ export interface CentreActions {
 /** What a centre-swap decided: the commit, or the refusal. */
 export type CentreSwapVerdict = ReturnType<typeof decideCentreSwap>;
 
-/** Apply a centre's name decided elsewhere (the worker, #2890), in the popover's vocabulary. */
+/** Apply a centre's or a focus's name decided elsewhere (the worker, #2890), in the popover's vocabulary: recorded, a taken letter answered IN the popover, or the error line. */
 export function applyCentreName(v: CentreNameVerdict, actions: CentreActions): LetterRenameResult {
   if (v.kind === 'record') {
     actions.record(v.verdict);
@@ -107,7 +166,7 @@ export function applyCentreName(v: CentreNameVerdict, actions: CentreActions): L
   return { ok: false, reason: v.error.key };
 }
 
-/** Apply a centre swap decided elsewhere (the worker, #2890). */
+/** Apply a centre or focus swap decided elsewhere (the worker, #2890): one commit, or the error line. */
 export function applyCentreSwap(v: CentreSwapVerdict, actions: CentreActions): LetterSwapResult {
   if (v.kind === 'refused') {
     actions.setError(v.error);

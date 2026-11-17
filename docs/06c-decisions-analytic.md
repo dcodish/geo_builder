@@ -14828,6 +14828,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 
 ## ADR-AG-375 — One annotation channel for what a student asks to see on the figure (#1863, #1218; for #1211, #1121, #1752)
 
+> **⚠ Amended by [ADR-AG-465](#adr-ag-465)** (2026-11-12, operator ruling on #2851): §5's #1752 line is built — a shown focus is clickable and records the typed sentence through `decideSubmit`. It is not a facet: the click states a sentence, so nothing is added to the map.
+
 **Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic), branch `feat/1863-conic-annotations`, one PR with [ADR-AG-376](#adr-ag-376) and [ADR-AG-377](#adr-ag-377). LADDER stage: none (display state; no fold, solve or sampling change).
 
 **Requirements:** [02c](02c-requirements-analytic.md) R221 (new), R20 (its ⚠ line rewritten). · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip".
@@ -14855,6 +14857,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 **Behaviour change for a student:** none by itself; its first surface is ADR-AG-376.
 
 ## ADR-AG-376 — The conic chip: nothing → directrix → focus → both, values only when the givens determine them (#1863, #1218)
+
+> **⚠ Amended by [ADR-AG-465](#adr-ag-465)** (2026-11-12, #2851): a shown focus mark no student point stands on is an offer — a click names it as a point. The marks are otherwise unchanged; without a click nothing changes.
 
 **Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic), branch `feat/1863-conic-annotations`. **Amends** [ADR-AG-353](#adr-ag-353) (the unlettered focus it left undrawn is now drawn on request). LADDER stage: none.
 
@@ -16936,3 +16940,27 @@ The lines named beside the refused one are the rows whose lengths take part (3-D
 **Ports (ADR-W-157).** 2-D and 3-D have no conics (X2), so there is nothing to port.
 
 **Behaviour change for a student:** «משוואת האליפסה היא (x-2)^2/25+(y+1)^2/9=1» after «אליפסה» fixes that ellipse, and «משוואת הפרבולה היא …» after «פרבולה» fixes that parabola; with two ellipses the tool asks which. «אליפסה», «נתונה אליפסה» and "an ellipse" draw an ellipse whose centre and both semi-axes are free, and «הציגו תצורה אחרת» moves and reshapes it. «פרבולה», «נתונה פרבולה» and "a parabola" draw a parabola whose vertex and size are free and which opens right, left, up or down, and «הציגו תצורה אחרת» moves and turns it. Before, each went to the AI.
+
+## ADR-AG-465 — A shown focus is clickable: the click names it with the sentence a student could type (#2851)
+
+**Date:** 2026-11-12 · **Status:** accepted · feature (P2, analytic), fix round #2855 stream B, branch `feat/2851-clickable-foci`. **Amends** [ADR-AG-375](#adr-ag-375) §5 (the #1752 line, built) and [ADR-AG-376](#adr-ag-376) (a lettered focus mark is an offer). LADDER stage: none (a canvas offer; the sentence it records goes through the existing `focus-of` lowering).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R221 (a shown focus is clickable) · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip" (the focus offer).
+
+**Operator report (2026-11-12):** *"I'm trying to create a triangle where the base is F1 and F2. drawing the ellipse and pressing show מוקדים shows where F1 and F2 are but when i try to write the triangle using F1 and F2 it doesnt recognize these points."* **Ruling, the same day:** *"I think that when a users wants to show the focus, we should make the focus points clickable so he can nail them on the diagram. if he doesnt, the behavior is like today."*
+
+**Measured at pickup** (`caf619a5`, `decideSubmit` → `derive`): `7x^2+9y^2=63` with the chip on «focus» draws F₁(√2, 0), F₂(−√2, 0) inside `analytic-roles`, which is `pointerEvents="none"`; «משולש F1F2D» then builds on two new free points. The typed «F1 מוקד ימני של האליפסה» · «F2 מוקד שמאלי של האליפסה» records and lands on the foci, as do «…עליון/תחתון…» on `9x^2+7y^2=63` and «F מוקד הפרבולה» on `y^2=8x`.
+
+**Class.** Every letter the chip shows (an ellipse's F₁/F₂, a parabola's F) was decoration: nothing joined the mark to a point a later sentence can use. Analytic only: 2-D and 3-D have no conic chip (exception family X2).
+
+**Decision.**
+1. **The offer** (`app/conicMarks.ts`). A shown focus mark that no student point stands on gets `offer: { id, letter, title }`: `id` = `focus:<k>:<curve>` (k in `ellipseFoci`'s order, 0 the right / upper end), `letter` the book letter in plain digits («F1», as typed), `title` the sentence a click records with it (the hover, as a centre ring's `<title>`). When the book letter is held by a student's point elsewhere, the mark still writes no letter (sr-07) but is offered all the same: the popover opens on that letter and offers the swap (3).
+2. **One composer** (`focusSentenceOf(d, offerId, letter)`, the focus's `centreSentenceOf`): «<letter> מוקד הפרבולה», or «<letter> מוקד <side> של האליפסה» with the side the focus sits on (`ימני`/`שמאלי` on an x-major ellipse, `עליון`/`תחתון` on a y-major one, read against the centre, so a translated ellipse (ADR-AG-455) is right too). The words are `parser/conicRoleWords.ts`'s. Null on a stale offer, or when the figure holds two curves of that kind: the grammar names THE parabola / THE ellipse, so such a figure offers nothing rather than a click that is always refused.
+3. **One path with typing** (`app/centreName.ts`): `decideFocusName` / `focusPopoverOps` are the centre's decision with the focus's composer — `normalizePointName`, `nameInUse` (a taken letter answered with its holder quoted), then `decideSubmit`, recorded by `commitRecord`. **A taken letter offers the swap** (operator ruling 2026-11-12 on PR #2856, answering the session's question; after his 2026-09-18 «always allow switching names of nodes»): `decideFocusSwap` is the centre's swap (`decideOfferSwap`, one function for both offers) — the focus is recorded under the automatic letter, then `decideSwap` exchanges it with the asked-for letter, one commit, one «בטל». The popover's `label` is that automatic letter, as the centre's is. **Landed after [ADR-AG-478](#adr-ag-478) (2026-11-16 integration):** the decision runs in the analytic worker exactly as the centre's — `focusName` / `focusSwap` letter requests (`opsAn.letter`), applied by `applyCentreName` / `applyCentreSwap` — so the page never solves for a focus either; `focusPopoverOps` stays the in-process pair the locks drive.
+4. **The canvas.** `scene.roles.foci` carries the offer; `Figure.tsx` draws the offer ring around each offered focus — the crossing / centre offer's dashed ring, one `OFFER_RING` constant for every offer (operator 2026-11-12, playing T30: *"we should make the focuses round like we have for points that we want users to click. its not clear from the gui that they are clickable"*) in `analytic-focus-offers` (`data-noexport`, before the points, only when `onFocus` is given); the mark itself stays in the decoration layer. `App.tsx` opens the shared `LetterPopover` (title «מוקד»), which takes a new optional `initialValue` (shell, product-free): it opens on «F1», selected.
+5. **After the click** the focus is the student's point: the mark yields (sr-07, unchanged), the row is the typed sentence, hiding the chip does not move it, and «משולש F1F2D» uses it. Without a click nothing changes.
+6. **Found in round #2855 (same path): a letter TYPED «F1» could not be renamed or swapped.** `app/rename.ts`'s token pattern matched an indexed id in its glyph spelling (`F₁`) only, so «F1(1,1)» held no occurrence of `F₁`, the faithfulness proof failed and every swap or rename of it answered `swap-unsafe` — the swap this ADR offers among them. The pattern now matches every spelling the grammar reads as that one name (`F₁`, `F1`, `F_1`, `F_{1}`, ADR-AG-398) and keys each occurrence back to the id; a bare `F` beside `F1` is still its own token. The rewrite writes the id's glyph («F₁»), as every rename already did. Unit: `issue-1631-analytic-swap.test.ts` (#2851 block).
+
+**Locks.** `src-analytic/__tests__/issue-2851-focus-offer.test.ts` (pipeline-lock: the click path — the operator's sequence through the scene, the rendered hit targets, the popover callback over the real store; y-major; parabola; another letter; a taken letter; the book letter held by «F1(1,1)» → the swap, the rows re-typed in order, one undo; two ellipses). Unit: `round-2678-conic-display.test.tsx` (`focusSentenceOf`), `shell/__tests__/letter-popover-1631.test.tsx` (`initialValue`). Fixture `ellipse-foci-triangle-2851` (the rows the clicks record).
+
+**Behaviour change for a student:** in analytic, with a conic's foci shown, clicking a focus opens the letter box on «F1» / «F2» / «F»; confirming adds the row «F1 מוקד ימני של האליפסה» (or «F מוקד הפרבולה») and the focus becomes a point later lines can use. A letter already in use offers to swap the two letters. Without a click, nothing changes.

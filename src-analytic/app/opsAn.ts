@@ -28,7 +28,7 @@ import { activeOf, activePins } from './active';
 import { decideEditHost, decideSubmit, decideToggle } from './submit';
 import { anotherConfiguration } from './another';
 import { decideRename, decideSwap, type RenameState } from './rename';
-import { decideCentreName, decideCentreSwap } from './centreName';
+import { decideCentreName, decideCentreSwap, decideFocusName, decideFocusSwap } from './centreName';
 import { auditLoadedLines } from './loadAudit';
 import { existingNamesOf, judgeAnswer } from './fallback';
 import { readAfterPaint, readFigure, type ReaderInputs } from './figureReaders';
@@ -130,7 +130,10 @@ export type LetterRequest =
   | { kind: 'rename'; from: string; to: string }
   | { kind: 'swap'; a: string; b: string }
   | { kind: 'centreName'; offerId: string; to: string }
-  | { kind: 'centreSwap'; offerId: string; taken: string };
+  | { kind: 'centreSwap'; offerId: string; taken: string }
+  // #2851 (ADR-AG-465): a shown focus's popover — the centre's two, with the focus's sentence
+  | { kind: 'focusName'; offerId: string; to: string }
+  | { kind: 'focusSwap'; offerId: string; taken: string };
 
 const stateDerivation = (state: RenameState): Derivation =>
   derive(activeOf(state.lines, state.disabled), state.seed, state.seedNames ?? {}, activePins(state.hosts ?? {}, state.lines.length, state.disabled));
@@ -158,6 +161,10 @@ export const opsAn = {
           return { kind: 'centreName' as const, verdict: decideCentreName(request.offerId, request.to, state, current) };
         case 'centreSwap':
           return { kind: 'centreSwap' as const, verdict: decideCentreSwap(request.offerId, request.taken, state, current) };
+        case 'focusName':
+          return { kind: 'centreName' as const, verdict: decideFocusName(request.offerId, request.to, state, current) };
+        case 'focusSwap':
+          return { kind: 'centreSwap' as const, verdict: decideFocusSwap(request.offerId, request.taken, state, current) };
       }
     }, round),
   audit: ({ lines, disabled, hosts, round }: { lines: readonly string[]; disabled: readonly number[]; hosts: Readonly<Record<number, readonly string[]>> } & Round) =>

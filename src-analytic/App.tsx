@@ -609,6 +609,8 @@ export function App() {
   const [pick, setPick] = useState<{ items: Measurable[]; letter: string | null; segment?: { key: string; name: string }; curve?: CurveMenuTarget; x: number; y: number; seq: number } | null>(null);
   /** #1598: a clicked unnamed circle CENTRE — the offer it is, and where (viewport px) to open the letter popover. */
   const [centrePick, setCentrePick] = useState<{ offerId: string; x: number; y: number; seq: number } | null>(null);
+  /** #2851 (ADR-AG-465): the shown focus whose letter popover is open — the offer id and the book letter it opens on. */
+  const [focusPick, setFocusPick] = useState<{ offerId: string; letter: string; x: number; y: number; seq: number } | null>(null);
   /** The input zone — «שנה אות» focuses its box after filling it (the shared InputArea takes no ref). */
   const inputZoneRef = useRef<HTMLDivElement | null>(null);
 
@@ -1471,19 +1473,20 @@ export function App() {
       await figureOfStore();
       return { ok: v.kind === 'apply' };
     },
-    /** #1598 — the centre offer's popover: the letter typed records the sentence the typed path would; #2890: decided in the worker. */
-    centreOps: (offerId: string) => {
+    /** #1598 — the centre offer's popover: the letter typed records the sentence the typed path would; #2890: decided in the worker.
+     *  #2851 (ADR-AG-465): a shown focus's popover is the same two operations on the focus's sentence. */
+    centreOps: (offerId: string, offer: 'centre' | 'focus' = 'centre') => {
       const actions = { record: (v: Parameters<typeof commitRecord>[0]) => commitRecord(v, jobStoreAn().recordLine, t), applySwap: jobStoreAn().applySwap, setError };
       return {
         onRename: async (_from: string, to: string, round = 1): Promise<LetterRenameResult> => {
-          const r = await letterInWorker({ kind: 'centreName', offerId, to }, sessionOf(useAnalyticStore.getState()), round);
+          const r = await letterInWorker({ kind: offer === 'centre' ? 'centreName' : 'focusName', offerId, to }, sessionOf(useAnalyticStore.getState()), round);
           if (isNotDecided(r)) return renameStopped(r);
           const out = r.kind === 'centreName' ? applyCentreName(r.verdict, actions) : { ok: false as const, reason: 'rename-bad-name' };
           await figureOfStore();
           return out;
         },
         onSwap: async (_a: string, b: string, round = 1): Promise<LetterSwapResult> => {
-          const r = await letterInWorker({ kind: 'centreSwap', offerId, taken: b }, sessionOf(useAnalyticStore.getState()), round);
+          const r = await letterInWorker({ kind: offer === 'centre' ? 'centreSwap' : 'focusSwap', offerId, taken: b }, sessionOf(useAnalyticStore.getState()), round);
           if (isNotDecided(r)) return swapStopped(r);
           const out = r.kind === 'centreSwap' ? applyCentreSwap(r.verdict, actions) : { ok: false as const };
           await figureOfStore();
@@ -2014,6 +2017,8 @@ export function App() {
               }}
               /* #1598 — an unnamed circle's centre opens the letter popover: the student picks the letter. */
               onCentre={(offerId, screen) => setCentrePick({ offerId, x: screen.x, y: screen.y, seq: Date.now() })}
+              /* #2851 — a shown focus opens the same popover, on the book's letter: the student nails it as a point. */
+              onFocus={(offer, screen) => setFocusPick({ offerId: offer.id, letter: offer.letter, x: screen.x, y: screen.y, seq: Date.now() })}
               onCrossing={(sentence) => {
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
                 // and what the student is told. This only asks whether jumping the configuration
@@ -2709,6 +2714,47 @@ export function App() {
               }}
               onClose={() => setCentrePick(null)}
               testId="centre-popover"
+            />
+          </div>
+        );
+      })()}
+
+      {/*
+        NAME A SHOWN FOCUS (#2851, ADR-AG-465) — the centre's popover on a focus mark, opened on the book's letter. The
+        letter confirmed records the sentence a student could type («F1 מוקד ימני של האליפסה», `focusSentenceOf`); a taken
+        letter quotes its holder and offers the swap, as the centre's does (`label` is the letter the holder would take).
+      */}
+      {focusPick && (() => {
+        // decided in the worker on the latest render, as the centre's (#2890, #2874)
+        const offerId = focusPick.offerId;
+        const ops = {
+          onRename: (from: string, to: string, round?: number) => workAn.run(() => live.current.centreOps(offerId, 'focus').onRename(from, to, round)),
+          onSwap: (a: string, b: string, round?: number) => workAn.run(() => live.current.centreOps(offerId, 'focus').onSwap(a, b, round)),
+        };
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
+            <LetterPopover
+              key={focusPick.seq}
+              x={focusPick.x}
+              y={focusPick.y}
+              bounds={{ width: window.innerWidth, height: window.innerHeight }}
+              title={t('focusTitle')}
+              label={centreLabelOf(d)}
+              initialValue={focusPick.letter}
+              onRename={ops.onRename}
+              onSwap={ops.onSwap}
+              strings={{
+                placeholder: t('letterPlaceholder'),
+                apply: t('letterApply'),
+                taken: t('letterTaken'),
+                bad: t('letterBad'),
+                takenBy: t('letterTakenBy'),
+                swapLetters: t('letterSwap'),
+                notDecided: t('suite.notDecided.message'),
+                keepSearching: t('suite.notDecided.continue'),
+              }}
+              onClose={() => setFocusPick(null)}
+              testId="focus-popover"
             />
           </div>
         );
