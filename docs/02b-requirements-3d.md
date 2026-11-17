@@ -117,6 +117,9 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   givens allow agrees on it, and an «או» row lists every option. A point the givens fix up to two discrete roots that
   no seed happens to draw («A'K : A'C = 2 : 3» on a free A′) reads «A'(6, 0, 6) או (6/5, 24/5, 6/5)», never one root
   as fact; the drawing and «הציגו תצורה אחרת» are unchanged by this.
+  **Only configurations that keep every stated given are evidence** (#2916, [ADR-3D-533](06b-decisions-3d.md#adr-3d-533)): a
+  configuration that breaks a stated sign, side, angle bound or mutual position («שיעור ה-y של הקודקוד A שלילי», «k חיובי») is
+  not one the givens allow, so no value in the values panel or the ask box is read off it — 2-D's and analytic's rule.
   An **anchored** figure (an absolute object, a coordinate, or a stated vector fixes it in space) that the givens
   still let turn about a pinned point or axis, or resize, is turned to a new angle and resized by «הציגו
   תצורה אחרת»; the first drawing may be tilted (operator 2026-10-23, #2378: *"Each press turns the cube about
@@ -532,9 +535,18 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   them until |AB| = 5 holds, and keeps holding on «הציגו תצורה אחרת». What was not stated keeps varying; a
   conflicting magnitude is refused, naming the statement it conflicts with.
   - Sources: ADR-3D-260, #1311.
-- **FR-VC-2 (Must)** — Support **at most one symbolic parameter** in a vector expression, pinned by a
-  given through root-finding. Two unknowns in one expression is a known boundary.
-  - Sources: #301, superseded by #1551.
+- **FR-VC-2 (Must)** — **A vector expression may carry several letters, one per term (degree 1), in any
+  alphabet.** Over points already placed («EM = a·EA + b·EC» after the exam's «BM = u/6 − 2v/3 + w/12») the letters are
+  solved with the figure's free shape: a relation that holds for every shape gives seed-stable letters and the data panel
+  prints them (**a = 2/3, b = 1/6**); one that holds only for some shapes reshapes the box (and moves riders) so that it
+  holds, the rest staying free for «הציגו תצורה אחרת»; one that no shape satisfies is refused by name, «הנתונים סותרים זה
+  את זה — אין גוף שמקיים את «EB' = a·EA + b·EC» יחד עם שאר הנתונים». Over a new point («EN = a·EA + b·EC») each letter is
+  a free number: N lies free in the plane EAC, the panel reads «a = ?», «b = ?» and writes EN in a and b. A letter
+  carried by one term only («EM = aEA + 1/6EC») is the same case. «ab·EA», «a²EA» stay refused (FR-VC-3). **A letter is
+  one number wherever it is written**: two vector relations that give a letter two values («EM = a·EA + b·EC» then
+  «EM = b·EA + a·EC» on the exam) are refused naming the second; a letter written in a vector relation and in a placed
+  point's coordinates («AC = a·AB + b·AD» · «B(a,1,2)», in either order) has the same value in both (FR-VC-2b).
+  - Sources: #301, [ADR-3D-472](06b-decisions-3d.md#adr-3d-472) (Am. 1: one reader with ADR-3D-488), #1551 (operator rulings 2026-08-16, 2026-09-29, 2026-10-05, 2026-10-13).
 - **FR-VC-2a (Must)** — **A POWER in a coordinate component is supported where the solver can pin it,
   and refused BY NAME where it cannot.** On a figure carrying a solid, `C(p², p, 0)` builds and the
   relation `x = y²` holds. With no solid it is refused by name, never accepted with the power discarded.

@@ -1697,6 +1697,17 @@ a 2-D slice sees both others as siblings; every registered product is a usable v
 whole tree; `productOf` resolves by longest prefix, not list order; an unknown viewpoint THROWS rather
 than silently classifying everything as sibling; and the partition is total under every viewpoint.
 
+**Amendment 1 (2026-11-16) — a PR is measured against its base BRANCH, never a frozen base sha.** Found landing PR #2828
+(a 3-D-only change): every lane's guard failed listing `src/`, `src-analytic/`, `shell/` and `server/` files the PR never
+touched, and the `changes` job ran all four lanes. Cause: CI passed `--base github.event.pull_request.base.sha`. On a
+`pull_request` run HEAD is GitHub's test merge of the PR into the base's CURRENT tip, while that sha was frozen at an
+earlier event (here `19da6b89`, many `main` commits back), so `base...HEAD` counted every commit `main` gained since as the
+PR's own change — the PR's real diff from its merge-base with `main` is 19 `src3d/` files, 1 `fixtures3/`, 3 docs.
+Decision: the four sibling steps pass `--base origin/<base_ref>` (a push still passes `github.event.before`), and the
+`changes` job classifies from `git merge-base origin/<base_ref> HEAD` (no usable base still runs every lane). The guard
+itself is unchanged: `base...HEAD` from the base branch is exactly the PR's net change, and an unreachable base still
+stops the run. **Requirements:** none (internal: CI) · **Design:** none (internal) · LADDER stage: none.
+
 ### ADR-W-037 — the tier artifact carries shared state and nothing else (#812)
 
 **What happened.** Every parallel PR in a fix round conflicted against `main` on exactly one file —
