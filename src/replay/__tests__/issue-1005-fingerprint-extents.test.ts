@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { replay, searchResample } from '@/replay/core';
+import { findValidConfig, meetsRequirements, replay, searchAnotherView, searchResample } from '@/replay/core';
 import { factsOf } from '@/__tests__/scenario-pipeline';
 import type { Derived } from '@/replay/core';
 
@@ -55,5 +55,63 @@ describe('#1005 — the shape fingerprint reads circle radii, not named points a
 
   it('a figure with NO circle is untouched — the point-only fingerprint still decides', () => {
     expect(searchResample(factsOf(['משולש ABC']), 0)).not.toBeNull();
+  });
+});
+
+/**
+ * #2831 ([ADR-824](../../../docs/06-decisions.md#adr-824), [ADR-W-206](../../../docs/06w-decisions-workspace.md#adr-w-206)) —
+ * the fingerprint is also what makes two drawings ONE SOLUTION: the operator, 2026-11-12 (*"2831 - A"*), a mirror image
+ * of a drawing is the same solution placed differently, and «הציגו תצורה אחרת» shows new solutions first. On a figure
+ * whose shape is determined, `searchAnotherView` walks the solution cycle: the axis assignments grouped by fingerprint,
+ * interleaved round-robin from the all-default one.
+ */
+describe('#2831 — a determined shape shows its new solutions before another placement', () => {
+  /** The labelled shape: every distance between two named points, normalised — mirror- and turn-invariant. */
+  const shapeOf = (fig: Derived) => {
+    const ids = [...fig.positions.keys()].filter((id) => /^[A-Z]$/.test(id)).sort();
+    const ds: number[] = [];
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) ds.push(Math.hypot(fig.positions.get(ids[i])!.x - fig.positions.get(ids[j])!.x, fig.positions.get(ids[i])!.y - fig.positions.get(ids[j])!.y));
+    const m = Math.max(...ds);
+    return ds.map((x) => (x / m).toFixed(3)).join(',');
+  };
+  /** The shape of the first drawing and of each of `n` presses. */
+  const pressShapes = (lines: string[], n: number) => {
+    // The drawing a commit shows (the store settles every line through the config search).
+    let cur = findValidConfig(factsOf(lines)) ?? { facts: factsOf(lines), seed: 0 };
+    const out = [shapeOf(replay(cur.facts, cur.seed))];
+    for (let k = 0; k < n; k++) {
+      const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);
+      expect(next, `press ${k + 1} finds another configuration`).not.toBeNull();
+      expect(meetsRequirements(next!.facts, next!.seed), `press ${k + 1} meets every given`).toBe(true);
+      cur = next!;
+      out.push(shapeOf(replay(cur.facts, cur.seed)));
+    }
+    return out;
+  };
+  const TANGENT = ['נתון מעגל O שרדיוסו 5', 'מנקודה A הוציאו משיק למעגל בנקודה B', 'OA = 13'];
+
+  it('the tangent point is a placement, C on OA a solution: the second solution is press 1, not press 2', () => {
+    const s = pressShapes([...TANGENT, 'C על הקטע OA', 'BC = 4.8'], 3);
+    expect(new Set(s).size).toBe(2);
+    expect(s[1]).not.toBe(s[0]);
+    expect(s[2]).toBe(s[0]);
+    expect(s[3]).toBe(s[1]);
+  });
+
+  it('a figure whose only alternative is a mirror still reaches it: the tangent from A touches at either point', () => {
+    const facts = factsOf(TANGENT);
+    const next = searchAnotherView(facts, 0, undefined, Number.POSITIVE_INFINITY);
+    expect(next).not.toBeNull();
+    const [b0, b1] = [replay(facts, 0).positions.get('B')!, replay(next!.facts, next!.seed).positions.get('B')!];
+    expect(shapeOf(replay(next!.facts, next!.seed))).toBe(shapeOf(replay(facts, 0)));
+    // Another placement, not the drawing on the screen: B is reflected across OA (same shape, the point moved).
+    const moved = Math.hypot(b0.x - b1.x, b0.y - b1.y) > 1e-6 || next!.seed !== 0;
+    expect(moved).toBe(true);
+  });
+
+  it('control: a right triangle with two valid seats still alternates them (AB = 6 · BC = 8)', () => {
+    const s = pressShapes(['משולש ישר זווית ABC', 'AB = 6', 'BC = 8'], 3);
+    expect(new Set(s).size).toBe(2);
+    for (let k = 1; k < s.length; k++) expect(s[k]).not.toBe(s[k - 1]);
   });
 });

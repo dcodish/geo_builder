@@ -2368,3 +2368,7 @@ over all four (ADR-041).
 ### `lengths-clearer-reason-2894` — a length the figure already forces, stated otherwise, is refused with 3-D's reason, naming the statement it contradicts (#2894, ADR-835)
 
 **Guards against:** the 2-D refusal of a length conflict the metric closure decides drifting from 3-D's sentence (ADR-3D-495) or losing the earlier statement it names: «ריבוע ABCD · AB = 3 · AC = 10», a rectangle's diagonal, an equilateral side, a diameter longer than 2r, «ABCD ריבוע» over two unequal sides — each driven through the submit gate and read word for word; the control (a square with only its diagonal) commits.
+
+### `new-solutions-first-tangent-right-triangle-2831` — «משיק מ-A בנקודה B · OA = 13 · משולש ישר זווית ABD · BD = 6»: the three triangles come on presses 0, 1 and 2 (#2831, ADR-824)
+
+**Guards against:** «הציגו תצורה אחרת» showing a mirror image of the drawing on the screen before a solution not yet shown (the odometer turned the tangent-point and side axes, both mirrors, faster than the right-angle seat: the triangles came on presses 0, 2 and 4). **Asserts** presses 0–2 are three different shapes, there is no fourth, and presses 3–5 repeat them in order, as other placements.
