@@ -29,6 +29,12 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2916 (ADR-3D-533) — the ADR-3D-032 exam box, the issue's sequence: «A.y < 0» is stated, and a knowledge sample at seed + 3041
+  // broke it. The admission is asserted in engine/__tests__/engine3.test.ts; the ask/panel agreement by the #2367 sweep over this corpus.
+  'exam-box-sign-2916.geo3.json': [
+    'תיבה', "מישור A'B'C'D' הוא x+4y-8z-142=0", 'B(0,7,6)', 'משוואת הישר AB היא x = (0,7,6) + t(0,2,1)', 'אורך המקצוע AB הוא 5√5',
+    'שיעור ה-y של הקודקוד A שלילי', 'נתונה נקודה M(k,1,3), k חיובי', 'גודל הזווית שבין הישר AB ובין הישר AM הוא 60',
+  ],
   // #2563 (ADR-3D-489) — the operator's sequence: a NEW point with letter coordinates, k shared with B and p a new letter.
   // The class is asserted in letter-coords-new-point-2563.test.ts; this is the build + drift + load net.
   'letter-coords-new-point-2563.geo3.json': ['פירמידה SABCD', 'B(2t, t, k)', 'N(k,p,3)'],

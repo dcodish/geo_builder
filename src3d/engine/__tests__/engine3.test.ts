@@ -4,10 +4,12 @@
  * not move existing points).
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { applyCommand3, coordLetterExprs3, freeDims, freeSolidRun3, renameIds3, resolveUnletteredSolid3, unstatedPyramidReading3 } from '../apply';
 import { claimResidual3, pinLettersAt3, residualHolds3, verifyClaim } from '../claims';
-import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, type QuadPreference3 } from '../evaluate';
+import { admittedConfiguration3, evaluate3, firstSatisfyingSeed3, freeDofCount3, knowledgeSamples3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, statedLetterValue3, type QuadPreference3 } from '../evaluate';
 import { commandStatesCircle3, concaveSeatVertices3, quadDrawnDegenerate, statedConcyclic3 } from '../baseShapes';
 import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
@@ -917,5 +919,45 @@ describe('#2785 (ADR-3D-488) — a coordinate letter written twice is one pin sy
     expect(pinLettersAt3(c, res).t).toBeCloseTo(1, 9);
     expect(pinLettersAt3(c, res).k).toBeCloseTo(-8, 9);
     expect(c.claims.filter((cl) => cl.type === 'coords-eq').every((cl) => verifyClaim(cl, c, 0))).toBe(true);
+  });
+});
+
+/**
+ * #2916 (ADR-3D-533) — ONLY ADMITTED CONFIGURATIONS ARE KNOWLEDGE. The ADR-3D-032 exam box states «A.y < 0»; on `main` the
+ * read-back sample at seed + 3041 put A at y > 0, and the ask lane's plane row lost its A′ anchor. The commands are the
+ * fixture's own (`fixtures3/exam-box-sign-2916.geo3.json`), applied by the reducer.
+ */
+describe('#2916 — the knowledge samples admit only configurations that keep every stated given', () => {
+  const file = JSON.parse(readFileSync(join(__dirname, '..', '..', '..', 'fixtures3', 'exam-box-sign-2916.geo3.json'), 'utf8')) as { facts: { cmds: Command3[] }[] };
+  const c = build(...file.facts.flatMap((f) => f.cmds));
+  const RB = { readback: true } as const;
+  const seedsOf = (s: number) => [s, s + 1013, s + 2027, s + 3041]; // the ask lane's
+
+  it('the predicate refuses a configuration whose stated sign is broken, and admits the one that keeps it', () => {
+    const r = resolve3(c, 0, { solvedFrame: true });
+    expect(r.positions.get('A')!.y).toBeLessThan(0);
+    expect(admittedConfiguration3(c, r)).toBe(true);
+    const flipped = new Map(r.positions);
+    const a = r.positions.get('A')!;
+    flipped.set('A', v3(a.x, -a.y, a.z));
+    expect(admittedConfiguration3(c, { ...r, positions: flipped })).toBe(false);
+    // ...and the letter sign «k חיובי» is read by the verifier's own reader
+    expect(statedLetterValue3(c, r, 'k')).toBeGreaterThan(0);
+  });
+
+  it('every read-back sample keeps «A.y < 0» and «k > 0», and the gauge keeps its witnesses (seeds 0 and 23: where main broke)', () => {
+    for (const s of [0, 23]) {
+      const samples = knowledgeSamples3(c, seedsOf(s), RB);
+      expect(samples.length, `seed ${s}`).toBeGreaterThanOrEqual(4);
+      for (const r of samples) {
+        expect(r.positions.get('A')!.y, `seed ${s}`).toBeLessThan(0);
+        expect(admittedConfiguration3(c, r), `seed ${s}`).toBe(true);
+      }
+    }
+  }, 120_000);
+
+  it('a figure that states no selector is sampled exactly as before (no admission, no reserve seed)', () => {
+    const cube = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
+    expect(knowledgeSamples3(cube, [0, 1013])).toHaveLength(2);
   });
 });

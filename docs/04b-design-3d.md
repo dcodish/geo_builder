@@ -575,6 +575,16 @@ over the unflagged pool (the drawing, `solutions`, «הציגו תצורה אח�
 pools (`pivotStageMemo3`) and stands the pick on the k-th reached root. Claims, narrowing and the drawing keep the plain
 samples.
 
+**Only admitted configurations are knowledge** (#2916, [ADR-3D-533](06b-decisions-3d.md#adr-3d-533)). `knowledgeSamples3`
+keeps a sample only when `admittedConfiguration3` holds on it: every coordinate sign (`signGivens`), named-component sign
+(`componentSignsHold`), letter sign (`paramSigns`, read by `statedLetterValue3`, the store verifier's own reader), plane side
+(`memberships[].side`) and hard requirement (`requirementsHoldOn3`, the seed search's own judgement), at the verifier's
+tolerances. A base seed left with no admitted sample is replaced by its reserve walk (s + k·6089), at most one reserve seed
+per base seed in all, so the gauge keeps its witnesses and the work is bounded. A figure that states no selector
+(`hasStatedSelectors3`) is sampled as before at no cost; one with no admitted sample anywhere breaks a given at its own
+drawing (its row is red), and its plain samples stand. Every lane reads the admitted set: ask, panel, claims, narrowing,
+preferences.
+
 ### Who may introduce a point (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253); #1310, [ADR-3D-397](06b-decisions-3d.md#adr-3d-397))
 
 A **carrier** («נסמן: AB = u») never introduces its own subject in its own lane (`v7-t1`). The bare segment

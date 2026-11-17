@@ -48,7 +48,7 @@ import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engi
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../lexicon/marks3';
-import { checkInSpan, clearEngineCaches3, componentValue, crossingOnInk3, declaredRingCrossed3, evaluate3, searchSeed3, type SeedResume3, type SeedSearch3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, clearEngineCaches3, statedLetterValue3, crossingOnInk3, declaredRingCrossed3, evaluate3, searchSeed3, type SeedResume3, type SeedSearch3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
@@ -2434,14 +2434,9 @@ function deriveCore3(
         // reported `sign-unsatisfiable` against a figure that honours it. Measured: that is exactly what
         // happened the moment apply started accepting the sign. `ratioSymbols` is published by the code
         // that picks the root, so the two can never disagree about which value was used.
-        const bound = c.partialNames.find((b) => b.sym === cmd.sym);
-        const v =
-          resolved.param?.name === cmd.sym
-            ? resolved.param.value
-            : (resolved.pivot?.pinSymbols?.[cmd.sym] ??
-               resolved.ratioSymbols?.[cmd.sym] ??
-               resolved.freeSyms.get(cmd.sym) ?? // #2684 (ADR-3D-421): a free-vector system's letter
-               (bound ? componentValue(c, bound.target, bound.axis, (id) => positions.get(id), resolved.freeVectors) : undefined)); // #1188: a free vector's component
+        // #2684 (ADR-3D-421): a free-vector system's letter; #1188: a free vector's component. #2916 (ADR-3D-533): one
+        // reader, shared with the knowledge admission
+        const v = statedLetterValue3(c, resolved, cmd.sym);
         if (v === undefined || !Number.isFinite(v) || (cmd.positive ? v <= 1e-9 : v >= -1e-9)) {
           status[f.id] = { code: 'sign-unsatisfiable', id: cmd.sym };
           break;
